@@ -10,4 +10,4 @@ May import `shared-kernel`. Zero framework dependencies.
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: transition-table primitive only. The full engine arrives in Phase 2._

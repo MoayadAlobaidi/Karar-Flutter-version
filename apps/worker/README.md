@@ -10,4 +10,4 @@ May import `modules/*/public-api.ts` and `packages/*`. **Contains no duplicated 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: boots a standalone application context over the (empty) module graph and heartbeats. `pnpm --filter @karar/worker dev`._

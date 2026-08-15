@@ -1,0 +1,5 @@
+# apps/mobile is a Flutter project, not a pnpm package — excluded explicitly.
+packages:
+  - 'apps/*'
+  - '!apps/mobile'
+  - 'packages/*'

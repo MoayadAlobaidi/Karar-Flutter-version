@@ -20,15 +20,15 @@ coverage/
 .pnpm-store/
 
 # Flutter / Dart
-app/.dart_tool/
-app/.packages
-app/build/
-app/.flutter-plugins
-app/.flutter-plugins-dependencies
-app/ios/Pods/
-app/ios/.symlinks/
-app/android/.gradle/
-app/android/local.properties
+apps/mobile/.dart_tool/
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
 *.iml
 
 # Prisma
@@ -63,3 +63,7 @@ tmp/
 docker/data/
 minio-data/
 postgres-data/
+
+# User backup artifacts — never commit (scoped: only the known root archive,
+# so legitimate zip fixtures elsewhere are not silently ignored)
+/Archive.zip

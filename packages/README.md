@@ -8,4 +8,4 @@ Importable by anything. **These packages import nothing but each other and `shar
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: package scaffolds exist with placeholder types and tests. Implementations arrive with their phases._

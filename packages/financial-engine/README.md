@@ -10,4 +10,4 @@ May import `shared-kernel`. **Imports nothing else.**
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: package boundary and build only. The engine arrives in Phase 2._

@@ -8,4 +8,4 @@ May import `modules/*/public-api.ts` and `packages/*`. Contains no domain logic.
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: boots NestJS on Fastify and serves `/healthz` and `/readyz` placeholders only. `pnpm --filter @karar/api dev`._

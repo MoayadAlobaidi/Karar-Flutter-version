@@ -8,6 +8,14 @@ Adding a capability adds a folder under `lib/features/` and a route. **Nothing e
 
 Consumes the generated Dart SDK. Never talks to the database.
 
+## Run
+
+```
+flutter pub get
+flutter run
+flutter test
+```
+
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: placeholder shell only (`lib/main.dart`). No features, no SDK yet._

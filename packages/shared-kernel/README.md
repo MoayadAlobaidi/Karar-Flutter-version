@@ -12,4 +12,4 @@ Importable by everything. Imports nothing.
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: the nine declarations exist as types in `src/index.ts`. Semantics arrive in Phase 2._

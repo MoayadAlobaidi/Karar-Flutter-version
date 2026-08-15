@@ -10,4 +10,4 @@ May import `shared-kernel`. Zero framework dependencies (architecture test 17).
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: package boundary and build only. Policy resolution arrives in Phase 2._

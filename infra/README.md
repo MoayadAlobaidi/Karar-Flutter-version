@@ -8,4 +8,4 @@ Referenced by deployment pipelines. Imported by nothing.
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: committable structure only — no `.tf` files, nothing provisioned. Provider modules arrive at Phase 17._

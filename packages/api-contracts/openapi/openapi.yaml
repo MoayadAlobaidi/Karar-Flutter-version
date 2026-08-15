@@ -1,0 +1,10 @@
+# Authored by hand, never generated from code (ADR-0009).
+# Phase 1: info block only. Endpoints are added here before they are implemented.
+openapi: 3.1.0
+info:
+  title: Karar API
+  version: 0.0.0
+  description: >-
+    Contract-first API surface for the Karar platform. Empty until the first
+    endpoint is designed; SDKs are generated from this file and committed.
+paths: {}
