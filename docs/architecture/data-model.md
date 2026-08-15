@@ -59,6 +59,17 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `readmodel` | Projections | Projection builders only | Enabled |
 | `audit` | Append-only records | Append-only writer | Enabled; UPDATE/DELETE grants revoked |
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
+| `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
+
+**As implemented in Phase 2** — the `platform` and `audit` schemas exist (five migrations, `0001` through `0021`, owned by `karar_migrator`), holding five tables. Full six-field lifecycle declarations: [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) and [`modules/audit/MODULE.md`](../../modules/audit/MODULE.md). RLS policies activate with the first tenant-scoped domain tables in Phase 3 (architecture test 22); `readmodel` and `sealed` arrive with their phases.
+
+| Table | Purpose | Classification |
+|---|---|---|
+| `platform.schema_migrations` | Migration bookkeeping — the database's verifiable history | `INTERNAL` |
+| `platform.outbox_events` | Transactional outbox rows until published or dead-lettered | mirrors the envelope; at most `CONFIDENTIAL` in Phase 2 |
+| `platform.event_consumer_receipts` | Consumer idempotency — `(consumer, event id)` receipts | `INTERNAL` |
+| `platform.jobs` | Background jobs with lease, retry, and dead-letter semantics | mirrors the payload; at most `CONFIDENTIAL` in Phase 2 |
+| `audit.audit_events` | Append-only accountability record | `CONFIDENTIAL` |
 
 ## 4. Columns every tenant-owned table carries
 
@@ -68,6 +79,8 @@ tenant_id    UUID        NOT NULL,          -- RLS predicate
 created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 updated_at   TIMESTAMPTZ NOT NULL
 ```
+
+The Phase 2 `platform` and `audit` tables are platform infrastructure, not tenant-owned domain tables — they carry opaque tenant *references* where an envelope or audit row concerns one, never the RLS-predicate `tenant_id` column above. The first tenant-owned tables arrive in Phase 3 and carry all four columns.
 
 ## 5. Pinning — records with legal consequence
 
@@ -183,6 +196,8 @@ Domain and application code persist and pass the opaque reference; only the infr
 
 Append-only, enforced by **both** revoked grants and a trigger that raises on UPDATE and DELETE **even for the table owner**. Two mechanisms because the legacy's audit table itself carries the schema's one flagged anomaly — RLS FORCEd but not enabled — and no guard detected that shape.
 
+**Implemented in Phase 2:** `audit.audit_events` (migration `0010_audit_events.sql`) grants `karar_app` `SELECT, INSERT` only, and its statement-level trigger raises on UPDATE, DELETE, and TRUNCATE including for the owning `karar_migrator` role — both mechanisms are proven by integration tests, owner path included. The writer is the audit module ([`modules/audit/MODULE.md`](../../modules/audit/MODULE.md)), whose metadata guard keeps payloads and secrets out of `before/after_metadata`.
+
 Audited: every mutation; every **staff read of a customer record, including reads returning nothing**; every capability availability change; every policy and entity change; and **every attempted sealed access, successful or refused**.
 
 Staff-read auditing is inherited from legacy finding AZ5, which the legacy's own worklist ranks as *"the only item on the whole list that gets permanently worse every day it stays open"* — unrecorded events cannot be recovered later.
@@ -209,6 +224,6 @@ See [`tenancy.md`](tenancy.md).
 
 ## 13. Migrations
 
-Forward-only SQL, each with a rollback script, each run in CI **as the restricted application role** rather than an owner. A migration requiring elevated privilege fails on a laptop instead of in production — a control the legacy records as having genuinely caught a defective migration.
+Forward-only SQL, applied by the platform's real runner as of Phase 2 (`packages/platform/src/db/migrations.ts`; policy in [`db/migrations/README.md`](../../packages/platform/db/migrations/README.md)): strict filename order, one transaction per file, sha256 checksums in `platform.schema_migrations` with hard failure on drift, and a mandatory `-- rollback:` recovery block per file. The runner connects **as the restricted `karar_migrator` role** — never a superuser; `karar_app` gets minimal per-table DML and no DDL. A migration requiring elevated privilege fails on a laptop instead of in production — a control the legacy records as having genuinely caught a defective migration. Runner semantics and the from-zero flow are summarized in [`backend.md` §6](backend.md).
 
 **Environments must be distinguishable at boot.** The legacy's development and production databases carry byte-identical connection URLs, differing only in a username suffix, and its production service ran against development for four days. Karar asserts environment identity at startup and refuses to boot on a mismatch.

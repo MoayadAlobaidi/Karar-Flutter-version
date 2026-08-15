@@ -1,6 +1,6 @@
 # Karar Documentation
 
-**Phase 1 — foundation in progress.** Executable monorepo and tooling only; no product capability is implemented. Current status lives in the [root README status block](../README.md#status).
+**Phase 2 — platform and data foundation in progress.** Backend platform foundation (config, database, audit, events, jobs, observability); no product capability is implemented. Current status lives in the [root README status block](../README.md#status).
 
 ---
 
@@ -97,6 +97,7 @@ Reproducible from the documentation alone — a Phase 0 exit criterion.
 | [phases/](phases/README.md) | Phase reports and the phase-end update ritual |
 | [phases/PHASE_TEMPLATE](phases/PHASE_TEMPLATE.md) | The required structure of every phase report |
 | [phases/phase-01](phases/phase-01.md) | Phase 1 report — foundation |
+| [phases/phase-02](phases/phase-02.md) | Phase 2 report — platform and data foundation (in progress) |
 | [MODULE_TEMPLATE](MODULE_TEMPLATE.md) | Required for every module |
 | [phase-0-completion](phase-0-completion.md) | Phase 0 exit-criteria verification |
 | [phase-05-consolidation](phase-05-consolidation.md) | Phase 0.5 consolidation record — D1–D6 resolved, portability canonical |

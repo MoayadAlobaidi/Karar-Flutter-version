@@ -196,6 +196,8 @@ A country deployment must not be trapped because documents assume GCS URLs, even
 
 Provider-specific identifiers live inside infrastructure implementations and configuration. **This is a precondition for ever migrating a deployment between providers** — see §9 and [`data-model.md` §9.1](data-model.md).
 
+**Implemented as of Phase 2** (`packages/platform/src/config/refs.ts`, `src/keys/refs.ts`): the opaque scheme is `karar-ref:<kind>:<id>`, with branded types and parsers for `SecretRef`, `KeyRef`, `ObjectRef`, `DatabaseProfileRef`, and `DeploymentProfileRef`, plus `KeyVersionRef` (`karar-ref:key-version:<keyId>@v<N>`) for the wrap/rotation provenance ADR-0017 requires. **Types and validation exist today; resolution is deliberately future** — the active profile's adapters resolve a ref to a provider resource when their deployment phases arrive. Everything persisted from Phase 2 on is already in the portable form.
+
 ## 7. Provider capability verification
 
 Not every cloud offers every service in every region, and:
@@ -243,6 +245,8 @@ The opaque references of §6 and the migrations-from-zero rule of [`database-por
 ## 10. Observability stays portable
 
 Application code emits **logs, metrics, and traces through OpenTelemetry-compatible instrumentation** — provider-neutral by construction. The deployment profile routes them to Google Cloud Operations, an AWS monitoring stack, or another approved platform **without rewriting business code**.
+
+Implemented locally as of Phase 2: platform code depends on `@opentelemetry/api` only, the apps initialize the OTel SDK at their composition roots, and telemetry exports over OTLP to the Compose `otel-collector` — the same seam a cloud profile later points at its provider's backend ([`backend.md` §11](backend.md)).
 
 ## 11. Application config is not cloud config
 

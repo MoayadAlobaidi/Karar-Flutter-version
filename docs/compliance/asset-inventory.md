@@ -1,6 +1,8 @@
 # Asset Inventory
 
-**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.1 · **Date:** 2026-08-15 · **Review:** every phase gate
+**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** every phase gate
+
+**v0.2 (2026-08-15, Phase 2):** platform database objects added (the Phase 2 schemas and tables); all other rows re-checked, unchanged.
 
 Current, real assets only — a Phase-1 project has few, and listing imagined ones would corrupt the register's honesty. Future assets appear as `PLANNED` with the phase that creates them. Serves ISO 27002 5.9 and the ISMS scope statement.
 
@@ -16,6 +18,7 @@ Current, real assets only — a Phase-1 project has few, and listing imagined on
 | GitHub organization/account (repo admin, settings, Actions) | Account | Security Owner | SECRET (credentials) | GitHub | MFA + settings verification pending (EV-007) |
 | Developer workstation (one, held by the person carrying all roles) | Hardware | Operations Owner | Up to SECRET (local `.env`, session credentials) | Off-premises (remote work) | Controls per acceptable-use-policy: FDE, screen lock, updates. No personal data on it by rule |
 | Local development environment (Compose: PostgreSQL, Redis, MinIO, OpenTelemetry collector) | Tooling | Engineering Owner | INTERNAL | Developer workstation | Synthetic data only (KAR-CTL-038) |
+| Platform database objects (Phase 2): schemas `platform` and `audit`; tables `platform.schema_migrations` (INTERNAL), `audit.audit_events` (CONFIDENTIAL), `platform.outbox_events` (CONFIDENTIAL ceiling), `platform.event_consumer_receipts` (INTERNAL), `platform.jobs` (CONFIDENTIAL ceiling) | Information / schema | Engineering Owner | CONFIDENTIAL (declared ceiling; contents synthetic today) | **Local only** — instantiated from migrations in the Compose PostgreSQL on the developer workstation and in ephemeral CI databases; deployed nowhere | Definition lives in-repo (`packages/platform/db/migrations`, rebuildable from zero — KAR-CTL-054); per-table classification, retention, and erasure declared in `packages/platform/db/DATA_LIFECYCLE.md` and `modules/audit/MODULE.md`. Classification is the declared ceiling: only synthetic/test data exists in any instance (KAR-CTL-038). Access split `karar_migrator`/`karar_app` (KAR-CTL-053); audit table append-only (KAR-CTL-056) |
 | Package-registry accounts (npm, pub.dev — consumption only) | Account | Engineering Owner | SECRET (credentials, if/when publishing tokens exist) | Vendor | Read/consume today; no packages published |
 | Compliance evidence (register + interim artifacts) | Information | Compliance Owner | INTERNAL | In-repo register; interim store per evidence-handling.md | Never contains customer data, credentials, or raw logs |
 

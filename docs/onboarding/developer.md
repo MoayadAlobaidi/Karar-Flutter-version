@@ -72,10 +72,13 @@ If you are building a sealed capability: split metadata from payload so **lifecy
 make doctor      # verify your toolchain matches the pins
 make bootstrap   # install workspace and Flutter dependencies
 make dev         # bring up local infra; prints how to start each entrypoint
+pnpm build       # compile once — the db CLI runs from dist
+make db-create   # bootstrap roles, the local database, and grants (first run)
+make db-migrate  # apply migrations as karar_migrator
 make verify      # run the full local check suite
 ```
 
-`make help` lists everything else. **Local development has zero cloud dependency** — no GCP account, no API key, no shared database. In Phase 1 the running system is infrastructure plus health endpoints; product capabilities do not exist yet (Q39).
+`make help` lists everything else. **Local development has zero cloud dependency** — no GCP account, no API key, no shared database. Without the two db steps the API boots but `/readyz` honestly answers 503 (Q40). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` first (Q48). As of Phase 2 the running system is infrastructure, real readiness, and the platform foundation; product capabilities do not exist yet (Q39).
 
 ### 7. What do I need installed?
 
@@ -179,9 +182,9 @@ See [`../testing/architecture-tests.md`](../testing/architecture-tests.md) and t
 
 ### 22. How do I add a database table?
 
-Forward-only SQL migration with a rollback script, run in CI **as the restricted application role** — a migration needing elevated privilege fails on a laptop instead of in production.
+One forward-only migration file in `packages/platform/db/migrations/`, named `NNNN_description.sql` with the next free number **in your workstream's range** (`0001`–`0009` platform core, `0010`–`0019` audit, `0020`–`0029` eventing/jobs; later ranges assigned by the phase lead). In the same file: grant `karar_app` the **minimal DML the table needs** (audit tables `SELECT, INSERT` only; never `GRANT ALL`), and end with the mandatory `-- rollback:` recovery block — the runner rejects files without one. Then `pnpm --filter @karar/platform db:migrate && db:verify`. Canonical rules: [`packages/platform/db/migrations/README.md`](../../packages/platform/db/migrations/README.md).
 
-The table needs: `tenant_id` if tenant-owned, RLS enabled **and** FORCEd, and a full **lifecycle declaration** in `MODULE.md` — subject relationship, purpose, classification, retention, export treatment, erasure strategy ([ADR-0026](../adr/0026-data-lifecycle.md)) — plus pinning columns if it carries legal consequence. The SQL is **provider-neutral PostgreSQL**: no cloud-specific database feature without the documented exception in [`../architecture/database-portability.md` §3](../architecture/database-portability.md).
+The table also needs: `tenant_id` if tenant-owned, RLS enabled **and** FORCEd (activates Phase 3), and a full **lifecycle declaration** — in `MODULE.md` for module-owned tables, in [`DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) for platform tables no module owns ([ADR-0026](../adr/0026-data-lifecycle.md)) — plus pinning columns if it carries legal consequence. The SQL is **provider-neutral PostgreSQL**: no cloud-specific database feature without the documented exception in [`../architecture/database-portability.md` §3](../architecture/database-portability.md).
 
 ### 23. How do I add an external dependency?
 
@@ -269,8 +272,58 @@ Not a new adapter — the one `PostgresPersistenceAdapter` serves every approved
 
 ### 38. What is the current phase?
 
-Phase 1 — foundation, in progress. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-01.md`](../phases/phase-01.md).
+Phase 2 — platform and data foundation, in progress. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-02.md`](../phases/phase-02.md).
 
 ### 39. What is explicitly out of scope right now?
 
-Product capabilities. Phase 1 delivers the executable foundation only — no budgets, transactions, Zakat, AI, identity, or migrations, and no cloud is provisioned. The full out-of-scope list is in [`../phases/phase-01.md`](../phases/phase-01.md).
+Product capabilities. Phase 2 delivers the backend platform foundation — configuration, database, audit, events/outbox/jobs, observability — with no budgets, transactions, Zakat, AI, identity, or tenancy, and no cloud provisioned. The full out-of-scope list is in [`../phases/phase-02.md`](../phases/phase-02.md).
+
+---
+
+## The platform foundation
+
+Added in Phase 2, when the database, eventing, and observability foundations became real.
+
+### 40. How do migrations work — and how do I create a database from zero?
+
+Plain SQL files in `packages/platform/db/migrations/`, applied in strict filename order by the platform runner, each in its own transaction, recorded in `platform.schema_migrations` with a sha256 checksum; drift on an applied file fails hard. Any database — first, second, or scratch — is created identically, never by copying another:
+
+```bash
+KARAR_DB_NAME=<name> pnpm --filter @karar/platform db:create   # roles, database, grants
+KARAR_DB_NAME=<name> pnpm --filter @karar/platform db:migrate  # full history as karar_migrator
+KARAR_DB_NAME=<name> pnpm --filter @karar/platform db:verify   # expect: status clean
+```
+
+Canonical: [`packages/platform/db/migrations/README.md`](../../packages/platform/db/migrations/README.md); the portability rule it satisfies is [`../architecture/database-portability.md` §6](../architecture/database-portability.md).
+
+### 41. Which database role may do what?
+
+Three roles, least privilege each ([`../architecture/backend.md` §6](../architecture/backend.md)): the compose **superuser** is used only by `db:create`/`db:reset-local` to create roles, databases, and grants; **`karar_migrator`** owns the `platform`/`audit` schemas and applies migrations — restricted (`NOSUPERUSER`, `NOBYPASSRLS`), so a migration needing elevated privilege fails on a laptop; **`karar_app`** is the runtime role — per-table minimal DML granted by each table's own migration, no DDL, no `BYPASSRLS`, and deliberately no DELETE on outbox/jobs/audit tables. The api and worker connect as `karar_app`, the runner as `karar_migrator`, and nothing runs as superuser.
+
+### 42. Events vs jobs — which do I use?
+
+**Events are facts; jobs are work.** An event records that something *happened* — past tense, immutable, published through the outbox, consumed by whoever the catalogue allows. A job *requests* that something be done — it retries, exactly one worker holds its lease at a time, and it ends in an outcome (`succeeded`/`failed_retryable`/`dead`). If it can fail and be retried, it is a job; if it is true forever once said, it is an event. Publishing a command as an event is RPC-over-bus ([`../architecture/event-governance.md` §5](../architecture/event-governance.md), [ADR-0013](../adr/0013-worker-entrypoint.md)).
+
+### 43. How does the outbox guarantee delivery?
+
+The envelope is inserted in **the same transaction** as the state change (`enqueueInTransaction`), so neither commits without the other. The relay claims rows with `FOR UPDATE SKIP LOCKED`, publishes, and marks `published_at` only after the publisher succeeded; failures retry with exponential backoff and dead-letter at `max_attempts`, counted by an alertable metric. Delivery is **at-least-once**, made safe by consumer receipts: `withIdempotency` records `(consumer, eventId)` in the consumer's own transaction, so a duplicate is a no-op. ([`../architecture/backend.md` §8](../architecture/backend.md), [ADR-0012](../adr/0012-event-bus-outbox.md))
+
+### 44. How do I add an event safely?
+
+Catalogue first: declare it in `packages/api-contracts/events/catalogue.json` — name, `schemaVersion`, owner module, classification, `allowedConsumers`, retention, payload rule and schema. `SEALED` events carry identifiers and status only, no exemption exists; `HIGHLY_SENSITIVE_FINANCIAL` beyond identifier-only needs a `payloadExemption`. Then publish through `makeEnvelope` + `enqueueInTransaction` (the payload is validated against the catalogue and the classification rules at publish time), and each consumer must be named in `allowedConsumers` — the bus refuses an undeclared subscription. Canonical rules: [`../architecture/event-governance.md`](../architecture/event-governance.md).
+
+### 45. How do I add a job handler?
+
+Register it by `job_type` in the worker's `JobHandlerRegistry` (duplicate registration throws): `registry.register('my.job.type', handler)`. A handler receives the claimed job and a context with `heartbeat()` for lease extension on long work, and it **calls a use case** — a job cannot make a transition a human path could not ([ADR-0013](../adr/0013-worker-entrypoint.md)). Enqueue with `queue.enqueue({ jobType, payload, idempotencyKey?, … })`; the same `(jobType, idempotencyKey)` enqueued twice returns the first job. The poller converts handler errors into job outcomes — throw, never log-and-swallow.
+
+### 46. Where are logs, metrics, and traces configured — and how is redaction enforced?
+
+In `packages/platform/src/observability`: pino JSON logs and `@opentelemetry/api` helpers; the apps initialize the OTel SDK at their composition roots (`apps/*/src/telemetry/`) and export OTLP to the Compose collector (`OTEL_EXPORTER_OTLP_ENDPOINT`). Redaction is layered and automatic: credential-shaped keys are replaced on every log object, `SecretValue` self-redacts on every rendering path, and the classification module's sink rules keep `SECRET`/`SEALED` out entirely. Log an error **once**, at the boundary that converts it; interior code rethrows. ([`../architecture/backend.md` §11](../architecture/backend.md))
+
+### 47. How is audit different from logs?
+
+Logs are operational telemetry — free-form, retention by ops policy, consumed by engineers, and lines can be lost without a correctness problem. Audit is an **accountability record**: structured `audit.audit_events` rows written through the audit module's use case, append-only by both revoked grants and an owner-proof trigger, with a metadata guard keeping payloads out. If the answer to "who did what, when, to which resource, with what outcome" must survive scrutiny, it is audit; if it helps debug Tuesday's incident, it is a log. ([`../architecture/data-model.md` §10](../architecture/data-model.md), [`modules/audit/MODULE.md`](../../modules/audit/MODULE.md))
+
+### 48. How do I run every test, including the live-PostgreSQL suites?
+
+`make test` (or `pnpm test` plus `flutter test`) runs the whole workspace — the platform's migration, audit-immutability, outbox, and jobs suites included, which need the Compose PostgreSQL: `make dev` first. On machines where a host-level PostgreSQL already listens on 5432, point everything at the Compose instance with `POSTGRES_PORT=5433` in `.env` (compose republishes on it) — the test suites and the db CLI read the same variable, `PGPORT` works too. `make verify` runs the full local gate; CI runs the same suites against its own Compose PostgreSQL. ([Q32](#32-how-do-i-run-all-checks); [`../architecture/backend.md` §12](../architecture/backend.md))

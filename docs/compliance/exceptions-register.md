@@ -1,6 +1,8 @@
 # Exceptions Register
 
-**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.1 · **Date:** 2026-08-15 · **Review:** every phase gate
+**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** every phase gate
+
+**v0.2 (2026-08-15, Phase 2 review):** EXC-001, 002, 003 re-affirmed; no exit trigger fired; no exception opened or closed. EXC-003 carries a dated re-affirmation note.
 
 An exception is a recorded, bounded deviation from a stated policy or control — with compensating controls and a defined exit. An unrecorded deviation is not an exception; it is a finding.
 
@@ -58,6 +60,7 @@ An exception is a recorded, bounded deviation from a stated policy or control �
 | Risk link | KAR-RSK-004, KAR-RSK-005 (contributing condition) |
 | Approved by | Security Owner |
 | Opened | 2026-08-15 |
+| Re-affirmed | 2026-08-15 (Phase 2): the local posture is unchanged — Phase 2 added platform unit/integration tests that do run locally against live PostgreSQL, but the security-scan set (SCA, secret scan, SBOM) still executes only in CI, which remains merge-blocking. Compensating controls unchanged; exception stands |
 | Exit | Re-evaluate when the team grows (more unmerged local work at risk) or if a merge-bypass path is ever discovered — the latter reopens this as a finding, not an exception |
 | Status | OPEN |
 

@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **Phase 1 COMPLETE — Phase 2 NOT STARTED** ([phase report](docs/phases/phase-01.md)) |
-| Last completed phase | 1 (engineering and compliance foundation) |
+| Current phase | **2 — in progress** ([phase report](docs/phases/phase-02.md)) |
+| Last completed phase | 1 (engineering and compliance foundation, [report](docs/phases/phase-01.md)) |
 | Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
 | Application implementation | Foundation only — no product capabilities are implemented |
 | Cloud | None provisioned; local development is cloud-free |
@@ -87,7 +87,7 @@ graph TB
 | `apps/api` | NestJS modular monolith — the only public API surface |
 | `apps/worker` | Second entrypoint over the same modules: outbox relay, projections, scheduled jobs |
 | `apps/admin` | Super Admin SPA; talks to the control plane only, carries no database driver |
-| `packages/` | Five shared packages; four are framework-free (see layout below) |
+| `packages/` | Six shared packages; four are framework-free pure. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation, errors, observability, events/outbox/jobs |
 | `modules/` | 20 bounded contexts, each behind a `public-api.ts` |
 | PostgreSQL | The one authoritative store — RLS-enforced tenant isolation |
 | Local infra | Docker Compose ([`docker-compose.yml`](docker-compose.yml)): `postgres`, `redis`, `minio`, `otel-collector` — zero cloud dependency |
@@ -131,7 +131,7 @@ Cross-module imports resolve to the target module's `public-api.ts` and nothing 
 
 ```
 apps/        mobile · api · worker · admin — entrypoints, no business logic
-packages/    shared-kernel · financial-engine · jurisdiction-policy · state-machine · api-contracts
+packages/    shared-kernel · financial-engine · jurisdiction-policy · state-machine · api-contracts · platform
 modules/     20 bounded contexts, each with public-api.ts and MODULE.md
 infra/       Terraform — contracts · providers · per-deployment compositions
 docs/        architecture · adr · security · compliance · phases · legacy · onboarding
@@ -226,18 +226,21 @@ Prerequisites are pinned in [`.tool-versions`](.tool-versions) (Node, pnpm, Flut
 make doctor      # verify your toolchain matches the pins
 make bootstrap   # install workspace and Flutter dependencies
 make dev         # bring up local infra; prints how to start each entrypoint
+pnpm build       # compile once — the db CLI runs from dist
+make db-create   # bootstrap database roles and grants (first run)
+make db-migrate  # apply migrations as the restricted migrator role
 make verify      # run the full local check suite
 ```
 
-`make help` lists the remaining targets. `make dev` starts the Compose services and tells you how to run the API, worker, admin, and mobile entrypoints; in Phase 1 the API surface is health endpoints only. A clean-machine walkthrough of exactly these commands is part of Phase 1 verification.
+`make help` lists the remaining targets. `make dev` starts the Compose services and tells you how to run the API, worker, admin, and mobile entrypoints; the API surface is health endpoints (`/readyz` answers 503 until the database is created and migrated — a real check, not a constant). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` in `.env` first. A clean-machine walkthrough of these commands is part of phase verification.
 
 No cloud account, API key, or shared database is required for any of it — that is a design rule, not a convenience ([`environments.md` §3](docs/architecture/environments.md)).
 
 ## Testing and CI
 
 - **Unit tests** for `domain/` and the pure packages — no mocks, no container.
-- **Integration tests** against real PostgreSQL in Docker (from Phase 2).
-- **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) (future: also against each approved managed provider).
+- **Integration tests** against real PostgreSQL in Docker — since Phase 2 the workspace suite (467 passing tests when this was recorded) includes live-PostgreSQL runs of the migration, audit-immutability, outbox, and jobs suites, with concurrency proofs (two relays over 200 events; two workers over 100 jobs). `make dev` first; see the quick-start port note for machines with a host PostgreSQL.
+- **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today; cloud provider legs are future.
 - **Architecture tests** — 26 CI-blocking structural tests, kept in a registry with per-test activation phases; a test activates when the structure it guards exists.
 - **Security scans and SBOM** — dependency and secret scanning, software bill of materials, supply-chain checks.
 
@@ -247,7 +250,7 @@ Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never
 
 ## Roadmap and phase discipline
 
-Completed: 0 and 0.5. Current: **1** (monorepo, tooling, Compose, CI, architecture tests, docs). Next: 2 (persistence, config, observability, audit, event bus).
+Completed: 0, 0.5, and 1. Current: **2** — platform and data foundation (config, PostgreSQL and migrations, audit, event catalogue and outbox, jobs, observability, classification, key-custody design). Next: 3 (identity, tenancy, RLS).
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 
