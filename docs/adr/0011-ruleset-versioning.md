@@ -13,7 +13,7 @@ Financial rules change: thresholds move, methodologies are corrected, jurisdicti
 **Every recommendation records its provenance:**
 
 ```
-rulesetVersion · jurisdiction · operatingEntity · subjectProfileVersion
+rulesetVersion · jurisdiction · operatingEntity · subjectPolicySelectionVersion
 calculatedAt · inputHash
 ```
 

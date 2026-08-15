@@ -23,13 +23,17 @@ Terms this module owns, with definitions. Where a term is also used elsewhere
 with a different meaning, say so — that is a boundary, not a collision.
 
 ## Data owned
-| Table | Classification | Erasure strategy | Retention | Notes |
-|---|---|---|---|---|
-|  | PUBLIC \| INTERNAL \| CONFIDENTIAL \| HIGHLY_SENSITIVE_FINANCIAL \| SECRET \| SEALED | CASCADE \| ANONYMISE \| RETAIN_WITH_BASIS \| ORPHANED_BY_DESIGN | from PolicyPack |  |
 
-`ORPHANED_BY_DESIGN` requires a stated reason and a demonstration that the data
+Every persistent dataset declares its full lifecycle (ADR-0026, architecture test 25):
+
+| Table | Subject relationship | Purpose | Classification | Retention | Export treatment | Erasure strategy |
+|---|---|---|---|---|---|---|
+|  | SUBJECT_OWNED \| SUBJECT_DERIVED \| AGGREGATE \| NON_PERSONAL | why held | PUBLIC \| INTERNAL \| CONFIDENTIAL \| HIGHLY_SENSITIVE_FINANCIAL \| SECRET \| SEALED | from PolicyPack | included \| excluded (reason) \| n/a | CASCADE_DELETE \| ANONYMIZE_IRREVERSIBLY \| RETAIN_WITH_BASIS \| NON_PERSONAL_BY_DESIGN |
+
+`NON_PERSONAL_BY_DESIGN` requires a stated reason and a demonstration that the data
 cannot be re-identified. It is a decision requiring justification, not a description
-of an accident.
+of an accident. **Pseudonymization is not anonymization** — restorable linkage stays
+personal data.
 
 ## Events published
 | Event | Classification | Allowed consumers | Payload rule |

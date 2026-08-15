@@ -121,13 +121,15 @@ graph TB
 
 **A port with no implementation is honest. A fake implementation that pretends to work is not.**
 
+The full provider-port catalogue — including cache, job queue, secrets, key management, analytics, and observability — is canonical in [`infrastructure-portability.md` §5](infrastructure-portability.md); implementations bind per `DeploymentProfile`.
+
 ## 6. Non-engineering gates
 
 | Capability | Gate | Owner |
 |---|---|---|
 | `AMANAT` | Legal clearance **per jurisdiction** | Legal |
 | `AMANAT` | Domain terminology review | Legal + domain |
-| `ZAKAT` | **Sharia review — none exists** | External |
+| `ZAKAT` | **Sharia review — none exists.** Outputs are deterministic calculations/estimates and are **never represented as a fatwa** | External |
 | `AI_ADVISOR` | Cross-border processing basis, DPAs | Legal |
 | All | Operating-entity and licensing decision per market | Legal |
 | All | Data-residency determination | Legal |

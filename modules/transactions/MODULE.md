@@ -17,10 +17,10 @@ Transactions, statement import, normalisation, deduplication, provenance, and ca
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` | merchant and note encrypted at rest |
+| `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | merchant and note encrypted at rest |
 | `statement_imports` | `HIGHLY_SENSITIVE_FINANCIAL` | `RETAIN_WITH_BASIS` | raw file **encrypted from the start** |
-| `statement_import_rows` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` |  |
-| `merchant_rules` | `INTERNAL` | `ORPHANED_BY_DESIGN` | curated corpus; see notes |
+| `statement_import_rows` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` |  |
+| `merchant_rules` | `INTERNAL` | `NON_PERSONAL_BY_DESIGN` | curated corpus; see notes |
 
 ## Events published
 
@@ -49,7 +49,7 @@ carry a raw UUID plus a reference type declared **in this module**.
 
 Rules ported from the legacy as *rules plus test cases*, not code: Arabic-Indic digit and U+066B/U+066C separator normalisation; accounting negatives and trailing minus; **unreadable rows return null, never a substituted zero**; ambiguous dates flagged rather than assumed; exact reconciliation with **no tolerance**; duplicate rejection by content hash; review before commit.
 
-`merchant_rules` `ORPHANED_BY_DESIGN` justification: a curated pattern corpus derived from many subjects, retained without subject linkage. **It must not hold narrative text lifted verbatim from a single customer's statement** — the legacy's does, unencrypted and permanent, and cannot use its own converter because the repository sorts on `LENGTH(pattern)` (legacy C12). Patterns here are reviewed and generalised before entry.
+`merchant_rules` `NON_PERSONAL_BY_DESIGN` justification: a curated pattern corpus derived from many subjects, retained without subject linkage. **It must not hold narrative text lifted verbatim from a single customer's statement** — the legacy's does, unencrypted and permanent, and cannot use its own converter because the repository sorts on `LENGTH(pattern)` (legacy C12). Patterns here are reviewed and generalised before entry.
 
 **Explicit ingestion limits** — bytes, rows, wall-clock, memory — rejecting rather than degrading (legacy FILES-2, HIGH).
 

@@ -17,8 +17,8 @@ Non-authoritative read models for admin and operations, built from domain events
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `readmodel.*` | `INTERNAL` | `ORPHANED_BY_DESIGN` | derived, rebuildable, non-authoritative |
-| `projection_checkpoints` | `INTERNAL` | `ORPHANED_BY_DESIGN` |  |
+| `readmodel.*` | `INTERNAL` | `NON_PERSONAL_BY_DESIGN` | derived, rebuildable, non-authoritative |
+| `projection_checkpoints` | `INTERNAL` | `NON_PERSONAL_BY_DESIGN` |  |
 
 ## Events published
 
@@ -39,7 +39,7 @@ carry a raw UUID plus a reference type declared **in this module**.
 
 ## Notes and known limitations
 
-`ORPHANED_BY_DESIGN` justification: projections are derived aggregates rebuilt from source events and hold no independent subject record. Erasure is achieved by erasing the source and rebuilding. Re-identification is prevented by the payload rules — **SEALED data never enters a projection** (architecture test 13), and aggregates are not published below a minimum cohort size.
+`NON_PERSONAL_BY_DESIGN` justification: projections are derived aggregates rebuilt from source events and hold no independent subject record. Erasure is achieved by erasing the source and rebuilding. Re-identification is prevented by the payload rules — **SEALED data never enters a projection** (architecture test 13), and aggregates are not published below a minimum cohort size.
 
 **Never a source of truth.** Fully rebuildable. Every admin view shows an *as of* timestamp. Lag is monitored and alerted.
 

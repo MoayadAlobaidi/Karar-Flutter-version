@@ -1,29 +1,36 @@
-# ADR-0023 — Deployment topology ladder L0–L3
+# ADR-0023 — Deployment topology ladder L0–L3, and deployment profiles
 
 **Status:** ACCEPTED · **Phase:** design binding from Phase 1; rungs built on demand
+**Amended:** in Phase 0.5 — the ladder is **cloud-neutral** (any rung may run on any approved provider), and `DeploymentProfile` is the named mechanism that binds a deployment to its provider stack.
 
 ## Context
 
-Partners and regulators may require isolation Karar cannot predict: a dedicated database, a dedicated deployment, or a dedicated cloud project with its own keys, identity provider, and connectors. Building all of it speculatively costs complexity for a requirement nobody has stated. Building none of it risks a rewrite when one appears.
+Partners and regulators may require isolation Karar cannot predict: a dedicated database, a dedicated deployment, or a dedicated cloud account with its own keys, identity provider, and connectors. Building all of it speculatively costs complexity for a requirement nobody has stated. Building none of it risks a rewrite when one appears.
+
+Different jurisdictions may also require **different cloud providers**: Qatar on one, the UAE on a locally-available alternative, a partner bank on its own mandated infrastructure. A ladder that hard-codes one vendor answers the isolation question and fails the portability one.
 
 ## Decision
 
-**Four named rungs, with the domain identical at every one.**
+**Four named rungs, with the domain identical at every one — on any approved infrastructure provider.**
 
 | Rung | Isolation |
 |---|---|
 | **L0** | Shared database, `tenant_id` + RLS |
 | **L1** | Dedicated database, shared platform |
-| **L2** | Dedicated deployment |
-| **L3** | Dedicated project — own KMS, IdP, connectors |
+| **L2** | Dedicated deployment — own runtime and database |
+| **L3** | **Dedicated cloud account / project / subscription boundary** (the provider's own top-level isolation unit) — own KMS, IdP, connectors |
 
-**Three mechanisms, all in `infrastructure/`:**
+L3 is deliberately **not** defined as "a GCP project." It is whatever the selected provider's account-isolation boundary is.
 
-1. Tenant resolution at the infrastructure edge → which datasource.
+**`DeploymentProfile` is the binding mechanism** — a typed, provider-independent description of one deployment: provider, region, database profile, storage, cache, messaging, secrets, key management, identity, AI routing, analytics, observability, network, and residency classification. Tenants map to profiles through a `DeploymentResolver` at the infrastructure edge; resolution may depend on tenant, jurisdiction, environment, contract, and isolation requirement — **not country alone**. Full specification: `docs/architecture/infrastructure-portability.md`.
+
+**Three runtime mechanisms, all in `infrastructure/`:**
+
+1. Tenant resolution at the infrastructure edge → which deployment profile and datasource.
 2. `TenantProviderResolver` → which provider adapter binds at runtime.
 3. `KeyRef` → which encryption key applies, per tenant and jurisdiction.
 
-**No use case knows any of them exist.** GCP names appear only in `infrastructure/providers/` (architecture test 10).
+**No use case knows any of them exist.** Cloud-provider names and SDKs appear only in `infrastructure/providers/` (architecture test 10). Provider assignments per jurisdiction are **configuration and examples, never domain assumptions**.
 
 **Not doing project-per-country.** No regulatory, isolation, customer, or operational reason exists yet.
 

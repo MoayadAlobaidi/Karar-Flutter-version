@@ -10,7 +10,7 @@
 LOCAL → DEV → STAGING → PRODUCTION
 ```
 
-Terraform carries `dev/ staging/ production/` **from Phase 1**. There is no requirement to provision or pay for staging until GCP exists — but:
+Terraform carries the `deployments/qa/{dev,staging,production}/` compositions **from Phase 1** ([`infrastructure-portability.md` §Terraform](infrastructure-portability.md)), and each environment of each deployment binds to a **`DeploymentProfile`** — provider, region, database, storage, keys — rather than to an assumed cloud. There is no requirement to provision or pay for staging until a cloud account exists — but:
 
 > **Production must not be introduced before a separate staging environment exists.** Hard gate, Phase 20.
 
@@ -110,6 +110,8 @@ For LOCAL and DEV, the control plane runs **as a module inside `apps/api`** — 
 | Scanning | CI secret scanning, blocking |
 
 **Configuration is type-validated.** The legacy's admin settings are not: *"a non-numeric value where a number is expected is accepted and silently falls back to a default."* A silent fallback is a configuration change nobody made.
+
+**Application configuration is not cloud configuration.** Business modules never read `GCP_PROJECT_ID`, `AWS_REGION`, or any provider variable — they consume ports. Provider selection, regions, and resource names are **infrastructure deployment configuration**, owned by the deployment profile and its Terraform composition. Scattering cloud variables through application modules is the anti-pattern the split exists to prevent ([`infrastructure-portability.md`](infrastructure-portability.md)).
 
 ## 8. CI gates block merges, not just runs
 

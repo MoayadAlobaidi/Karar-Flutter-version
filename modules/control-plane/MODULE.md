@@ -19,7 +19,7 @@ Security gateway for administrative access: identity, environment scoping, reaso
 |---|---|---|---|
 | `admin_identities` | `CONFIDENTIAL` | `RETAIN_WITH_BASIS` |  |
 | `control_plane_audit` | `CONFIDENTIAL` | `RETAIN_WITH_BASIS` | append-only |
-| `scoped_tokens` | `SECRET` | `CASCADE` | short-lived, single-environment, purpose-scoped |
+| `scoped_tokens` | `SECRET` | `CASCADE_DELETE` | short-lived, single-environment, purpose-scoped |
 
 ## Events published
 

@@ -17,7 +17,7 @@ Usually 1:1. Not always: **UAE free zones (DIFC, ADGM) operate distinct legal re
 
 Conflating them is cheap today and expensive once records exist, because unpicking it means re-deriving the governing regime for every historical record from data that no longer distinguishes the two.
 
-A third dimension — **OperatingEntity** — is orthogonal to both and documented in [`operating-entity.md`](operating-entity.md). A fourth — **SubjectPolicyProfile** — is covered in §7 below.
+A third dimension — **OperatingEntity** — is orthogonal to both and documented in [`operating-entity.md`](operating-entity.md). A fourth — **SubjectPolicySelection** — is covered in §7 below.
 
 ## 2. The typed/configured split
 
@@ -63,7 +63,7 @@ graph TB
     RES --> STRAT[PolicyResolutionStrategy<br/>registry · extensible]
     STRAT --> PACK[PolicyPack<br/>CODE · typed · versioned · tested]
     RES --> SET[(JurisdictionSettings<br/>DB · audited · restrict-only)]
-    RES --> SUBJ[SubjectPolicyProfile<br/>elective, within pack-permitted options]
+    RES --> SUBJ[SubjectPolicySelection<br/>elective, within pack-permitted options]
     PACK --> MERGE{Merge<br/>settings may only RESTRICT}
     SET --> MERGE
     SUBJ --> MERGE
@@ -117,7 +117,7 @@ The banned thing is **country- or jurisdiction-keyed business branching outside 
 
 Banning literals outright would fire constantly on legitimate reference data and would train engineers to suppress the rule. **A test nobody trusts enforces nothing.** Architecture test 12 targets conditionals and pattern matches on jurisdiction identifiers in business layers.
 
-## 7. SubjectPolicyProfile — the fourth dimension
+## 7. SubjectPolicySelection — the fourth dimension
 
 Some policy variation is neither geographic, legal-regime, nor legal-person. It is **elected by the subject**.
 
@@ -125,12 +125,18 @@ Two customers in Qatar, contracting with the same operating entity, under `qa/v1
 
 The same shape appears in accounting-basis choices, fiscal-year conventions, and risk-tolerance bands. It is not Zakat-specific, and it was found by auditing a real system rather than anticipated — see [`plan-v2-deltas.md` D1](plan-v2-deltas.md) and [`../legacy/feature-inventory.md` §5](../legacy/feature-inventory.md).
 
+**The split of responsibilities:**
+
+- **`SubjectPolicySelection` is the common platform mechanism.** It records *which option-set version a subject elected*, with versioning, pinning, and provenance — and knows nothing about any capability's options.
+- **Profile content is capability-scoped.** The option set itself — e.g. `ZakatMethodologyProfile` — is declared and owned by the capability's bounded context. The next capability with elective options declares its own profile type; the selection mechanism is reused unchanged.
+
 **Rules, mirroring the restrict-only invariant:**
 
-1. A profile may only select **among options the jurisdiction's PolicyPack permits.** It can never expand the permitted set.
-2. The profile version is **pinned at record creation**, alongside jurisdiction, pack version, and operating entity.
+1. A selection may only elect **among options the jurisdiction's PolicyPack permits.** It can never expand the permitted set.
+2. The selection version is **pinned at record creation**, alongside jurisdiction, pack version, and operating entity.
 3. Per-recommendation provenance records it, so every historical result stays explainable under the rules, jurisdiction, legal party, **and elected conventions** that produced it.
-4. Where a capability declares no elective options, the profile is absent and costs nothing. **This is the common case** — it must not tax capabilities that do not need it.
+4. Where a capability declares no elective options, the selection is absent and costs nothing. **This is the common case** — it must not tax capabilities that do not need it.
+5. **Elections are potentially sensitive and are purpose-limited.** A jurisprudential methodology choice can reveal religious affiliation. Selections are `CONFIDENTIAL` at minimum, readable only by the capability that owns them, and **never exposed to marketing, analytics, or unrelated AI processing.**
 
 The legacy validates the pattern: its jurisprudential settings are named, validated, audit-logged on change, and **snapshotted into every assessment**. That is this rule, discovered independently, applied to one capability.
 
@@ -151,7 +157,7 @@ interface PolicyPack {
   aiProcessingPolicy: AIProcessingPolicy
   clearedCapabilities: CapabilityId[]      // the MAXIMUM set
   resolutionStrategies: Record<CapabilityId, StrategyName>
-  subjectProfileOptions: Record<CapabilityId, ProfileOptionSet>
+  subjectPolicyOptions: Record<CapabilityId, ProfileOptionSet>
 }
 ```
 
@@ -159,7 +165,10 @@ interface PolicyPack {
 
 - A disclosure-bearing capability with no `ApprovalPolicy` (architecture test 19).
 - A capability with no named resolution strategy.
-- A subject-profile option outside the type's permitted set.
+- A subject-policy option outside the type's permitted set.
+- A processing purpose with no declared legal basis.
+
+**Consent is one legal basis among several, never assumed.** Each processing purpose in a pack declares its basis for that jurisdiction — consent, contract performance, legal obligation, or another basis the regime recognises. The consent machinery gates the purposes whose declared basis *is* consent; a purpose with a different basis is gated on that basis's own conditions; a purpose with **no declared basis fails closed** (ADR-0024).
 
 ## 9. Adding a jurisdiction
 

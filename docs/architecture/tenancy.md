@@ -142,9 +142,9 @@ The legacy's finding, quoted because it is the clearest statement of the problem
 | **L0** | Shared database, `tenant_id` + RLS |
 | **L1** | Dedicated database, shared platform |
 | **L2** | Dedicated deployment |
-| **L3** | Dedicated project, own KMS, IdP, connectors |
+| **L3** | Dedicated cloud account/project/subscription, own KMS, IdP, connectors |
 
-**Domain code is identical at every rung**, because it never names a database, provider, region, or key. Movement between rungs is infrastructure resolution and Terraform. See [`deployment-topology.md`](deployment-topology.md).
+**Domain code is identical at every rung — on any approved cloud provider**, because it never names a database, provider, region, or key. A tenant maps to a `DeploymentProfile`; movement between rungs or providers is infrastructure resolution and Terraform. See [`deployment-topology.md`](deployment-topology.md) and [`infrastructure-portability.md`](infrastructure-portability.md).
 
 ## 10. What tenancy does not do
 

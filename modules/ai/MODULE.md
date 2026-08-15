@@ -17,10 +17,10 @@ AI orchestration: context assembly from verified facts, provider abstraction, pr
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `ai_conversations` | `CONFIDENTIAL` | `CASCADE` | title encrypted |
-| `ai_messages` | `CONFIDENTIAL` | `CASCADE` | content encrypted — answers quote merchant narratives back |
-| `ai_response_provenance` | `INTERNAL` | `CASCADE` | prompt version, model, ruleset version, jurisdiction |
-| `ai_usage` | `INTERNAL` | `ANONYMISE` | metering and cost |
+| `ai_conversations` | `CONFIDENTIAL` | `CASCADE_DELETE` | title encrypted |
+| `ai_messages` | `CONFIDENTIAL` | `CASCADE_DELETE` | content encrypted — answers quote merchant narratives back |
+| `ai_response_provenance` | `INTERNAL` | `CASCADE_DELETE` | prompt version, model, ruleset version, jurisdiction |
+| `ai_usage` | `INTERNAL` | `ANONYMIZE_IRREVERSIBLY` | metering and cost |
 
 ## Events published
 

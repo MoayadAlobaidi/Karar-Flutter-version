@@ -39,7 +39,7 @@ graph TB
     subgraph "Key path — unreachable from ordinary request context"
         G[SealAccessGrant<br/>purpose · recipient · scope ·<br/>expiry · approvals · audit_ref]
         E[EncryptionProvider]
-        K[KeyRef → local key / Cloud KMS KEK<br/>scoped per jurisdiction]
+        K[KeyRef → KEK via the profile's<br/>key-management provider<br/>scoped per jurisdiction]
     end
     M -->|reference only| S
     G -->|REQUIRED ARGUMENT| S
@@ -151,11 +151,13 @@ The legacy survived because production held 3 users and 45 transactions, and bec
 - **Undetectable** — nothing may read the payload, so nothing can notice a KEK has stopped working.
 - **Discovered at the worst possible moment** — after death verification, recipient verification, a waiting period, and human approval, at the point of releasing a record to a bereaved family.
 
-### The three requirements
+### The three requirements — expressed as provider-independent policies
 
-1. **KEK escrow under split control**, with a documented, rehearsed, timed recovery drill. No single operator can reconstruct a KEK alone.
+Custody is declared through `KeyCustodyStrategy`, `KeyRecoveryPolicy`, and `KeyRotationPolicy` — provider-independent policies implemented by whichever key-management provider the deployment profile selects. **No single cloud's escrow product is mandated** (ADR-0017).
+
+1. **KEK escrow under split control** (`KeyCustodyStrategy`), with a documented, rehearsed, timed recovery drill (`KeyRecoveryPolicy`). No single operator can reconstruct a KEK alone.
 2. **Sealed-integrity canary** — a synthetic sealed record per jurisdiction-KEK, holding **known plaintext containing no customer data**, decrypted on a schedule. Failure raises a security event. This is the **only** mechanism that can detect key loss without violating the seal.
-3. **Rotation designed in from Phase 2**, not retrofitted. The legacy's rotation is entangled with statement fingerprinting — rotating changes every future fingerprint, so a rotation must recompute stored ones or a re-upload imports twice. That entanglement is what retrofitting produces.
+3. **Rotation designed in from Phase 2** (`KeyRotationPolicy`), not retrofitted, with key and version provenance recorded for every wrap and rotation. The legacy's rotation is entangled with statement fingerprinting — rotating changes every future fingerprint, so a rotation must recompute stored ones or a re-upload imports twice. That entanglement is what retrofitting produces.
 
 **Architecture test:** the canary's plaintext is asserted to contain no customer-derived data, so the detection mechanism cannot itself become a leak.
 

@@ -12,7 +12,9 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **OperatingEntity** — the legal person providing the service and bearing responsibility. Determines controllership, contracting party, licensing, invoicing, liability, and who releases disclosed data. Orthogonal to country and jurisdiction.
 
-**SubjectPolicyProfile** — elective conventions chosen by the subject, within what the jurisdiction permits. The fourth policy dimension, recovered from the legacy's Zakat capability.
+**SubjectPolicySelection** — the platform mechanism recording which elective option-set version a subject chose, with versioning, pinning, and provenance. The fourth policy dimension, recovered from the legacy's Zakat capability. The option *content* is capability-scoped (e.g. `ZakatMethodologyProfile`), and elections are potentially sensitive and purpose-limited.
+
+**ZakatMethodologyProfile** — the Zakat bounded context's own elective option set (nisab basis, valuation convention, doubtful portions, calendar), elected through `SubjectPolicySelection`.
 
 **PolicyPack** — typed, versioned, tested **code** carrying policy with legal or business consequence. Changed only by pull request, review, tests, staging, deploy.
 
@@ -24,7 +26,7 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **PolicyResolutionStrategy** — how a long-lived record's governing policy version is chosen: `AT_CREATION`, `AT_EVALUATION`, `MOST_RESTRICTIVE`, and others. Registered, extensible. **No default exists** — an unspecified strategy is a load-time error.
 
-**Pinning** — storing `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, and `subjectProfileVersion` on a record, permanently, so it stays explainable.
+**Pinning** — storing `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, and `subjectPolicySelectionVersion` on a record, permanently, so it stays explainable.
 
 **EntityMigration** — the explicit, audited operation that changes an entity binding, with a re-consent evaluation step. **Never a silent `UPDATE`.**
 
@@ -56,7 +58,9 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **KEK / DEK** — key-encryption key (per jurisdiction, per tenant at rung L3) and data-encryption key (per sealed record).
 
-**Erasure strategy** — declared per table: `CASCADE`, `ANONYMISE`, `RETAIN_WITH_BASIS`, or `ORPHANED_BY_DESIGN`. The last **requires justification, not description**.
+**Lifecycle declaration** — six fields every persistent dataset declares (ADR-0026): subject relationship, purpose, classification, retention, export treatment, erasure strategy.
+
+**Erasure strategy** — one lifecycle field: `CASCADE_DELETE`, `ANONYMIZE_IRREVERSIBLY`, `RETAIN_WITH_BASIS`, or `NON_PERSONAL_BY_DESIGN`. The last **requires justification, not description** — and **pseudonymization is not anonymization**.
 
 ---
 
@@ -94,7 +98,7 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **Hawl** — the lunar year a holding must be held. Twelve Hijri months via Umm al-Qura — **354 or 355 days, not a fixed count.**
 
-**Jurisprudential settings** — named, validated, audit-logged settings covering points of scholarly disagreement, **snapshotted into every assessment**. In Karar these are `SubjectPolicyProfile` elections.
+**Jurisprudential settings** — named, validated, audit-logged settings covering points of scholarly disagreement, **snapshotted into every assessment**. In Karar these are `SubjectPolicySelection` elections.
 
 > **No Sharia review, board, scholar, or certificate exists.** The Zakat work is engineering against a written specification and nothing more should be inferred from it.
 
@@ -114,7 +118,19 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **Transactional outbox** — state change and event enqueue committed in one transaction, relayed asynchronously.
 
-**Topology ladder (L0–L3)** — shared SaaS → dedicated database → dedicated deployment → dedicated project. **Domain code is identical at every rung.**
+**Topology ladder (L0–L3)** — shared SaaS → dedicated database → dedicated deployment → dedicated cloud account/project/subscription. **Domain code is identical at every rung, on any approved provider.**
+
+**DeploymentProfile** — a typed, provider-independent description of one deployment: provider, region, database, storage, cache, messaging, secrets, key management, identity, AI routing, analytics, observability, network, residency classification. Distinct from Country, Jurisdiction, Tenant, OperatingEntity, and Brand.
+
+**DeploymentResolver** — the infrastructure-edge mechanism mapping tenant × jurisdiction × environment × contract × isolation requirement → `DeploymentProfile`. **Domain code never invokes it.**
+
+**ObjectRef / SecretRef / KeyRef** — opaque, provider-neutral references persisted by the application; the active profile's adapters resolve them. **A `gs://` URL or `arn:` path is never a domain field.**
+
+**KeyCustodyStrategy / KeyRecoveryPolicy / KeyRotationPolicy** — provider-independent key custody policies (ADR-0017). No single cloud's escrow product is mandated.
+
+**Assurance Claim Registry** — the mechanism behind architecture test 26: every technical or legal capability claim maps to an entry with an evidence pointer and a named owner. CI asserts the link; humans verify the substance.
+
+**Greenfield Rule** — Karar V2 is built from scratch. The legacy is a requirements, evidence, and test-case source — never a code, schema, or architecture source. Reuse the knowledge, not the implementation.
 
 **Control plane** — the security gateway for administrative access. The browser holds a session with it and **never an environment credential**.
 

@@ -1,6 +1,20 @@
 # Plan v2 — Amendments Arising from the Legacy Audit
 
-**Status:** Raised for decision. **None of these blocks Phases 1–8.**
+> ## Status: RESOLVED — HISTORICAL
+>
+> All six deltas were **accepted and consolidated into the canonical architecture in Phase 0.5** (15 August 2026). This document is retained as the audit-time record of *why* each amendment was raised; **the authoritative rules now live in the documents below**, and where this text and a canonical document differ, the canonical document governs.
+>
+> | Delta | Canonical home |
+> |---|---|
+> | D1 — Zakat + subject-elected policy | [ADR-0015](../adr/0015-policy-packs.md) (`SubjectPolicySelection`; capability-scoped `ZakatMethodologyProfile`), [`jurisdiction-policy.md` §7](jurisdiction-policy.md), capability map, Phase 9 scope |
+> | D2 — Sealed key custody | [ADR-0017](../adr/0017-sealed-classification.md) (`KeyCustodyStrategy` / `KeyRecoveryPolicy` / `KeyRotationPolicy`, provider-independent), [`sealed-data.md` §7](sealed-data.md), Phase 20 gates |
+> | D3 — White-label planes | [`white-label.md`](white-label.md) — "no code changes" means **no core-domain fork**, not no activation/build work |
+> | D4 — Legal-document lifecycle | [ADR-0024](../adr/0024-operating-entity.md), [`jurisdiction-policy.md` §10](jurisdiction-policy.md) — including that consent is not assumed to be every purpose's legal basis |
+> | D5 — Data lifecycle | [ADR-0026](../adr/0026-data-lifecycle.md) — **renumbered from 0027 in Phase 0.5** so the sequence is continuous at 0001–0026; six-field declaration; pseudonymization ≠ anonymization |
+> | D6 — Architecture tests 22–26 | [`../testing/architecture-tests.md`](../testing/architecture-tests.md) + the [Assurance Claim Registry](../security/assurance-claims.md) |
+>
+> Consolidation record: [`../phase-05-consolidation.md`](../phase-05-consolidation.md).
+
 **Raised by:** Phase 0.2 legacy audit, 15 August 2026, after Blocker 1 was resolved.
 **Against:** Architecture Plan v2 (consolidated), 15 August 2026.
 
@@ -61,11 +75,11 @@ Adding it at Phase 3.5, before either package is built, is a type parameter and 
 
 | Dimension | Question | Key for |
 |---|---|---|
-| **SubjectPolicyProfile** | Which elective rules has *this subject* chosen, within what the jurisdiction permits? | Calculation conventions, jurisprudential settings, accounting basis, elective methodology |
+| **SubjectPolicySelection** | Which elective rules has *this subject* chosen, within what the jurisdiction permits? | Calculation conventions, jurisprudential settings, accounting basis, elective methodology |
 
 **Governing rules, mirroring the existing restrict-only invariant:**
 
-1. A `SubjectPolicyProfile` may only select **among options the jurisdiction's PolicyPack permits.** It can never expand the permitted set. Same enforcement, same test, same reason as §1.3's database-settings invariant.
+1. A `SubjectPolicySelection` may only select **among options the jurisdiction's PolicyPack permits.** It can never expand the permitted set. Same enforcement, same test, same reason as §1.3's database-settings invariant.
 2. The profile version is **pinned at record creation** alongside `jurisdictionAtCreation`, `policyPackVersionAtCreation`, and `operatingEntityAtCreation` (architecture test 21 extends by one field).
 3. Per-recommendation provenance records it, so §7.7's guarantee holds in full: *every historical recommendation remains explainable under the rules, jurisdiction, legal party — and elected conventions — that produced it.*
 4. Where a capability declares no elective options, the profile is absent and costs nothing. **This is the common case** and must not tax capabilities that do not need it.
@@ -195,16 +209,16 @@ The legacy did not decide to create ownerless data. It discovered it during an e
 
 | Strategy | Meaning |
 |---|---|
-| `CASCADE` | Deleted with the owning subject |
-| `ANONYMISE` | Subject linkage severed; the row survives without it |
+| `CASCADE_DELETE` | Deleted with the owning subject |
+| `ANONYMIZE_IRREVERSIBLY` | Subject linkage severed; the row survives without it |
 | `RETAIN_WITH_BASIS` | Retained, with a stated legal basis and a retention period |
-| `ORPHANED_BY_DESIGN` | Deliberately owner-less from creation, with a stated reason and a demonstration that it cannot be re-identified |
+| `NON_PERSONAL_BY_DESIGN` | Deliberately owner-less from creation, with a stated reason and a demonstration that it cannot be re-identified |
 
-**`ORPHANED_BY_DESIGN` is a decision requiring justification, not a description of an accident.** That distinction is the whole amendment.
+**`NON_PERSONAL_BY_DESIGN` is a decision requiring justification, not a description of an accident.** That distinction is the whole amendment.
 
 Adds **architecture test 25** (§D6). Touches Phase 0.7's `MODULE.md` template, so it is cheap now and expensive at Phase 16.
 
-**ADR-0025** (domain event governance) is adjacent but not the right home. Recommend a new **ADR-0027 — Data lifecycle: retention, erasure, and ownerless derived data**, because it governs tables rather than events.
+**ADR-0025** (domain event governance) is adjacent but not the right home. Recommend a new **ADR-0026 — Data lifecycle: retention, erasure, and ownerless derived data**, because it governs tables rather than events.
 
 ---
 
@@ -234,10 +248,10 @@ Test 22 subsumes nothing in the existing 21; tests 12–21 are unaffected.
 | **D2** | **Accept.** Amend §4.2 and the Phase 20 gate; extend ADR-0017 | Phase 2 design, Phase 13 build, Phase 20 gate |
 | **D3** | **Accept as an estimate correction.** Amend §8.3 note and Phase 11 wording. No ADR | Phase 11 |
 | **D4** | **Accept.** Amend §1.2/§1.3; extend ADR-0024 | Phase 3 |
-| **D5** | **Accept.** New ADR-0027; extend the `MODULE.md` template now | Phase 0.7, enforced Phase 5 |
+| **D5** | **Accept.** New ADR-0026; extend the `MODULE.md` template now | Phase 0.7, enforced Phase 5 |
 | **D6** | **Accept.** §13 becomes 26 tests | Phase 1 |
 
-**ADR count moves from 25 to 26** (adding 0027; 0026 deliberately unused so that D1 stays inside ADR-0015 rather than splitting one decision across two documents).
+**ADR count moves from 25 to 26.** (At the time this was raised, the new ADR was numbered 0027 with 0026 left unused so that D1 stayed inside ADR-0015; the Phase 0.5 consolidation renumbered it to 0026, making the sequence continuous.)
 
 **None of these blocks Phases 1–8.** D1, D2, D4, and D5 all touch Phase 0.7 and Phase 3.5 artefacts that do not yet exist, which is exactly why raising them now is cheap.
 

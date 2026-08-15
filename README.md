@@ -40,6 +40,7 @@ Stated plainly so nothing is inferred from silence.
 3. **One authoritative financial engine.** Money is BIGINT minor units with a `Currency` carrying its ISO 4217 exponent. The client computes nothing authoritative. ([ADR-0006](docs/adr/0006-monetary-representation.md), [ADR-0007](docs/adr/0007-one-financial-engine.md))
 4. **Policy is typed code; availability is audited configuration** — and **settings may only restrict what code permits, never expand it.** ([ADR-0015](docs/adr/0015-policy-packs.md))
 5. **Deny by default.** A capability with no availability row is `DISABLED`. Code existing is never sufficient for exposure. ([ADR-0016](docs/adr/0016-capability-registry.md))
+6. **Greenfield, and cloud-portable.** V2 is built from scratch — the legacy is knowledge, never code ([greenfield rule](docs/architecture/greenfield-rule.md)). No business capability knows which cloud hosts it: deployments bind to providers through `DeploymentProfile`s, and the database commitment is PostgreSQL-the-engine, portable across managed providers. ([infrastructure-portability](docs/architecture/infrastructure-portability.md), [database-portability](docs/architecture/database-portability.md))
 
 ## Layout
 
@@ -48,7 +49,7 @@ apps/         api · worker · admin          entrypoints, no business logic
 packages/     shared-kernel · financial-engine · jurisdiction-policy · state-machine · api-contracts
 modules/      20 bounded contexts, each with public-api.ts and MODULE.md
 app/          Flutter client
-infra/        Terraform — dev · staging · production from Phase 1
+infra/        Terraform — contracts · providers (gcp/aws) · per-deployment compositions
 docs/         architecture · adr · security · legacy · scenarios · onboarding
 scripts/      verification, drills, helpers
 ```

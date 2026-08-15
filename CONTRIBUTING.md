@@ -5,8 +5,9 @@
 ## Before you write code
 
 1. **Read [`docs/architecture/overview.md`](docs/architecture/overview.md).** It is the entry point and links everything else.
-2. **Check the ADRs.** An accepted ADR is not revisited without new information. If you have new information, write a superseding ADR — do not edit the old one.
-3. **If you are adding a capability, write `MODULE.md` first** — all seventeen checklist points, before any code. Six of them are governance decisions and several need a legal answer.
+2. **Know the greenfield rule** — [`docs/architecture/greenfield-rule.md`](docs/architecture/greenfield-rule.md). Karar V2 is built from scratch. The legacy repo is a requirements, evidence, and test-case source — **never a code source**. No file in this repository may be a port of legacy application code; reimplement from the documented requirement.
+3. **Check the ADRs.** An accepted ADR is not revisited without new information. If you have new information, write a superseding ADR — do not edit the old one.
+4. **If you are adding a capability, write `MODULE.md` first** — all seventeen checklist points, before any code. Six of them are governance decisions and several need a legal answer.
 
 ## The rules CI enforces
 
@@ -23,9 +24,11 @@ You cannot merge past these, so knowing them saves a round trip.
 | Every published event is in the catalogue with declared consumers | ADR-0025 |
 | `SEALED` never in projections, events, logs, analytics, or AI context | ADR-0017 |
 | Sealed reads require a `SealAccessGrant`, at the type level | ADR-0017 |
-| Every table declares an erasure strategy | ADR-0027 |
+| Every persistent dataset declares its lifecycle — subject relationship, purpose, classification, retention, export treatment, erasure strategy | ADR-0026 |
 | Every declared guard has a call site | — |
-| Ingestion and rendering paths declare explicit limits | — |
+| Ingestion and rendering paths declare explicit resource limits | — |
+| No cloud SDK, provider client, or provider URI in `domain/` or `application/` | ADR-0023 |
+| Technical/legal capability claims trace to the Assurance Claim Registry | — |
 | `shared-kernel` exports exactly nine symbols | ADR-0003 |
 
 Full list: [`docs/testing/architecture-tests.md`](docs/testing/architecture-tests.md).

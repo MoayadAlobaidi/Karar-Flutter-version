@@ -17,8 +17,8 @@ Delivery of notifications behind channel ports. Owns delivery, not content polic
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `notifications` | `CONFIDENTIAL` | `CASCADE` |  |
-| `delivery_attempts` | `INTERNAL` | `ANONYMISE` | subject linkage severed after retention |
+| `notifications` | `CONFIDENTIAL` | `CASCADE_DELETE` |  |
+| `delivery_attempts` | `INTERNAL` | `ANONYMIZE_IRREVERSIBLY` | subject linkage severed after retention |
 
 ## Events published
 

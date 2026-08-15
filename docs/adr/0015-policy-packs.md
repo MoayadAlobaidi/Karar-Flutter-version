@@ -1,7 +1,7 @@
 # ADR-0015 — Typed PolicyPacks, restrict-only settings, extensible resolution, and subject-elected policy
 
 **Status:** ACCEPTED · **Phase:** 3.5
-**Amended:** after the Phase 0.2 legacy audit, to cover subject-elected policy (`SubjectPolicyProfile`).
+**Amended:** after the Phase 0.2 legacy audit, to cover subject-elected policy; refined in Phase 0.5 — the platform mechanism is `SubjectPolicySelection`, and profile *content* is capability-scoped.
 
 ## Context
 
@@ -19,7 +19,7 @@ Putting both in code makes the platform unoperable. Putting both in configuratio
 
 | | **PolicyPack** — code | **JurisdictionSettings** — database |
 |---|---|---|
-| Contains | Ruleset selection, consent requirements, retention, identity requirements, disclosure + approval policy, currency policy, AI-processing policy, **cleared capabilities**, resolution strategies, **permitted subject-profile options** | Capability availability, provider enablement, kill switches, legal-document version in force, plan availability, entity assignment |
+| Contains | Ruleset selection, consent requirements, retention, identity requirements, disclosure + approval policy, currency policy, AI-processing policy, **cleared capabilities**, resolution strategies, **permitted subject-policy options** | Capability availability, provider enablement, kill switches, legal-document version in force, plan availability, entity assignment |
 | Changed by | PR → review → tests → staging → deploy | Authorized operator, audited, no deploy |
 
 ### The invariant
@@ -36,16 +36,24 @@ Which policy version governs a long-lived record is a **legal** question, and th
 
 > **No default is invented. An unspecified strategy is a load-time error.**
 
-### Subject-elected policy — `SubjectPolicyProfile`
+### Subject-elected policy — `SubjectPolicySelection`
 
 Some variation is neither geographic, legal-regime, nor legal-person: it is **elected by the subject**. Two customers in Qatar, same entity, same pack, can legitimately require different Zakat calculations — nisab basis, valuation convention, treatment of doubtful portions, calendar.
 
 The same shape appears in accounting-basis choices, fiscal-year conventions, and risk-tolerance bands.
 
-1. A profile may only select **among options the pack permits**. Same restrict-only invariant.
-2. Its version is **pinned at record creation**.
+**The split of responsibilities:**
+
+- **`SubjectPolicySelection` is the common platform mechanism** — it records *which option-set version a subject elected*, with versioning, pinning, and provenance. It is generic and knows nothing about any capability's options.
+- **The profile *content* is capability-scoped.** The option set itself — e.g. `ZakatMethodologyProfile` — is declared and owned by the capability's bounded context, not by the platform. The next capability with elective options declares its own profile type; the selection mechanism is reused unchanged.
+
+**Rules:**
+
+1. A selection may only elect **among options the pack permits**. Same restrict-only invariant.
+2. Its version is **pinned at record creation** (`subjectPolicySelectionVersion`).
 3. Provenance records it (ADR-0011).
-4. Where a capability declares no elective options, the profile is absent and costs nothing. **This is the common case.**
+4. Where a capability declares no elective options, the selection is absent and costs nothing. **This is the common case.**
+5. **Elections are potentially sensitive and are purpose-limited.** A jurisprudential methodology choice can reveal religious affiliation. Selections are classified `CONFIDENTIAL` at minimum, are readable only by the capability that owns them, and are **never exposed to marketing, analytics, or unrelated AI processing.**
 
 ## Consequences
 
@@ -74,4 +82,4 @@ The same shape appears in accounting-basis choices, fiscal-year conventions, and
 
 **A default resolution strategy.** Rejected: a default is a legal position taken by whoever wrote the fallback branch.
 
-**A separate ADR (0026) for subject-elected policy.** Rejected: it is the same decision about where policy lives and how it is versioned and pinned. Splitting it would create two places to look for one rule, violating the consolidation principle. **0026 is deliberately unused.**
+**A separate ADR for subject-elected policy.** Rejected: it is the same decision about where policy lives and how it is versioned and pinned. Splitting it would create two places to look for one rule, violating the consolidation principle. (A number was briefly reserved for it during Phase 0; the Phase 0.5 consolidation reassigned that number to the data-lifecycle ADR so the sequence stays continuous at 0001–0026.)

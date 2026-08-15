@@ -17,7 +17,7 @@ Accounts and balances. Accounts are created from statement import; there is no b
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `accounts` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` | **only a mask is stored — no full account number column exists** |
+| `accounts` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | **only a mask is stored — no full account number column exists** |
 | `institutions` | `PUBLIC` | `RETAIN_WITH_BASIS` | public catalogue |
 
 ## Events published

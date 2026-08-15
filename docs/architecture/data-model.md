@@ -77,7 +77,7 @@ A record whose legality, consent basis, or calculation depends on policy **pins 
 jurisdiction_at_creation        TEXT NOT NULL,
 policy_pack_version_at_creation TEXT NOT NULL,
 operating_entity_at_creation    UUID NOT NULL,
-subject_profile_version         TEXT     NULL   -- where the capability has elective options
+subject_policy_selection_version         TEXT     NULL   -- where the capability has elective options
 ```
 
 **Why all four, and why never a silent `UPDATE`:**
@@ -91,20 +91,29 @@ Architecture test 21 asserts the pinning columns exist on every table declared t
 
 The legacy validates the pattern independently: its Zakat assessments snapshot the jurisprudential settings in force into every assessment, which is exactly this rule applied to one capability.
 
-## 6. Erasure strategy — declared, not discovered
+## 6. Data lifecycle — declared, not discovered
 
-**Every table declares an erasure strategy at design time**, recorded in its module's `MODULE.md` and asserted by architecture test 25.
+**Every persistent dataset declares its lifecycle at design time**, recorded in its module's `MODULE.md` and asserted by architecture test 25 ([ADR-0026](../adr/0026-data-lifecycle.md)). Six fields:
 
-| Strategy | Meaning |
+| Field | Declares |
 |---|---|
-| `CASCADE` | Deleted with the owning subject |
-| `ANONYMISE` | Subject linkage severed; the row survives without it |
+| Subject relationship | `SUBJECT_OWNED` · `SUBJECT_DERIVED` · `AGGREGATE` · `NON_PERSONAL` |
+| Purpose | The processing purpose the data serves |
+| Classification | One of the six classes (§7) |
+| Retention | Duration **from the PolicyPack, per jurisdiction — never a constant in code** |
+| Export treatment | In the subject's export, excluded with a stated reason, or n/a |
+| Erasure strategy | One of the four below |
+
+| Erasure strategy | Meaning |
+|---|---|
+| `CASCADE_DELETE` | Deleted with the owning subject |
+| `ANONYMIZE_IRREVERSIBLY` | Subject linkage severed **irreversibly**; the row survives without it |
 | `RETAIN_WITH_BASIS` | Retained, with a stated legal basis and retention period |
-| `ORPHANED_BY_DESIGN` | Deliberately ownerless from creation, with a stated reason and a demonstration it cannot be re-identified |
+| `NON_PERSONAL_BY_DESIGN` | Deliberately holds no personal data from creation, with a stated reason and a demonstration it cannot be re-identified |
 
 This exists because the legacy discovered, during an erasure review, that one production table holds statement-derived data belonging to no user and **therefore cannot be erased on request** (finding P7). Phase 5 builds normalisation, dedup, and categorisation — all of which naturally produce data derived from a subject without belonging to one.
 
-**`ORPHANED_BY_DESIGN` is a decision requiring justification, not a description of an accident.** That distinction is the entire control.
+**`NON_PERSONAL_BY_DESIGN` is a decision requiring justification, not a description of an accident.** And **pseudonymization is not anonymization** — data whose subject linkage can be restored remains personal data and cannot claim `ANONYMIZE_IRREVERSIBLY` or `NON_PERSONAL_BY_DESIGN`.
 
 ## 7. Data classification on every column
 
@@ -157,6 +166,18 @@ It is tempting to keep obligation amounts in metadata for reporting. **Resist it
 **Also inherited — the lesson the legacy paid for.** Key rotation, escrow, and a second copy were **NOT BUILT**, and the production key *"has already been lost once."* For `SEALED` data that failure is both unrecoverable and undetectable. Karar therefore requires, before any production sealed data exists: **KEK escrow under split control with a rehearsed recovery drill**, and a **sealed-integrity canary** — a synthetic sealed record per KEK, holding known non-customer plaintext, decrypted on a schedule. See [`plan-v2-deltas.md` D2](plan-v2-deltas.md) and `../security/sealed-access.md`.
 
 **One known constraint, inherited:** a column that must be sorted or matched exactly cannot use random-IV GCM. The legacy hit this with `merchant_rules.pattern`, whose repository sorts on `LENGTH(pattern)`. Such columns need a different design — deterministic encryption with its own trade-offs, or a redesigned lookup — decided per column, not by default.
+
+## 9.1 Provider-neutral references
+
+**No provider-specific identifier is ever a domain field.** A `gs://bucket/file` URL, an `arn:aws:s3` path, a cloud key resource name, or a secret-manager ID persisted as domain identity would weld every stored row to one vendor.
+
+| Reference | Resolves to | Resolved by |
+|---|---|---|
+| `ObjectRef` | Stored bytes | The active `ObjectStorage` adapter |
+| `KeyRef` | An encryption key | The active key-management adapter |
+| `SecretRef` | A secret | The active secret-provider adapter |
+
+Domain and application code persist and pass the opaque reference; only the infrastructure adapter for the active deployment profile knows what it maps to. This is what makes moving a deployment between providers a data-free operation for the domain. See [`infrastructure-portability.md`](infrastructure-portability.md).
 
 ## 10. Audit
 

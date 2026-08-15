@@ -176,7 +176,7 @@ See [`../testing/architecture-tests.md`](../testing/architecture-tests.md) and t
 
 Forward-only SQL migration with a rollback script, run in CI **as the restricted application role** — a migration needing elevated privilege fails on a laptop instead of in production.
 
-The table needs: `tenant_id` if tenant-owned, RLS enabled **and** FORCEd, a data classification, an **erasure strategy** declared in `MODULE.md`, and pinning columns if it carries legal consequence.
+The table needs: `tenant_id` if tenant-owned, RLS enabled **and** FORCEd, and a full **lifecycle declaration** in `MODULE.md` — subject relationship, purpose, classification, retention, export treatment, erasure strategy ([ADR-0026](../adr/0026-data-lifecycle.md)) — plus pinning columns if it carries legal consequence. The SQL is **provider-neutral PostgreSQL**: no cloud-specific database feature without the documented exception in [`../architecture/database-portability.md` §3](../architecture/database-portability.md).
 
 ### 23. How do I add an external dependency?
 
@@ -210,7 +210,7 @@ Read the ADR first — it records the alternatives that were rejected and why. I
 
 `MoayadAlobaidi/Qarar` — a near-production Java/Spring Boot platform with a React Native client, audited in Phase 0.2.
 
-**No source file is portable** — different language, different framework, and Plan v2 forbids mechanical migration. What *is* reusable is more valuable: the 2,028-line Zakat specification, tuned parsing rules with their test cases, schema and migration patterns, operational scripts, and the decisions with their rationale — including the mistakes.
+**No. The greenfield rule is absolute** — [`../architecture/greenfield-rule.md`](../architecture/greenfield-rule.md). The legacy is a requirements, evidence, and test-case source, never a code, schema, or architecture source; every surviving behaviour travels the full sequence *requirement → domain model → use case → port → adapter*. What *is* reusable is knowledge, and it is more valuable than the code: the 2,028-line Zakat specification, tuned parsing rules with their test cases, schema and migration lessons, operational scripts, and the decisions with their rationale — including the mistakes.
 
 [`../legacy/reusable-assets.md`](../legacy/reusable-assets.md) grades every asset. [`../legacy/security-findings.md`](../legacy/security-findings.md) records what must not be repeated.
 
@@ -221,3 +221,11 @@ Two, and they are different in kind.
 **ENC-2 — the production encryption key is a one-way door and has already been lost once.** For `SEALED` data that failure is unrecoverable *and* undetectable, discovered at the worst possible moment. Hence escrow, rotation, and the integrity canary.
 
 **P1 — the published AI consent notice described a redaction behaviour the code did not implement**, and that notice was the legal basis for a cross-border transfer of customer financial data. *The code was defensible; the document was wrong.* **Published legal text is part of the system.**
+
+### 31. Which cloud provider does Karar depend on?
+
+**None, by design.** Domain and application code know no cloud — every infrastructure dependency is a provider-neutral port, and cloud SDKs, provider clients, and provider URIs are banned outside `infrastructure/` adapters (architecture test 10).
+
+Where a deployment actually runs is a **`DeploymentProfile`** — provider, region, database, storage, keys — resolved at the infrastructure edge, per deployment, and recorded in the [country deployment matrix](../architecture/country-deployment-matrix.md). Qatar's candidate is GCP (**UNVERIFIED**, no account exists); other jurisdictions may use other providers; a partner bank may mandate its own. The database commitment is **PostgreSQL the engine, portable across managed providers** — not any one vendor's PostgreSQL ([`../architecture/database-portability.md`](../architecture/database-portability.md)).
+
+Practical consequences: persist `ObjectRef`/`SecretRef`/`KeyRef`, never a `gs://` or `arn:` value; read ports, never `GCP_PROJECT_ID`; and write provider-neutral SQL.

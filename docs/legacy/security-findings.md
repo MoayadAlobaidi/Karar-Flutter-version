@@ -149,7 +149,7 @@ Arabic name and phone field-encrypted server-side and **cached in plaintext `Asy
 
 One production table holds statement-derived data belonging to no user and **therefore cannot be erased on request**. The export omits whole categories of the customer's own data *while its coverage block claims to name everything it omits*. Nothing but the raw file has a retention schedule.
 
-**Karar V2:** every table declares an erasure strategy at design time — `CASCADE`, `ANONYMISE`, `RETAIN_WITH_BASIS`, or `ORPHANED_BY_DESIGN` with a stated legal basis. Enforced by the `MODULE.md` template (Phase 0.7) and asserted in Phase 16. **Deriving data into an ownerless shape is a design decision, and it must be made deliberately rather than discovered during a data-subject request.**
+**Karar V2:** every table declares an erasure strategy at design time — `CASCADE_DELETE`, `ANONYMIZE_IRREVERSIBLY`, `RETAIN_WITH_BASIS`, or `NON_PERSONAL_BY_DESIGN` with a stated legal basis. Enforced by the `MODULE.md` template (Phase 0.7) and asserted in Phase 16. **Deriving data into an ownerless shape is a design decision, and it must be made deliberately rather than discovered during a data-subject request.**
 
 ---
 
@@ -179,8 +179,8 @@ Additions to Plan v2 §13, which specifies 21. These take it to **26**.
 | 22 | **RLS coverage guard** — every table is RLS-enabled and FORCEd, or appears on an explicit allow-list with a stated reason. Detects *no RLS*, *enabled-without-policy*, and *FORCEd-without-enabled* | RLS-01, RLS-02, P14 |
 | 23 | **No declared guard without a call site** — a class or decorator documented as a protection must be reachable | AZ3 |
 | 24 | **Ingestion and rendering paths declare explicit limits** — bytes, rows, pages, wall-clock, memory | FILES-2, FILES-7, API-05 |
-| 25 | **Every table declares an erasure strategy** | P7, P8 |
-| 26 | **Capability promises reconcile with legal documents** — a `CapabilityDescriptor` referencing a legal document must declare the behaviours that document promises | P1, P4, P12, C4 |
+| 25 | **Every persistent dataset declares its lifecycle** — subject relationship, purpose, classification, retention, export treatment, erasure strategy | P7, P8 |
+| 26 | **Technical/legal capability claims have evidence traceability** — via the [Assurance Claim Registry](../security/assurance-claims.md) | P1, P4, P12, C4 |
 
 Test 26 cannot fully verify prose against code and is not claimed to. It asserts the *link* exists and that a declared promise has a named owner — which is what was missing when the AI notice and the redaction code diverged.
 
@@ -217,3 +217,28 @@ Carried from the legacy's go-live worklist. These belong on Karar V2's pre-launc
 | **M12** | Measure RTO. RPO is evidenced at ~24h; **recovery time has never been measured** |
 
 Plus, specific to Karar V2 and with no legacy equivalent: **Sharia review for Zakat** (none exists), and **Amanat legal clearance per jurisdiction** (Plan v2, before Phase 14).
+
+---
+
+## 9. Root-cause groups and dispositions (Phase 0.5)
+
+**The 128 findings are evidence, not implementation instructions.** Karar does not create 128 one-to-one checks, and never copies legacy security code merely because it exists. Instead, every material finding applicable to V2 maps — through one of the ten systemic root causes below — to exactly one disposition:
+
+`ARCHITECTURE CONTROL` · `REGRESSION TEST` · `DEFERRED RISK` (named owner, in the risk register) · `NOT APPLICABLE` (with reason)
+
+| # | Root cause | Representative findings | Disposition |
+|---|---|---|---|
+| 1 | **A control exists but is not wired or verified** — guards with no call site, enforcement flags defaulting off, a decorative kill switch | AZ3, API-13, AUTHN-04 (recovery half), AI kill switch | ARCHITECTURE CONTROL (deny-by-default, ADR-0016) + REGRESSION TEST (test 23; every control ships a test that fails when it is removed) |
+| 2 | **A security boundary was retrofitted, incompletely** — RLS across three migrations, 24 tables uncovered, shapes no guard detects | RLS-01, RLS-02, RLS-04, P14, AZ2 | ARCHITECTURE CONTROL (RLS at Phase 3, ADR-0022) + REGRESSION TEST (test 22; adversarial tests on non-empty data, UPDATE/DELETE exercised) |
+| 3 | **Client-supplied input trusted for a security decision** — `X-Forwarded-For` rate keys, raw-URI policy selection, filename-based routing | AUTHN-04, API-01, FILES-3 | ARCHITECTURE CONTROL (trusted-proxy allow-list; normalised-path policy; magic-byte validation) + REGRESSION TEST (attack-shaped tests) |
+| 4 | **No resource bounds on ingestion or rendering** | FILES-2, FILES-7, API-05 | ARCHITECTURE CONTROL + REGRESSION TEST (test 24) |
+| 5 | **Key lifecycle unowned** — no rotation, no escrow, no coverage measurement, unauthenticated transport, a key lost in production | ENC-1, ENC-2, ENC-3, ENC-13, M9 | ARCHITECTURE CONTROL (ADR-0017: `KeyCustodyStrategy`/`KeyRecoveryPolicy`/`KeyRotationPolicy`, canary, coverage tool, `verify-full`) + Phase 20 gates |
+| 6 | **Published documents diverge from the system** — the notice promises what the code does not do; gates fail open | P1, P4, P12, C4, AI-5 | ARCHITECTURE CONTROL (fail-closed consent; re-consent evaluation, ADR-0024) + REGRESSION TEST (test 26 via the Assurance Claim Registry) |
+| 7 | **Data lifecycle undeclared** — ownerless derived data, no retention schedule, incomplete export claiming completeness | P7, P8, P5, M6 | ARCHITECTURE CONTROL (ADR-0026) + REGRESSION TEST (test 25) |
+| 8 | **Operations and assurance gaps** — no staging, no on-call, gates that block runs not merges, mobile never in CI, unmeasured RTO, in-heap admin sessions | INFRA-02/-04/-06/-07/-09/-10/-13/-16, AUTHN-16, M12 | ARCHITECTURE CONTROL (merge-blocking CI; control plane, ADR-0021) + **Phase 19/20 gates** (staging, on-call, measured RTO, independent assessment) |
+| 9 | **Client-side data hygiene** — plaintext caches, hand-maintained sign-out registry, no biometric lock, no cert pinning | MOB-01…MOB-07 | ARCHITECTURE CONTROL (Phase 4 Flutter rules) + **DEFERRED RISK**: certificate pinning (C11), named in the risk register |
+| 10 | **Staff access one layer deep, reads unaudited** | AZ1, AZ5 | ARCHITECTURE CONTROL (RLS + revoked grants; projections; every staff read audited) |
+
+**NOT APPLICABLE with reason** — findings about legacy-specific surfaces that do not exist in V2 and whose *lesson* is already captured above: the fabricated connect-a-bank flow (dropped; capability states shown honestly), the family-budget mock (dropped), Render/Supabase configuration findings (different topology; the environment-identity lesson is §4.6 of [`reusable-assets.md`](reusable-assets.md) and the boot assertion rule), and the QNB-labelling defect (FILES-11; V2's layout port names its layout).
+
+Anything neither controlled, tested, nor N/A must appear in the **risk-acceptance register** with a named owner before production — the register the legacy never wrote (M10).

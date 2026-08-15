@@ -138,9 +138,13 @@ Every request resolves four independent things at the edge, before any use case 
 | **Tenant** | Which brand and product boundary? | [`tenancy.md`](tenancy.md) |
 | **Jurisdiction** | Which legal regime governs this person or record? | [`jurisdiction-policy.md`](jurisdiction-policy.md) |
 | **OperatingEntity** | Which legal person provides the service and bears responsibility? | [`operating-entity.md`](operating-entity.md) |
-| **SubjectPolicyProfile** | Which elective conventions has this subject chosen, within what the jurisdiction permits? | [`jurisdiction-policy.md`](jurisdiction-policy.md) |
+| **SubjectPolicySelection** | Which elective conventions has this subject chosen, within what the jurisdiction permits? | [`jurisdiction-policy.md`](jurisdiction-policy.md) |
 
-The fourth is an amendment arising from the legacy audit — see [`plan-v2-deltas.md` D1](plan-v2-deltas.md).
+The fourth is an amendment arising from the legacy audit — see [`plan-v2-deltas.md` D1](plan-v2-deltas.md). The selection *mechanism* is platform; the option *content* (e.g. `ZakatMethodologyProfile`) belongs to the owning capability.
+
+### Where it runs is a fifth, separate question
+
+**`DeploymentProfile`** — provider, region, database, storage, keys, AI routing — is an infrastructure concept resolved at the edge, deliberately distinct from all four business dimensions. A jurisdiction does not determine a cloud; a tenant does not determine a deployment; and **no business capability may care which cloud hosts it**. Qatar may run on one provider, the UAE on another, and a partner bank on its own — with the domain identical in every case. See [`infrastructure-portability.md`](infrastructure-portability.md) and [`greenfield-rule.md`](greenfield-rule.md) for the two platform-wide rules made canonical in Phase 0.5.
 
 **Use cases never read a country code and never branch on jurisdiction.** They ask `EffectivePolicy` a question. Country- or jurisdiction-keyed business branching outside `packages/jurisdiction-policy` fails CI.
 
@@ -223,8 +227,12 @@ Items 5 and 6 rank immediately after clear architecture, and **neither justifies
 | [`white-label.md`](white-label.md) | Control plane and data plane |
 | [`sdk-strategy.md`](sdk-strategy.md) | OpenAPI-first, generated SDKs, capability scoping |
 | [`environments.md`](environments.md) | LOCAL → DEV → STAGING → PRODUCTION |
-| [`deployment-topology.md`](deployment-topology.md) | The L0–L3 ladder |
-| [`gcp-target.md`](gcp-target.md) | Target infrastructure, with no GCP in the domain |
+| [`deployment-topology.md`](deployment-topology.md) | The L0–L3 ladder — cloud-neutral, any rung on any approved provider |
+| [`infrastructure-portability.md`](infrastructure-portability.md) | DeploymentProfile, provider ports, opaque references, the definition of portable |
+| [`database-portability.md`](database-portability.md) | PostgreSQL provider portability — and its honest limit |
+| [`country-deployment-matrix.md`](country-deployment-matrix.md) | Which provider serves which jurisdiction — decisions, not assumptions |
+| [`greenfield-rule.md`](greenfield-rule.md) | V2 is built from scratch; the legacy is knowledge, never code |
+| [`gcp-target.md`](gcp-target.md) | The GCP provider profile — candidate for Qatar, not a domain dependency |
 | [`data-residency.md`](data-residency.md) | The open question, and how the architecture keeps it answerable |
 | [`plan-v2-deltas.md`](plan-v2-deltas.md) | Amendments arising from the legacy audit |
 

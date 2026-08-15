@@ -17,7 +17,7 @@ Derived insight: dashboard figures, financial health, category breakdown, waste 
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `recurring_detections` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` | proposals until confirmed |
+| `recurring_detections` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | proposals until confirmed |
 
 ## Events published
 

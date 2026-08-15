@@ -70,9 +70,9 @@ Each an adapter under `infrastructure/providers/`, behind an existing port:
 
 ## 6. Deployment
 
-**None for L0.** SA tenants run on the shared platform.
+**None for L0.** SA tenants run on the shared platform under the existing `DeploymentProfile`.
 
-If residency findings demand local processing → L2 or L3, which is **Terraform and IAM work, not code**. See [`../architecture/deployment-topology.md`](../architecture/deployment-topology.md).
+If residency findings demand local processing → L2 or L3 — a **new `DeploymentProfile`** on whichever approved provider Saudi availability and regulation select (verified per the [country deployment matrix](../architecture/country-deployment-matrix.md) §3 capability check), provisioned as a Terraform composition, with the database created **from canonical migrations, never by copying Qatar's**. Still **Terraform and IAM work, not code**. See [`../architecture/deployment-topology.md`](../architecture/deployment-topology.md) and [`../architecture/infrastructure-portability.md`](../architecture/infrastructure-portability.md).
 
 ## 7. Untouched
 

@@ -17,8 +17,8 @@ Budgets and spending limits.
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `budgets` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` |  |
-| `budget_periods` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` |  |
+| `budgets` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` |  |
+| `budget_periods` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` |  |
 
 ## Events published
 

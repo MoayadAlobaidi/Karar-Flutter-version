@@ -97,7 +97,7 @@ graph TB
     end
     subgraph "Bindings — pinned at creation"
         U[User<br/>residencyJurisdiction<br/>contractingOperatingEntity]
-        R[Record<br/>jurisdictionAtCreation<br/>policyPackVersionAtCreation<br/>operatingEntityAtCreation<br/>subjectProfileVersion]
+        R[Record<br/>jurisdictionAtCreation<br/>policyPackVersionAtCreation<br/>operatingEntityAtCreation<br/>subjectPolicySelectionVersion]
     end
     JU --> U
     OE --> U

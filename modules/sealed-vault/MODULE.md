@@ -17,7 +17,7 @@ Grant-gated storage for SEALED payloads. Designed from day one to be extracted i
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `sealed.sealed_payloads` | `SEALED` | `CASCADE` | ciphertext, wrapped DEK, key ref, checksum |
+| `sealed.sealed_payloads` | `SEALED` | `CASCADE_DELETE` | ciphertext, wrapped DEK, key ref, checksum |
 | `seal_access_grants` | `CONFIDENTIAL` | `RETAIN_WITH_BASIS` | audited, approval-bearing |
 | `seal_canaries` | `INTERNAL` | `RETAIN_WITH_BASIS` | known plaintext, no customer data |
 

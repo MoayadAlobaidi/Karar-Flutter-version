@@ -39,12 +39,12 @@ An accepted ADR is not revisited without new information. If new information arr
 | [0023](0023-deployment-topology-ladder.md) | Deployment topology ladder L0–L3 | 17+ |
 | [0024](0024-operating-entity.md) | Legal / Operating Entity as a distinct platform dimension, and legal-document lifecycle | 3 |
 | [0025](0025-event-governance.md) | Domain event governance and identifier-only payload rules | 2 |
-| [0027](0027-data-lifecycle.md) | Data lifecycle — retention, erasure, and ownerless derived data | 5 |
+| [0026](0026-data-lifecycle.md) | Data lifecycle — subject relationship, purpose, retention, export, and erasure | 5 |
 
-**0026 is deliberately unused.** Subject-elected policy was folded into [0015](0015-policy-packs.md) rather than split across two documents, per the consolidation rule that there be exactly one authoritative rule per decision.
+**Numbering is continuous, 0001–0026.** The data-lifecycle ADR was numbered 0027 when raised in Phase 0 (0026 was briefly reserved for subject-elected policy, which was instead folded into [0015](0015-policy-packs.md) per the one-rule-per-decision principle); the Phase 0.5 consolidation renumbered it to 0026.
 
 ---
 
 ## Decisions arising from the legacy audit
 
-ADRs 0015, 0017, 0024, and 0027 were extended or created after the Phase 0.2 audit of `MoayadAlobaidi/Qarar` gained source access. See [`../architecture/plan-v2-deltas.md`](../architecture/plan-v2-deltas.md).
+ADRs 0015, 0017, 0024, and 0026 were extended or created after the Phase 0.2 audit of `MoayadAlobaidi/Qarar` gained source access, and were consolidated — together with 0023's multi-provider amendment — in Phase 0.5. See [`../architecture/plan-v2-deltas.md`](../architecture/plan-v2-deltas.md) (historical) and [`../phase-05-consolidation.md`](../phase-05-consolidation.md).

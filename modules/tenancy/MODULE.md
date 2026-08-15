@@ -19,8 +19,8 @@ Tenant model, contracts, seat allocation, and the isolation boundary.
 |---|---|---|---|
 | `tenants` | `INTERNAL` | `RETAIN_WITH_BASIS` | contractual record |
 | `tenant_contracts` | `INTERNAL` | `RETAIN_WITH_BASIS` | contractual record |
-| `tenant_members` | `CONFIDENTIAL` | `CASCADE` | RLS-scoped; policy required for TENANT_ADMIN |
-| `tenant_invitations` | `CONFIDENTIAL` | `CASCADE` | holds a bearer code — RLS mandatory |
+| `tenant_members` | `CONFIDENTIAL` | `CASCADE_DELETE` | RLS-scoped; policy required for TENANT_ADMIN |
+| `tenant_invitations` | `CONFIDENTIAL` | `CASCADE_DELETE` | holds a bearer code — RLS mandatory |
 
 ## Events published
 

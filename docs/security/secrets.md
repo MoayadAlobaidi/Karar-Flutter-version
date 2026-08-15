@@ -17,6 +17,8 @@ Secrets are `SECRET`: **never in events, never in projections, never in logs, ne
 
 > **Never reuse production's encryption key anywhere.** A staging leak would otherwise decrypt production data.
 
+**Application code holds `SecretRef` and `KeyRef` — never a provider's secret ID or key resource name.** The opaque reference resolves through the active deployment profile's secret and key-management adapters, so moving a deployment between providers re-points references without touching application code or stored data ([`../architecture/infrastructure-portability.md`](../architecture/infrastructure-portability.md)).
+
 The legacy makes this concrete: its staging plan requires its own `DATA_ENCRYPTION_KEY`, its own `JWT_SECRET`, and a separate AI key with a **capped spend**.
 
 ## 3. Environments must be distinguishable at boot
@@ -48,6 +50,8 @@ The most important lesson in the legacy audit. Finding **ENC-2**:
 > Key rotation, escrow or a second copy: **NOT BUILT**. The key is a one-way door and **has already been lost once in production, on 11 August 2026.**
 
 The legacy survived because production held 3 users and 45 transactions, and because encrypted columns sit beside readable metadata that makes loss visible. **`SEALED` removes both cushions by design** — loss is unrecoverable *and* undetectable.
+
+Custody is expressed as three **provider-independent** policies — `KeyCustodyStrategy`, `KeyRecoveryPolicy`, `KeyRotationPolicy` — implemented by whichever key-management provider the deployment profile selects (ADR-0017). No single cloud's escrow product is mandated.
 
 | Requirement | Detail | Gate |
 |---|---|---|

@@ -1,7 +1,7 @@
 # ADR-0024 — Legal / Operating Entity as a distinct platform dimension
 
 **Status:** ACCEPTED · **Phase:** 3
-**Amended:** after the Phase 0.2 legacy audit, to cover legal-document version lifecycle and re-consent.
+**Amended:** after the Phase 0.2 legacy audit, to cover legal-document version lifecycle and re-consent; refined in Phase 0.5 — consent is not assumed to be the legal basis for every purpose or jurisdiction.
 
 ## Context
 
@@ -41,6 +41,10 @@ A change to the in-force legal document version for an `(entity, jurisdiction)` 
 **Neither is a default. An unclassified republication blocks the version change.** A subject with an outstanding material re-consent is treated as consent-absent, so the capability resolver returns `CONSENT_REQUIRED` — **failing closed**.
 
 **`licensesHeld` asserts nothing about any regulator.** It is a typed reference so capabilities can require one. Karar claims no licence anywhere.
+
+### Consent is one legal basis, not the only one
+
+**Do not assume consent is the legal basis for every processing purpose or jurisdiction.** A purpose may rest on contract performance, legal obligation, or another basis the jurisdiction recognises — and which basis applies is a per-purpose, per-jurisdiction declaration in the PolicyPack, not a platform-wide default. The consent machinery in this ADR governs the purposes whose declared basis *is* consent; a purpose with a different declared basis is gated on that basis's own conditions instead. A purpose with **no declared basis fails closed**, exactly as an unclassified republication does.
 
 ## Consequences
 

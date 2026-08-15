@@ -34,8 +34,12 @@ Looking up a term: [`glossary.md`](glossary.md).
 | [white-label](architecture/white-label.md) | Control plane and data plane |
 | [sdk-strategy](architecture/sdk-strategy.md) | OpenAPI-first, generated SDKs, capability scoping |
 | [environments](architecture/environments.md) | LOCAL → DEV → STAGING → PRODUCTION |
-| [deployment-topology](architecture/deployment-topology.md) | The L0–L3 ladder |
-| [gcp-target](architecture/gcp-target.md) | Target infrastructure, no GCP in the domain |
+| [deployment-topology](architecture/deployment-topology.md) | The L0–L3 ladder — cloud-neutral |
+| [infrastructure-portability](architecture/infrastructure-portability.md) | **DeploymentProfile, provider ports, opaque refs, the definition of portable** |
+| [database-portability](architecture/database-portability.md) | **PostgreSQL provider portability — and its honest limit** |
+| [country-deployment-matrix](architecture/country-deployment-matrix.md) | **Provider per jurisdiction — decisions, not assumptions** |
+| [greenfield-rule](architecture/greenfield-rule.md) | **V2 from scratch; the legacy is knowledge, never code** |
+| [gcp-target](architecture/gcp-target.md) | The GCP provider profile — Qatar candidate, not a domain dependency |
 | [data-residency](architecture/data-residency.md) | The open question, and the seam that keeps it answerable |
 | [plan-v2-deltas](architecture/plan-v2-deltas.md) | **Amendments arising from the legacy audit** |
 
@@ -52,6 +56,7 @@ Looking up a term: [`glossary.md`](glossary.md).
 | [access-control](security/access-control.md) | Roles, permissions, enforcement points |
 | [secrets](security/secrets.md) | Key hierarchy, escrow, rotation, the canary |
 | [sealed-access](security/sealed-access.md) | Grant procedures, audit, incident response |
+| [assurance-claims](security/assurance-claims.md) | The Assurance Claim Registry behind architecture test 26 |
 
 ## Legacy
 
@@ -82,7 +87,8 @@ Reproducible from the documentation alone — a Phase 0 exit criterion.
 | [roadmap](roadmap.md) | Phases 0–21, gates, and honest scope |
 | [testing/architecture-tests](testing/architecture-tests.md) | The 26 CI-blocking tests |
 | [MODULE_TEMPLATE](MODULE_TEMPLATE.md) | Required for every module |
-| [phase-0-completion](phase-0-completion.md) | Exit-criteria verification |
+| [phase-0-completion](phase-0-completion.md) | Phase 0 exit-criteria verification |
+| [phase-05-consolidation](phase-05-consolidation.md) | Phase 0.5 consolidation record — D1–D6 resolved, portability canonical |
 
 ---
 

@@ -1,6 +1,7 @@
 # Deployment Topology Ladder
 
 **ADR:** 0023 · **Phase:** 17+ (infrastructure), design binding from Phase 1
+**Amended in Phase 0.5:** the ladder is **cloud-neutral** — every rung may run on any approved provider, selected per deployment by a `DeploymentProfile`.
 
 ---
 
@@ -10,7 +11,7 @@
 graph LR
     L0[L0 Shared SaaS<br/>shared DB · tenant_id + RLS] --> L1[L1 Dedicated DB<br/>shared platform]
     L1 --> L2[L2 Dedicated deployment<br/>own runtime + DB]
-    L2 --> L3[L3 Dedicated project<br/>own KMS · IdP · connectors]
+    L2 --> L3[L3 Dedicated cloud account<br/>own KMS · IdP · connectors]
     L0 -.data migration +<br/>connection routing.-> L1
     L1 -.deploy topology.-> L2
     L2 -.Terraform + IAM.-> L3
@@ -21,13 +22,28 @@ graph LR
 | **L0** | Shared database, `tenant_id` + RLS | Default. First-party and most partners |
 | **L1** | Dedicated database, shared platform | Partner data-isolation requirement |
 | **L2** | Dedicated deployment — own runtime and database | Contractual or performance isolation |
-| **L3** | Dedicated project — own KMS, IdP, connectors | Regulatory or residency requirement |
+| **L3** | **Dedicated cloud account / project / subscription** — the provider's own top-level isolation unit — own KMS, IdP, connectors | Regulatory or residency requirement |
+
+L3 is deliberately not defined as "a GCP project"; it is whatever the selected provider's account-isolation boundary is.
+
+## 1.1 Any rung, any approved provider
+
+Each rung binds to a provider stack through a [`DeploymentProfile`](infrastructure-portability.md) — never by assumption. Illustrative only:
+
+| Deployment | Rung | Provider |
+|---|---|---|
+| Qatar shared SaaS | L0 | GCP (candidate) |
+| Saudi shared SaaS | L0 | TBD |
+| UAE shared SaaS | L0 | A UAE-available approved provider (TBD) |
+| Bank X dedicated UAE | L2/L3 | The provider the bank's contract requires |
+
+> **Provider assignments are examples and configuration, never Domain assumptions.** The decided state lives in [`country-deployment-matrix.md`](country-deployment-matrix.md).
 
 ## 2. The claim
 
-> **Domain code is identical at every rung**, because it never names a database, provider, region, or key.
+> **Domain code is identical at every rung — on any approved provider**, because it never names a database, provider, region, or key.
 
-Moving a tenant up the ladder is **infrastructure resolution and Terraform** — not a rewrite, not a fork, not a branch.
+Moving a tenant up the ladder, or a deployment between providers, is **infrastructure resolution and Terraform** — not a rewrite, not a fork, not a branch.
 
 ## 3. The three mechanisms that make it true
 

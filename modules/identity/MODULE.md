@@ -17,10 +17,10 @@ Authentication, sessions, multi-factor, and credential lifecycle. Owns who a pri
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `users_auth` | `CONFIDENTIAL` | `CASCADE` | credential material, hashed |
-| `sessions` | `CONFIDENTIAL` | `CASCADE` | refresh tokens, revocable server-side |
-| `mfa_enrolments` | `CONFIDENTIAL` | `CASCADE` | TOTP secrets are SECRET-handled |
-| `verification_codes` | `CONFIDENTIAL` | `CASCADE` | salted hash, attempt-capped |
+| `users_auth` | `CONFIDENTIAL` | `CASCADE_DELETE` | credential material, hashed |
+| `sessions` | `CONFIDENTIAL` | `CASCADE_DELETE` | refresh tokens, revocable server-side |
+| `mfa_enrolments` | `CONFIDENTIAL` | `CASCADE_DELETE` | TOTP secrets are SECRET-handled |
+| `verification_codes` | `CONFIDENTIAL` | `CASCADE_DELETE` | salted hash, attempt-capped |
 
 ## Events published
 

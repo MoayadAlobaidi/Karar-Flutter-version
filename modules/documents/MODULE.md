@@ -17,8 +17,8 @@ Document and evidence references. The only module that touches object storage.
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `document_references` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` | bytes live behind ObjectStorage |
-| `document_verifications` | `CONFIDENTIAL` | `CASCADE` |  |
+| `document_references` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | bytes live behind ObjectStorage |
+| `document_verifications` | `CONFIDENTIAL` | `CASCADE_DELETE` |  |
 
 ## Events published
 

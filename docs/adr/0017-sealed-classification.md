@@ -1,7 +1,7 @@
 # ADR-0017 — `SEALED` classification, grant-gated vault, extractable boundary, key escrow
 
-**Status:** ACCEPTED · **Phase:** 13 (build), 20 (extraction, escrow, canary gates)
-**Amended:** after the Phase 0.2 legacy audit, to add key escrow, rotation, and the integrity canary.
+**Status:** ACCEPTED · **Phase:** 13 (build), 20 (extraction, custody, canary gates)
+**Amended:** after the Phase 0.2 legacy audit, to add key escrow, rotation, and the integrity canary; refined in Phase 0.5 to make key custody **provider-independent** — no single cloud's escrow product is mandated.
 
 ## Context
 
@@ -35,11 +35,25 @@ Network-capable port surface, **no participation in the caller's transaction**, 
 
 **Gate:** extracted into a dedicated security boundary **before any production `SEALED` data exists**.
 
-### Key escrow, rotation, and the canary
+### Key custody, recovery, rotation, and the canary — provider-independent
 
-1. **KEK escrow under split control**, with a documented, rehearsed, timed recovery drill.
-2. **Sealed-integrity canary** — a synthetic sealed record per jurisdiction-KEK holding **known plaintext containing no customer data**, decrypted on a schedule, alerting on failure.
-3. **Rotation designed in from Phase 2**, not retrofitted.
+Custody is expressed as three **provider-independent** policies, implemented by whichever key-management provider a deployment profile selects. **No single cloud's escrow product is mandated** — a deployment on a different provider satisfies the same policies with different infrastructure:
+
+| Policy | Declares |
+|---|---|
+| `KeyCustodyStrategy` | Where KEK material and its second copy live, and under whose split control — no single operator can reconstruct a KEK alone |
+| `KeyRecoveryPolicy` | The documented, rehearsed, **timed** recovery procedure and its separation of duties |
+| `KeyRotationPolicy` | Rotation cadence and mechanics — designed in from Phase 2, not retrofitted |
+
+**Before any production `SEALED` data exists, all of the following hold:**
+
+- custody strategy selected and implemented
+- rotation tested
+- recovery documented **and the drill rehearsed and timed**
+- separation of duties defined
+- **sealed-integrity canary operational** — a synthetic sealed record per jurisdiction-KEK holding **known plaintext containing no customer data**, decrypted on a schedule, alerting on failure
+- monitoring operational
+- key and version **provenance recorded** for every wrap and rotation
 
 ## Consequences
 

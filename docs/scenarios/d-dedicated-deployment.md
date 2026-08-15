@@ -9,7 +9,7 @@
 
 | Requirement | Mechanism | Code change |
 |---|---|---|
-| Dedicated GCP project | **L3 rung** — Terraform environment + project | none |
+| Dedicated cloud account/project/subscription | **L3 rung** — a Terraform composition on the provider the customer's `DeploymentProfile` selects (which may differ from Karar's other deployments) | none |
 | Dedicated database | Tenant→datasource routing at the infrastructure edge | none |
 | Dedicated encryption keys | `KeyRef` resolves a tenant-scoped KEK via `EncryptionProvider` | none |
 | Own branding | `BrandConfiguration` + Flutter flavor | none (flavor is build config) |

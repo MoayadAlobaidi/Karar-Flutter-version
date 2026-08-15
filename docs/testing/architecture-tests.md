@@ -16,7 +16,7 @@
 | 4 | No ORM leakage | A Prisma type appears outside `infrastructure/` |
 | 5 | Ports declared inward | An adapter exists with no port declared in `application/` |
 | 6 | No business logic in controllers | A controller exceeds declared complexity or calls more than one use case |
-| 10 | No direct provider access | A domain or application file names a vendor SDK |
+| 10 | No direct provider access | A domain or application file names a vendor or **cloud SDK** — any GCP/AWS/Azure SDK import in `domain/` or `application/`; a provider-specific URI or resource name (`gs://`, `arn:`, project paths) in a domain entity; a database, storage, messaging, secrets, KMS, or AI provider client (Cloud SQL, RDS, GCS, S3, Pub/Sub, Secret Manager, Secrets Manager, Vertex, …) referenced outside its own adapter in `infrastructure/providers/` or `infrastructure/persistence/` |
 | 11 | Deterministic domain | `domain/` reads the system clock or a random source |
 | 17 | Pure packages | `jurisdiction-policy` or `state-machine` gains a framework dependency |
 | 18 | Storage access | A domain touches `ObjectStorage` directly rather than via `documents` |
@@ -28,7 +28,7 @@
 |---|---|---|
 | 7 | Money discipline | A float, `number`, or `double` appears in a monetary position |
 | 12 | No jurisdiction branching | A conditional or pattern match on a country/jurisdiction identifier appears in `domain/`, `application/`, or `presentation/`. **Country codes in localization, reference data, formatting, fixtures, and seed data are permitted** |
-| 21 | Pinning | A table declared to carry legal consequence lacks `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, or `subjectProfileVersion` |
+| 21 | Pinning | A table declared to carry legal consequence lacks `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, or `subjectPolicySelectionVersion` |
 
 ## Sealed data
 
@@ -64,15 +64,15 @@
 |---|---|---|
 | 22 | RLS coverage guard, all three shapes | RLS-01, RLS-02, P14 — the legacy's guard tests only for *enabled-without-policy*, and its own audit table is *FORCEd but not enabled* |
 | 23 | **No declared guard without a call site** | AZ3 — `TenantAccessGuard` has *two of three documented protections with no call site anywhere*. They read as live controls and are not |
-| 24 | **Ingestion and rendering paths declare explicit limits** — bytes, rows, pages, wall-clock, memory | FILES-2 (HIGH), FILES-7, API-05 |
-| 25 | **Every table declares an erasure strategy** | P7, P8 — one production table holds statement-derived data belonging to no user and cannot be erased on request |
-| 26 | **Capability promises reconcile with legal documents** | P1, P4, P12, C4 |
+| 24 | **Ingestion and rendering paths declare explicit resource limits** — bytes, rows, pages, wall-clock, memory | FILES-2 (HIGH), FILES-7, API-05 |
+| 25 | **Every persistent dataset declares its lifecycle** — subject relationship, purpose, classification, retention, export treatment, erasure strategy ([ADR-0026](../adr/0026-data-lifecycle.md)) | P7, P8 — one production table holds statement-derived data belonging to no user and cannot be erased on request |
+| 26 | **Technical and legal capability claims have evidence traceability** — every claim a `CapabilityDescriptor` or referenced legal document makes maps to an entry in the [Assurance Claim Registry](../security/assurance-claims.md) with an evidence pointer and a named owner | P1, P4, P12, C4 |
 
 ### On test 26
 
-It cannot verify prose against code and does not claim to. It asserts that the **link** exists and that a declared promise has a **named owner** — which is exactly what was missing when the legacy's AI consent notice and its redaction code diverged.
+CI cannot read legal prose, and this test does not pretend it can. What it asserts mechanically is the **link**: a capability that references a legal document, or a document that promises a behaviour, must have a registry entry naming the claim, its evidence (a test ID, a code path, a document, an evidence label), and an owner. Whether the evidence actually supports the claim is a **human review recorded in the registry**, not a build step.
 
-That divergence is worth restating, because it is the most instructive failure in the audit: *"The code is defensible; the consent text is wrong, and that text is the legal basis for a cross-border transfer of customer financial data."*
+That link and owner are exactly what was missing when the legacy's AI consent notice and its redaction code diverged: *"The code is defensible; the consent text is wrong, and that text is the legal basis for a cross-border transfer of customer financial data."*
 
 ---
 
@@ -83,6 +83,10 @@ That divergence is worth restating, because it is the most instructive failure i
 Not a test that the control exists — **a test that the attack fails.**
 
 And for isolation specifically: **tests assert on non-empty expected data.** A cross-tenant test that passes because nothing came back has verified nothing. The legacy's tenant roster returns empty for everyone because a policy is missing, and *an empty roster is indistinguishable from correct isolation.*
+
+## Related suites — not architecture tests
+
+**PostgreSQL adapter contract tests** ([`../architecture/database-portability.md`](../architecture/database-portability.md)): one contract suite per repository port, runnable against local Docker PostgreSQL from Phase 1–2 and, when those environments exist, against each approved managed PostgreSQL provider. It pins repository behaviour, RLS assumptions, transaction semantics, `Money` persistence, and migrations to the **PostgreSQL contract rather than any provider's**. Integration tests, not structural ones — listed here so nobody looks for them in the 26.
 
 ## Coverage this does not provide
 

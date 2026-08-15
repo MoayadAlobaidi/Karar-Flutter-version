@@ -17,9 +17,9 @@ Savings goals, plans, and affordability.
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `goals` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` |  |
-| `savings_plans` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` | **typed, not unvalidated JSON** |
-| `loans` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE` | customer-entered debts; bank name encrypted |
+| `goals` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` |  |
+| `savings_plans` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | **typed, not unvalidated JSON** |
+| `loans` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | customer-entered debts; bank name encrypted |
 
 ## Events published
 

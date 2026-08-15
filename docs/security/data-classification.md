@@ -70,7 +70,7 @@ Classification is declared:
 | Event payload rules by classification | 15 |
 | Log redaction of `CONFIDENTIAL` and above | 13 |
 | AI context types cannot hold sealed data | 13, structural |
-| Every table declares an erasure strategy | 25 |
+| Every persistent dataset declares its lifecycle | 25 |
 
 ## 7. Reclassification
 

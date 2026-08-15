@@ -79,7 +79,7 @@ The `SubscriptionBillingProvider` port remains unimplemented. A white-label deal
 | Control-plane core | |
 | API contract | Surface narrows from entitlements, not from a branch |
 
-**Zero code changes** — for the platform and capability scoping. The client build pipeline is Phase 11 delivery work, and that distinction is the whole of §1.
+**"Zero code changes" means no core-domain fork — not no activation or build work.** The platform, capability scoping, policy resolution, and every domain module are untouched; the flavor configuration, branded build pipeline, and tenant activation are real Phase 11 delivery work. That distinction is the whole of §1.
 
 ## 8. Dedicated deployment
 
@@ -92,7 +92,7 @@ If a partner requires more isolation, the topology ladder handles it as **Terraf
 | Own IdP | `TenantProviderResolver` binds tenant → `IdentityProvider` |
 | Own bank connector | Same resolver, `FinancialDataConnector` port |
 | Restricted AI | `ModelRoutingPolicy`, or remove the `AI_ADVISOR` entitlement entirely |
-| Dedicated GCP project | L3 rung |
+| Dedicated cloud account / project / subscription | L3 rung — on whichever approved provider the partner's `DeploymentProfile` selects |
 
 See [`deployment-topology.md`](deployment-topology.md) and `../scenarios/d-dedicated-deployment.md`.
 

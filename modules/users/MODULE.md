@@ -17,9 +17,8 @@ Customer profile, preferences, and locale. Owns the person, not the credential.
 
 | Table | Classification | Erasure strategy | Notes |
 |---|---|---|---|
-| `users` | `CONFIDENTIAL` | `CASCADE` | name, Arabic name, phone — encrypted at rest |
-| `user_preferences` | `CONFIDENTIAL` | `CASCADE` | locale, notification settings |
-| `subject_policy_profiles` | `CONFIDENTIAL` | `CASCADE` | elected conventions; versioned and pinned into records |
+| `users` | `CONFIDENTIAL` | `CASCADE_DELETE` | name, Arabic name, phone — encrypted at rest |
+| `user_preferences` | `CONFIDENTIAL` | `CASCADE_DELETE` | locale, notification settings |
 
 ## Events published
 
@@ -43,7 +42,7 @@ carry a raw UUID plus a reference type declared **in this module**.
 
 ## Notes and known limitations
 
-`subject_policy_profiles` implements the fourth policy dimension (ADR-0015). Where a capability declares no elective options the profile is absent and costs nothing.
+Subject-elected policy selections do **not** live here. `SubjectPolicySelection` is a platform *mechanism* (versioning, pinning, provenance — ADR-0015); the selection **records and profile content are capability-scoped** and stored by the owning capability — e.g. Zakat's `zakat_methodology_selections`. Elections are potentially sensitive and purpose-limited; this module never aggregates or exposes them.
 
 Legacy MOB-04: profile fields encrypted server-side were cached in plaintext on device. The Flutter client uses secure storage for anything CONFIDENTIAL or above.
 

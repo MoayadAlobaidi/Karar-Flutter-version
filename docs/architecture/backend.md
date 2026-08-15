@@ -34,7 +34,7 @@ karar/
 │   ├── state-machine/      — pure. ~100 lines
 │   └── api-contracts/      — OpenAPI spec + event catalogue
 ├── modules/                — bounded contexts
-├── infra/terraform/        — dev/ staging/ production/ from Phase 1
+├── infra/terraform/        — contracts + provider modules + per-deployment compositions
 └── docs/
 ```
 
@@ -104,7 +104,7 @@ interface RequestContext {
   userId: UserId | null
   jurisdiction: JurisdictionId          // legal regime — the policy key
   operatingEntity: OperatingEntityId    // legal person responsible
-  subjectPolicyProfile: ProfileRef | null
+  subjectPolicySelection: SelectionRef | null
   locale: Locale
   environment: Environment
 }
@@ -190,6 +190,8 @@ Structured JSON logs with correlation and tenant IDs; **never** `SEALED` data, a
 
 Metrics: RED per endpoint, job outcomes, outbox lag, **projection lag**, AI usage and cost, capability-denial counts by reason.
 
+**Instrumentation is OpenTelemetry-compatible and provider-neutral.** Application code emits logs, metrics, and traces through OTel interfaces; the deployment profile routes them to whichever observability backend its provider offers. Moving providers re-routes telemetry without touching business code ([`infrastructure-portability.md`](infrastructure-portability.md)).
+
 Production log level must retain the forensic timeline the incident plan depends on — the legacy pinned its level so high that it suppressed exactly that (INFRA-09).
 
 ## 12. Testing
@@ -212,5 +214,5 @@ The non-empty assertion is not pedantry. The legacy's tenant roster returns empt
 | No dynamic module loading or plugin system | Every capability is a named bounded context with an owner (ADR-0016) |
 | No `executeSql()` tool for AI | AI asks, Karar calculates (ADR-0010) |
 | No business logic in controllers | Architecture test 6 |
-| No GCP names in `domain/` or `application/` | Ports only (ADR-0023) |
+| No cloud-provider names in `domain/` or `application/` — GCP, AWS, or any other | Ports only (ADR-0023); architecture test 10 |
 | No `features/`, `future/`, `services/`, or `misc/` module | These are where bounded contexts go to die |

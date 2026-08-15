@@ -48,9 +48,9 @@ Plan v2's blocking fact #1 states the target repository is empty — *"zero comm
 
 ### 4.3 All ADRs present
 
-✅ **26** — 0001–0025 plus 0027. Each records context, decision, consequences, and **alternatives rejected**.
+✅ **26** — at Phase 0 sign-off, numbered 0001–0025 plus 0027, with 0026 deliberately unused (subject-elected policy was folded into ADR-0015 per the one-rule-per-decision principle). Each records context, decision, consequences, and **alternatives rejected**.
 
-**0026 is deliberately unused.** Subject-elected policy was folded into ADR-0015 rather than split across two documents, per the consolidation rule of exactly one authoritative rule per decision.
+*Phase 0.5 note: the data-lifecycle ADR was subsequently renumbered 0027 → 0026, making the sequence continuous at 0001–0026. See [`phase-05-consolidation.md`](phase-05-consolidation.md).*
 
 ### 4.4 Feature inventory complete
 
@@ -87,7 +87,7 @@ Each rule below lives in exactly one place; everything else links to it.
 | Sealed handling | [`architecture/sealed-data.md`](architecture/sealed-data.md) |
 | Event payload rules | [`architecture/event-governance.md`](architecture/event-governance.md) §3 |
 | Data classification matrix | [`security/data-classification.md`](security/data-classification.md) §2 |
-| Erasure strategies | [`adr/0027`](adr/0027-data-lifecycle.md) |
+| Data lifecycle and erasure | [`adr/0026`](adr/0026-data-lifecycle.md) |
 | Architecture tests | [`testing/architecture-tests.md`](testing/architecture-tests.md) |
 | Phase gates | [`roadmap.md`](roadmap.md) |
 
@@ -97,11 +97,11 @@ Six, from the legacy audit. **None blocks Phases 1–8.** Full detail and recomm
 
 | # | Delta | Type | Landed in |
 |---|---|---|---|
-| **D1** | **Zakat is missing, and exposes a fourth policy dimension** (`SubjectPolicyProfile`) | Additive | ADR-0015, §1 of jurisdiction-policy, capability map, Phase 9 scope |
+| **D1** | **Zakat is missing, and exposes a fourth policy dimension** (`SubjectPolicySelection`) | Additive | ADR-0015, §1 of jurisdiction-policy, capability map, Phase 9 scope |
 | **D2** | **Sealed key escrow, rotation, and an integrity canary** | Additive | ADR-0017, sealed-data §7, secrets §5, Phase 20 gates |
 | **D3** | White-label **data plane** is not costed | Cost correction | white-label §1, roadmap Phase 11 |
 | **D4** | **Consent re-acceptance on document republish** | Additive | ADR-0024, jurisdiction-policy §10 |
-| **D5** | **Erasure strategy for ownerless derived data** | Additive | **ADR-0027 (new)**, MODULE template, test 25 |
+| **D5** | **Erasure strategy for ownerless derived data** | Additive | **ADR-0026 (new)**, MODULE template, test 25 |
 | **D6** | Five additional architecture tests (22–26) | Additive | testing/architecture-tests |
 
 **ADR count moved 25 → 26.** Architecture tests moved **21 → 26**.

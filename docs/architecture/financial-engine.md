@@ -58,7 +58,7 @@ A jurisdiction maps to an **existing** ruleset version unless business rules gen
 Every recommendation records:
 
 ```
-rulesetVersion · jurisdiction · operatingEntity · subjectProfileVersion
+rulesetVersion · jurisdiction · operatingEntity · subjectPolicySelectionVersion
 calculatedAt · inputHash
 ```
 

@@ -124,6 +124,10 @@ interface AiProvider {
 
 Model routing is a per-tenant `ModelRoutingPolicy`, so a tenant can be pinned to a specific model or region — which is how a residency requirement becomes configuration rather than a rewrite. See [`data-residency.md`](data-residency.md).
 
+### AI routing is independent of the deployment provider
+
+**An AWS-hosted deployment does not imply an AWS model, and a GCP-hosted one does not imply Gemini.** `AIProvider`, `AIProcessingPolicy`, and `AIRegionPolicy` resolve independently of the `DeploymentProfile`: a UAE runtime on one cloud may route AI to a different approved provider, or have AI disabled entirely, as **the jurisdiction's PolicyPack — not the infrastructure — determines what is permitted.** See [`infrastructure-portability.md`](infrastructure-portability.md).
+
 ## 8. Tools
 
 AI tools call **use cases**, under the caller's authorization, through the same capability gates as HTTP.

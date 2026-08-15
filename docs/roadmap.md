@@ -10,10 +10,11 @@ Phases 10–21 are an architectural **option, not a schedule**. The seams are wh
 | Phase | Content | Δ from Plan v1 |
 |---|---|---|
 | **0** | Architecture, ADRs, capability map, domain map, docs skeleton, **legacy audit** | ✅ **complete** |
+| **0.5** | **Final consolidation** — D1–D6 canonical, ADRs continuous 0001–0026, greenfield rule, `DeploymentProfile` + multi-cloud portability, PostgreSQL provider portability, country deployment matrix, cloud-neutral ladder, Assurance Claim Registry | ✅ **complete** |
 | **1** | Monorepo, tooling, Compose, CI, **architecture tests**, docs; Terraform `dev/staging/production` | staging from day one |
 | **2** | Config, PostgreSQL, migrations, health, errors, observability, **audit**, event bus + **catalogue**, **outbox**, jobs, `shared-kernel`, **data classification**, **key rotation design** | +catalogue, +classification, +rotation |
 | **3** | Identity, users, tenancy, **operating-entity**, RBAC, consent + **re-consent evaluation**, sessions, kill switches, **PostgreSQL RLS**, adversarial cross-tenant tests | **RLS here**, +entity, +re-consent |
-| **3.5** | **Jurisdiction & Capability Foundation** — Country/Jurisdiction, PolicyPack `qa/v1`, resolution-strategy registry, **subject-policy profiles**, capability registry, availability model, entitlements | `ADDED` |
+| **3.5** | **Jurisdiction & Capability Foundation** — Country/Jurisdiction, PolicyPack `qa/v1`, resolution-strategy registry, **`SubjectPolicySelection` mechanism**, capability registry, availability model, entitlements | `ADDED` |
 | **4** | Flutter foundation — bootstrap, routing, design system, **Arabic RTL first-class**, network, auth, secure storage, biometric lock, capability-aware navigation | |
 | **5** | Financial data platform — institutions, connectors, accounts, transactions, normalization, dedup, provenance, categorization; **manual + CSV `IMPLEMENTED`**; **erasure strategies enforced** | +erasure |
 | **6** | **Financial engine** — calculators, rulesets, jurisdiction selection, **VerifiedFinancialFacts**, exhaustive tests | |
@@ -27,7 +28,7 @@ Phases 10–21 are an architectural **option, not a schedule**. The seams are wh
 | **14** | **Amanat** — gated on legal clearance; ships `PENDING_LEGAL_REVIEW` until cleared | `ADDED` |
 | **15** | Embedded Flutter | |
 | **16** | Operations, support, marketing, analytics, privacy flows, data export + erasure surfaces | |
-| **17** | GCP infrastructure (when an account exists) | |
+| **17** | Cloud infrastructure — the QA `DeploymentProfile`'s provider (GCP is the candidate; **UNVERIFIED** in the [country deployment matrix](architecture/country-deployment-matrix.md)), when an account exists | provider-neutral |
 | **18** | DEV deployment | |
 | **19** | **STAGING** — mandatory, precedes production | |
 | **20** | Production readiness — see gates below | |
@@ -82,6 +83,10 @@ These are not made obsolete by a rewrite and belong on the pre-launch list.
 | Counsel review of the privacy policy | Production | Legal |
 | **Arabic legal translation by a legal translator** | Production | External |
 | Retention decision — minimums, maximums, and whether they differ for an original statement file versus derived transactions | Phase 5 policy | Legal + regulator |
+
+## Phase 1 starts from zero, on a fresh branch
+
+Phase 1 begins from an updated `main` after the architecture PR merges — branch `claude/karar-v2-phase-1-foundation`, **not** a continuation of the architecture branch. Its first executable artifacts come from these documents and the ADRs; **no legacy file is copied** ([greenfield rule](architecture/greenfield-rule.md)).
 
 ## Solo-capacity honesty
 
