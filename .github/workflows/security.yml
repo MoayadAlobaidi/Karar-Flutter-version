@@ -1,0 +1,254 @@
+# Security scanning for the Karar V2 monorepo.
+#
+# Job inventory (blocking = should be a required status check on main):
+#   codeql             blocking     static analysis (JS/TS), results in code scanning
+#   secrets            blocking     gitleaks full-history secret scan
+#   dependency-review  blocking     PR-only review of newly introduced dependencies
+#   dependency-audit   report-only  pnpm audit; tightening criterion tracked in
+#                                   docs/operations/repository-security-settings.md
+#   iac-and-containers blocking     trivy misconfiguration scan, gates on HIGH/CRITICAL
+#   sbom               blocking     SPDX SBOM generation (artifact: sbom)
+#   licenses           report-only  license inventory (artifact: licenses)
+#
+# Every action is pinned to a commit SHA. No cloud (GCP/AWS) credentials are
+# used anywhere in this workflow; the only secret is the read-only GITHUB_TOKEN.
+
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Least privilege: read-only token by default; jobs that upload SARIF elevate
+# security-events only.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  # Cancel superseded runs on PRs only; never cancel in-flight main builds.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  codeql:
+    name: codeql
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # upload analysis results to code scanning
+      actions: read # required by codeql-action on private repositories
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # codeql-bundle-v2.26.3
+        with:
+          languages: javascript-typescript
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # codeql-bundle-v2.26.3
+        with:
+          category: '/language:javascript-typescript'
+
+  gitleaks:
+    name: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full clone: gitleaks scans every commit, not just HEAD. A shallow
+          # clone would miss secrets that were committed and later removed.
+          fetch-depth: 0
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The workflow token is read-only by design; PR comments would need
+          # pull-requests: write, so they stay disabled.
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          # If this repository moves into a GitHub organization, gitleaks-action
+          # requires a GITLEAKS_LICENSE repository secret (free for personal
+          # accounts). See docs/operations/repository-security-settings.md.
+
+  dependency-review:
+    name: dependency-review
+    # The action diffs dependency manifests between base and head, so it only
+    # exists on pull_request events; it is skipped (not failed) on push to main.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Blocking gate, aligned with the `pnpm audit --audit-level high` policy.
+          fail-on-severity: high
+
+  dependency-audit:
+    name: dependency-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm (version from "packageManager" in package.json)
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node (version from .tool-versions)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .tool-versions
+
+      - name: pnpm audit (report-only)
+        # Report-only for now: continue-on-error keeps the job green while the
+        # advisory baseline is established, but the step still shows a failure
+        # annotation when high-severity advisories exist. The tightening
+        # criterion and owner are recorded in
+        # docs/operations/repository-security-settings.md.
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          # pnpm audit reads pnpm-lock.yaml; no install needed.
+          set +e
+          pnpm audit --audit-level high --json > reports/dependency-audit.json
+          status=$?
+          set -e
+          # Human-readable copy for the job log; exit status comes from the JSON run.
+          pnpm audit --audit-level high || true
+          exit "$status"
+
+      - name: Upload audit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-audit
+          path: reports/dependency-audit.json
+          if-no-files-found: warn
+
+  iac-and-containers:
+    name: iac-and-containers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # SARIF upload to code scanning
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Trivy config scan (SARIF)
+        # First pass produces SARIF for code scanning and always succeeds;
+        # the blocking gate is the severity-filtered pass below.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          exit-code: '0'
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # codeql-bundle-v2.26.3
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Upload SARIF artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: iac-scan-report
+          path: trivy-config.sarif
+          if-no-files-found: warn
+
+      - name: Trivy config gate (HIGH/CRITICAL)
+        # Blocking on high/critical misconfigurations in docker-compose,
+        # Dockerfiles, and other IaC; lower severities are visible in code
+        # scanning but do not fail CI.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+
+      - name: Container image scan status
+        # No container images are built in CI yet, so there is nothing to scan
+        # with scan-type: image. This step exists so the gap is explicit instead
+        # of silently absent; activate an image scan when image builds land.
+        run: |
+          echo "No container images are built in CI yet."
+          echo "When image builds land, add a trivy image scan (scan-type: image) against the built tags."
+
+  sbom:
+    name: sbom
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false # uploaded below under the stable artifact name "sbom"
+          dependency-snapshot: false # the submission API needs contents: write; token stays read-only
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: sbom.spdx.json
+          if-no-files-found: error
+
+  licenses:
+    name: licenses
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm (version from "packageManager" in package.json)
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node (version from .tool-versions)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: License inventory (report-only)
+        # Inventory for review, not yet an allowlist gate; `|| true` keeps it
+        # non-blocking by design.
+        run: pnpm licenses list --json > licenses.json || true
+
+      - name: Upload license report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: licenses
+          path: licenses.json
+          if-no-files-found: warn

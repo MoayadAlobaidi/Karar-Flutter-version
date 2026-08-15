@@ -1,0 +1,227 @@
+{
+  "description": "Machine-readable registry of the 26 architecture tests (docs/testing/architecture-tests.md) plus the canary-purity test. Read by scripts/checks/architecture.mjs, which enforces the activation gate: a test whose activationPhase has been reached without an implementation fails the run.",
+  "currentPhase": 1,
+  "source": "docs/testing/architecture-tests.md",
+  "statusValues": {
+    "ACTIVE": "The guarded structure exists now; the check runs on every invocation and must pass.",
+    "NOT_APPLICABLE_UNTIL_PHASE_X": "The guarded structure does not exist yet. activationPhase names the phase at which the structure arrives; from that phase on, an unimplemented check fails the run."
+  },
+  "tests": [
+    {
+      "id": 1,
+      "name": "Domain purity",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkDomainPurity",
+      "notes": "Real target today: the four pure packages have source. modules/*/domain/ is scanned too and passes vacuously (no .ts yet); non-vacuousness is proven by the built-in self-test on every run."
+    },
+    {
+      "id": 2,
+      "name": "Layer direction",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkLayerDirection",
+      "notes": "Modules have no code yet; the scan runs against the real glob and passes vacuously today. The self-test seeds a domain->infrastructure import and asserts the check fails on it."
+    },
+    {
+      "id": 3,
+      "name": "Module boundary",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkModuleBoundary",
+      "notes": "Cross-module imports must target public-api.ts only. Vacuous today (no module code); self-test seeds a bypass and asserts failure."
+    },
+    {
+      "id": 4,
+      "name": "No ORM leakage",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkOrmLeakage",
+      "notes": "prisma/@prisma imports allowed only under infrastructure/persistence/ paths. Scans apps, packages, and modules source."
+    },
+    {
+      "id": 5,
+      "name": "Ports declared inward",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_2",
+      "owner": "Engineering Owner",
+      "activationPhase": 2,
+      "activationCriterion": "First module infrastructure adapter exists and the port location convention (application/ports/) is pinned in code. Unlike tests 2/3, this check has no well-defined vacuous form: detecting an adapter-without-port requires the adapter/port naming convention that Phase 2 establishes; registering a scan before then would be a check that cannot fail.",
+      "notes": "Judgment recorded: deferred rather than vacuously active, because the rule is existential (an adapter must have a matching port), not directional, and there is nothing to match against yet."
+    },
+    {
+      "id": 6,
+      "name": "No business logic in controllers",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_2",
+      "owner": "Engineering Owner",
+      "activationPhase": 2,
+      "activationCriterion": "First module presentation controller invoking a use case exists. The Phase 1 health controllers call no use case and carry no declared complexity budget to check against."
+    },
+    {
+      "id": 7,
+      "name": "Money discipline",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkMoneyDiscipline",
+      "notes": "Monetary positions exist now (shared-kernel Money/Percentage/ExchangeRate, financial-engine zero()). Lexical check: monetary-named fields typed as number, and parseFloat/toFixed, in pure packages and module domain/application source. Type-level enforcement deepens with the engine in Phase 2/6."
+    },
+    {
+      "id": 8,
+      "name": "Event catalogue - published events",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkEventCatalogue",
+      "notes": "The catalogue file exists with zero events, so the structural check can and does run: the catalogue must parse, every entry must be well-formed, every DomainEvent implementation in code must be catalogued, and publish call sites with an empty catalogue fail. Today it verifies the catalogue parses and no event definitions exist outside it. Consumer-side allowedConsumers enforcement deepens when the bus exists (Phase 2)."
+    },
+    {
+      "id": 9,
+      "name": "Tenant scoping",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_3",
+      "owner": "Engineering Owner",
+      "activationPhase": 3,
+      "activationCriterion": "First tenant-scoped tables, repositories, and RLS policies exist (identity/tenancy phase)."
+    },
+    {
+      "id": 10,
+      "name": "No direct provider access",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkProviderBoundary",
+      "notes": "Forbidden cloud SDK specifiers, provider URI/resource-name literals (gs://, arn:aws, projects/<id>/...), and provider env-var names, outside infrastructure/providers/ and infrastructure/persistence/."
+    },
+    {
+      "id": 11,
+      "name": "Deterministic domain",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkDeterministicDomain",
+      "notes": "Real target today: financial-engine and the other pure packages. Forbids system clock reads and random sources in modules/*/domain/ and the four pure packages."
+    },
+    {
+      "id": 12,
+      "name": "No jurisdiction branching",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkJurisdictionBranching",
+      "notes": "Lexical check: conditionals and switches on jurisdiction/country identifiers in modules/*/{domain,application,presentation}. Vacuous today; self-test proves it fails on a seeded countryCode comparison. Localization/reference-data exemptions live outside these layers by construction."
+    },
+    {
+      "id": 13,
+      "name": "Sealed containment",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_13",
+      "owner": "Engineering Owner",
+      "activationPhase": 13,
+      "activationCriterion": "sealed-vault module code exists (Documents + Sealed Vault phase). The static SEALED-content scan is part of this test and activates with it; today no code carries SEALED-marked content to scan."
+    },
+    {
+      "id": 14,
+      "name": "Grant required",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_13",
+      "owner": "Engineering Owner",
+      "activationPhase": 13,
+      "activationCriterion": "SealedRecordStore and SealAccessGrant types exist; vault transaction isolation is implementable and checkable."
+    },
+    {
+      "id": 15,
+      "name": "Event catalogue - payload rules",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkEventCatalogue",
+      "notes": "Shares the catalogue checker with test 8. The payload-rule constraints (SEALED events identifier-only; HIGHLY_SENSITIVE_FINANCIAL payload requires a declared payloadExemption with owner, reason, reviewer) are enforced against every catalogue entry; with zero entries the constraint set runs against an empty list and the catalogue's shape is still verified."
+    },
+    {
+      "id": 16,
+      "name": "Module ownership",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkModuleDocs"
+    },
+    {
+      "id": 17,
+      "name": "Pure packages",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkPurePackages",
+      "notes": "The four pure packages carry no runtime dependencies except @karar/shared-kernel where documented; shared-kernel itself carries none. devDependencies are allowed."
+    },
+    {
+      "id": 18,
+      "name": "Storage access",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkStorageBoundary",
+      "notes": "Object-storage client imports (minio, @google-cloud/storage, @aws-sdk/client-s3) only inside modules/documents/infrastructure/ or infrastructure/providers/. Vacuous today; real scan, self-tested."
+    },
+    {
+      "id": 19,
+      "name": "Approval policy",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_3.5",
+      "owner": "Engineering Owner",
+      "activationPhase": 3.5,
+      "activationCriterion": "PolicyPack qa/v1 and the capability registry with disclosure declarations exist; ApprovalPolicy entries become checkable in packs."
+    },
+    {
+      "id": 20,
+      "name": "Kernel surface",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkKernelSurface",
+      "notes": "packages/shared-kernel/src/index.ts must export exactly the nine universals: Money, Currency, Percentage, ExchangeRate, Clock, Result, DomainEvent, TenantId, UserId. Any tenth export, or a missing one, fails."
+    },
+    {
+      "id": 21,
+      "name": "Pinning",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_3",
+      "owner": "Engineering Owner",
+      "activationPhase": 3,
+      "activationCriterion": "First tables declared to carry legal consequence exist; pinning columns (jurisdictionAtCreation, policyPackVersionAtCreation, operatingEntityAtCreation, subjectPolicySelectionVersion) become checkable in schema."
+    },
+    {
+      "id": 22,
+      "name": "RLS coverage",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_3",
+      "owner": "Engineering Owner",
+      "activationPhase": 3,
+      "activationCriterion": "First tenant-scoped tables and RLS policies exist. All three failure shapes (no RLS, enabled-without-policy, FORCEd-without-enabled) become checkable against a live schema."
+    },
+    {
+      "id": 23,
+      "name": "No declared guard without call site",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_2",
+      "owner": "Engineering Owner",
+      "activationPhase": 2,
+      "activationCriterion": "First guard class documented as a protection exists. No guards exist in Phase 1, so there is nothing whose call sites could be verified."
+    },
+    {
+      "id": 24,
+      "name": "Resource limits declared",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_5",
+      "owner": "Engineering Owner",
+      "activationPhase": 5,
+      "activationCriterion": "First ingestion path (manual/CSV) or rendering path exists; explicit byte/row/page/wall-clock/memory limits become declarable and checkable."
+    },
+    {
+      "id": 25,
+      "name": "Lifecycle declarations",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkLifecycleDeclarations",
+      "notes": "MODULE.md files exist now with lifecycle tables. Every modules/*/MODULE.md must contain a Data owned table whose rows carry an erasure strategy from the four canonical values of ADR-0026: CASCADE_DELETE, ANONYMIZE_IRREVERSIBLY, RETAIN_WITH_BASIS, NON_PERSONAL_BY_DESIGN. Current enforcement: erasure-strategy column (canonical values; named datasets may not leave it blank). Deepening to all six lifecycle fields is an explicit criterion of the Phase 2 schema work \u2014 when the first real schema lands, the check must parse subject relationship, purpose, classification, retention, and export treatment as well."
+    },
+    {
+      "id": 26,
+      "name": "Assurance-claim traceability",
+      "status": "ACTIVE",
+      "owner": "Engineering Owner",
+      "implementedIn": "scripts/checks/architecture.mjs#checkAssuranceClaims",
+      "notes": "Referential integrity of docs/security/assurance-claims.md: every AC-### row has non-empty evidence and owner; statuses limited to VERIFIED/PENDING/UNVERIFIED; every 'test N' evidence reference exists in this registry; and this registry contains all 26 canonical tests."
+    },
+    {
+      "id": "canary-purity",
+      "name": "Canary purity",
+      "status": "NOT_APPLICABLE_UNTIL_PHASE_13",
+      "owner": "Engineering Owner",
+      "activationPhase": 13,
+      "activationCriterion": "The sealed-integrity canary is designed and implemented (key custody strategy phase); its plaintext becomes inspectable for customer-derived content."
+    }
+  ]
+}

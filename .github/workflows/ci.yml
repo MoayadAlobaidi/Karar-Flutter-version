@@ -1,0 +1,137 @@
+# Continuous integration for the Karar V2 monorepo.
+#
+# Layout notes:
+# - Every action is pinned to a commit SHA; the Dependabot github-actions
+#   ecosystem keeps the pins fresh.
+# - There is intentionally NO `paths:` filter on this workflow. docs-check runs
+#   inside the `architecture` job, so a paths filter would either skip it
+#   silently on markdown-only PRs or leave required checks stuck in "Expected".
+#   Folding the docs check here (instead of a separate docs.yml) gives one run
+#   per PR and one stable required-check name. Decision recorded in
+#   docs/operations/repository-security-settings.md.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Least privilege: read-only token everywhere; no job in this workflow needs more.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel superseded runs on PRs only; never cancel in-flight main builds.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    # Explicit bash enables pipefail, so `cmd | tee` cannot mask a failure.
+    shell: bash
+
+jobs:
+  workspace:
+    name: workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm (version from "packageManager" in package.json)
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node (version from .tool-versions)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+  architecture:
+    name: architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm (version from "packageManager" in package.json)
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node (version from .tool-versions)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Architecture rules
+        run: |
+          mkdir -p reports
+          node scripts/checks/architecture.mjs 2>&1 | tee reports/architecture-check.txt
+
+      - name: Docs check
+        # Runs even when the architecture step failed so the uploaded report is complete.
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p reports
+          node scripts/checks/docs-check.mjs 2>&1 | tee reports/docs-check.txt
+
+      - name: Upload architecture report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: architecture-report
+          path: reports/
+          if-no-files-found: warn
+
+  mobile:
+    name: mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Resolve packages
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
