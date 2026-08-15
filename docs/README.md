@@ -25,7 +25,7 @@ Looking up a term: [`glossary.md`](glossary.md).
 | [operating-entity](architecture/operating-entity.md) | Legal person, controller/processor, entity migration |
 | [capability-registry](architecture/capability-registry.md) | Descriptors, availability, deny-by-default |
 | [extension-pattern](architecture/extension-pattern.md) | How to add a capability; the seventeen-point checklist |
-| [sealed-data](architecture/sealed-data.md) | `SEALED`, the vault, grants, key escrow |
+| [sealed-data](architecture/sealed-data.md) | `SEALED`, the vault, grants, key custody |
 | [disclosure](architecture/disclosure.md) | Disclosure ≠ access; approval policy; safety properties |
 | [event-governance](architecture/event-governance.md) | Catalogue, payload rules by classification |
 | [financial-engine](architecture/financial-engine.md) | Calculators, rulesets, verified facts |
@@ -54,7 +54,7 @@ Looking up a term: [`glossary.md`](glossary.md).
 | [threat-model](security/threat-model.md) | Assets, boundaries, ten threat classes, accepted risks |
 | [data-classification](security/data-classification.md) | Six classes and the handling matrix |
 | [access-control](security/access-control.md) | Roles, permissions, enforcement points |
-| [secrets](security/secrets.md) | Key hierarchy, escrow, rotation, the canary |
+| [secrets](security/secrets.md) | Key hierarchy, custody, rotation, the canary |
 | [sealed-access](security/sealed-access.md) | Grant procedures, audit, incident response |
 | [assurance-claims](security/assurance-claims.md) | The Assurance Claim Registry behind architecture test 26 |
 

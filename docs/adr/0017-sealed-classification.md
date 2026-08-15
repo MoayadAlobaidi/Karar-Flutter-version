@@ -1,7 +1,7 @@
-# ADR-0017 — `SEALED` classification, grant-gated vault, extractable boundary, key escrow
+# ADR-0017 — `SEALED` classification, grant-gated vault, extractable boundary, key custody
 
 **Status:** ACCEPTED · **Phase:** 13 (build), 20 (extraction, custody, canary gates)
-**Amended:** after the Phase 0.2 legacy audit, to add key escrow, rotation, and the integrity canary; refined in Phase 0.5 to make key custody **provider-independent** — no single cloud's escrow product is mandated.
+**Amended:** after the Phase 0.2 legacy audit, to add key custody, rotation, and the integrity canary; refined in Phase 0.5 and the pre-merge pass to make custody **provider-independent and outcome-based** — no single custody model (escrow, BYOK, HSM, managed KMS) is universally mandated.
 
 ## Context
 
@@ -37,23 +37,42 @@ Network-capable port surface, **no participation in the caller's transaction**, 
 
 ### Key custody, recovery, rotation, and the canary — provider-independent
 
-Custody is expressed as three **provider-independent** policies, implemented by whichever key-management provider a deployment profile selects. **No single cloud's escrow product is mandated** — a deployment on a different provider satisfies the same policies with different infrastructure:
+Custody is expressed as three **provider-independent** policies, implemented by whichever key-management provider a deployment profile selects. **No single implementation model is mandated** — in particular, it is **not** universally required that raw managed-KMS key material be exportable or reconstructable. A custody strategy may be:
+
+```
+CLOUD_KMS_MANAGED
+BYOK_IMPORTED_WITH_EXTERNAL_CUSTODY
+EXTERNAL_KEY_MANAGER
+HSM_MANAGED
+```
+
+or another approved model (names illustrative).
 
 | Policy | Declares |
 |---|---|
-| `KeyCustodyStrategy` | Where KEK material and its second copy live, and under whose split control — no single operator can reconstruct a KEK alone |
-| `KeyRecoveryPolicy` | The documented, rehearsed, **timed** recovery procedure and its separation of duties |
-| `KeyRotationPolicy` | Rotation cadence and mechanics — designed in from Phase 2, not retrofitted |
+| `KeyCustodyStrategy` | Which custody model applies, where key material lives, and the **separation of duties appropriate to that model** — for a BYOK/external model that may mean split-controlled external material; for a managed-KMS model it means IAM separation, deletion protection, and multi-region key configuration |
+| `KeyRecoveryPolicy` | The documented recovery/continuity procedure **appropriate to the custody model**, its separation of duties, and the drill that exercises it **where technically applicable** |
+| `KeyRotationPolicy` | Rotation cadence and mechanics — designed in from Phase 2, not retrofitted — plus **destruction safeguards** |
 
-**Before any production `SEALED` data exists, all of the following hold:**
+**The universal requirement:**
 
-- custody strategy selected and implemented
-- rotation tested
-- recovery documented **and the drill rehearsed and timed**
-- separation of duties defined
-- **sealed-integrity canary operational** — a synthetic sealed record per jurisdiction-KEK holding **known plaintext containing no customer data**, decrypted on a schedule, alerting on failure
-- monitoring operational
+> Before production `SEALED` data exists, the selected key-custody strategy must provide an **approved and tested way to prevent unrecoverable key loss and to detect key unavailability.**
+
+**Concretely, before any production `SEALED` data exists, all of the following hold:**
+
+- custody strategy documented and selected
+- separation of duties defined, appropriate to the provider and model
 - key and version **provenance recorded** for every wrap and rotation
+- rotation tested
+- **destruction safeguards** in place
+- recovery/continuity procedure documented, appropriate to the custody model
+- recovery drill rehearsed and timed **where technically applicable**
+- **sealed-integrity canary operational** — see below
+- monitoring and alerting operational
+- verified in **staging**
+- passed a **production readiness review**
+
+**The sealed-integrity canary** is mandatory regardless of custody model: a synthetic sealed record per jurisdiction-KEK that is **synthetic only, containing no customer-derived data**, decrypted on a schedule. It tests the **complete encryption/decryption path, key-version resolution, and access to the key provider**; it **never logs plaintext**; and it **alerts on failure**. Its implementation depends on the selected custody and provider strategy.
 
 ## Consequences
 
@@ -69,7 +88,7 @@ Custody is expressed as three **provider-independent** policies, implemented by 
 - **No search over sealed content.** A deliberate capability sacrifice; an index would be an unsealed copy.
 - **No atomic write** across metadata and payload. The saga's failure mode is loss of a record, never exposure of one.
 - Support cannot diagnose content issues. That is the point.
-- Escrow and canary are real operational burden, gated before production.
+- Custody, recovery drills, and the canary are real operational burden, gated before production.
 
 ## Alternatives rejected
 
@@ -81,4 +100,4 @@ Custody is expressed as three **provider-independent** policies, implemented by 
 
 **Grant as an optional parameter or an ambient context value.** Rejected: optional means forgettable, and ambient means invisible. A required argument is the only version the compiler enforces.
 
-**Escrow deferred to post-launch.** Rejected on the legacy's evidence — **ENC-2: the production key "has already been lost once."** For sealed data, loss is unrecoverable *and* undetectable, discovered at the worst possible moment.
+**Custody deferred to post-launch.** Rejected on the legacy's evidence — **ENC-2: the production key "has already been lost once."** For sealed data, loss is unrecoverable *and* undetectable, discovered at the worst possible moment.

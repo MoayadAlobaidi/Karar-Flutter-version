@@ -1,6 +1,6 @@
 # Infrastructure Portability
 
-**ADR:** 0023 (amended, Phase 0.5) · **Canonical for:** DeploymentProfile, DeploymentResolver, provider ports, opaque references, provider capability verification, observability portability, and the definition of "portable".
+**ADR:** 0023 (amended, Phase 0.5) · **Canonical for:** DeploymentProfile, deployment routing (DeploymentRouter + DeploymentDirectory), provider ports, opaque references, provider capability verification, observability portability, and the definition of "portable".
 
 ---
 
@@ -53,31 +53,92 @@ DeploymentProfile
 - A jurisdiction does **not** automatically determine one cloud.
 - A tenant does **not** automatically determine one deployment.
 
-## 3. DeploymentResolver
+## 3. Deployment routing — two different problems
 
-Resolution happens **at the infrastructure edge. Domain code never invokes it.**
+Routing involves two problems that must not be conflated, solved by two distinct mechanisms. **Domain code never invokes either.**
+
+**Problem A — which Karar deployment receives this request?** A Qatar user reaches the Qatar deployment; a UAE user the UAE deployment; a Bank X user that bank's dedicated deployment. Solved **at the Karar edge, before any business data access**, by:
+
+| Concept | Role |
+|---|---|
+| **`DeploymentRouter`** | The edge component that answers Problem A per request/connection |
+| **`DeploymentDirectory`** | The minimal lookup the router consults: assignment → `DeploymentId` → `DeploymentProfile` |
+
+**Problem B — once inside that deployment, which datasource belongs to the tenant?** Solved **inside the runtime** by the existing `DataSourceResolver` ([`database-portability.md` §4](database-portability.md)) — shared vs dedicated PostgreSQL within that deployment's own resources.
 
 ```
-User → Tenant → Jurisdiction → Deployment assignment → DeploymentProfile
+Client
+    ↓
+Karar Edge / DeploymentRouter
+    ↓
+DeploymentDirectory lookup
+    ↓
+Home deployment / tenant deployment       ← Problem A answered here
+    ↓
+Karar runtime
+    ↓
+Tenant context
+    ↓
+DataSourceResolver                         ← Problem B answered here
+    ↓
+PostgreSQL
 ```
 
-with exceptions the mapping must express:
+Assignment may depend on **tenant, jurisdiction, environment, contract, and deployment-isolation requirement — not country alone**:
 
 ```
-UAE shared SaaS                  (jurisdiction default)
-Bank X dedicated UAE deployment  (contract-driven)
+Qatar shared SaaS                 (jurisdiction default)
+UAE shared SaaS                   (jurisdiction default)
+Bank X dedicated UAE deployment   (contract-driven)
 Bank Y dedicated global deployment
-Qatar shared SaaS
 ```
 
-Resolution may therefore depend on **tenant, jurisdiction, environment, contract, and deployment-isolation requirement — not country alone.** The resolver is the deployment-level sibling of the existing tenant-level mechanisms (`TenantProviderResolver`, datasource routing, `KeyRef`), all of which live in `infrastructure/`.
+### 3.1 The directory is minimal
+
+The `DeploymentDirectory` is **routing metadata only — not another global customer database**:
+
+| Holds | Never holds |
+|---|---|
+| `TenantDeploymentAssignment` / `HomeDeploymentRef` | Financial data of any kind |
+| `DeploymentId` | Replicated transactions |
+| `RoutingVersion` | Customer content, balances, documents |
+
+For **B2B / white-label**, `tenant/domain/app identity → DeploymentId` is typically sufficient.
+
+For **B2C**, there is an **account-home-deployment bootstrap problem**: before sign-in, the edge must learn which deployment holds the account without a global customer store. Candidate mechanisms — an opaque account routing identifier, a region/home-deployment claim in identity metadata, tenant-specific endpoints, or another approved design — are **deliberately not selected yet**. The architecture rule that is binding now:
+
+> **Routing to the correct deployment occurs before business data access.**
+
+### 3.2 Deployment moves
+
+An assignment is **versioned and audited**, and supports controlled movement — shared → dedicated, or provider A → provider B — through states such as:
+
+```
+ACTIVE → MIGRATING → CUTOVER_PENDING → ROLLBACK_WINDOW → ACTIVE
+```
+
+**The migration engine is not built now** (§9 documents the contract). What is binding now: moving a tenant changes an assignment — it must require **no mobile-app change, no financial-rule change, no Domain code change, and no tenant-specific business recompilation.**
+
+### 3.3 Portability is not cross-cloud runtime coupling
+
+> **Infrastructure portability means Karar can be *deployed on* different approved providers. It does not mean every runtime should hold credentials and network access to every provider.**
+
+Prefer isolation:
+
+```
+QA runtime  → QA resources
+AE runtime  → AE resources
+Bank runtime → that bank's resources
+```
+
+over one runtime reaching every country's database, KMS, object store, and secrets. A Qatar API runtime querying a UAE RDS on an ordinary UAE customer request is the anti-pattern: the UAE request goes to the UAE deployment. Cross-deployment access requires an explicitly reviewed architecture — the default protects **data residency, blast radius, latency, IAM boundaries, network complexity, and operational independence.**
 
 ## 4. The deployment picture
 
 ```mermaid
 graph TB
     CORE[KARAR CORE<br/>domain · application · financial engine<br/>knows no provider]
-    CORE --> DR[DeploymentResolver<br/>infrastructure edge]
+    CORE --> DR[DeploymentRouter +<br/>DeploymentDirectory<br/>infrastructure edge]
     DR --> QP[Qatar Profile]
     DR --> UP[UAE Profile]
     DR --> SP[Saudi Profile]
@@ -97,23 +158,27 @@ graph TB
 Every infrastructure dependency is a provider-neutral contract. Implementations belong **exclusively** in `infrastructure/`.
 
 ```
-DatabaseProvider        ObjectStorage         CacheProvider
+DatabaseProvider*       ObjectStorage         CacheProvider
 EventBus                JobQueue              SecretProvider
 EncryptionProvider      KeyManagementProvider IdentityProvider
 AIProvider              AnalyticsSink         EmailProvider
 SmsProvider             NotificationProvider  ObservabilityProvider
+
+*provisioning/connection contract only — never consumed by application code,
+ which sees Repository interfaces (database-portability.md §2)
 ```
 
 Illustrative adapter names (not commitments):
 
 ```
-GcpCloudSqlPostgresAdapter   AwsRdsPostgresAdapter
 GcpCloudStorageAdapter       AwsS3Adapter
 GcpPubSubAdapter             AwsMessagingAdapter
 GcpSecretManagerAdapter      AwsSecretsManagerAdapter
 GcpKmsAdapter                AwsKmsAdapter
 VertexGeminiProvider         FutureAlternateAIProvider
 ```
+
+**The database is deliberately absent from that list.** Managed PostgreSQL providers do **not** get per-cloud persistence adapters — one `PostgresPersistenceAdapter` serves them all, and provider differences live in **connection profiles and Terraform** (networking, TLS, IAM/database authentication, secrets, discovery, backup, HA). `DatabaseProvider` is an infrastructure **provisioning and connection** concern, never an Application or Domain dependency — the application requests a `Repository`. See [`database-portability.md` §2](database-portability.md).
 
 **Do not implement every adapter now.** Build the ports correctly; implement only what the active development profile requires (local Docker + mocks in Phase 1–2, one cloud provider set when its deployment phase arrives).
 

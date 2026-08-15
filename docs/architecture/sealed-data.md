@@ -1,6 +1,6 @@
 # Sealed Data Architecture
 
-**ADR:** 0017 · **Phase:** 13 (build), 20 (extraction + escrow gate)
+**ADR:** 0017 · **Phase:** 13 (build), 20 (extraction + custody gates)
 
 ---
 
@@ -139,7 +139,7 @@ sequenceDiagram
 | Storage | Local key file in development; KMS in production; per-tenant KEK at L3 |
 | Algorithms | Standard AEAD. **No proprietary cryptography** |
 
-### Why escrow is mandatory here and was merely advisable in the legacy
+### Why an approved custody strategy is mandatory here and was merely advisable in the legacy
 
 Legacy finding **ENC-2**: key rotation, escrow, and a second copy are **NOT BUILT**, and the production key *"has already been lost once in production, on 11 August 2026."*
 
@@ -155,7 +155,7 @@ The legacy survived because production held 3 users and 45 transactions, and bec
 
 Custody is declared through `KeyCustodyStrategy`, `KeyRecoveryPolicy`, and `KeyRotationPolicy` — provider-independent policies implemented by whichever key-management provider the deployment profile selects. **No single cloud's escrow product is mandated** (ADR-0017).
 
-1. **KEK escrow under split control** (`KeyCustodyStrategy`), with a documented, rehearsed, timed recovery drill (`KeyRecoveryPolicy`). No single operator can reconstruct a KEK alone.
+1. **An approved `KeyCustodyStrategy`** — CLOUD_KMS_MANAGED, BYOK with external custody, external key manager, HSM, or another approved model — with separation of duties appropriate to the model, destruction safeguards, and a documented recovery/continuity procedure (`KeyRecoveryPolicy`) whose drill is rehearsed and timed **where technically applicable**. It is not universally required that raw managed-KMS key material be exportable or reconstructable.
 2. **Sealed-integrity canary** — a synthetic sealed record per jurisdiction-KEK, holding **known plaintext containing no customer data**, decrypted on a schedule. Failure raises a security event. This is the **only** mechanism that can detect key loss without violating the seal.
 3. **Rotation designed in from Phase 2** (`KeyRotationPolicy`), not retrofitted, with key and version provenance recorded for every wrap and rotation. The legacy's rotation is entangled with statement fingerprinting — rotating changes every future fingerprint, so a rotation must recompute stored ones or a re-upload imports twice. That entanglement is what retrofitting produces.
 
@@ -193,6 +193,6 @@ Stated so nobody proposes recovering it later without recognising the trade:
 | Analytics, even aggregates | An aggregate over few records leaks membership |
 | Support diagnosis of content | The point of the classification |
 | Projection-backed reporting on substance | Projections are unsealed by definition |
-| Recovery after key loss without escrow | Hence §7 |
+| Recovery after key loss without an approved custody strategy | Hence §7 |
 
 **What is retained:** lifecycle state, counts, ages, owner, tenant, jurisdiction, entity, and every audit record — enough to operate the capability without reading a single obligation.

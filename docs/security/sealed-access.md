@@ -65,30 +65,35 @@ Sealed data cannot be monitored by reading it. The canary is the only mechanism 
 
 | Property | |
 |---|---|
-| One synthetic sealed record **per jurisdiction-KEK** | |
-| Holds **known plaintext containing no customer data** | Asserted by architecture test |
+| One synthetic sealed record **per jurisdiction-KEK** | **Synthetic only** |
+| Holds **known plaintext containing no customer-derived data** | Asserted by architecture test |
+| Tests the **complete encryption/decryption path** | Not merely key existence |
+| Tests **key-version resolution** | A rotated-away version must be caught |
+| Tests **access to the key provider** | IAM/network failures surface here, not at disclosure |
+| **Never logs plaintext** | Success/failure only |
 | Decrypted on a schedule | |
-| Failure raises a **security event**, not a log line | |
+| Failure raises a **security event**, not a log line | Alerts, monitored |
 
-Without it, a KEK failure is discovered at the worst possible moment: a verified, authorised disclosure to a bereaved family, after every gate has been passed.
+Its implementation depends on the selected custody and provider strategy. Without it, a KEK failure is discovered at the worst possible moment: a verified, authorised disclosure to a bereaved family, after every gate has been passed.
 
-## 7. Escrow and recovery
+## 7. Custody and recovery
 
-**KEK escrow under split control** — no single operator can reconstruct a KEK alone — with a **documented, rehearsed, timed** recovery drill.
+**An approved `KeyCustodyStrategy`** (ADR-0017) — CLOUD_KMS_MANAGED, BYOK with external custody, external key manager, HSM, or another approved model — with separation of duties appropriate to the model and a **documented recovery/continuity procedure**, its drill rehearsed and timed **where technically applicable**. The universal requirement is the outcome: an approved and tested way to **prevent unrecoverable key loss and detect key unavailability.**
 
 **Hard gates before any production `SEALED` data exists:**
 
 1. Vault extracted into a dedicated security boundary.
-2. Escrow in place, recovery drill executed and timed.
+2. Custody strategy approved and implemented; recovery/continuity tested, the drill executed and timed where technically applicable.
 3. Canary running in staging and production.
+4. Production readiness review passed (ADR-0017's full checklist).
 
-All three are Phase 20 prerequisites, verified before Amanat ships.
+All are Phase 20 prerequisites, verified before Amanat ships.
 
 ## 8. Incident response
 
 | Signal | Response |
 |---|---|
-| Canary decryption fails | **SEV-1.** Halt sealed writes. Initiate escrow recovery. Do not attempt reads |
+| Canary decryption fails | **SEV-1.** Halt sealed writes. Initiate the custody strategy's recovery/continuity procedure. Do not attempt reads |
 | Refused access attempts spike | Security review. Possible credential compromise |
 | A grant is minted outside a workflow | **SEV-1.** Assume application compromise |
 | Vault boundary reached from an unexpected source | **SEV-1.** Network isolation review |
@@ -121,5 +126,5 @@ Enough to run the capability:
 | Sealed data cached or persisted on a device | |
 | A search index over sealed content | |
 | Sealed content in a disclosure package beyond the authorized scope | |
-| Production sealed data without extraction, escrow, and canary | |
+| Production sealed data without extraction, an approved custody strategy, and the canary | |
 | **Reclassifying anything out of `SEALED`** | The promise has no downgrade path |

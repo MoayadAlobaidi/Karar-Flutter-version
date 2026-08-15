@@ -26,7 +26,7 @@ The 128 legacy findings are additionally grouped by **ten systemic root causes**
 | Addition | Document |
 |---|---|
 | **Greenfield Rule** — absolute; legacy is knowledge, never code; Phase 1 starts from zero | [`architecture/greenfield-rule.md`](architecture/greenfield-rule.md) |
-| **`DeploymentProfile` + `DeploymentResolver`** — typed, provider-independent, distinct from Country/Jurisdiction/Tenant/OperatingEntity/Brand; resolution by tenant × jurisdiction × environment × contract × isolation, not country alone | [`architecture/infrastructure-portability.md`](architecture/infrastructure-portability.md) |
+| **`DeploymentProfile` + deployment routing** — typed, provider-independent, distinct from Country/Jurisdiction/Tenant/OperatingEntity/Brand; assignment by tenant × jurisdiction × environment × contract × isolation, not country alone *(routing split into `DeploymentRouter` + `DeploymentDirectory` in the pre-merge pass — see the addendum)* | [`architecture/infrastructure-portability.md`](architecture/infrastructure-portability.md) |
 | Provider-port catalogue (15 ports), opaque references (`ObjectRef`/`SecretRef`/`KeyRef`/`EventEnvelope`/`CacheKey`), provider capability verification, AI-routing independence, OTel observability, DR-vs-migration contract, config separation, definition of portable | same |
 | **PostgreSQL provider portability** — engine commitment + the honest limit; connection resolution; migrations-from-zero; contract test suite | [`architecture/database-portability.md`](architecture/database-portability.md) |
 | **Country deployment matrix** — decisions tracked separately from code, unknowns marked TBD/UNVERIFIED/PENDING_*, new-country bootstrap workflow | [`architecture/country-deployment-matrix.md`](architecture/country-deployment-matrix.md) |
@@ -84,3 +84,20 @@ overview · backend · data-model · tenancy · jurisdiction-policy · operating
 ## 7. Next
 
 Per the Phase 0.5 instruction: commit on the architecture branch, push, **open a PR into `main`** titled *"Karar V2: greenfield architecture foundation and legacy audit"* — and **stop**. The PR is not merged automatically. Phase 1 begins from fresh updated `main` on `claude/karar-v2-phase-1-foundation`, never on the architecture branch.
+
+---
+
+## Addendum — pre-merge consistency and portability correction (15 August 2026)
+
+One final targeted correction pass on PR #1, before merge. No redesign; no new phase.
+
+| Correction | What changed |
+|---|---|
+| **Repository layout normalized** | The Flutter client moved from singular `app/` to **`apps/mobile/`** — all buildable/deployable entrypoints now live under `apps/` (`mobile`, `api`, `worker`, `admin`). ADR-0003, README, flutter.md, onboarding, CONTRIBUTING, and every seam-verification grep updated. No singular/plural ambiguity remains |
+| **PostgreSQL persistence simplified** | **One `PostgresPersistenceAdapter`** for all managed PostgreSQL providers; differences live in **connection profiles** (`CloudSqlConnectionProfile`, `RdsConnectionProfile`, `LocalPostgresConnectionProfile`) and Terraform/networking/TLS/IAM/secrets/backup/HA — **no per-cloud business persistence adapters**. `DatabaseProvider` is a provisioning/connection contract, never an Application/Domain dependency |
+| **Deployment routing split into two problems** | **Problem A** (which deployment receives this request) → `DeploymentRouter` + minimal `DeploymentDirectory` at the Karar edge, **before any business data access**; **Problem B** (which datasource within that deployment) → `DataSourceResolver`. Directory holds routing metadata only — never financial data; B2C account-home bootstrap documented as an open problem with no mechanism prematurely selected; assignments versioned/audited with `ACTIVE → MIGRATING → CUTOVER_PENDING → ROLLBACK_WINDOW`; moves require no app/domain/rules changes |
+| **Portability ≠ cross-cloud runtime coupling** | Explicit rule: a runtime holds credentials and network access for **its own deployment's resources only**; QA runtime → QA resources. Cross-deployment access requires reviewed architecture |
+| **Key custody made outcome-based everywhere** | The universal rule is now: *the selected custody strategy must provide an approved and tested way to prevent unrecoverable key loss and detect key unavailability*. Custody models (`CLOUD_KMS_MANAGED`, `BYOK_IMPORTED_WITH_EXTERNAL_CUSTODY`, `EXTERNAL_KEY_MANAGER`, `HSM_MANAGED`, …) replace the hard-coded "KEK escrow / second copy / split-control reconstruction" mandate in ADR-0017, sealed-data, sealed-access, secrets, threat-model, environments, roadmap, SECURITY.md, scenarios, and the sealed-vault/amanat MODULE docs. Legacy documents keep the historical escrow finding as history. Canary expanded: complete-path, key-version-resolution, and provider-access testing; never logs plaintext |
+| **Subscription billing wording corrected** | Canonical rule: **Karar does not custody customer funds and does not operate as a payment processor or stored-value wallet; it may orchestrate billing through approved external providers** (`SubscriptionBillingProvider` → Apple/Google/web PSP/bank-sponsored rail), which execute settlement while Karar records subscription/entitlement state and verified billing events. Stricter capability rules retained: Zakat calculates/tracks only; Sadaqah tracks only; Amanat has no payment-provider dependency. README, overview, AC-011, and the Zakat module updated |
+
+Verification re-run after the pass: internal links, stale-token greps (`app/` paths, escrow mandates, universal no-payment claims, per-cloud DB adapters), and the greenfield checks. Results in the pre-merge commit message.

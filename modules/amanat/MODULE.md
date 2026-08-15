@@ -62,7 +62,7 @@ Adding this capability must leave `transactions`, `budgets`, `goals`, `zakat`, `
 
 ## Gates
 
-Legal clearance per jurisdiction; domain terminology review; vault extracted; KEK escrow with a rehearsed, timed recovery drill; sealed-integrity canary running. All before production.
+Legal clearance per jurisdiction; domain terminology review; vault extracted; approved key-custody strategy with tested recovery/continuity (ADR-0017); sealed-integrity canary running. All before production.
 
 ---
 

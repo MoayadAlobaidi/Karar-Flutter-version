@@ -30,7 +30,7 @@ An accepted ADR is not revisited without new information. If new information arr
 | [0014](0014-jurisdiction-vs-country.md) | Jurisdiction vs Country, and the business-branching prohibition | 3.5 |
 | [0015](0015-policy-packs.md) | Typed PolicyPacks + restrict-only settings + extensible resolution strategies + subject-elected policy | 3.5 |
 | [0016](0016-capability-registry.md) | Capability Registry — compile-time, governance only | 3.5 |
-| [0017](0017-sealed-classification.md) | `SEALED` classification, grant-gated vault, extractable boundary, key escrow | 13 |
+| [0017](0017-sealed-classification.md) | `SEALED` classification, grant-gated vault, extractable boundary, key custody | 13 |
 | [0018](0018-disclosure-not-access.md) | Disclosure ≠ Access; configurable approval policy with Amanat default | 13 |
 | [0019](0019-verified-financial-facts.md) | `VerifiedFinancialFacts` as primary AI numeric safety | 7 |
 | [0020](0020-projections.md) | Projections as non-authoritative read models | 8 |

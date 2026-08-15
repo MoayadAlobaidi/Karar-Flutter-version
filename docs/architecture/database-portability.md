@@ -16,19 +16,31 @@ Karar's canonical operational database family is **PostgreSQL**, because the arc
 
 Never claim more than this.
 
-## 2. The stack
+## 2. The stack — one persistence implementation, many connection profiles
 
 ```
-Karar repository ports            (application/ — knows only Repository interfaces)
+Application repository port       (application/ — knows only Repository interfaces)
         ↓
-PostgreSQL persistence adapter    (infrastructure/persistence/ — Prisma, confined)
+PostgresPersistenceAdapter        (infrastructure/persistence/ — ONE implementation, Prisma, confined)
         ↓
-Database connection / deployment resolver
+DataSource / connection factory
         ↓
-Managed PostgreSQL provider       (per DeploymentProfile)
+DatabaseProfile                   (per DeploymentProfile)
+        ↓
+Managed PostgreSQL
 ```
 
 The application requests a **`Repository`** — never a `CloudSQLClient`, `AwsRdsClient`, or `SupabaseClient`.
+
+> **There are no per-cloud business persistence adapters.** No `GcpCloudSqlPostgresAdapter`, no `AwsRdsPostgresAdapter`, no `AzurePostgresAdapter` for normal repository operations — unless an actual technical requirement appears, documented under §3. Cloud SQL, RDS, Azure Database for PostgreSQL, local Docker, and any approved compatible managed PostgreSQL all use the **same** `PostgresPersistenceAdapter`; what differs is the **connection profile**:
+
+```
+PostgresPersistenceAdapter → CloudSqlConnectionProfile
+PostgresPersistenceAdapter → RdsConnectionProfile
+PostgresPersistenceAdapter → LocalPostgresConnectionProfile
+```
+
+Cloud-provider differences belong in **Terraform, networking, TLS, IAM/database authentication, secrets, connection discovery, backup configuration, and high-availability configuration** — never in duplicated repository or business persistence code. `DatabaseProvider` is an infrastructure **provisioning/connection** concern; it is never an Application or Domain dependency.
 
 **Approved provider family** (illustrative; the decided state per deployment lives in [`country-deployment-matrix.md`](country-deployment-matrix.md)):
 

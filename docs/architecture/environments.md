@@ -14,7 +14,7 @@ Terraform carries the `deployments/qa/{dev,staging,production}/` compositions **
 
 > **Production must not be introduced before a separate staging environment exists.** Hard gate, Phase 20.
 
-Pre-GCP, staging is a **second Compose profile** used for release rehearsal, which keeps the discipline at near-zero cost.
+Pre-cloud, staging is a **second Compose profile** used for release rehearsal, which keeps the discipline at near-zero cost.
 
 ## 2. Why staging is mandatory rather than advisable
 
@@ -128,7 +128,7 @@ Production launch requires all of:
 | Separate staging environment | Provisioned and exercised |
 | Separately deployed control plane | Independent credentials |
 | **Sealed vault extracted** to its own security boundary | Before any production `SEALED` data |
-| **KEK escrow + rehearsed, timed recovery drill** | Before any production `SEALED` data |
+| **Approved key-custody strategy (ADR-0017)** — recovery/continuity tested, drill rehearsed where applicable | Before any production `SEALED` data |
 | **Sealed-integrity canary** running | Staging and production |
 | Independent security assessment | By a party that did not build the system |
 | Penetration test | Executed, not merely scoped |

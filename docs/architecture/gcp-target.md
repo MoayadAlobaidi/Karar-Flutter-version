@@ -18,7 +18,7 @@ What each provider-neutral port binds to **when a deployment profile selects GCP
 
 | Port | LOCAL | GCP profile |
 |---|---|---|
-| `DatabaseProvider` | PostgreSQL in Compose | Cloud SQL for PostgreSQL |
+| `DatabaseProfile` (provisioning/connection — the **same** `PostgresPersistenceAdapter` everywhere) | PostgreSQL in Compose | Cloud SQL for PostgreSQL via `CloudSqlConnectionProfile` |
 | `ObjectStorage` | MinIO | Cloud Storage |
 | `KeyManagementProvider` / `EncryptionProvider` | Local key file | Cloud KMS |
 | `SecretProvider` | `.env` | Secret Manager |

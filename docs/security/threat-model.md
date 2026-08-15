@@ -75,7 +75,7 @@ graph TB
 | Control | |
 |---|---|
 | KMS-held KEKs, jurisdiction-scoped; per-record DEKs | |
-| **KEK escrow under split control**, with a rehearsed, timed recovery drill | Phase 20 gate |
+| **Approved `KeyCustodyStrategy`** (ADR-0017) — recovery/continuity tested; drill rehearsed where technically applicable | Phase 20 gate |
 | **Sealed-integrity canary** — synthetic sealed record per KEK, known non-customer plaintext, decrypted on a schedule | Phase 20 gate |
 | Rotation designed in from Phase 2, not retrofitted | |
 | Startup refuses to boot without a key, or when existing data cannot be decrypted | |

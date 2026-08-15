@@ -162,7 +162,7 @@ Before that, extraction costs more than it saves. Writing the trigger down is wh
 After adding a capability, verify the untouched list is genuinely untouched:
 
 ```bash
-git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insights)/|packages/financial-engine/|app/lib/app/'
+git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insights)/|packages/financial-engine/|apps/mobile/lib/app/'
 ```
 
 **Empty output, or the seam is wrong.**

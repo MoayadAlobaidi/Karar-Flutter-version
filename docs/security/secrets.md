@@ -43,7 +43,7 @@ KMS
 
 **Algorithms:** AES-256-GCM, fresh 12-byte random IV per encryption, 128-bit tag, 32-byte key enforced, versioned prefix. **No proprietary cryptography.**
 
-## 5. Escrow, rotation, and the canary — mandatory
+## 5. Custody, rotation, and the canary — mandatory
 
 The most important lesson in the legacy audit. Finding **ENC-2**:
 
@@ -55,7 +55,7 @@ Custody is expressed as three **provider-independent** policies — `KeyCustodyS
 
 | Requirement | Detail | Gate |
 |---|---|---|
-| **KEK escrow under split control** | No single operator can reconstruct a KEK alone. Documented, rehearsed, **timed** recovery drill | Phase 20 |
+| **Approved `KeyCustodyStrategy`** | A named custody model (managed KMS, BYOK + external custody, external key manager, HSM, …) with separation of duties appropriate to it, destruction safeguards, and a tested recovery/continuity procedure — drill rehearsed and timed **where technically applicable** | Phase 20 |
 | **Sealed-integrity canary** | Synthetic sealed record per jurisdiction-KEK, **known plaintext containing no customer data**, decrypted on a schedule, alerting on failure | Phase 20 |
 | **Rotation designed in from Phase 2** | Not retrofitted | Phase 2 |
 
@@ -95,7 +95,7 @@ The legacy encrypts **on write only**, and *"no tool counts how many rows are st
 3. Dual-write / dual-read window.
 4. Re-wrap DEKs under the new KEK.
 5. Verify coverage with the tool from §8.
-6. Retire the old version, retaining escrow.
+6. Retire the old version, retaining recoverability per the custody strategy.
 
 **Rehearsed in staging before production, and timed.**
 
@@ -109,7 +109,7 @@ The legacy encrypts **on write only**, and *"no tool counts how many rows are st
 |---|---|
 | Secrets in the repository, logs, or error messages | |
 | Sharing a key across environments | |
-| A key with no escrow, once sealed data exists | |
+| A key under no approved custody strategy, once sealed data exists | |
 | Proprietary cryptography | |
 | Reversible "encryption" of passwords | Passwords are hashed, salted, with a modern KDF |
 | Claiming encryption coverage without measuring it | §8 |

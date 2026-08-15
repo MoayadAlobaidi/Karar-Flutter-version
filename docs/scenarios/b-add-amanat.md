@@ -114,7 +114,7 @@ graph LR
 | 5 | Country availability | QA `PENDING_LEGAL_REVIEW`; SA/AE/OM `DISABLED`. **Nothing enabled by default** |
 | 6 | Country policy | `EstateDisclosurePolicy` + `ApprovalPolicy` clause per pack; **absent ⇒ capability unavailable** |
 | 7 | Data classification | Metadata `CONFIDENTIAL`; payload **`SEALED`** |
-| 8 | Encryption | Per-record DEK, jurisdiction-scoped KEK, via `EncryptionProvider`; **extractable vault; KEK escrow + canary** |
+| 8 | Encryption | Per-record DEK, jurisdiction-scoped KEK, via `EncryptionProvider`; **extractable vault; approved custody strategy + canary** |
 | 9 | API | `/api/v1/amanat/*`, `/api/v1/admin/amanat/*` (**cases only, never content**) |
 | 10 | Flutter | `features/amanat/` — new folder, **zero shell changes**; hidden entirely when unavailable |
 | 11 | Admin | Cases, states, approvals, audit. **Never content** |
@@ -145,7 +145,7 @@ graph LR
 > **If this list shortens during implementation, the seam is wrong and gets fixed before Amanat proceeds.**
 
 ```bash
-git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insights|zakat)/|packages/financial-engine/|app/lib/app/'
+git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insights|zakat)/|packages/financial-engine/|apps/mobile/lib/app/'
 ```
 
 Empty output, or stop.
@@ -167,6 +167,6 @@ Amanat emits `EligibleRepaymentSupportRequested` carrying **identifiers, jurisdi
 | Legal clearance **per jurisdiction** | Before Phase 14 |
 | Domain terminology review | Before Phase 14 |
 | **Sealed vault extracted** to its own boundary | Phase 20 |
-| **KEK escrow + rehearsed, timed recovery drill** | Phase 20 |
+| **Approved key-custody strategy — recovery/continuity tested, drill rehearsed where applicable** | Phase 20 |
 | **Sealed-integrity canary running** | Phase 20 |
 | Per-capability policy-resolution strategy selection | **Legal, not engineering** — before Phase 13 |

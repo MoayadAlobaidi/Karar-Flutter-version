@@ -52,7 +52,7 @@ Full list: [`docs/testing/architecture-tests.md`](docs/testing/architecture-test
 The seam is real or it is not, and the way to find out is to try it and refuse to work around it.
 
 ```bash
-git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insights|zakat)/|packages/financial-engine/|app/lib/app/'
+git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insights|zakat)/|packages/financial-engine/|apps/mobile/lib/app/'
 ```
 
 **Empty output, or the seam is wrong and gets fixed before you proceed.** This is a stop-work condition, not a preference.

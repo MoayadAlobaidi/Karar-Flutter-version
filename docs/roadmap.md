@@ -11,7 +11,7 @@ Phases 10–21 are an architectural **option, not a schedule**. The seams are wh
 |---|---|---|
 | **0** | Architecture, ADRs, capability map, domain map, docs skeleton, **legacy audit** | ✅ **complete** |
 | **0.5** | **Final consolidation** — D1–D6 canonical, ADRs continuous 0001–0026, greenfield rule, `DeploymentProfile` + multi-cloud portability, PostgreSQL provider portability, country deployment matrix, cloud-neutral ladder, Assurance Claim Registry | ✅ **complete** |
-| **1** | Monorepo, tooling, Compose, CI, **architecture tests**, docs; Terraform `dev/staging/production` | staging from day one |
+| **1** | Monorepo, tooling, Compose, CI, **architecture tests**, docs; Terraform `deployments/qa/{dev,staging,production}` compositions | staging from day one |
 | **2** | Config, PostgreSQL, migrations, health, errors, observability, **audit**, event bus + **catalogue**, **outbox**, jobs, `shared-kernel`, **data classification**, **key rotation design** | +catalogue, +classification, +rotation |
 | **3** | Identity, users, tenancy, **operating-entity**, RBAC, consent + **re-consent evaluation**, sessions, kill switches, **PostgreSQL RLS**, adversarial cross-tenant tests | **RLS here**, +entity, +re-consent |
 | **3.5** | **Jurisdiction & Capability Foundation** — Country/Jurisdiction, PolicyPack `qa/v1`, resolution-strategy registry, **`SubjectPolicySelection` mechanism**, capability registry, availability model, entitlements | `ADDED` |
@@ -24,7 +24,7 @@ Phases 10–21 are an architectural **option, not a schedule**. The seams are wh
 | **10** | Subscriptions & entitlements — `SubscriptionBillingProvider` port + first implementation | rail deferred |
 | **11** | White label — **control plane *and* data plane**: brand config, tokens, flavors, tenant entitlements, branded release pipeline, demo bank tenant | **data plane costed** |
 | **12** | API / SDK / partner auth / webhooks | |
-| **13** | **Documents + Sealed Vault + state-machine helper** — Amanat prerequisites; **KEK escrow and canary designed** | `ADDED` |
+| **13** | **Documents + Sealed Vault + state-machine helper** — Amanat prerequisites; **key custody strategy and canary designed** | `ADDED` |
 | **14** | **Amanat** — gated on legal clearance; ships `PENDING_LEGAL_REVIEW` until cleared | `ADDED` |
 | **15** | Embedded Flutter | |
 | **16** | Operations, support, marketing, analytics, privacy flows, data export + erasure surfaces | |
@@ -56,7 +56,7 @@ All must hold before launch:
 | Separate staging environment | Provisioned and exercised |
 | Separately deployed control plane | Independent credentials |
 | **Sealed vault extracted** to its own security boundary | Before any production `SEALED` data |
-| **KEK escrow + rehearsed, timed recovery drill** | Before any production `SEALED` data |
+| **Approved key-custody strategy (ADR-0017)** — recovery/continuity tested, drill rehearsed where applicable | Before any production `SEALED` data |
 | **Sealed-integrity canary running** | Staging and production |
 | **Independent** security assessment | By a party that did not build the system |
 | Penetration test | Executed, not merely scoped |

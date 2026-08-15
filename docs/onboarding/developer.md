@@ -88,7 +88,7 @@ From Phase 1: Node, pnpm, Docker, and the Flutter SDK. Versions will be pinned i
 | An HTTP endpoint | `modules/<m>/presentation/http/` |
 | A financial calculation | `packages/financial-engine/` |
 | A jurisdictional rule | `packages/jurisdiction-policy/` |
-| Client UI | `app/lib/features/<f>/` |
+| Client UI | `apps/mobile/lib/features/<f>/` |
 
 ### 9. What may import what?
 
@@ -218,7 +218,7 @@ Read the ADR first — it records the alternatives that were rejected and why. I
 
 Two, and they are different in kind.
 
-**ENC-2 — the production encryption key is a one-way door and has already been lost once.** For `SEALED` data that failure is unrecoverable *and* undetectable, discovered at the worst possible moment. Hence escrow, rotation, and the integrity canary.
+**ENC-2 — the production encryption key is a one-way door and has already been lost once.** For `SEALED` data that failure is unrecoverable *and* undetectable, discovered at the worst possible moment. Hence an approved key-custody strategy, rotation, and the integrity canary (ADR-0017).
 
 **P1 — the published AI consent notice described a redaction behaviour the code did not implement**, and that notice was the legal basis for a cross-border transfer of customer financial data. *The code was defensible; the document was wrong.* **Published legal text is part of the system.**
 

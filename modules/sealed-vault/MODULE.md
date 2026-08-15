@@ -42,7 +42,7 @@ carry a raw UUID plus a reference type declared **in this module**.
 
 Extractability constraints binding from the first implementation: network-capable port surface; **operations never join the caller's transaction**; idempotent with caller-supplied keys; no shared state, pool, or cache. The write path is therefore a saga with outbox-driven compensation.
 
-**Phase 20 gates before any production SEALED data:** vault extracted to its own boundary; KEK escrow under split control with a rehearsed and timed recovery drill; sealed-integrity canary running in staging and production.
+**Phase 20 gates before any production SEALED data:** vault extracted to its own boundary; an **approved `KeyCustodyStrategy`** (ADR-0017 — managed KMS, BYOK + external custody, external key manager, HSM, or another approved model) with tested recovery/continuity, its drill rehearsed where technically applicable; sealed-integrity canary running in staging and production.
 
 Origin: legacy ENC-2 — *the key is a one-way door and has already been lost once in production*. For sealed data, loss is unrecoverable **and** undetectable.
 

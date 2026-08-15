@@ -10,6 +10,8 @@ Karar spans a backend, a Flutter client, generated SDKs, pure domain packages, a
 
 **Monorepo** with `apps/`, `packages/`, `modules/`, `infra/`, `docs/`.
 
+**All buildable or deployable application entrypoints live under `apps/`** — `apps/mobile/` (Flutter client), `apps/api/`, `apps/worker/`, `apps/admin/`. There is no singular `app/` directory; a client is an entrypoint like any other. `worker` remains a second entrypoint over the same module graph (ADR-0013), not a separate business application.
+
 **`shared-kernel` contains exactly nine universals:**
 
 ```

@@ -22,7 +22,7 @@ Different jurisdictions may also require **different cloud providers**: Qatar on
 
 L3 is deliberately **not** defined as "a GCP project." It is whatever the selected provider's account-isolation boundary is.
 
-**`DeploymentProfile` is the binding mechanism** — a typed, provider-independent description of one deployment: provider, region, database profile, storage, cache, messaging, secrets, key management, identity, AI routing, analytics, observability, network, and residency classification. Tenants map to profiles through a `DeploymentResolver` at the infrastructure edge; resolution may depend on tenant, jurisdiction, environment, contract, and isolation requirement — **not country alone**. Full specification: `docs/architecture/infrastructure-portability.md`.
+**`DeploymentProfile` is the binding mechanism** — a typed, provider-independent description of one deployment: provider, region, database profile, storage, cache, messaging, secrets, key management, identity, AI routing, analytics, observability, network, and residency classification. Requests reach the right deployment through **edge routing** — a `DeploymentRouter` consulting a minimal, versioned `DeploymentDirectory` (assignment → `DeploymentId` → profile) **before any business data access**; assignment may depend on tenant, jurisdiction, environment, contract, and isolation requirement — **not country alone**. Inside the selected runtime, the separate `DataSourceResolver` picks the tenant's datasource. Portability does **not** mean cross-cloud runtime coupling: a runtime holds credentials for its own deployment's resources only. Full specification: `docs/architecture/infrastructure-portability.md`.
 
 **Three runtime mechanisms, all in `infrastructure/`:**
 

@@ -122,7 +122,11 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **DeploymentProfile** — a typed, provider-independent description of one deployment: provider, region, database, storage, cache, messaging, secrets, key management, identity, AI routing, analytics, observability, network, residency classification. Distinct from Country, Jurisdiction, Tenant, OperatingEntity, and Brand.
 
-**DeploymentResolver** — the infrastructure-edge mechanism mapping tenant × jurisdiction × environment × contract × isolation requirement → `DeploymentProfile`. **Domain code never invokes it.**
+**DeploymentRouter** — the Karar-edge component that answers *which deployment receives this request*, by consulting the `DeploymentDirectory` — **before any business data access. Domain code never invokes it.**
+
+**DeploymentDirectory** — the minimal, versioned, audited lookup: assignment (tenant × jurisdiction × environment × contract × isolation requirement) → `DeploymentId` → `DeploymentProfile`. **Routing metadata only — never financial data.** Assignments support controlled moves (`ACTIVE → MIGRATING → CUTOVER_PENDING → ROLLBACK_WINDOW`).
+
+**DataSourceResolver** — the *within-runtime* mechanism selecting the tenant's shared or dedicated PostgreSQL datasource inside the already-selected deployment. A different problem from deployment routing, deliberately.
 
 **ObjectRef / SecretRef / KeyRef** — opaque, provider-neutral references persisted by the application; the active profile's adapters resolve them. **A `gs://` URL or `arn:` path is never a domain field.**
 

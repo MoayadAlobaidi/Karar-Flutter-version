@@ -49,7 +49,7 @@ The vault is **already extracted** into its own security boundary — a Phase 20
 
 - A tenant-scoped KEK and its own key ring
 - Its own service account and network segment
-- **Its own escrow arrangement and canary**, per KEK
+- **Its own custody arrangement and canary**, per KEK — under whichever custody model the profile's key-management provider supports
 
 The port surface does not change, because it was designed **network-capable, transaction-independent, and idempotent** from the first implementation. That decision, made at Phase 13, is what makes this scenario cheap at Phase 17+.
 
@@ -59,7 +59,7 @@ The port surface does not change, because it was designed **network-capable, tra
 |---|---|
 | Terraform project and environment | Real work, hours to days |
 | Datasource routing entry | Configuration |
-| Key ring, KMS setup, escrow, canary | Real work, and **security review** |
+| Key ring, KMS setup, custody strategy, canary | Real work, and **security review** |
 | New IdP adapter | Real work, if the IdP is unfamiliar |
 | New bank connector adapter | Real work, and likely the long pole |
 | Domain, engine, client, contract | **Zero** |

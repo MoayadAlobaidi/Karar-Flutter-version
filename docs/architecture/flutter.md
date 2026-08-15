@@ -25,7 +25,7 @@ The reason is concrete rather than aesthetic. A meaningful share of the legacy c
 ## 3. Structure
 
 ```
-app/
+apps/mobile/
 ├── lib/
 │   ├── app/              — bootstrap, DI, routing, flavors
 │   ├── core/

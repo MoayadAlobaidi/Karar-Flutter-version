@@ -24,6 +24,7 @@ Both entrypoints boot the same root module and differ only in what they start: `
 ```
 karar/
 ├── apps/
+│   ├── mobile/             — Flutter client (see flutter.md)
 │   ├── api/
 │   ├── worker/
 │   └── admin/              — Super Admin SPA. CI-enforced: no database driver

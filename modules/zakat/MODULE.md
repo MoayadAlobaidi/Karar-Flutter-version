@@ -38,7 +38,7 @@ Zakat assessment: nisab, hawl, declared asset and liability ledgers, valuation b
 | `zakat.assessment.write` | `USER` |
 | `zakat.settings.manage` | `PLATFORM_ADMIN` |
 
-**Permissions deliberately absent:** **Karar executes no payment.** The engine stops at *due*; only the customer's confirmation records payment.
+**Permissions deliberately absent:** **No Zakat payment execution exists in this capability.** The engine stops at *due*; only the customer's confirmation records payment. Any future Zakat payment flow would be a separately reviewed capability using an external licensed provider — it is not this module growing a permission.
 
 ## Dependencies
 

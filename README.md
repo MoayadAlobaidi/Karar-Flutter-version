@@ -25,8 +25,10 @@ Stated plainly so nothing is inferred from silence.
 
 | | |
 |---|---|
-| Karar does not hold funds | No custody, no wallet, no float |
-| Karar executes no payment | Not for subscriptions, Zakat, Sadaqah, or bills |
+| Karar does not custody customer funds | No wallet, no float, no stored value; **Karar is not a payment processor** |
+| Karar may orchestrate billing through approved external providers | `SubscriptionBillingProvider` → Apple / Google / web PSP / bank-sponsored entitlement. **The provider executes settlement**; Karar records subscription state, entitlements, and verified billing events |
+| Zakat and Sadaqah are calculators and trackers only | **No Zakat or Sadaqah payment execution** under current scope |
+| Amanat has no payment-provider dependency | Direct or transitive |
 | Karar makes no credit decision | No scoring, origination, or disbursement |
 | Karar gives no investment advice | |
 | Karar's AI is never the source of financial truth | It explains figures the engine computed. **It never writes a number** |
@@ -45,10 +47,9 @@ Stated plainly so nothing is inferred from silence.
 ## Layout
 
 ```
-apps/         api · worker · admin          entrypoints, no business logic
+apps/         mobile · api · worker · admin  entrypoints, no business logic
 packages/     shared-kernel · financial-engine · jurisdiction-policy · state-machine · api-contracts
 modules/      20 bounded contexts, each with public-api.ts and MODULE.md
-app/          Flutter client
 infra/        Terraform — contracts · providers (gcp/aws) · per-deployment compositions
 docs/         architecture · adr · security · legacy · scenarios · onboarding
 scripts/      verification, drills, helpers

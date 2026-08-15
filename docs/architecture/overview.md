@@ -22,8 +22,11 @@ Stated plainly so nobody infers otherwise from silence.
 
 | | |
 |---|---|
-| Karar does not hold funds | No custody, no wallet, no float |
-| Karar executes no payment | Not for subscriptions, not for Zakat, not for Sadaqah, not for bills |
+| Karar does not custody customer funds | No wallet, no float, no stored value — **Karar does not operate as a payment processor** |
+| Billing is orchestrated, never settled, by Karar | Consumer subscriptions flow `Karar → SubscriptionBillingProvider → Apple / Google / web PSP / bank-sponsored entitlement / other approved rail`. The external provider executes settlement; Karar records subscription state, entitlement state, billing-provider references, and verified billing events/receipts |
+| **Zakat**: calculation and tracking only | No Zakat payment execution unless a future, separately reviewed capability explicitly introduces an external licensed payment flow |
+| **Sadaqah**: tracking only | Under current scope |
+| **Amanat**: no payment-provider dependency, direct or transitive | Future repayment/fundraising remains a separate bounded context |
 | Karar makes no credit decision | No scoring, no origination, no disbursement |
 | Karar gives no investment advice | |
 | Karar's AI is never the source of financial truth | It explains figures the engine computed. It never produces one |

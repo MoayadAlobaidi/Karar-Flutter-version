@@ -42,7 +42,7 @@ These come from the audit of the legacy system and are binding on Karar's implem
 | Client IP derived from a **configured trusted-proxy allow-list** — never a bare client-supplied header | AUTHN-04, HIGH |
 | Rate-limit policy selected from the **normalised, decoded** path — never the raw URI | API-01, HIGH |
 | Every ingestion and rendering path declares explicit limits and **rejects rather than degrades** | FILES-2, HIGH |
-| **KEK escrow, rotation, and an integrity canary** before any production sealed data | **ENC-2 — the legacy's production key has already been lost once** |
+| **Approved key-custody strategy, rotation, and an integrity canary** before any production sealed data (ADR-0017) | **ENC-2 — the legacy's production key has already been lost once** |
 | RLS guard detects *no RLS*, *enabled-without-policy*, **and** *FORCEd-without-enabled* | RLS-01, RLS-02 |
 | Consent gates **fail closed** | AI-5 — the legacy's fails open |
 | **Every staff read of a customer record is audited**, including reads returning nothing | AZ5 |
@@ -62,6 +62,6 @@ Recorded with owners rather than left implicit.
 
 ## Production gates
 
-Production launch requires, among others: a separate staging environment; a separately deployed control plane; the **sealed vault extracted to its own security boundary**; **KEK escrow with a rehearsed, timed recovery drill**; the **sealed-integrity canary running**; an **independent** security assessment by a party that did not build the system; an executed penetration test; a measured RTO; and a written risk-acceptance register.
+Production launch requires, among others: a separate staging environment; a separately deployed control plane; the **sealed vault extracted to its own security boundary**; **an approved key-custody strategy with tested recovery/continuity (drill rehearsed where applicable)**; the **sealed-integrity canary running**; an **independent** security assessment by a party that did not build the system; an executed penetration test; a measured RTO; and a written risk-acceptance register.
 
 See [`docs/architecture/environments.md`](docs/architecture/environments.md).

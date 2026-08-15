@@ -88,7 +88,7 @@ If residency findings demand local processing → L2 or L3 — a **new `Deployme
 **Verification:**
 
 ```bash
-git diff --name-only main... | grep -E 'packages/financial-engine/|modules/(transactions|budgets|goals|insights)/|app/lib/app/'
+git diff --name-only main... | grep -E 'packages/financial-engine/|modules/(transactions|budgets|goals|insights)/|apps/mobile/lib/app/'
 ```
 
 Empty output, or the seam is wrong.
