@@ -3,3 +3,11 @@ packages:
   - 'apps/*'
   - '!apps/mobile'
   - 'packages/*'
+  # Modules join as they gain code (clean-architecture.md §5: cross-module
+  # imports resolve as @karar/<module> -> public-api.ts). Directories without
+  # a package.json are ignored, so skeleton modules cost nothing here.
+  - 'modules/*'
+allowBuilds:
+  # Transitive dep of the OTLP HTTP exporters (apps/api). Its postinstall is a
+  # version-stub writer the library does not need — never run it.
+  protobufjs: false

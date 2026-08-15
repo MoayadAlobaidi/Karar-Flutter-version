@@ -1,7 +1,14 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor bootstrap dev down reset-local generate lint test architecture-test security-scan docs-check verify
+# The Makefile is the local development entrypoint, so local is the default
+# environment here — and only here. The credential-fallback gate in
+# packages/platform treats an UNSET KARAR_ENV as non-local on purpose (a
+# mis-targeted CLI run must not downgrade role passwords); direct CLI use and
+# CI set the variable explicitly.
+export KARAR_ENV ?= local
+
+.PHONY: help doctor bootstrap dev down reset-local generate lint test architecture-test security-scan docs-check verify db-create db-migrate db-verify db-reset-local
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -65,3 +72,19 @@ verify: ## Full local gate, fail fast
 	$(MAKE) test
 	$(MAKE) architecture-test
 	$(MAKE) docs-check
+
+db-create: ## Bootstrap roles and create the local database (superuser, local only)
+	pnpm --filter @karar/platform build >/dev/null
+	pnpm --filter @karar/platform db:create
+
+db-migrate: ## Apply pending migrations as the restricted migrator role
+	pnpm --filter @karar/platform build >/dev/null
+	pnpm --filter @karar/platform db:migrate
+
+db-verify: ## Report applied/pending/drift; --strict fails on pending
+	pnpm --filter @karar/platform build >/dev/null
+	pnpm --filter @karar/platform db:verify
+
+db-reset-local: ## Drop and recreate the LOCAL database (guarded: KARAR_ENV=local)
+	pnpm --filter @karar/platform build >/dev/null
+	pnpm --filter @karar/platform db:reset-local
