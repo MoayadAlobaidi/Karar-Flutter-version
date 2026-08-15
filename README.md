@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **1 — in progress** ([phase report](docs/phases/phase-01.md)) |
-| Last completed phase | 0.5 (architecture consolidation) |
+| Current phase | **Phase 1 COMPLETE — Phase 2 NOT STARTED** ([phase report](docs/phases/phase-01.md)) |
+| Last completed phase | 1 (engineering and compliance foundation) |
 | Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
 | Application implementation | Foundation only — no product capabilities are implemented |
 | Cloud | None provisioned; local development is cloud-free |

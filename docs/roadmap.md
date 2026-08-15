@@ -11,7 +11,7 @@ Phases 10–21 are an architectural **option, not a schedule**. The seams are wh
 |---|---|---|
 | **0** | Architecture, ADRs, capability map, domain map, docs skeleton, **legacy audit** | ✅ **complete** |
 | **0.5** | **Final consolidation** — D1–D6 canonical, ADRs continuous 0001–0026, greenfield rule, `DeploymentProfile` + multi-cloud portability, PostgreSQL provider portability, country deployment matrix, cloud-neutral ladder, Assurance Claim Registry | ✅ **complete** |
-| **1** | Monorepo, tooling, Compose, CI, **architecture tests**, docs; Terraform `deployments/qa/{dev,staging,production}` compositions — **in progress** | staging from day one |
+| **1** | Monorepo, tooling, Compose, CI, **architecture tests**, docs; Terraform `deployments/qa/{dev,staging,production}` compositions | ✅ **complete** (2026-08-15, [report](phases/phase-01.md)) |
 | **2** | Config, PostgreSQL, migrations, health, errors, observability, **audit**, event bus + **catalogue**, **outbox**, jobs, `shared-kernel`, **data classification**, **key rotation design** | +catalogue, +classification, +rotation |
 | **3** | Identity, users, tenancy, **operating-entity**, RBAC, consent + **re-consent evaluation**, sessions, kill switches, **PostgreSQL RLS**, adversarial cross-tenant tests | **RLS here**, +entity, +re-consent |
 | **3.5** | **Jurisdiction & Capability Foundation** — Country/Jurisdiction, PolicyPack `qa/v1`, resolution-strategy registry, **`SubjectPolicySelection` mechanism**, capability registry, availability model, entitlements | `ADDED` |

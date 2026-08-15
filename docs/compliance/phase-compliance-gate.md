@@ -42,3 +42,13 @@ The compliance preconditions for the next phase to begin — deferred controls t
 ## Phase 1 specifics
 
 The first gate report (closing Phase 1) must additionally record: verification of EV-007 (branch protection, per `docs/operations/repository-security-settings.md`), the workflow-file review against KAR-CTL-009 and KAR-RSK-005, first-run references for EV-001–EV-006, disposition of the `Archive.zip` item (KAR-RSK-012), a decision on the SCA blocking threshold (KAR-CTL-025 — currently report-only), and confirmation that every [C1]-contingent control's check actually exists in the merged CI.
+
+## Phase 1 gate record — PASSED, 2026-08-15
+
+- EV-007 verified row-by-row via the GitHub API; observed values in `docs/operations/repository-security-settings.md`.
+- EV-001–EV-006 COLLECTED with first-run URLs (all 12 checks green; one transient Actions-allowlist failure fixed and recorded).
+- `Archive.zip` (KAR-RSK-012) disposition: untracked and git-ignored in the Phase 1 PR; history deliberately not rewritten; risk row updated.
+- KAR-CTL-025 decision: dependency audit stays report-only for Phase 2; the blocking dependency gate remains `dependency-review` (KAR-CTL-027). Tightening criterion unchanged in the settings doc.
+- All [C1]-contingent controls confirmed: every referenced check exists in the merged CI and ran green.
+- Independent review: 0 BLOCKING / 2 HIGH / 6 MEDIUM — all HIGH and MEDIUM remediated pre-PR ([phase report](../phases/phase-01.md)).
+- No control moved to OPERATING or EVIDENCED at this gate; statuses remain as the matrix records.
