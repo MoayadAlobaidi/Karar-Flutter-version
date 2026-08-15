@@ -68,13 +68,18 @@ If you are building a sealed capability: split metadata from payload so **lifecy
 
 ### 6. How do I run the system locally?
 
-**Phase 0: you cannot — no application code exists.**
+```bash
+make doctor      # verify your toolchain matches the pins
+make bootstrap   # install workspace and Flutter dependencies
+make dev         # bring up local infra; prints how to start each entrypoint
+make verify      # run the full local check suite
+```
 
-From Phase 1: `make up` brings up PostgreSQL, MinIO, and a mock AI provider in Compose. **Local development has zero cloud dependency** — no GCP account, no API key, no shared database.
+`make help` lists everything else. **Local development has zero cloud dependency** — no GCP account, no API key, no shared database. In Phase 1 the running system is infrastructure plus health endpoints; product capabilities do not exist yet (Q39).
 
 ### 7. What do I need installed?
 
-From Phase 1: Node, pnpm, Docker, and the Flutter SDK. Versions will be pinned in `.tool-versions` and `package.json` engines.
+Node, pnpm, Docker, and the Flutter SDK — versions pinned in `.tool-versions` and `package.json` engines. `make doctor` checks your machine against the pins.
 
 ### 8. Where does my code go?
 
@@ -229,3 +234,43 @@ Two, and they are different in kind.
 Where a deployment actually runs is a **`DeploymentProfile`** — provider, region, database, storage, keys — resolved at the infrastructure edge, per deployment, and recorded in the [country deployment matrix](../architecture/country-deployment-matrix.md). Qatar's candidate is GCP (**UNVERIFIED**, no account exists); other jurisdictions may use other providers; a partner bank may mandate its own. The database commitment is **PostgreSQL the engine, portable across managed providers** — not any one vendor's PostgreSQL ([`../architecture/database-portability.md`](../architecture/database-portability.md)).
 
 Practical consequences: persist `ObjectRef`/`SecretRef`/`KeyRef`, never a `gs://` or `arn:` value; read ports, never `GCP_PROJECT_ID`; and write provider-neutral SQL.
+
+---
+
+## Running and extending the workspace
+
+Added in Phase 1, when the repository became executable.
+
+### 32. How do I run all checks?
+
+`make verify` — the same suite CI runs, minus the scans that only make sense in CI. `make help` lists every target. The CI-enforced rules themselves are tabulated in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) and specified in [`../testing/architecture-tests.md`](../testing/architecture-tests.md).
+
+### 33. How do I add an app, package, or module?
+
+- **App:** a new entrypoint under `apps/` — composition and startup only, no business logic (`apps/README.md`).
+- **Package:** under `packages/`, only if it is genuinely shared; the pure packages must stay framework-free (architecture test 17).
+- **Module:** a capability — follow [`../architecture/extension-pattern.md`](../architecture/extension-pattern.md), `MODULE.md` first (Q1), and the seam-verification diff in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md).
+
+### 34. How do I add a DeploymentProfile?
+
+A `DeploymentProfile` is typed infrastructure configuration, never business code: define the profile per [`../architecture/infrastructure-portability.md` §2](../architecture/infrastructure-portability.md), wire its routing assignment per §3, bind it to a Terraform composition, and record the decision in the [country deployment matrix](../architecture/country-deployment-matrix.md) — following its new-country bootstrap workflow, with unknowns marked, never invented.
+
+### 35. How do I add a cloud adapter?
+
+Implement an existing provider port from the canonical catalogue ([`../architecture/infrastructure-portability.md` §5](../architecture/infrastructure-portability.md)) in `infrastructure/providers/`; if no port fits, declare one in `application/ports/` first (Q23). Nothing provider-specific leaves the adapter — no cloud SDK, client, or URI in `domain/` or `application/` (architecture test 10). The database is the deliberate exception: no per-cloud persistence adapters exist (Q36).
+
+### 36. How do I add a database connection profile?
+
+Not a new adapter — the one `PostgresPersistenceAdapter` serves every approved managed PostgreSQL. Add a connection profile and its `DataSourceResolver` mapping per [`../architecture/database-portability.md` §2/§4](../architecture/database-portability.md); provider differences stay in Terraform, networking, TLS, IAM, secrets, backup, and HA configuration.
+
+### 37. How are security controls mapped, and where is evidence recorded?
+
+[`../compliance/control-matrix.md`](../compliance/control-matrix.md) maps platform controls to SOC 2 and ISO/IEC 27001; [`../compliance/evidence-register.md`](../compliance/evidence-register.md) records the evidence, fed by every phase's report ([`../phases/README.md`](../phases/README.md)). This is readiness work — no certification is claimed.
+
+### 38. What is the current phase?
+
+Phase 1 — foundation, in progress. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-01.md`](../phases/phase-01.md).
+
+### 39. What is explicitly out of scope right now?
+
+Product capabilities. Phase 1 delivers the executable foundation only — no budgets, transactions, Zakat, AI, identity, or migrations, and no cloud is provisioned. The full out-of-scope list is in [`../phases/phase-01.md`](../phases/phase-01.md).

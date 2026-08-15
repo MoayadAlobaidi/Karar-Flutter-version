@@ -8,4 +8,4 @@ Each subdirectory is a deployable or buildable entrypoint: `mobile/` (Flutter cl
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: minimal buildable entrypoints exist (mobile, api, worker, admin). No product capabilities are implemented._

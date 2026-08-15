@@ -1,0 +1,20 @@
+# Build output and dependencies
+node_modules/
+dist/
+build/
+coverage/
+pnpm-lock.yaml
+
+# Flutter project — formatted by `dart format`, not prettier
+apps/mobile/
+
+# Documentation trees are owned editorially, outside code formatting
+docs/
+modules/
+infra/
+README.md
+CONTRIBUTING.md
+SECURITY.md
+apps/README.md
+packages/README.md
+scripts/README.md

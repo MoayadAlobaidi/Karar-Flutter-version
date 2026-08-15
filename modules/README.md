@@ -12,4 +12,4 @@ There is no `features/`, `future/`, `services/`, or `misc/` module. Those are wh
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: documentation only (`MODULE.md` per module). Module code begins at Phase 2._

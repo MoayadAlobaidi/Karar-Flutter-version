@@ -1,0 +1,61 @@
+# Local development infrastructure only. No production schemas, no migrations.
+# Credentials come from .env (see .env.example); the ${VAR:-default} fallbacks
+# are development defaults, never real secrets.
+name: karar
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-karar}
+      POSTGRES_USER: ${POSTGRES_USER:-karar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-karar_dev_password}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-karar} -d ${POSTGRES_DB:-karar}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:${MINIO_IMAGE_TAG:-RELEASE.2025-09-07T16-13-09Z}
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-karar}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-karar_dev_password}
+    ports:
+      - '127.0.0.1:${MINIO_API_PORT:-9000}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_TAG:-0.158.0}
+    command: ['--config=/etc/otel-collector-config.yaml']
+    volumes:
+      - ./scripts/dev/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - '127.0.0.1:${OTEL_GRPC_PORT:-4317}:4317' # OTLP gRPC
+      - '127.0.0.1:${OTEL_HTTP_PORT:-4318}:4318' # OTLP HTTP
+
+volumes:
+  postgres-data:
+  minio-data:

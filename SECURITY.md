@@ -4,7 +4,7 @@
 
 ## Status
 
-**Karar is at Phase 0.** No application code exists, no system is deployed, and **no customer data is held**.
+**Karar is at Phase 1.** Foundation code exists (workspace tooling, minimal entrypoints, CI, architecture tests) — no product capabilities are implemented, no system is deployed, and **no customer data is held**.
 
 **No security claim is made.** No penetration test, independent assessment, certification, or regulatory approval exists for this system, and none is implied by any document in this repository.
 
@@ -31,7 +31,7 @@ Six classifications; see [`docs/security/data-classification.md`](docs/security/
 | Production connection strings | |
 | A key shared across environments | **Never reuse production's encryption key anywhere** — a staging leak would otherwise decrypt production data |
 
-CI runs secret scanning and blocks the merge, not merely the workflow run.
+CI runs secret scanning, and branch protection on `main` makes the required checks merge-blocking (verified 2026-08-15; see `docs/operations/repository-security-settings.md`).
 
 ## Inherited security requirements
 

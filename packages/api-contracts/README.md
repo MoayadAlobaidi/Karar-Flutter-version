@@ -10,4 +10,4 @@ Build-time dependency for SDK generation and CI enforcement.
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: empty contract (`openapi/openapi.yaml` info block, `events/catalogue.json` empty). SDK generation not wired yet._

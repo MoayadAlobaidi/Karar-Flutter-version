@@ -8,4 +8,4 @@ The administrative browser application. Talks to the **control plane** over HTTP
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: static Vite shell, no framework, no data access. `pnpm --filter @karar/admin dev`._

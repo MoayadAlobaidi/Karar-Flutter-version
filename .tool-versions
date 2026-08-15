@@ -1,0 +1,7 @@
+nodejs 25.9.0
+pnpm 11.18.0
+flutter 3.47.0
+
+# Node 25 (Current line) is pinned deliberately: it is what the toolchain was
+# built and verified against. Revisit at the next even-numbered LTS promotion;
+# CI installs exactly this version, so local/CI drift is impossible.

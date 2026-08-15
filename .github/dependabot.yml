@@ -1,0 +1,59 @@
+# Dependabot configuration for Karar V2.
+#
+# Weekly cadence everywhere. Minor and patch updates arrive grouped into a
+# single PR per ecosystem; major updates arrive as individual PRs so breaking
+# changes get individual review. Auto-merge is intentionally NOT configured:
+# every update goes through the normal PR review + required CI checks.
+
+version: 2
+updates:
+  # Root pnpm workspace (apps/api, apps/worker, apps/admin, packages/*)
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions: keeps the commit-SHA pins in .github/workflows fresh.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # Docker images referenced from the root docker-compose.yml and any Dockerfiles.
+  # Image tags are not always semver, so no grouping: each bump reviewed alone.
+  - package-ecosystem: docker
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  # Flutter / Dart packages for the mobile app.
+  - package-ecosystem: pub
+    directory: '/apps/mobile'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      pub-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch

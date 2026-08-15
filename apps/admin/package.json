@@ -1,0 +1,17 @@
+{
+  "name": "@karar/admin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Super Admin SPA. Talks to the control plane over HTTP; carries no database driver.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite",
+    "preview": "vite preview",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "devDependencies": {
+    "vite": "^8.2.1"
+  }
+}

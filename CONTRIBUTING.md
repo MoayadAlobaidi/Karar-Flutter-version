@@ -22,16 +22,18 @@ You cannot merge past these, so knowing them saves a round trip.
 | No country- or jurisdiction-keyed **business branching** outside `packages/jurisdiction-policy` | ADR-0014 |
 | Every module directory has a `MODULE.md` | — |
 | Every published event is in the catalogue with declared consumers | ADR-0025 |
-| `SEALED` never in projections, events, logs, analytics, or AI context | ADR-0017 |
-| Sealed reads require a `SealAccessGrant`, at the type level | ADR-0017 |
-| Every persistent dataset declares its lifecycle — subject relationship, purpose, classification, retention, export treatment, erasure strategy | ADR-0026 |
-| Every declared guard has a call site | — |
-| Ingestion and rendering paths declare explicit resource limits | — |
+| `SEALED` never in projections, events, logs, analytics, or AI context *(active from Phase 13)* | ADR-0017 |
+| Sealed reads require a `SealAccessGrant`, at the type level *(active from Phase 13)* | ADR-0017 |
+| Every persistent dataset declares its lifecycle — subject relationship, purpose, classification, retention, export treatment, erasure strategy *(CI enforces the erasure column today; the full six fields deepen with the schema phases)* | ADR-0026 |
+| Every declared guard has a call site *(active from Phase 2)* | — |
+| Ingestion and rendering paths declare explicit resource limits *(active from Phase 5)* | — |
 | No cloud SDK, provider client, or provider URI in `domain/` or `application/` | ADR-0023 |
-| Technical/legal capability claims trace to the Assurance Claim Registry | — |
+| The Assurance Claim Registry stays referentially intact (every claim has evidence and an owner; referenced tests exist) | — |
 | `shared-kernel` exports exactly nine symbols | ADR-0003 |
 
 Full list: [`docs/testing/architecture-tests.md`](docs/testing/architecture-tests.md).
+
+Run everything locally before pushing: `make verify`. `make help` lists the rest of the targets; the setup path is in the [README quick start](README.md#developer-quick-start).
 
 ## Things that are easy to get wrong
 
@@ -63,7 +65,16 @@ git diff --name-only main... | grep -E 'modules/(transactions|budgets|goals|insi
 - Conventional commit prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 - A pull request that changes behaviour states what it changes and why. A pull request that changes a *rule* links the ADR.
 
+## Pull requests
+
+- All required CI checks must pass — they block the merge, not merely the workflow run.
+- Complete the [pull request template](.github/pull_request_template.md), every section. "None" is an answer; an empty section is not.
+- Documentation changes ship in the same PR as the change they describe.
+- At a phase boundary, the closing PR performs the **phase-end documentation ritual** — the fixed file set in [`docs/phases/README.md`](docs/phases/README.md). A phase is not complete while any of those files is stale.
+
 ## Documentation
+
+The [documentation style guide](docs/documentation-style-guide.md) is **binding** — terminology (with [`docs/glossary.md`](docs/glossary.md) as the vocabulary source), ownership, diagram conventions, claim labelling, and the prohibitions on promotional prose and AI signatures all live there.
 
 **Derive documentation from source, not from the previous version of the document.**
 
