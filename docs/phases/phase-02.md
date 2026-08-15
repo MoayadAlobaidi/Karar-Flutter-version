@@ -1,7 +1,8 @@
 # Phase 2 — Platform and data foundation
 
-**Branch:** `claude/karar-v2-phase-2-platform-foundation` · **Started:** 15 August 2026 · **Status:** in progress
-**Base:** Phase 1 merge commit `e535615` on `main`.
+**Branch:** `claude/karar-v2-phase-2-platform-foundation` · **Started:** 15 August 2026 · **Completed:** 16 August 2026 · **Status:** COMPLETE
+**Base:** Phase 1 merge commit `e535615` on `main` · **Final head:** `324fce1` plus the closeout commit finishing this report
+**Final CI:** CI and Security workflows green on the final head (12 required checks) · **Compliance gate:** PASS_WITH_DOCUMENTED_DEFERRED_ITEMS (record in [`../compliance/phase-compliance-gate.md`](../compliance/phase-compliance-gate.md)) · **Evidence:** EV-201–EV-219 COLLECTED with run references · **Independent review:** 0 BLOCKING / 0 HIGH / 2 MEDIUM / 4 LOW — all fixed pre-PR · **Confirmed:** no consumer capability was implemented in this phase
 
 Verification sections are filled by the phase lead after running the commands — they record executed results, never intentions.
 
@@ -126,9 +127,9 @@ All executed locally by the phase lead on 2026-08-15 (macOS arm64, toolchain per
 
 | Suite | Result |
 |---|---|
-| Workspace (vitest, all packages/apps) | **467 passed, 5 gated, 472 total** — 43/44 files (the gated file is the compose-manipulating readiness suite below) |
+| Workspace (vitest, all packages/apps) | **469 passed, 5 gated, 474 total** — 43/44 files at the final head (the gated file is the compose-manipulating readiness suite below; totals grew during reviewer remediation with the credential-gate and redaction tests) |
 | Readiness integration (KARAR_INTEGRATION=1, stops/starts PostgreSQL) | **22/22** — up, down, recovery, migration-behind |
-| Platform package alone | 203 tests, 17 files — includes migration contract, restricted-role denial, audit immutability, outbox atomicity/concurrency (2 relays × 200 events, zero duplicates), jobs concurrency (2 workers × 100 jobs, exactly-once), local-only password-guard |
+| Platform package alone | 205 tests, 17 files — includes migration contract, restricted-role denial, audit immutability, outbox atomicity/concurrency (2 relays × 200 events, zero duplicates), jobs concurrency (2 workers × 100 jobs, exactly-once), local-only password-guard |
 | Architecture tests | **20 passed, 0 failed, 8 deferred by activation phase; registry errors 0; self-test 22/22 seeded violations caught** |
 | Documentation checks | 7/7 |
 | Flutter analyze/test | pass (unchanged from Phase 1; no mobile work this phase) |
@@ -136,6 +137,14 @@ All executed locally by the phase lead on 2026-08-15 (macOS arm64, toolchain per
 ## Build results
 
 `pnpm -r build` clean across all 9 workspace projects. `make verify` passes end to end. Database flow verified live: `make db-verify` reports all five migrations applied by `karar_migrator`; the from-zero path (`db:create` → `db:migrate` → `db:verify`) is additionally proven twice against scratch databases inside the contract tests. Integration fixes applied during the lead pass, recorded rather than hidden: the Phase 1 `financial-engine` placeholder was reconciled to the real kernel API; development password fallbacks in connection profiles were gated to `KARAR_ENV=local` with fail-fast outside it (new guard tests); a package `exports` map was added to `@karar/platform`; the CI workspace job gained a Compose PostgreSQL step; `make db-*` targets were wired with a build prerequisite and added to `.PHONY`. One flaky observation, recorded honestly and then fixed: the `apps/worker` outbox-ping integration test failed once immediately after a PostgreSQL container restart — its final assertion raced the relay's `published_at` update against the consumer receipt. The assertion now polls (the outbox contract guarantees eventual publication, not same-instant ordering); five consecutive reruns pass.
+
+## Clean-clone verification
+
+A clean-clone reproducibility check by the maintainer (not a second-engineer or organizationally independent test), 2026-08-16, 00:58:53–01:02 local, against head `324fce1` in a new temporary directory with its own install and its own PostgreSQL cluster.
+
+Sequence and results: clone → `make doctor` (all pinned tools pass) → `make bootstrap` → fresh cluster on isolated ports → **database from zero on a virgin cluster**: `make db-create` (roles + grants), `make db-migrate` (all five migrations as `karar_migrator`), `make db-verify` (five applied, checksums clean) → full workspace suite **469 passed / 5 gated / 474** → gated readiness matrix **22/22** → API `/healthz` ok and `/readyz` 200 → worker `/readyz` 200, graceful drain logged ("shutting down" → "shutdown complete") with exit code 143, the standard SIGTERM acknowledgement → architecture **20/0/8, self-test ok** → docs **7/7** → stack torn down with volumes removed.
+
+Two observations recorded: (1) `docker-compose.yml` pins the Compose project name to `karar`, so two checkouts on one machine share a single stack — fine for a single-developer setup, worth revisiting when parallel checkouts matter; a first attempt with a `-p` project override broke the readiness suite's own compose calls (they use the cwd default) and was redone without the override. (2) On machines with host-level PostgreSQL/Redis, the documented port overrides are the one manual prerequisite.
 
 ## Independent review
 

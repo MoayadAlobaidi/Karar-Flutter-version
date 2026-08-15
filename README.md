@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **2 — in progress** ([phase report](docs/phases/phase-02.md)) |
-| Last completed phase | 1 (engineering and compliance foundation, [report](docs/phases/phase-01.md)) |
+| Current phase | **Phase 2 COMPLETE — Phase 3 NOT STARTED** ([phase report](docs/phases/phase-02.md)) |
+| Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
 | Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
 | Application implementation | Foundation only — no product capabilities are implemented |
 | Cloud | None provisioned; local development is cloud-free |
@@ -239,7 +239,7 @@ No cloud account, API key, or shared database is required for any of it — that
 ## Testing and CI
 
 - **Unit tests** for `domain/` and the pure packages — no mocks, no container.
-- **Integration tests** against real PostgreSQL in Docker — since Phase 2 the workspace suite (467 passing tests when this was recorded) includes live-PostgreSQL runs of the migration, audit-immutability, outbox, and jobs suites, with concurrency proofs (two relays over 200 events; two workers over 100 jobs). `make dev` first; see the quick-start port note for machines with a host PostgreSQL.
+- **Integration tests** against real PostgreSQL in Docker — since Phase 2 the workspace suite (469 passing tests at Phase 2 close, plus a 22-test gated readiness matrix) includes live-PostgreSQL runs of the migration, audit-immutability, outbox, and jobs suites, with concurrency proofs (two relays over 200 events; two workers over 100 jobs). `make dev` first; see the quick-start port note for machines with a host PostgreSQL.
 - **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today; cloud provider legs are future.
 - **Architecture tests** — 26 CI-blocking structural tests, kept in a registry with per-test activation phases; a test activates when the structure it guards exists.
 - **Security scans and SBOM** — dependency and secret scanning, software bill of materials, supply-chain checks.
