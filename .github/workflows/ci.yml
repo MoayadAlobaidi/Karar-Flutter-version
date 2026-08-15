@@ -65,8 +65,26 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The Phase 2 platform suites (migrations, audit immutability, outbox,
+      # jobs) run against a real local PostgreSQL. Compose is used instead of a
+      # GitHub service container so the same stack runs locally and in CI, and
+      # so suites that stop/start postgres (readiness recovery tests) work.
+      - name: Start local PostgreSQL (compose)
+        run: docker compose up -d postgres --wait
+
       - name: Test
+        env:
+          KARAR_ENV: local
+          POSTGRES_PORT: '5432'
+          # Enables the readiness-integration suite (stops/starts the compose
+          # postgres container) so EV-216's evidence is collected in CI, not
+          # only on a maintainer laptop.
+          KARAR_INTEGRATION: '1'
         run: pnpm test
+
+      - name: Stop local PostgreSQL
+        if: always()
+        run: docker compose down -v
 
   architecture:
     name: architecture
