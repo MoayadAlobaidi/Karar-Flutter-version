@@ -1,6 +1,6 @@
 {
   "description": "Machine-readable registry of the 26 architecture tests (docs/testing/architecture-tests.md) plus the canary-purity test. Read by scripts/checks/architecture.mjs, which enforces the activation gate: a test whose activationPhase has been reached without an implementation fails the run.",
-  "currentPhase": 1,
+  "currentPhase": 2,
   "source": "docs/testing/architecture-tests.md",
   "statusValues": {
     "ACTIVE": "The guarded structure exists now; the check runs on every invocation and must pass.",
@@ -42,19 +42,18 @@
     {
       "id": 5,
       "name": "Ports declared inward",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_2",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 2,
-      "activationCriterion": "First module infrastructure adapter exists and the port location convention (application/ports/) is pinned in code. Unlike tests 2/3, this check has no well-defined vacuous form: detecting an adapter-without-port requires the adapter/port naming convention that Phase 2 establishes; registering a scan before then would be a check that cannot fail.",
-      "notes": "Judgment recorded: deferred rather than vacuously active, because the rule is existential (an adapter must have a matching port), not directional, and there is nothing to match against yet."
+      "implementedIn": "scripts/checks/architecture.mjs#checkPortsDeclaredInward",
+      "notes": "Activated in Phase 2 with the first real adapter (modules/audit/infrastructure). Every adapter-suffixed class (Adapter/Writer/Repository/Provider/Store/Gateway/Client/Publisher/Consumer/Relay/Source/Sink) exported from modules/*/infrastructure must implement an interface declared under that module's application/ports/. Self-test seeds an adapter without a port and asserts failure."
     },
     {
       "id": 6,
       "name": "No business logic in controllers",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_2",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 2,
-      "activationCriterion": "First module presentation controller invoking a use case exists. The Phase 1 health controllers call no use case and carry no declared complexity budget to check against."
+      "implementedIn": "scripts/checks/architecture.mjs#checkControllerComplexity",
+      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) — domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
     },
     {
       "id": 7,
@@ -70,7 +69,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkEventCatalogue",
-      "notes": "The catalogue file exists with zero events, so the structural check can and does run: the catalogue must parse, every entry must be well-formed, every DomainEvent implementation in code must be catalogued, and publish call sites with an empty catalogue fail. Today it verifies the catalogue parses and no event definitions exist outside it. Consumer-side allowedConsumers enforcement deepens when the bus exists (Phase 2)."
+      "notes": "The catalogue file exists with zero events, so the structural check can and does run: the catalogue must parse, every entry must be well-formed, every DomainEvent implementation in code must be catalogued, and publish call sites with an empty catalogue fail. Today it verifies the catalogue parses and no event definitions exist outside it. Consumer-side allowedConsumers enforcement deepens when the bus exists (Phase 2). Coordination note (Phase 2, workstreams D/F): the checker validates the minimal required shape and ignores unknown fields, so D's richer catalogue entries (envelope/version/retention additions) extend entries without changes here; payload-rule constraints (test 15) stay as specified."
     },
     {
       "id": 9,
@@ -186,10 +185,10 @@
     {
       "id": 23,
       "name": "No declared guard without call site",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_2",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 2,
-      "activationCriterion": "First guard class documented as a protection exists. No guards exist in Phase 1, so there is nothing whose call sites could be verified."
+      "implementedIn": "scripts/checks/architecture.mjs#checkGuardCallSites",
+      "notes": "Activated in Phase 2 with the first guard class (audit's AuditMetadataGuard; config guards count as they land). Every class named *Guard in apps/*/src, packages/*/src, or modules/** must be referenced from non-test code outside its own declaration; tests do not count as call sites. Self-test seeds an unreferenced FooGuard and asserts failure."
     },
     {
       "id": 24,
@@ -205,7 +204,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkLifecycleDeclarations",
-      "notes": "MODULE.md files exist now with lifecycle tables. Every modules/*/MODULE.md must contain a Data owned table whose rows carry an erasure strategy from the four canonical values of ADR-0026: CASCADE_DELETE, ANONYMIZE_IRREVERSIBLY, RETAIN_WITH_BASIS, NON_PERSONAL_BY_DESIGN. Current enforcement: erasure-strategy column (canonical values; named datasets may not leave it blank). Deepening to all six lifecycle fields is an explicit criterion of the Phase 2 schema work \u2014 when the first real schema lands, the check must parse subject relationship, purpose, classification, retention, and export treatment as well."
+      "notes": "Deepened in Phase 2 with the first real schema (audit.audit_events): a module with implementation code must declare the full six-field table (subject relationship, purpose, classification, retention, export treatment, erasure strategy), and six-field tables are validated field by field \u2014 canonical subject/classification/erasure values, export treatment included|excluded (reason)|n/a with 'excluded' requiring a stated reason, and placeholders (TBD/TODO/empty) forbidden. Skeleton modules without code keep the erasure-only obligation. Also parses packages/platform/db/DATA_LIFECYCLE.md (platform-owned tables: schema_migrations now; workstream D appends outbox/jobs rows) with the same six-field rules. Self-test seeds a non-canonical strategy, a code-bearing module without the six-field table, and a placeholder row."
     },
     {
       "id": 26,

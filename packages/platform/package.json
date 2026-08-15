@@ -1,0 +1,74 @@
+{
+  "name": "@karar/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\"",
+    "db:create": "node dist/db/cli.js create",
+    "db:migrate": "node dist/db/cli.js migrate",
+    "db:verify": "node dist/db/cli.js verify",
+    "db:reset-local": "node dist/db/cli.js reset-local"
+  },
+  "dependencies": {
+    "@karar/api-contracts": "workspace:*",
+    "@karar/shared-kernel": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "pg": "^8.16.0",
+    "pino": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "default": "./dist/config/index.js"
+    },
+    "./db": {
+      "types": "./dist/db/index.d.ts",
+      "default": "./dist/db/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "default": "./dist/errors/index.js"
+    },
+    "./wire": {
+      "types": "./dist/wire/index.d.ts",
+      "default": "./dist/wire/index.js"
+    },
+    "./observability": {
+      "types": "./dist/observability/index.d.ts",
+      "default": "./dist/observability/index.js"
+    },
+    "./classification": {
+      "types": "./dist/classification/index.d.ts",
+      "default": "./dist/classification/index.js"
+    },
+    "./keys": {
+      "types": "./dist/keys/index.d.ts",
+      "default": "./dist/keys/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "default": "./dist/events/index.js"
+    },
+    "./outbox": {
+      "types": "./dist/outbox/index.d.ts",
+      "default": "./dist/outbox/index.js"
+    },
+    "./jobs": {
+      "types": "./dist/jobs/index.d.ts",
+      "default": "./dist/jobs/index.js"
+    },
+    "./dist/*": "./dist/*"
+  }
+}

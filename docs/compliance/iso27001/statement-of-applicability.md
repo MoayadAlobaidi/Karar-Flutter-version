@@ -1,6 +1,8 @@
 # Statement of Applicability
 
-**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.1 · **Date:** 2026-08-15 · **Review:** every phase gate (deltas per gate report §5)
+**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** every phase gate (deltas per gate report §5)
+
+**v0.2 (2026-08-15, Phase 2):** seven rows moved to IMPLEMENTED on the strength of matrix-IMPLEMENTED controls (5.13, 5.33, 8.9, 8.11, 8.12, 8.15, 8.28); 8.3, 8.10, 8.16, 8.24, 8.32 annotated without a status change. Deltas listed under the tally.
 
 All 93 controls of ISO/IEC 27002:2022 (Annex A of ISO/IEC 27001:2022), by identifier, with a short **Karar-language name** (paraphrased — not the standard's text), an applicability status, and a justification. Where a Karar control implements the Annex A control, the KAR-CTL ID links into the [control matrix](../control-matrix.md), whose status detail is authoritative.
 
@@ -32,7 +34,7 @@ All 93 controls of ISO/IEC 27002:2022 (Annex A of ISO/IEC 27001:2022), by identi
 | 5.10 | Acceptable use and handling rules for assets | APPLICABLE | [acceptable-use-policy](../../policies/acceptable-use-policy.md); classification handling matrix |
 | 5.11 | Assets returned on exit | PLANNED (first hire) | No employment relationships exist; rule activates with them |
 | 5.12 | Information classified by sensitivity | APPLICABLE | Six-class scheme, canonical (`docs/security/data-classification.md`). KAR-CTL-033 |
-| 5.13 | Information carries its classification label | PLANNED (2) | Labels enter schema comments, event catalogue, MODULE.md at Phase 2 |
+| 5.13 | Information carries its classification label | IMPLEMENTED | 2026-08-15: every Phase 2 table carries a six-field lifecycle row including its class (`packages/platform/db/DATA_LIFECYCLE.md`, `modules/audit/MODULE.md`, enforced by architecture test 25); event catalogue fields carry classes. KAR-CTL-033, 061 (IMPLEMENTED [P2]); labelling extends to each new surface as it lands |
 | 5.14 | Information transfer rules | APPLICABLE | Today's only transfer surface is authenticated TLS to SCM/registries; classification matrix defines in-transit rules for the future system |
 | 5.15 | Access control rules established | APPLICABLE | [access-control-policy](../../policies/access-control-policy.md); layered model in `docs/security/access-control.md`. KAR-CTL-007 |
 | 5.16 | Identity lifecycle managed | APPLICABLE | One SCM identity today, managed; application identity Phase 3. KAR-CTL-007, 010 |
@@ -52,7 +54,7 @@ All 93 controls of ISO/IEC 27002:2022 (Annex A of ISO/IEC 27001:2022), by identi
 | 5.30 | ICT continuity readiness | PLANNED (20) | DR runbook executed + RTO measured are Phase 20 gates |
 | 5.31 | Legal/regulatory requirements identified | APPLICABLE | Roadmap non-engineering gates; jurisdiction docs; residency open (KAR-RSK-006). KAR-CTL-006 |
 | 5.32 | Intellectual property respected | APPLICABLE | Greenfield rule (no legacy code, AC-012); dependency licenses visible via SBOM. KAR-CTL-022 |
-| 5.33 | Records protected | APPLICABLE | Git history + evidence retention rules. KAR-CTL-046 |
+| 5.33 | Records protected | IMPLEMENTED | Git history + evidence retention rules (KAR-CTL-046, still DESIGNED). 2026-08-15: a purpose-built records-protection mechanism now exists — the append-only audit store with grant- and trigger-enforced immutability (KAR-CTL-056, IMPLEMENTED [P2]); local/test execution only, no operating history |
 | 5.34 | Privacy and PII obligations met | PLANNED (5/16/prod) | **No PII is held today** (KAR-CTL-038); ADR-0026 lifecycle + consent controls activate Phases 3–16 |
 | 5.35 | Independent review of security | PLANNED (20) | Independent assessment by a party that did not build the system — hard Phase 20 gate; nothing in-house substitutes |
 | 5.36 | Compliance with policies verified | APPLICABLE | Phase gates check policy adherence. KAR-CTL-004, 005 |
@@ -96,20 +98,20 @@ All 93 controls of ISO/IEC 27002:2022 (Annex A of ISO/IEC 27001:2022), by identi
 |---|---|---|---|
 | 8.1 | Endpoint devices secured | APPLICABLE | FDE, lock, updates, separation of concerns on the one workstation (acceptable-use-policy) |
 | 8.2 | Privileged access tightly held | APPLICABLE | SCM admin = one person today, recorded; control-plane model for the future (KAR-CTL-013) |
-| 8.3 | Access to information restricted | APPLICABLE | Repository is public by decision (read); write access maintainer-only. No restricted-class information is held in it by rule. Application-layer restriction from Phase 3 (KAR-CTL-010, 011) |
+| 8.3 | Access to information restricted | APPLICABLE | Repository is public by decision (read); write access maintainer-only. No restricted-class information is held in it by rule. 2026-08-15: database-layer restriction now real — DML-only `karar_app` vs schema-owning `karar_migrator`, denials proven (KAR-CTL-053). Application-layer restriction from Phase 3 (KAR-CTL-010, 011) |
 | 8.4 | Source code access controlled | APPLICABLE | Write access maintainer-only; branch protection on `main` verified 2026-08-15 (EV-007): PR-only, 8 required checks, admins bound. KAR-CTL-007, 008 |
 | 8.5 | Strong authentication | APPLICABLE | MFA on SCM (verification EV-007); application authn design Phase 3 (KAR-CTL-010) |
 | 8.6 | Capacity managed | PLANNED (17) | Nothing to capacity-manage; CI quotas trivial |
 | 8.7 | Malware defenses | APPLICABLE | Endpoint hygiene + no-untrusted-downloads rule (acceptable-use-policy §R5); pinned dependencies reduce the realistic vector |
 | 8.8 | Technical vulnerabilities managed | **IMPLEMENTED** | Phase-1 CI runs dependency scanning per-PR (report-only pending its blocking threshold — KAR-CTL-025), CodeQL static analysis (KAR-CTL-029, [C1]), and automated update PRs (dependabot); runtime/platform vuln management PLANNED with runtimes. The mechanism exists; the blocking decision is the open piece |
-| 8.9 | Configuration managed | APPLICABLE | All config in git via PR; typed boot-validated runtime config from Phase 2 (KAR-CTL-031) |
-| 8.10 | Information deleted when no longer needed | PLANNED (5) | ADR-0026 lifecycle declarations + erasure strategies. KAR-CTL-037 |
-| 8.11 | Data masked where full values are not needed | PLANNED (2/8) | Log redaction Phase 2; admin projections instead of raw tables Phase 8 (KAR-CTL-040) |
-| 8.12 | Data leakage prevented | PLANNED (2) | Secret scanning is one live layer (KAR-CTL-026); classification-driven event/log rules land Phase 2 |
+| 8.9 | Configuration managed | IMPLEMENTED | All config in git via PR. 2026-08-15: typed, boot-validated, fail-fast runtime configuration delivered (KAR-CTL-051, IMPLEMENTED [P2]); errors name fields, never values. IaC skeleton remains DESIGNED (KAR-CTL-031) |
+| 8.10 | Information deleted when no longer needed | PLANNED (5) | ADR-0026 lifecycle declarations + erasure strategies. KAR-CTL-037. 2026-08-15: every Phase 2 table already carries its declared retention and erasure strategy (`packages/platform/db/DATA_LIFECYCLE.md`); the deriving mechanism is still Phase 5 |
+| 8.11 | Data masked where full values are not needed | IMPLEMENTED | 2026-08-15: log/event/audit-metadata redaction delivered (`[redacted:*]` markers, HSF stored redacted — KAR-CTL-040, 057, IMPLEMENTED [P2]). Admin projections instead of raw tables remain Phase 8 |
+| 8.12 | Data leakage prevented | IMPLEMENTED | Secret scanning was the first live layer (KAR-CTL-026); 2026-08-15: classification-driven event/log rules landed (SEALED identifier-only without exemption, `SecretValue` redaction — KAR-CTL-052, 061, IMPLEMENTED [P2]). Egress-side DLP for a running system remains with runtimes |
 | 8.13 | Backups taken and tested | PLANNED (17) | Nothing to back up but git, covered by clone recoverability (KAR-CTL-046); real backups with restore verification at Phase 17+, KAR-CTL-044 |
 | 8.14 | Redundant processing capability | PLANNED (17/20) | KAR-CTL-045 |
-| 8.15 | Logs produced and protected | PLANNED (2) | Append-only audit design; KAR-CTL-039, 040 |
-| 8.16 | Systems monitored for anomalies | PLANNED (20) | KAR-CTL-041; a single alert recipient will not count as on-call |
+| 8.15 | Logs produced and protected | IMPLEMENTED | 2026-08-15: structured classification-redacting logs and the append-only audit store with immutability enforcement delivered (KAR-CTL-040, 056, 063, IMPLEMENTED [P2]); staff-read auditing remains Phase 8 (KAR-CTL-039, DEFERRED). Local/test execution only — nothing runs anywhere to produce logs continuously |
+| 8.16 | Systems monitored for anomalies | PLANNED (20) | KAR-CTL-041; a single alert recipient will not count as on-call. 2026-08-15, partial: the signal substrate exists (metrics, traces, truthful `/readyz`, outbox lag/DLQ metrics — KAR-CTL-058, 062, 063) but nothing watches, alerts, or pages, so this row does not advance (KAR-RSK-003) |
 | 8.17 | Clocks synchronized | PLANNED (17) | Relevant when distributed runtime exists |
 | 8.18 | Privileged utilities restricted | PLANNED (17) | Runtime concern; control-plane gateway design already excludes ad-hoc production tooling |
 | 8.19 | Software on operational systems controlled | PLANNED (17) | No operational systems; endpoint software per acceptable-use-policy |
@@ -117,27 +119,29 @@ All 93 controls of ISO/IEC 27002:2022 (Annex A of ISO/IEC 27001:2022), by identi
 | 8.21 | Network services secured | PLANNED (17) | KAR-CTL-032; DB transport `verify-full` per `docs/security/secrets.md` §10 |
 | 8.22 | Networks segregated | PLANNED (17/20) | Sealed vault into its own boundary before production sealed data (ADR-0017) |
 | 8.23 | Web access filtered | NOT_APPLICABLE | No managed corporate network or endpoint fleet exists to filter. Revisit: ≥3 staff or managed endpoints |
-| 8.24 | Cryptography used properly, keys managed | APPLICABLE | [cryptography-and-key-management-policy](../../policies/cryptography-and-key-management-policy.md); ADR-0017; implementation Phases 2/13/20 (KAR-CTL-034, 035) |
+| 8.24 | Cryptography used properly, keys managed | APPLICABLE | [cryptography-and-key-management-policy](../../policies/cryptography-and-key-management-policy.md); ADR-0017; implementation Phases 13/20 (KAR-CTL-034, 035). 2026-08-15: **design only** — custody, provenance, rotation, and canary contracts exist as code with tests (KAR-CTL-064, 065, DESIGNED); no key management operates, no cloud KMS, no production keys, and this row deliberately does not advance |
 | 8.25 | Development follows a secure lifecycle | APPLICABLE | [secure-development-policy](../../policies/secure-development-policy.md); CI gates land Phase 1 (KAR-CTL-020, 021) |
 | 8.26 | Security requirements set for applications | APPLICABLE | Threat model drives requirements; MODULE.md intake (KAR-CTL-021, 024) |
 | 8.27 | Secure architecture principles applied | APPLICABLE | 26 ADRs + architecture tests as enforcement (KAR-CTL-019, 020) |
-| 8.28 | Secure coding practiced | APPLICABLE | Standards in secure-development-policy; bite from first application code (KAR-CTL-029, Phase 2) |
+| 8.28 | Secure coding practiced | IMPLEMENTED | Standards in secure-development-policy. 2026-08-15: the first application code exists and the enforcement bites it — lint/type checks, CodeQL (KAR-CTL-029), architecture tests at Phase 2 scope (KAR-CTL-020), typed error and Result discipline in the platform code itself |
 | 8.29 | Security testing through development | APPLICABLE | Architecture tests + scans in merge-blocking CI from Phase 1 (KAR-CTL-016, 020) |
 | 8.30 | Outsourced development supervised | NOT_APPLICABLE | No third-party development organization is engaged; AI-assisted work happens inside the same SDLC controls under maintainer review. Revisit: any contracted development |
 | 8.31 | Development, test, production separated | PLANNED (17–19) | Ladder designed (`docs/architecture/environments.md`); staging is a hard pre-production gate (KAR-CTL-018, 030) |
-| 8.32 | Changes controlled | APPLICABLE | PR-only flow + merge-blocking CI (KAR-CTL-015, 016); branch-protection verification pending (EV-007); EXC-001 qualifies the approval leg |
+| 8.32 | Changes controlled | APPLICABLE | PR-only flow + merge-blocking CI (KAR-CTL-015, 016); branch protection verified 2026-08-15 (EV-007); EXC-001 qualifies the approval leg. 2026-08-15: schema change is now controlled the same way — checksum-verified forward-only migrations with the destructive-op guard (KAR-CTL-054, 055) |
 | 8.33 | Test data selected and protected | APPLICABLE | Synthetic-only rule, currently true by construction (KAR-CTL-038) |
 | 8.34 | Systems protected during audits/tests | PLANNED (20) | Pen-test scoping at Phase 20; no system exists to protect or test |
 
-## Tally (v0.1)
+## Tally (v0.2)
 
 | Status | Count |
 |---|---|
-| APPLICABLE | 50 |
-| PLANNED | 32 |
+| APPLICABLE | 47 |
+| PLANNED | 28 |
 | NOT_APPLICABLE | 10 |
-| IMPLEMENTED | 1 |
+| IMPLEMENTED | 8 |
 | OPERATING | 0 |
 | **Total** | **93** |
 
 Every NOT_APPLICABLE row states its reason and (where one exists) a revisit trigger; the 7.x exclusions and the ISMS scope exclusions are the same facts viewed twice, deliberately.
+
+**Phase 2 deltas (2026-08-15):** PLANNED → IMPLEMENTED: 5.13, 8.11, 8.12, 8.15. APPLICABLE → IMPLEMENTED: 5.33, 8.9, 8.28. Annotated without status change: 8.3 (DB roles), 8.10 (declarations exist, deriving mechanism Phase 5), 8.16 (signals exist, watching does not), 8.24 (design only, deliberately not advanced), 8.32 (EV-007 verified; migration discipline). Every move tracks a matrix-IMPLEMENTED control per this file's rule; IMPLEMENTED here still means evidence pending, and no row holds OPERATING.

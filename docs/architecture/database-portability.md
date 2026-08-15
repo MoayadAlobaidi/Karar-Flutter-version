@@ -21,7 +21,7 @@ Never claim more than this.
 ```
 Application repository port       (application/ — knows only Repository interfaces)
         ↓
-PostgresPersistenceAdapter        (infrastructure/persistence/ — ONE implementation, Prisma, confined)
+PostgresPersistenceAdapter        (ONE implementation, confined to infrastructure code)
         ↓
 DataSource / connection factory
         ↓
@@ -31,6 +31,8 @@ Managed PostgreSQL
 ```
 
 The application requests a **`Repository`** — never a `CloudSQLClient`, `AwsRdsClient`, or `SupabaseClient`.
+
+**Implemented as of Phase 2** (`packages/platform/src/db`): the one `PostgresPersistenceAdapter` exists — node-postgres inside the platform package's infrastructure code; Prisma remains the plan for domain repositories from Phase 3, ADR-0005 unchanged ([`backend.md` §6](backend.md)). Connection settings come from a typed `ConnectionProfile` built per role (`LocalPostgresConnectionProfile.fromEnv('superuser' | 'migrator' | 'app')` — the only place the environment is read for connections), and the migration runner with its `db:create` / `db:migrate` / `db:verify` / `db:reset-local` CLI ships with it. A future `CloudSqlConnectionProfile` or `RdsConnectionProfile` differs in TLS material, IAM/database authentication, and discovery only — never in adapter or repository behaviour.
 
 > **There are no per-cloud business persistence adapters.** No `GcpCloudSqlPostgresAdapter`, no `AwsRdsPostgresAdapter`, no `AzurePostgresAdapter` for normal repository operations — unless an actual technical requirement appears, documented under §3. Cloud SQL, RDS, Azure Database for PostgreSQL, local Docker, and any approved compatible managed PostgreSQL all use the **same** `PostgresPersistenceAdapter`; what differs is the **connection profile**:
 
@@ -80,6 +82,8 @@ Three infrastructure-level concepts carry this, and none is visible to a use cas
 | `DataSourceResolver` | Maps resolved tenant/deployment context → the datasource |
 | `DatabaseConnectionFactory` | Produces connections for a profile, pooling included |
 
+Phase 2 implements the profile shape and its opaque `DatabaseProfileRef` (`karar-ref:database-profile:<id>`, [`infrastructure-portability.md` §6](infrastructure-portability.md)) plus pooled connections per profile in the adapter. `DataSourceResolver` and multi-datasource routing remain future — they arrive with tenancy (Phase 3) and dedicated-database deployments.
+
 ## 5. Multi-database from the beginning — without multi-database chaos
 
 Karar is architecturally capable of multiple databases. That does **not** mean requests dynamically talk to arbitrary databases — every binding goes through a **controlled deployment profile**.
@@ -105,6 +109,8 @@ create infrastructure → configure secrets → run migrations → seed referenc
 
 — never from manual DBA history, and never by copying an existing environment's database. **A new UAE database is provisioned without copying Qatar's.**
 
+**Implemented as of Phase 2** for the local provider: `pnpm --filter @karar/platform db:create`, then `db:migrate`, then `db:verify` (with `KARAR_DB_NAME=<name>` selecting the target) creates roles, database, grants, and the full schema from the repository alone; integration tests prove the from-zero path, twice, against scratch databases. Runner semantics (checksum drift, forward-only, `-- rollback:` blocks) are canonical in [`packages/platform/db/migrations/README.md`](../../packages/platform/db/migrations/README.md). Of the requirements below, dry-run tooling does not exist yet (`db:verify` is the read-only comparison), and backup-before-destructive plus expand/migrate/contract are stated policy pending their first destructive migration.
+
 Requirements:
 
 | | |
@@ -126,7 +132,7 @@ One **integration-test contract per repository port**, asserting behaviour again
 - **`Money` persistence** — BIGINT minor units round-trip exactly, all exponents
 - migrations — from-zero bootstrap produces the expected schema
 
-The same suite must eventually run against **local Docker PostgreSQL, Cloud SQL, RDS, and any other approved provider** where practical. Local contract tests begin in **Phase 1–2**; cloud CI execution is added when those environments exist. A provider that fails the suite is not approved, whatever its marketing says.
+The same suite must eventually run against **local Docker PostgreSQL, Cloud SQL, RDS, and any other approved provider** where practical. Local contract tests exist as of **Phase 2** — adapter, migration, outbox, and job-queue contract suites run against the Compose PostgreSQL locally and in CI, including concurrency proofs (two relays over 200 events; two workers over 100 jobs) and the from-zero migration bootstrap; RLS and repository-port rows activate with Phase 3. **Cloud CI legs remain future** — they are added when those environments exist. A provider that fails the suite is not approved, whatever its marketing says.
 
 ## 8. What this document does not promise
 

@@ -4,8 +4,21 @@ import { describe, expect, it } from 'vitest';
 import * as contracts from './index';
 
 describe('public surface', () => {
-  it('is intentionally empty in Phase 1', () => {
-    expect(Object.keys(contracts)).toHaveLength(0);
+  it('exposes the event catalogue surface (Phase 2); HTTP types await SDK generation', () => {
+    for (const name of [
+      'parseEventCatalogue',
+      'readDefaultEventCatalogue',
+      'getEventEntry',
+      'assertConsumerAllowed',
+      'assertPayloadMatchesSchema',
+      'validatePayloadAgainstSchema',
+      'EventCatalogueError',
+      'EVENT_CLASSIFICATIONS',
+      'EVENT_PAYLOAD_RULES',
+      'PLATFORM_DIAGNOSTIC_PING',
+    ]) {
+      expect(contracts, `missing export '${name}'`).toHaveProperty(name);
+    }
   });
 });
 

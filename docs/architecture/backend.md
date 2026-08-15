@@ -1,6 +1,6 @@
 # Backend Architecture
 
-**Stack:** NestJS · strict TypeScript · PostgreSQL · Prisma (confined to `infrastructure/`)
+**Stack:** NestJS · strict TypeScript · PostgreSQL · node-postgres in the platform foundation · Prisma planned for domain repositories (both confined to infrastructure code — §6)
 **ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–2
 
 ---
@@ -33,13 +33,17 @@ karar/
 │   ├── financial-engine/   — pure. Zero framework deps
 │   ├── jurisdiction-policy/— pure. Zero framework deps
 │   ├── state-machine/      — pure. ~100 lines
-│   └── api-contracts/      — OpenAPI spec + event catalogue
+│   ├── api-contracts/      — OpenAPI spec + event catalogue
+│   └── platform/           — backend platform library: config, DB foundation,
+│                             errors, observability, events/outbox/jobs (Phase 2)
 ├── modules/                — bounded contexts
 ├── infra/terraform/        — contracts + provider modules + per-deployment compositions
 └── docs/
 ```
 
 `apps/admin` carrying no database driver is enforced, not assumed: the Super Admin talks to the control plane over HTTP and never to Postgres.
+
+`packages/` holds six packages. `@karar/platform` (Phase 2) is the backend platform library `api` and `worker` share; it is deliberately **not** one of the four pure packages — it depends on `pg`, `pino`, and `@opentelemetry/api`. `shared-kernel`, `financial-engine`, `jurisdiction-policy`, and `state-machine` are unchanged and stay framework-free (architecture test 17).
 
 ## 3. Module anatomy
 
@@ -119,6 +123,8 @@ Resolved once, at the edge, and threaded through `AsyncLocalStorage`. **Use case
 
 Repositories are declared as ports in `application/ports/` and implemented here. They map persistence models to domain objects explicitly; there is no ORM object flowing into the domain.
 
+**Phase 2 state, recorded plainly:** the platform foundation (`packages/platform/src/db`) reaches PostgreSQL through **node-postgres**, inside the platform package's infrastructure code — one `PostgresPersistenceAdapter` constructed from a connection profile, exposing `query` and `withTransaction`. **Prisma remains the plan for domain repositories from Phase 3**; ADR-0005 is unchanged. Neither library appears outside infrastructure code.
+
 ### Schemas
 
 | Schema | Holds | Written by |
@@ -127,14 +133,19 @@ Repositories are declared as ports in `application/ports/` and implemented here.
 | `readmodel` | Projections. Non-authoritative, rebuildable | Projection builders only |
 | `audit` | Append-only. Grants revoked for UPDATE/DELETE | Append-only writer |
 | `sealed` | Ciphertext only. Grant-gated. Extractable | `SealedRecordStore` only |
+| `platform` | Migration metadata, outbox, jobs — infrastructure bookkeeping | Migration runner; producers, relay, and job queue via the platform adapter |
+
+The `platform` and `audit` schemas exist as of Phase 2; the implemented tables are listed in [`data-model.md` §3](data-model.md). `readmodel` and `sealed` arrive with their phases.
 
 ### Migrations
 
-Flyway-style forward-only SQL, run **as the restricted application role, not an owner**.
+Forward-only SQL under `packages/platform/db/migrations`, applied in strict filename order by the platform's own runner (package scripts `db:create` / `db:migrate` / `db:verify` / `db:reset-local`), each file in its own transaction, recorded in `platform.schema_migrations` with a sha256 checksum. **Checksum drift on an applied file fails hard** — applied history is immutable.
 
-This one is inherited directly from the legacy, where the equivalent script is recorded as *"proven to fail on a genuinely defective migration"* — a control that has actually caught something. A migration that only works with elevated privilege is a migration that will fail in production, and running it as `karar_app` in CI finds that on a laptop instead.
+The runner connects **as `karar_migrator` — a restricted role, never a superuser** (`NOSUPERUSER`, `NOBYPASSRLS`); the runtime role `karar_app` receives minimal per-table DML from each table's own migration and can perform no DDL anywhere.
 
-Every migration carries a rollback script, as the legacy does.
+The restricted-role rule is inherited directly from the legacy, where the equivalent script is recorded as *"proven to fail on a genuinely defective migration"* — a control that has actually caught something. A migration that only works with elevated privilege is a migration that will fail in production; running it under a restricted role finds that on a laptop instead.
+
+Migrations are forward-only — no executable down-scripts. Every file ends with a mandatory `-- rollback:` block documenting recovery honestly, and breaking changes follow expand / migrate / contract. Canonical policy, number-range ownership, the grant convention, and the from-zero flow: [`packages/platform/db/migrations/README.md`](../../packages/platform/db/migrations/README.md).
 
 ## 7. Tenant transactions and RLS
 
@@ -163,6 +174,8 @@ graph LR
 
 State change and event enqueue commit in **one transaction**. The relay publishes at-least-once with idempotent consumers. There is no path that publishes an event for a state change that did not commit, and none that commits a change whose event is lost.
 
+**Implemented in Phase 2** (`packages/platform/src/outbox`, table `platform.outbox_events` from migration `0020`): `enqueueInTransaction` inserts the envelope on the caller's transaction; the relay claims pending rows with plain-PostgreSQL `FOR UPDATE SKIP LOCKED` (two relays never claim the same row — proven by a contract test running two concurrent relays over 200 events), sets `published_at` only **after** the publisher succeeded, retries with exponential backoff via `available_at`, and dead-letters at `max_attempts` — terminal, counted by the `karar.outbox.dead_lettered` metric so a DLQ is never silent. Consumers record `(consumer, eventId)` receipts through `withIdempotency` inside their own transactions, which is what makes at-least-once delivery safe. Governance rules for the catalogue and payloads stay canonical in [`event-governance.md`](event-governance.md).
+
 ## 9. Errors and results
 
 Use cases return `Result<T, DomainError>`. Exceptions are for genuinely exceptional conditions, not for expected business outcomes — "insufficient balance" is a result, not a throw.
@@ -185,6 +198,8 @@ Each of these exists because the legacy audit found its absence. See [`../legacy
 | Consent gates | **Fail closed.** No published disclosure ⇒ unavailable | AI-5 |
 | Staff reads | **Audited**, including reads that return nothing | AZ5 |
 
+The health row is implemented as of Phase 2: `apps/api` `/readyz` executes real checks — `SELECT 1` on the application role and a read-only migration verify (applied == latest) — and answers 503 with per-check states on any failure, states only, never hosts or driver errors. The worker runs its own loopback-only health server (`KARAR_WORKER_PORT`, default 3001) whose `/readyz` additionally checks that the relay and poller loops are recently alive.
+
 ## 11. Observability
 
 Structured JSON logs with correlation and tenant IDs; **never** `SEALED` data, and `HIGHLY_SENSITIVE_FINANCIAL` redacted (architecture test 13).
@@ -192,6 +207,8 @@ Structured JSON logs with correlation and tenant IDs; **never** `SEALED` data, a
 Metrics: RED per endpoint, job outcomes, outbox lag, **projection lag**, AI usage and cost, capability-denial counts by reason.
 
 **Instrumentation is OpenTelemetry-compatible and provider-neutral.** Application code emits logs, metrics, and traces through OTel interfaces; the deployment profile routes them to whichever observability backend its provider offers. Moving providers re-routes telemetry without touching business code ([`infrastructure-portability.md`](infrastructure-portability.md)).
+
+**Implemented in Phase 2** (`packages/platform/src/observability`): pino JSON logs carrying service identity plus `traceId`/`spanId`/`correlationId` on every line inside a span, with a key-based redaction pass (credential-shaped fields) and classification-aware redaction (`SECRET` and `SEALED` never appear; sink rules from `src/classification`). The platform imports `@opentelemetry/api` only — the apps initialize the OTel NodeSDK and export OTLP to the local Compose collector. An error is logged once, at the boundary that converts it (the API's exception filter, the worker's job runner) — interior code rethrows, never logs. Declared metric names: `http.server.duration`, `karar.readiness.state`, `karar.db.up`, `karar.outbox.{published,failed,dead_lettered,lag_seconds}`, `karar.jobs.{completed,retried,dead_lettered,active,duration_ms}`.
 
 Production log level must retain the forensic timeline the incident plan depends on — the legacy pinned its level so high that it suppressed exactly that (INFRA-09).
 

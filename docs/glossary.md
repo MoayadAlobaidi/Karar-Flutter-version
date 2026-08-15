@@ -140,6 +140,32 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 ---
 
+## Platform foundation (Phase 2)
+
+**EventEnvelope** — the transport-neutral record every domain event travels in: event identity and name, schema version, `occurredAt`/`recordedAt`, correlation and causation ids, producer, classification, payload. Never a provider's message shape. ([`architecture/event-governance.md` §4](architecture/event-governance.md))
+
+**Consumer receipt** — a `(consumer, event id)` row in `platform.event_consumer_receipts`, written inside the consumer's own transaction. What makes at-least-once delivery safe: a duplicate delivery finds the receipt and becomes a no-op.
+
+**JobQueue / lease** — the provider-neutral port for background work. A claimed job is held under a **lease** (owner + expiry) by exactly one worker; an expired lease is recoverable by any worker. Jobs are requested *work*; events are recorded *facts*. ([`architecture/backend.md` §1](architecture/backend.md), ADR-0013)
+
+**Dead letter** — the terminal state of an outbox event or job that exhausted `max_attempts`. Alertable by metric (`karar.outbox.dead_lettered`, `karar.jobs.dead_lettered`); a silent DLQ is the failure mode the alert exists to prevent.
+
+**Outbox lag** — the age of the oldest unpublished outbox envelope (gauge `karar.outbox.lag_seconds`). The first-class delivery-health metric of [`architecture/backend.md` §11](architecture/backend.md).
+
+**Connection profile** — the typed description one `PostgresPersistenceAdapter` is constructed from: host, database, role, secret-wrapped password, TLS mode, pool and timeout settings. Provider differences live here, never in adapter code. ([`architecture/database-portability.md` §2](architecture/database-portability.md))
+
+**Migration drift** — a checksum mismatch, missing file, or renamed file among *applied* migrations. `db:migrate` and `db:verify` fail hard on it: applied history is immutable. ([`../packages/platform/db/migrations/README.md`](../packages/platform/db/migrations/README.md))
+
+**SecretValue** — the only way a secret travels through typed configuration. Every accidental rendering path (string coercion, JSON, `console.log`) yields `[redacted]`; the real value requires an explicit, grep-able `unwrap()`.
+
+**DATA_LIFECYCLE file** — [`packages/platform/db/DATA_LIFECYCLE.md`](../packages/platform/db/DATA_LIFECYCLE.md): the six-field lifecycle declarations (ADR-0026) for platform infrastructure tables no module owns. Module-owned tables declare theirs in `MODULE.md`; architecture test 25 parses both.
+
+**KeyVersionRef** — `karar-ref:key-version:<keyId>@v<N>`: the opaque reference naming the exact key version that produced a wrap or ciphertext. Recorded on every encryption result, so rotation is auditable and key-version loss detectable. ([`architecture/infrastructure-portability.md` §6](architecture/infrastructure-portability.md), ADR-0017)
+
+**Canary contract** — what a sealed-integrity canary run must satisfy: synthetic-only plaintext (mandatory `KARAR-CANARY-` marker), a verify that exercises the complete path including DEK unwrap and live key-provider access, no plaintext in logs, and an alert on failure. The contract types ship in Phase 2; the running canary is Phase 13. (See *Sealed-integrity canary* above; ADR-0017)
+
+---
+
 ## Evidence labels
 
 Used on every factual claim about a system.

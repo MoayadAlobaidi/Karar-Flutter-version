@@ -1,3 +1,25 @@
 {
-  "events": []
+  "$comment": "Domain event catalogue (ADR-0025, docs/architecture/event-governance.md). Every published event is declared here; publishing an uncatalogued event and subscribing outside allowedConsumers are build/runtime errors. Field semantics and the schemaVersion policy (additive optional field = same version; removal, rename, or semantic change = bump) are documented in src/events/types.ts. payloadRule is one of identifier-only | identifiers-and-status | payload-permitted; SEALED entries never carry payload-permitted and never carry a payloadExemption (no exemption exists); HIGHLY_SENSITIVE_FINANCIAL entries need a payloadExemption naming owner, reason, and reviewer for anything beyond identifier-only.",
+  "events": [
+    {
+      "name": "platform.diagnostic.ping",
+      "schemaVersion": 1,
+      "ownerModule": "platform",
+      "classification": "INTERNAL",
+      "piiFlag": false,
+      "allowedConsumers": ["platform-tests", "worker-diagnostics"],
+      "retention": "P7D",
+      "payloadRule": "payload-permitted",
+      "payloadExemption": null,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "pingId": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "required": ["pingId"],
+        "additionalProperties": false
+      }
+    }
+  ]
 }

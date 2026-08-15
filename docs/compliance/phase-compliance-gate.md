@@ -1,6 +1,8 @@
 # Phase Compliance Gate
 
-**Status:** DRAFT · **Owner:** Compliance Owner · **Approver:** Platform Owner (pending) · **Version:** 0.1 · **Date:** 2026-08-15 · **Review:** Phase 2 gate
+**Status:** DRAFT · **Owner:** Compliance Owner · **Approver:** Platform Owner (pending) · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** Phase 2 gate
+
+**v0.2 (2026-08-15):** Phase 2 gate checklist appended — checklist only; the gate record itself is written by the lead at phase close.
 
 Every phase ends with a Security/Compliance review whose output is a recorded gate report. This defines what that report must contain. It is the compliance half of the phase-closure template the docs process defines at [`docs/phases/PHASE_TEMPLATE.md`](../phases/PHASE_TEMPLATE.md) — the template carries the overall phase report; the sections below are what its security/compliance section must satisfy. The gate report itself is evidence (EV-008 pattern) and is referenced from the evidence register.
 
@@ -52,3 +54,43 @@ The first gate report (closing Phase 1) must additionally record: verification o
 - All [C1]-contingent controls confirmed: every referenced check exists in the merged CI and ran green.
 - Independent review: 0 BLOCKING / 2 HIGH / 6 MEDIUM — all HIGH and MEDIUM remediated pre-PR ([phase report](../phases/phase-01.md)).
 - No control moved to OPERATING or EVIDENCED at this gate; statuses remain as the matrix records.
+
+## Phase 2 specifics — gate checklist
+
+**Status: PENDING. This is the checklist, not the record.** The gate outcome (PASS or findings) is recorded by the lead at phase close, below this block, following the Phase 1 pattern. Prepared 2026-08-15 alongside the Phase 2 compliance updates (matrix v0.2, registers v0.2).
+
+The Phase 2 gate report must verify, beyond the standard eight sections:
+
+1. **EV-201–EV-219 first instances.** The Phase 2 PR CI run URL(s) recorded against the new evidence rows and their statuses moved PENDING → COLLECTED; the phase report's verification section (`docs/phases/phase-02.md`) referenced as the lead-local-run record of 2026-08-15. Any row that cannot cite a green run stays PENDING, with a reason and owner.
+2. **Control deltas with pointers.** KAR-CTL-051–065 added (13 IMPLEMENTED [P2], 2 DESIGNED); KAR-CTL-033 and 040 moved to IMPLEMENTED [P2]; KAR-CTL-007, 008, 015 moved to IMPLEMENTED on the EV-007 verification. Each move must cite its pointer; confirm no control anywhere claims OPERATING or EVIDENCED and nothing is represented as deployed.
+3. **Design-only boundaries hold.** KAR-CTL-064/065 remain DESIGNED; no cloud KMS, no production keys, no operating canary is claimed anywhere (SoA 8.24 deliberately not advanced).
+4. **Policy approval decision.** The 14 DRAFT policies name this gate as their approval target ([policy-index](policy-index.md)); the gate records approval by the Platform Owner or the slip with a new target. Silence fails the gate.
+5. **Evidence-store decision.** The interim-store exit was due "no later than the Phase 2 gate" ([evidence register](evidence-register.md), KAR-RSK-011): record the chosen store or the explicit re-acceptance of the interim.
+6. **Risk review record (EV-008 pattern).** Register v0.2 deltas signed: KAR-RSK-014/015 added, 010 re-scored 12 → 9, 003 note revised, no closures; every other row confirmed reviewed.
+7. **Exceptions re-affirmed.** EXC-001, 002, 003 re-affirmed (register v0.2); verify no exit trigger fired — the team is still one person.
+8. **Mapping deltas match the matrix.** SoA v0.2 (seven rows to IMPLEMENTED, tally 47/28/10/8/0) and trust-services mapping v0.2 quote matrix v0.2 exactly; any disagreement resolves toward the matrix.
+9. **Claims reconciliation.** The threat model's "Phase 2 platform threats" evidence refs (EV-201–EV-213) resolve one-for-one against the evidence register; assurance-claim entries touched by Phase 2 re-reviewed; architecture test 26 green on the closing run.
+10. **Architecture-test activation.** Tests 5, 6, 23 ACTIVE and 25 deepened; 19 registry-active numbered tests plus the supplementary check passing (20 passing); self-test 22 seeded-violation cases (EV-217).
+11. **Fresh-clone verification.** Executed at phase close and recorded (EV-218, KAR-CTL-046).
+12. **KAR-CTL-025 threshold decision.** The Phase 1 gate deferred the SCA blocking threshold to this gate: decide, or re-defer with the reason and the tightening criterion re-affirmed.
+13. **Database-reality checks.** Spot-verify in the CI logs: from-zero creation ran twice, a 42501 denial and a P0001 trigger denial actually occurred, and the destructive-reset guard refused outside its double condition.
+
+## Phase 2 gate record — PASS_WITH_DOCUMENTED_DEFERRED_ITEMS, 2026-08-16
+
+Evaluated against the checklist above at commit `324fce1` plus the closeout commit.
+
+**Evidence status.** EV-201–EV-219 COLLECTED (CI run 31907338148, Security run 31907338141, both green on the final head; clean-clone record and lead local runs in the phase report). Reviewed: the independent reviewer re-executed every underlying suite and check and reproduced every count. Pending: formal evidence-file review in a protected store — the store itself is a deferred item below. Owner: Security Owner.
+
+**Control status.** KAR-CTL-051–063 confirmed IMPLEMENTED with the [P2] local-only contingency (mechanism plus tests in-repo; deployed nowhere); KAR-CTL-064 and 065 remain DESIGNED — key custody and the integrity canary are design-only, no cloud KMS and no production key exists. Nothing was upgraded to OPERATING or EVIDENCED.
+
+**Policies.** All fourteen remain DRAFT. Policy approval deferred — Platform Owner review required. Deadline: before the first non-local deployment (Phase 18 at the latest; earlier if an external audit engagement begins first).
+
+**Interim evidence storage.** Decision recorded: non-sensitive engineering evidence is referenced through GitHub Actions artifacts and controlled local verification records. Sensitive evidence must never enter the public repository. A protected long-term evidence store remains undecided — owner: Platform Owner; risk retained (KAR-RSK-011 vendor concentration and run-URL retention limits); mandatory reassessment before Phase 4 or before any external audit engagement, whichever occurs first.
+
+**Separation of duties.** EXC-001 stays open. Agent-based independent review is genuine technical review but is not independent human separation of duties; the exception and its two-engineer remediation trigger remain visible in the exceptions register.
+
+**SCA policy.** dependency-review blocks newly introduced high-severity dependencies at the PR boundary (KAR-CTL-027); the package-manager audit job remains report-only under the approved policy (KAR-CTL-025 DESIGNED), with the tightening trigger and owner in `docs/operations/repository-security-settings.md`. Historical transitive findings are not claimed to be blocking. Residual risk carried in the risk register.
+
+**Deferred items (with owners and targets):** policy approval (Platform Owner, before first non-local deployment) · protected evidence store (Platform Owner, before Phase 4 or external audit) · KAR-CTL-025 threshold tightening (Engineering Owner, criterion in the settings doc) · custody/canary implementation (Phase 13/20) · EXC-001 (team growth trigger).
+
+**Outcome: PASS_WITH_DOCUMENTED_DEFERRED_ITEMS.** No hard roadmap gate was waived; every deferred item carries an owner and a target.

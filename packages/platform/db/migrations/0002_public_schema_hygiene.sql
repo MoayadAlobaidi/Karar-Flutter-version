@@ -1,0 +1,21 @@
+-- 0002_public_schema_hygiene
+--
+-- Revokes the historical default that lets every role create objects in
+-- schema public. Object creation is the migrator's job alone: karar_app and
+-- any future role must be unable to create tables anywhere, or the
+-- restricted-role guarantees of ADR-0005/ADR-0022 are decoration.
+--
+-- PostgreSQL 15+ ships new databases without this grant, but the revoke is
+-- kept explicit so the guarantee holds on any approved provider or template
+-- database regardless of its defaults (database-portability.md section 3).
+-- It is effective, not a silent no-op, because bootstrap transferred
+-- ownership of schema public to karar_migrator (db/bootstrap/002).
+--
+-- USAGE on schema public for PUBLIC is intentionally left in place; without
+-- CREATE it exposes only what table-level grants allow.
+--
+-- rollback: forward-only (db/migrations/README.md). If a role legitimately
+-- needs to create objects in public — none should — the correction is a new
+-- migration granting that role CREATE explicitly, never a re-grant to PUBLIC.
+
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;

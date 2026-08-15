@@ -772,8 +772,280 @@ export function checkKernelSurface(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Test 5 — Ports declared inward
+// ---------------------------------------------------------------------------
+// Every infrastructure adapter class implements a port interface declared in
+// its own module's application/ports/. The rule is existential (an adapter
+// without a port is the violation), so it activates with the first module
+// that has infrastructure code (Phase 2: modules/audit).
+const ADAPTER_CLASS_NAME =
+  /(Adapter|Writer|Reader|Repository|Provider|Store|Gateway|Client|Publisher|Consumer|Relay|Source|Sink)$/;
+
+export function checkPortsDeclaredInward(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  let scanned = 0;
+  for (const mod of moduleNames(root)) {
+    const modDir = path.join(root, 'modules', mod);
+    const infraFiles = codeFiles([path.join(modDir, 'infrastructure')]);
+    if (infraFiles.length === 0) continue;
+    scanned += infraFiles.length;
+
+    // Port names declared under application/ports/ (any depth).
+    const portNames = new Set();
+    for (const portFile of codeFiles([path.join(modDir, 'application', 'ports')])) {
+      const portSrc = loadStripped(portFile);
+      for (const m of portSrc.matchAll(
+        /\bexport\s+(?:declare\s+)?(?:abstract\s+class|interface|type)\s+([A-Za-z_$][\w$]*)/g,
+      )) {
+        portNames.add(m[1]);
+      }
+    }
+
+    for (const file of infraFiles) {
+      const src = loadStripped(file);
+      for (const m of src.matchAll(
+        /\bexport\s+(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)([^{]*)\{/g,
+      )) {
+        const className = m[1];
+        const heritage = m[2] ?? '';
+        if (!ADAPTER_CLASS_NAME.test(className)) continue;
+        const implementsMatch = heritage.match(/\bimplements\s+(.+)$/s);
+        const implemented = implementsMatch
+          ? implementsMatch[1]
+              .split(',')
+              .map((name) => name.trim().split('<')[0].trim())
+              .filter((name) => name !== '')
+          : [];
+        if (implemented.length === 0) {
+          violations.push({
+            file: rel(root, file),
+            line: lineOf(src, m.index),
+            detail: `infrastructure adapter '${className}' implements no interface — every adapter implements a port declared in modules/${mod}/application/ports/`,
+          });
+          continue;
+        }
+        if (!implemented.some((name) => portNames.has(name))) {
+          violations.push({
+            file: rel(root, file),
+            line: lineOf(src, m.index),
+            detail: `infrastructure adapter '${className}' implements [${implemented.join(', ')}], none of which is declared under modules/${mod}/application/ports/ — ports are declared inward`,
+          });
+        }
+      }
+    }
+  }
+  return violationsResult(violations, scanned);
+}
+
+// ---------------------------------------------------------------------------
+// Test 6 — No business logic in controllers
+// ---------------------------------------------------------------------------
+// Controllers translate transport to use-case calls and back. The declared
+// complexity budget: at most MAX_CONTROLLER_ROUTES route handlers and
+// MAX_CONTROLLER_LINES lines per controller file, and no import of any
+// module's domain/ layer — domain access goes through a use case.
+const MAX_CONTROLLER_ROUTES = 8;
+const MAX_CONTROLLER_LINES = 250;
+const ROUTE_DECORATOR = /@(Get|Post|Put|Patch|Delete|Head|Options|All|Sse)\s*\(/g;
+
+export function checkControllerComplexity(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const files = codeFiles([
+    ...appsSrcDirs(root),
+    ...moduleLayerDirs(root, ['presentation']),
+  ]).filter((file) => /controller/i.test(path.basename(file)));
+  const modules = new Set(moduleNames(root));
+  const modulesRoot = path.join(root, 'modules');
+
+  for (const file of files) {
+    const src = loadStripped(file);
+    const lineCount = src.split('\n').length;
+    if (lineCount > MAX_CONTROLLER_LINES) {
+      violations.push({
+        file: rel(root, file),
+        detail: `controller is ${lineCount} lines (budget ${MAX_CONTROLLER_LINES}) — move logic into use cases`,
+      });
+    }
+    const routes = [...src.matchAll(ROUTE_DECORATOR)].length;
+    if (routes > MAX_CONTROLLER_ROUTES) {
+      violations.push({
+        file: rel(root, file),
+        detail: `controller declares ${routes} route handlers (budget ${MAX_CONTROLLER_ROUTES}) — split the surface`,
+      });
+    }
+    for (const { specifier, line } of extractImports(src)) {
+      const bare = specifier.match(/^@karar\/([^/]+)\/(?:dist\/)?domain(?:\/|$)/);
+      if (bare && modules.has(bare[1])) {
+        violations.push({
+          file: rel(root, file),
+          line,
+          detail: `controller imports '${specifier}' — controllers never import a module's domain/ directly; call a use case`,
+        });
+        continue;
+      }
+      if (specifier.startsWith('.')) {
+        const resolved = resolveRelative(file, specifier);
+        if (isWithin(modulesRoot, resolved)) {
+          const target = path.relative(modulesRoot, resolved).split(path.sep)[0];
+          if (isWithin(path.join(modulesRoot, target, 'domain'), resolved)) {
+            violations.push({
+              file: rel(root, file),
+              line,
+              detail: `controller imports module '${target}' domain internals ('${specifier}') — call a use case`,
+            });
+          }
+        }
+      }
+    }
+  }
+  return violationsResult(
+    violations,
+    files.length,
+    `budgets: ${MAX_CONTROLLER_ROUTES} routes, ${MAX_CONTROLLER_LINES} lines, no domain imports`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 23 — No declared guard without call site
+// ---------------------------------------------------------------------------
+// A class named *Guard is a declared protection. A protection that nothing
+// references is decoration that reads as security — so every declared guard
+// must be referenced from non-test code outside its own declaration.
+export function checkGuardCallSites(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const files = codeFiles([
+    ...appsSrcDirs(root),
+    ...packagesSrcDirs(root),
+    path.join(root, 'modules'),
+  ]);
+  const sources = new Map(files.map((file) => [file, loadStripped(file)]));
+
+  const declarations = [];
+  for (const [file, src] of sources) {
+    for (const m of src.matchAll(/\bclass\s+([A-Za-z_$][\w$]*Guard)\b/g)) {
+      declarations.push({ file, name: m[1], line: lineOf(src, m.index) });
+    }
+  }
+
+  for (const { file, name, line } of declarations) {
+    const wordRe = new RegExp(`\\b${name}\\b`, 'g');
+    let referenced = false;
+    for (const [otherFile, src] of sources) {
+      const count = [...src.matchAll(wordRe)].length;
+      if (otherFile === file) {
+        // The declaration itself counts once; any further mention in the
+        // defining file (instantiation, registration) is a call site.
+        if (count > 1) referenced = true;
+      } else if (count > 0) {
+        referenced = true;
+      }
+      if (referenced) break;
+    }
+    if (!referenced) {
+      violations.push({
+        file: rel(root, file),
+        line,
+        detail: `guard '${name}' is declared but never referenced outside its declaration — a guard with no call site protects nothing (tests do not count as call sites)`,
+      });
+    }
+  }
+  return violationsResult(violations, files.length, `guards declared: ${declarations.length}`);
+}
+
+// ---------------------------------------------------------------------------
 // Test 25 — Lifecycle declarations (Data owned tables, ADR-0026 strategies)
 // ---------------------------------------------------------------------------
+const SUBJECT_RELATIONSHIPS = ['SUBJECT_OWNED', 'SUBJECT_DERIVED', 'AGGREGATE', 'NON_PERSONAL'];
+const DATA_CLASSES = [
+  'PUBLIC',
+  'INTERNAL',
+  'CONFIDENTIAL',
+  'HIGHLY_SENSITIVE_FINANCIAL',
+  'SECRET',
+  'SEALED',
+];
+const LIFECYCLE_COLUMNS = [
+  { key: 'subject', re: /subject/i },
+  { key: 'purpose', re: /purpose/i },
+  { key: 'classification', re: /classification/i },
+  { key: 'retention', re: /retention/i },
+  { key: 'export', re: /export/i },
+  { key: 'erasure', re: /erasure/i },
+];
+
+function isLifecyclePlaceholder(value) {
+  return (
+    value === '' ||
+    value === '—' ||
+    value === '-' ||
+    value === '_' ||
+    value === '?' ||
+    /^(tbd|todo|\?{2,3}|n\.?a\.?)$/i.test(value)
+  );
+}
+
+/** Column indexes for the six lifecycle fields, or null when the table is not in six-field format. */
+function lifecycleColumnIndexes(headers) {
+  const indexes = {};
+  for (const { key, re } of LIFECYCLE_COLUMNS) {
+    const idx = headers.findIndex((h) => re.test(h));
+    if (idx === -1) return null;
+    indexes[key] = idx;
+  }
+  return indexes;
+}
+
+/** Validates one named six-field row; pushes violations described against `where`. */
+function validateLifecycleRow(violations, relPath, where, row, indexes) {
+  const cell = (key) => plainCell(row[indexes[key]] ?? '');
+  for (const { key } of LIFECYCLE_COLUMNS) {
+    if (isLifecyclePlaceholder(cell(key))) {
+      violations.push({
+        file: relPath,
+        detail: `${where}: '${key}' is empty or a placeholder — all six lifecycle fields are declared at design time, placeholders are forbidden (ADR-0026)`,
+      });
+    }
+  }
+  const subject = cell('subject');
+  if (!isLifecyclePlaceholder(subject) && !SUBJECT_RELATIONSHIPS.includes(subject)) {
+    violations.push({
+      file: relPath,
+      detail: `${where}: subject relationship '${subject}' is not one of (${SUBJECT_RELATIONSHIPS.join(', ')})`,
+    });
+  }
+  const classification = cell('classification');
+  if (!isLifecyclePlaceholder(classification) && !DATA_CLASSES.includes(classification)) {
+    violations.push({
+      file: relPath,
+      detail: `${where}: classification '${classification}' is not one of the six classes (${DATA_CLASSES.join(', ')})`,
+    });
+  }
+  const exportCell = cell('export');
+  if (!isLifecyclePlaceholder(exportCell)) {
+    if (!/^(included|excluded|n\/a)\b/i.test(exportCell)) {
+      violations.push({
+        file: relPath,
+        detail: `${where}: export treatment '${exportCell}' must be 'included', 'excluded (reason)', or 'n/a'`,
+      });
+    } else if (/^excluded$/i.test(exportCell)) {
+      violations.push({
+        file: relPath,
+        detail: `${where}: export treatment 'excluded' requires a stated reason (ADR-0026 — the legacy's export claimed completeness while omitting categories, P5)`,
+      });
+    }
+  }
+  const erasure = cell('erasure');
+  if (!isLifecyclePlaceholder(erasure) && !ERASURE_STRATEGIES.includes(erasure)) {
+    violations.push({
+      file: relPath,
+      detail: `${where}: erasure strategy '${erasure}' is not one of the four canonical values (${ERASURE_STRATEGIES.join(', ')})`,
+    });
+  }
+}
+
 export function checkLifecycleDeclarations(ctx) {
   const { root } = ctx;
   const violations = [];
@@ -801,19 +1073,33 @@ export function checkLifecycleDeclarations(ctx) {
       violations.push({ file: relPath, detail: `Data owned table has no erasure-strategy column` });
       continue;
     }
+    const sixField = lifecycleColumnIndexes(table.headers);
+    // Deepening (Phase 2, first real schema): a module that has implementation
+    // code owns real datasets, so the skeleton-era erasure-only table no
+    // longer suffices — it must declare all six fields (ADR-0026).
+    if (sixField === null && codeFiles([path.join(root, 'modules', mod)]).length > 0) {
+      violations.push({
+        file: relPath,
+        detail: `module '${mod}' has implementation code but its Data owned table is not in the six-field format (Table | Subject relationship | Purpose | Classification | Retention | Export treatment | Erasure strategy)`,
+      });
+    }
     for (const row of table.rows) {
       const tableName = plainCell(row[0] ?? '');
+      if (placeholder(tableName)) {
+        continue; // template/guidance rows carry no dataset name
+      }
+      if (sixField !== null) {
+        validateLifecycleRow(violations, relPath, `table '${tableName}'`, row, sixField);
+        continue;
+      }
       const value = plainCell(row[erasureIdx] ?? '');
       if (placeholder(value)) {
-        // A placeholder erasure value is only acceptable on a placeholder row
-        // (template rows with no real table name). A named dataset with no
-        // declared erasure strategy is exactly the gap test 25 exists to catch.
-        if (!placeholder(tableName)) {
-          violations.push({
-            file: relPath,
-            detail: `table '${tableName}': erasure strategy is empty/placeholder — a named dataset must declare one of (${ERASURE_STRATEGIES.join(', ')})`,
-          });
-        }
+        // A named dataset with no declared erasure strategy is exactly the
+        // gap test 25 exists to catch.
+        violations.push({
+          file: relPath,
+          detail: `table '${tableName}': erasure strategy is empty/placeholder — a named dataset must declare one of (${ERASURE_STRATEGIES.join(', ')})`,
+        });
         continue;
       }
       if (!ERASURE_STRATEGIES.includes(value)) {
@@ -824,7 +1110,36 @@ export function checkLifecycleDeclarations(ctx) {
       }
     }
   }
-  return violationsResult(violations, names.length);
+
+  // Platform-owned datasets: packages/platform/db/DATA_LIFECYCLE.md carries
+  // the same six-field table for tables no module owns (schema_migrations,
+  // and workstream D's outbox/jobs rows). Same rules, same strictness.
+  const lifecyclePath = path.join(root, 'packages', 'platform', 'db', 'DATA_LIFECYCLE.md');
+  const lifecycleRel = 'packages/platform/db/DATA_LIFECYCLE.md';
+  if (!fs.existsSync(lifecyclePath)) {
+    violations.push({
+      file: lifecycleRel,
+      detail: 'DATA_LIFECYCLE.md missing — platform-owned tables must declare their lifecycle',
+    });
+  } else {
+    const table = parseMdTable(readText(lifecyclePath).split('\n'));
+    const sixField = table === null ? null : lifecycleColumnIndexes(table.headers);
+    if (table === null || sixField === null) {
+      violations.push({
+        file: lifecycleRel,
+        detail:
+          'DATA_LIFECYCLE.md has no six-field lifecycle table (Table | Subject relationship | Purpose | Classification | Retention | Export treatment | Erasure strategy)',
+      });
+    } else {
+      for (const row of table.rows) {
+        const tableName = plainCell(row[0] ?? '');
+        if (placeholder(tableName)) continue;
+        validateLifecycleRow(violations, lifecycleRel, `table '${tableName}'`, row, sixField);
+      }
+    }
+  }
+
+  return violationsResult(violations, names.length + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -990,6 +1305,8 @@ const CHECKS = {
   checkLayerDirection,
   checkModuleBoundary,
   checkOrmLeakage,
+  checkPortsDeclaredInward,
+  checkControllerComplexity,
   checkMoneyDiscipline,
   checkEventCatalogue,
   checkProviderBoundary,
@@ -999,6 +1316,7 @@ const CHECKS = {
   checkPurePackages,
   checkStorageBoundary,
   checkKernelSurface,
+  checkGuardCallSites,
   checkLifecycleDeclarations,
   checkAssuranceClaims,
 };
@@ -1151,7 +1469,43 @@ function buildSelfTestFixture() {
     ].join('\n'),
   );
   write('modules/alpha/infrastructure/db.ts', 'export const Db = 1;\n');
+  // Adapter-suffixed class with no port interface — test 5's target shape.
+  write(
+    'modules/alpha/infrastructure/orphan-repository.ts',
+    'export class OrphanRepository {\n  save(): void {}\n}\n',
+  );
   write('modules/beta/domain/widget.ts', 'export const Widget = 1;\n'); // beta has no MODULE.md
+
+  // Fat controller reaching into a module's domain — test 6's target shape.
+  write(
+    'apps/api/src/fat.controller.ts',
+    [
+      `import { Widget } from '@karar/alpha/domain/entity';`,
+      ...Array.from(
+        { length: 9 },
+        (_, i) => `@Get('/route${i}')\nexport function route${i}() { return Widget; }`,
+      ),
+    ].join('\n'),
+  );
+
+  // Declared protection nothing references — test 23's target shape.
+  write(
+    'packages/state-machine/src/foo-guard.ts',
+    'export class FooGuard {\n  check(): void {}\n}\n',
+  );
+
+  // Platform lifecycle file with a forbidden placeholder — test 25's deepened shape.
+  write(
+    'packages/platform/db/DATA_LIFECYCLE.md',
+    [
+      '# Platform data lifecycle declarations',
+      '',
+      '| Table | Subject relationship | Purpose | Classification | Retention | Export treatment | Erasure strategy |',
+      '|---|---|---|---|---|---|---|',
+      '| `platform.fixture_rows` | NON_PERSONAL | TBD | INTERNAL | indefinite (local) | n/a | RETAIN_WITH_BASIS |',
+      '',
+    ].join('\n'),
+  );
 
   write(
     'apps/admin/package.json',
@@ -1192,6 +1546,11 @@ const SELF_TEST_CASES = [
   { fn: 'checkLayerDirection', expect: /infrastructure/ },
   { fn: 'checkModuleBoundary', expect: /beta/ },
   { fn: 'checkOrmLeakage', expect: /@prisma\/client/ },
+  // Test 5: an adapter-suffixed infrastructure class with no port interface.
+  { fn: 'checkPortsDeclaredInward', expect: /OrphanRepository/ },
+  // Test 6: a controller importing a module's domain, over the route budget.
+  { fn: 'checkControllerComplexity', expect: /domain/ },
+  { fn: 'checkControllerComplexity', expect: /route handlers/ },
   { fn: 'checkMoneyDiscipline', expect: /amount/ },
   { fn: 'checkEventCatalogue', expect: /FakeThingHappened/ },
   { fn: 'checkProviderBoundary', expect: /@aws-sdk/ },
@@ -1201,7 +1560,13 @@ const SELF_TEST_CASES = [
   { fn: 'checkPurePackages', expect: /lodash|rxjs/ },
   { fn: 'checkStorageBoundary', expect: /client-s3/ },
   { fn: 'checkKernelSurface', expect: /ExtraTenthExport/ },
+  // Test 23: a declared FooGuard nothing references.
+  { fn: 'checkGuardCallSites', expect: /FooGuard/ },
   { fn: 'checkLifecycleDeclarations', expect: /DELETE_LATER/ },
+  // Test 25 deepened: a module with code still using the erasure-only table…
+  { fn: 'checkLifecycleDeclarations', expect: /six-field/ },
+  // …and a DATA_LIFECYCLE.md row carrying a forbidden placeholder.
+  { fn: 'checkLifecycleDeclarations', expect: /placeholder/ },
   { fn: 'checkAssuranceClaims', expect: /AC-00[12]/ },
   { fn: 'checkAdminNoDbDriver', expect: /'pg'/ },
 ];

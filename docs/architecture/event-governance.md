@@ -36,6 +36,8 @@ CI enforces, on every build:
 
 The consumer allow-list is the rule that does the most work. It converts "who listens to this?" from an archaeology exercise into a declaration the owning module makes deliberately.
 
+**As implemented in Phase 2:** the catalogue lives at `packages/api-contracts/events/catalogue.json` (field names there: `ownerModule`, `piiFlag`, `payloadRule`, plus a closed `payloadSchema` per event), and its loader in `packages/api-contracts/src/events/` validates both shape and the governance rules of §3 at load time — a hand-edited catalogue fails the process that reads it, not only CI. Architecture tests 8 (published events catalogued) and 15 (payload rules) are active; the in-memory bus refuses a subscription whose consumer is not in `allowedConsumers` (`assertConsumerAllowed`).
+
 ## 3. Payload rules by classification
 
 | Classification | Rule |
@@ -58,7 +60,7 @@ AmanatDisclosureAuthorized {
 
 — never the obligation.
 
-Architecture test 15 asserts all of this.
+Architecture test 15 asserts all of this. Since Phase 2 the same rules are also code: the catalogue parser rejects a `SEALED` entry carrying payload permission or an exemption, and the platform's classification module (`packages/platform/src/classification`) re-checks every payload on the publish path — `makeEnvelope` refuses a payload its classification's rule forbids.
 
 ## 4. Transactional outbox
 
@@ -78,6 +80,8 @@ State change and event enqueue commit in **one transaction**.
 **Guarantees:** at-least-once delivery, idempotent consumers, ordering per aggregate. There is no path that publishes an event for a state change that did not commit, and none that commits a change whose event is lost.
 
 **Failure handling:** bounded retry with backoff, then dead-letter. **Dead-lettered events alert** — a silent DLQ is a queue that fills up unnoticed until someone asks why a projection is stale.
+
+**As implemented in Phase 2:** the outbox, relay, receipts, and dead-letter path exist (`packages/platform/src/outbox`; implementation detail in [`backend.md` §8](backend.md)). What travels is the platform `EventEnvelope`: `eventId`, `eventName`, `schemaVersion`, `occurredAt` (injected clock), `recordedAt` (stamped at outbox insert), `correlationId`, `causationId`, optional `tenantId`, `producer`, `classification` (mirrored from the catalogue so consumers never re-derive it), and `payload`. The envelope is transport-neutral by construction ([`infrastructure-portability.md` §6](infrastructure-portability.md)); the only bus today is the in-memory one, by design — a cloud transport later implements the same publisher port.
 
 ## 5. Naming and versioning
 
