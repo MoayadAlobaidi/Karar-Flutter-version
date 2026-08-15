@@ -1,0 +1,93 @@
+# Karar Documentation
+
+**Phase 0 — architecture and decisions only.** No application code exists.
+
+---
+
+## Start here
+
+[`architecture/overview.md`](architecture/overview.md) — the entry point. Everything else expands one part of it.
+
+New to the project: [`onboarding/developer.md`](onboarding/developer.md).
+Looking up a term: [`glossary.md`](glossary.md).
+
+## Architecture
+
+| Document | Covers |
+|---|---|
+| [overview](architecture/overview.md) | The whole system in one document |
+| [clean-architecture](architecture/clean-architecture.md) | Layers, the dependency rule, enforcement |
+| [backend](architecture/backend.md) | NestJS structure, module anatomy, entrypoints |
+| [flutter](architecture/flutter.md) | Client architecture, RTL, capability-aware navigation |
+| [data-model](architecture/data-model.md) | Schemas, pinning, money, classification |
+| [tenancy](architecture/tenancy.md) | Four isolation layers; RLS is the boundary |
+| [jurisdiction-policy](architecture/jurisdiction-policy.md) | PolicyPacks, restrict-only settings, resolution, subject profiles |
+| [operating-entity](architecture/operating-entity.md) | Legal person, controller/processor, entity migration |
+| [capability-registry](architecture/capability-registry.md) | Descriptors, availability, deny-by-default |
+| [extension-pattern](architecture/extension-pattern.md) | How to add a capability; the seventeen-point checklist |
+| [sealed-data](architecture/sealed-data.md) | `SEALED`, the vault, grants, key escrow |
+| [disclosure](architecture/disclosure.md) | Disclosure ≠ access; approval policy; safety properties |
+| [event-governance](architecture/event-governance.md) | Catalogue, payload rules by classification |
+| [financial-engine](architecture/financial-engine.md) | Calculators, rulesets, verified facts |
+| [ai](architecture/ai.md) | Provider port, facts-based context, numeric safety |
+| [capability-map](architecture/capability-map.md) | Capability × context × owner × availability |
+| [white-label](architecture/white-label.md) | Control plane and data plane |
+| [sdk-strategy](architecture/sdk-strategy.md) | OpenAPI-first, generated SDKs, capability scoping |
+| [environments](architecture/environments.md) | LOCAL → DEV → STAGING → PRODUCTION |
+| [deployment-topology](architecture/deployment-topology.md) | The L0–L3 ladder |
+| [gcp-target](architecture/gcp-target.md) | Target infrastructure, no GCP in the domain |
+| [data-residency](architecture/data-residency.md) | The open question, and the seam that keeps it answerable |
+| [plan-v2-deltas](architecture/plan-v2-deltas.md) | **Amendments arising from the legacy audit** |
+
+## Decisions
+
+[`adr/`](adr/README.md) — **26 records**, each with context, decision, consequences, and alternatives rejected.
+
+## Security
+
+| Document | Covers |
+|---|---|
+| [threat-model](security/threat-model.md) | Assets, boundaries, ten threat classes, accepted risks |
+| [data-classification](security/data-classification.md) | Six classes and the handling matrix |
+| [access-control](security/access-control.md) | Roles, permissions, enforcement points |
+| [secrets](security/secrets.md) | Key hierarchy, escrow, rotation, the canary |
+| [sealed-access](security/sealed-access.md) | Grant procedures, audit, incident response |
+
+## Legacy
+
+The Phase 0.2 audit of `MoayadAlobaidi/Qarar`. **Source-verified**, not reported.
+
+| Document | Covers |
+|---|---|
+| [qarar-audit](legacy/qarar-audit.md) | What the legacy is, and the six findings that change the plan |
+| [feature-inventory](legacy/feature-inventory.md) | Every capability, its legacy status, and its Karar disposition. **Phase 9 scope** |
+| [reusable-assets](legacy/reusable-assets.md) | What transfers, graded A–F, and what deliberately does not |
+| [security-findings](legacy/security-findings.md) | 128 findings, and what each means for Karar |
+
+## Scenarios
+
+Reproducible from the documentation alone — a Phase 0 exit criterion.
+
+| Scenario | Question |
+|---|---|
+| [A — new country](scenarios/a-new-country.md) | What does a second country cost? |
+| [B — add Amanat](scenarios/b-add-amanat.md) | Can a wholly unlike capability be added without touching what exists? |
+| [C — white label](scenarios/c-white-label.md) | Can a partner run a branded subset and never see the rest? |
+| [D — dedicated deployment](scenarios/d-dedicated-deployment.md) | What does full isolation cost? |
+
+## Delivery
+
+| Document | Covers |
+|---|---|
+| [roadmap](roadmap.md) | Phases 0–21, gates, and honest scope |
+| [testing/architecture-tests](testing/architecture-tests.md) | The 26 CI-blocking tests |
+| [MODULE_TEMPLATE](MODULE_TEMPLATE.md) | Required for every module |
+| [phase-0-completion](phase-0-completion.md) | Exit-criteria verification |
+
+---
+
+## Conventions
+
+**Evidence labels** on factual claims about a system: **CODE** (a file says so, and it was read) · **RUNTIME** (observed running) · **INFRASTRUCTURE** (a provider claim — *never* to be read as verified) · **ABSENT** (searched for, not found).
+
+**Derive documentation from source**, not from the previous version of the document.
