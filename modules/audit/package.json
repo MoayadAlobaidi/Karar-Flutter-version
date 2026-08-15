@@ -1,0 +1,23 @@
+{
+  "name": "@karar/audit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Append-only audit records for every mutation, staff read, and attempted sealed access.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}
