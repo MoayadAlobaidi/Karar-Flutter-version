@@ -29,7 +29,7 @@ What each provider-neutral port binds to **when a deployment profile selects GCP
 | `ObservabilityProvider` | stdout, local | Cloud Operations — via OpenTelemetry, re-routable |
 | `AnalyticsSink` | — | Deferred (BigQuery is a candidate, not a decision) |
 
-**Local development has zero cloud dependency.** `make up` produces a working system with no account and no API key.
+**Local development has zero cloud dependency.** `make bootstrap` followed by `make dev` produces a working system with no account and no API key.
 
 **Database note:** the schema and migrations target the **PostgreSQL contract, not Cloud SQL** — no Cloud SQL-specific feature without the three-condition exception in [`database-portability.md` §3](database-portability.md), and the same contract tests must pass on any approved PostgreSQL provider.
 

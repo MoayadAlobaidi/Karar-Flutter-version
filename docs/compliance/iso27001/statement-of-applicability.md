@@ -1,0 +1,143 @@
+# Statement of Applicability
+
+**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.1 · **Date:** 2026-08-15 · **Review:** every phase gate (deltas per gate report §5)
+
+All 93 controls of ISO/IEC 27002:2022 (Annex A of ISO/IEC 27001:2022), by identifier, with a short **Karar-language name** (paraphrased — not the standard's text), an applicability status, and a justification. Where a Karar control implements the Annex A control, the KAR-CTL ID links into the [control matrix](../control-matrix.md), whose status detail is authoritative.
+
+**Status vocabulary (SoA-specific):**
+
+| Status | Meaning here |
+|---|---|
+| `APPLICABLE` | In scope now; Karar's treatment is designed/underway in the current phase |
+| `PLANNED` | In scope; treatment begins at the named phase — not pretended before then |
+| `IMPLEMENTED` | A mechanism exists today (Phase-1 tooling); evidence still pending |
+| `OPERATING` | Running with reviewed evidence — **no control holds this status yet** |
+| `NOT_APPLICABLE` | Excluded, with the reason stated and a revisit trigger where one exists |
+
+---
+
+## Organizational (5.1–5.37)
+
+| ID | Karar-language name | Status | Justification / linkage |
+|---|---|---|---|
+| 5.1 | Security policy set defined and approved | APPLICABLE | 14 policies DRAFT ([policy-index](../policy-index.md)); approval at Phase 2 gate. KAR-CTL-001 |
+| 5.2 | Security responsibilities assigned to roles | APPLICABLE | [control-owners.md](../control-owners.md). KAR-CTL-002 |
+| 5.3 | Conflicting duties separated | APPLICABLE | SoD triggers defined; current single-person reality carried as EXC-001/KAR-RSK-002 — applicable and honestly deficient |
+| 5.4 | Management holds people to the policies | APPLICABLE | Platform Owner approval/acceptance duties; gate sign-off |
+| 5.5 | Relationships with authorities | PLANNED (20) | Regulator engagement is a production-readiness gate; premature contact would imply claims Karar does not make |
+| 5.6 | Contact with security community/advisories | PLANNED (2) | Today only scanner-fed advisories; a deliberate advisory intake lands with vulnerability management Phase 2 |
+| 5.7 | Threat intelligence informs defenses | PLANNED (2) | Threat model exists; a recurring intel loop starts with vuln management. KAR-CTL-021 partial |
+| 5.8 | Security built into project management | APPLICABLE | Phase gates + MODULE.md-first intake. KAR-CTL-004, 024 |
+| 5.9 | Inventory of information and supporting assets | APPLICABLE | [asset-inventory.md](../asset-inventory.md) |
+| 5.10 | Acceptable use and handling rules for assets | APPLICABLE | [acceptable-use-policy](../../policies/acceptable-use-policy.md); classification handling matrix |
+| 5.11 | Assets returned on exit | PLANNED (first hire) | No employment relationships exist; rule activates with them |
+| 5.12 | Information classified by sensitivity | APPLICABLE | Six-class scheme, canonical (`docs/security/data-classification.md`). KAR-CTL-033 |
+| 5.13 | Information carries its classification label | PLANNED (2) | Labels enter schema comments, event catalogue, MODULE.md at Phase 2 |
+| 5.14 | Information transfer rules | APPLICABLE | Today's only transfer surface is authenticated TLS to SCM/registries; classification matrix defines in-transit rules for the future system |
+| 5.15 | Access control rules established | APPLICABLE | [access-control-policy](../../policies/access-control-policy.md); layered model in `docs/security/access-control.md`. KAR-CTL-007 |
+| 5.16 | Identity lifecycle managed | APPLICABLE | One SCM identity today, managed; application identity Phase 3. KAR-CTL-007, 010 |
+| 5.17 | Authentication material protected | APPLICABLE | `docs/security/secrets.md`; per-env stores; scanning. KAR-CTL-026, 036 |
+| 5.18 | Access rights provisioned and reviewed | APPLICABLE | Reviews at gates. KAR-CTL-014 |
+| 5.19 | Supplier security managed | APPLICABLE | [vendor-security-policy](../../policies/vendor-security-policy.md) + register. KAR-CTL-047 |
+| 5.20 | Security terms in supplier agreements | PLANNED (production) | Standard vendor ToS today; negotiated terms/DPAs when personal data or custom contracts exist. KAR-CTL-048 |
+| 5.21 | ICT supply chain risk managed | APPLICABLE | SCA, SBOM, pinning. KAR-CTL-025, 027, 028 |
+| 5.22 | Suppliers monitored and changes reviewed | APPLICABLE | Register review dates; per-gate check. KAR-CTL-047 |
+| 5.23 | Security in cloud service use | APPLICABLE | GitHub is today's cloud service, governed via register; platform cloud selection Phase 17 with shared-responsibility mapping |
+| 5.24 | Incident management prepared | APPLICABLE | [incident-response-policy](../../policies/incident-response-policy.md) DRAFT. KAR-CTL-042 |
+| 5.25 | Events assessed and classified | APPLICABLE | Severity model defined (SEV-1 at n=1 for sealed exposure) |
+| 5.26 | Incidents responded to per procedure | APPLICABLE | Procedure drafted; untested pre-operations, stated in policy |
+| 5.27 | Incidents feed learning | APPLICABLE | Post-incident review → [continual-improvement.md](continual-improvement.md) |
+| 5.28 | Evidence collected and preserved | APPLICABLE | [evidence-handling.md](../evidence-handling.md) incl. incident evidence rules |
+| 5.29 | Security maintained during disruption | PLANNED (20) | BC policy DRAFT; substance requires operations. KAR-CTL-045 |
+| 5.30 | ICT continuity readiness | PLANNED (20) | DR runbook executed + RTO measured are Phase 20 gates |
+| 5.31 | Legal/regulatory requirements identified | APPLICABLE | Roadmap non-engineering gates; jurisdiction docs; residency open (KAR-RSK-006). KAR-CTL-006 |
+| 5.32 | Intellectual property respected | APPLICABLE | Greenfield rule (no legacy code, AC-012); dependency licenses visible via SBOM. KAR-CTL-022 |
+| 5.33 | Records protected | APPLICABLE | Git history + evidence retention rules. KAR-CTL-046 |
+| 5.34 | Privacy and PII obligations met | PLANNED (5/16/prod) | **No PII is held today** (KAR-CTL-038); ADR-0026 lifecycle + consent controls activate Phases 3–16 |
+| 5.35 | Independent review of security | PLANNED (20) | Independent assessment by a party that did not build the system — hard Phase 20 gate; nothing in-house substitutes |
+| 5.36 | Compliance with policies verified | APPLICABLE | Phase gates check policy adherence. KAR-CTL-004, 005 |
+| 5.37 | Operating procedures documented | PLANNED (2) | Developer docs exist; operational runbooks arrive with things to operate |
+
+## People (6.1–6.8)
+
+| ID | Karar-language name | Status | Justification / linkage |
+|---|---|---|---|
+| 6.1 | Background checks before engagement | PLANNED (first hire) | No hires exist; rule activates with the first |
+| 6.2 | Security duties in employment terms | PLANNED (first hire) | Same trigger |
+| 6.3 | Awareness and training | APPLICABLE | Solo: the docs corpus + CONTRIBUTING are the training surface; formal onboarding per `docs/onboarding/developer.md` at hire |
+| 6.4 | Consequences for violations | PLANNED (first hire) | Meaningless solo; defined with employment terms |
+| 6.5 | Duties surviving exit | PLANNED (first hire) | Same trigger |
+| 6.6 | Confidentiality agreements | PLANNED (first hire/contractor) | Includes external reviewers touching non-public material |
+| 6.7 | Remote working secured | APPLICABLE | All work is remote by structure; acceptable-use-policy endpoint rules |
+| 6.8 | Security events reported | APPLICABLE | SECURITY.md private channel. KAR-CTL-043 |
+
+## Physical (7.1–7.14)
+
+| ID | Karar-language name | Status | Justification / linkage |
+|---|---|---|---|
+| 7.1 | Security perimeters around facilities | NOT_APPLICABLE | No offices, data centers, or facilities are operated. Revisit: any premises, or Phase 17 (provider facilities inherited per shared-responsibility model) |
+| 7.2 | Controlled physical entry | NOT_APPLICABLE | Same reason and trigger |
+| 7.3 | Secured rooms and work areas | NOT_APPLICABLE | Same |
+| 7.4 | Physical surveillance/monitoring | NOT_APPLICABLE | Same |
+| 7.5 | Protection from physical/environmental threats | NOT_APPLICABLE | Same |
+| 7.6 | Working rules in secure areas | NOT_APPLICABLE | Same |
+| 7.7 | Clear desk and screen | APPLICABLE | Screen lock + no unattended unlocked session; acceptable-use-policy §R3 |
+| 7.8 | Equipment placed and protected sensibly | APPLICABLE | One workstation; physical care rules in acceptable-use-policy |
+| 7.9 | Assets protected off premises | APPLICABLE | The workstation *is* off-premises by structure: FDE, lock, no shared use (acceptable-use-policy) |
+| 7.10 | Storage media controlled | APPLICABLE | Encrypted disk; no removable media for project data (acceptable-use-policy §R6) |
+| 7.11 | Supporting utilities resilience | NOT_APPLICABLE | No facilities; provider-inherited at Phase 17 |
+| 7.12 | Cabling protected | NOT_APPLICABLE | No cabling plant exists |
+| 7.13 | Equipment maintained | APPLICABLE | Workstation kept on current OS/security updates (acceptable-use-policy §R4) |
+| 7.14 | Equipment wiped before disposal/reuse | APPLICABLE | Disposal rule in acceptable-use-policy §R7; recorded in asset inventory on the event |
+
+## Technological (8.1–8.34)
+
+| ID | Karar-language name | Status | Justification / linkage |
+|---|---|---|---|
+| 8.1 | Endpoint devices secured | APPLICABLE | FDE, lock, updates, separation of concerns on the one workstation (acceptable-use-policy) |
+| 8.2 | Privileged access tightly held | APPLICABLE | SCM admin = one person today, recorded; control-plane model for the future (KAR-CTL-013) |
+| 8.3 | Access to information restricted | APPLICABLE | Repository is public by decision (read); write access maintainer-only. No restricted-class information is held in it by rule. Application-layer restriction from Phase 3 (KAR-CTL-010, 011) |
+| 8.4 | Source code access controlled | APPLICABLE | Write access maintainer-only; branch protection on `main` verified 2026-08-15 (EV-007): PR-only, 8 required checks, admins bound. KAR-CTL-007, 008 |
+| 8.5 | Strong authentication | APPLICABLE | MFA on SCM (verification EV-007); application authn design Phase 3 (KAR-CTL-010) |
+| 8.6 | Capacity managed | PLANNED (17) | Nothing to capacity-manage; CI quotas trivial |
+| 8.7 | Malware defenses | APPLICABLE | Endpoint hygiene + no-untrusted-downloads rule (acceptable-use-policy §R5); pinned dependencies reduce the realistic vector |
+| 8.8 | Technical vulnerabilities managed | **IMPLEMENTED** | Phase-1 CI runs dependency scanning per-PR (report-only pending its blocking threshold — KAR-CTL-025), CodeQL static analysis (KAR-CTL-029, [C1]), and automated update PRs (dependabot); runtime/platform vuln management PLANNED with runtimes. The mechanism exists; the blocking decision is the open piece |
+| 8.9 | Configuration managed | APPLICABLE | All config in git via PR; typed boot-validated runtime config from Phase 2 (KAR-CTL-031) |
+| 8.10 | Information deleted when no longer needed | PLANNED (5) | ADR-0026 lifecycle declarations + erasure strategies. KAR-CTL-037 |
+| 8.11 | Data masked where full values are not needed | PLANNED (2/8) | Log redaction Phase 2; admin projections instead of raw tables Phase 8 (KAR-CTL-040) |
+| 8.12 | Data leakage prevented | PLANNED (2) | Secret scanning is one live layer (KAR-CTL-026); classification-driven event/log rules land Phase 2 |
+| 8.13 | Backups taken and tested | PLANNED (17) | Nothing to back up but git, covered by clone recoverability (KAR-CTL-046); real backups with restore verification at Phase 17+, KAR-CTL-044 |
+| 8.14 | Redundant processing capability | PLANNED (17/20) | KAR-CTL-045 |
+| 8.15 | Logs produced and protected | PLANNED (2) | Append-only audit design; KAR-CTL-039, 040 |
+| 8.16 | Systems monitored for anomalies | PLANNED (20) | KAR-CTL-041; a single alert recipient will not count as on-call |
+| 8.17 | Clocks synchronized | PLANNED (17) | Relevant when distributed runtime exists |
+| 8.18 | Privileged utilities restricted | PLANNED (17) | Runtime concern; control-plane gateway design already excludes ad-hoc production tooling |
+| 8.19 | Software on operational systems controlled | PLANNED (17) | No operational systems; endpoint software per acceptable-use-policy |
+| 8.20 | Networks secured | PLANNED (17) | KAR-CTL-032 |
+| 8.21 | Network services secured | PLANNED (17) | KAR-CTL-032; DB transport `verify-full` per `docs/security/secrets.md` §10 |
+| 8.22 | Networks segregated | PLANNED (17/20) | Sealed vault into its own boundary before production sealed data (ADR-0017) |
+| 8.23 | Web access filtered | NOT_APPLICABLE | No managed corporate network or endpoint fleet exists to filter. Revisit: ≥3 staff or managed endpoints |
+| 8.24 | Cryptography used properly, keys managed | APPLICABLE | [cryptography-and-key-management-policy](../../policies/cryptography-and-key-management-policy.md); ADR-0017; implementation Phases 2/13/20 (KAR-CTL-034, 035) |
+| 8.25 | Development follows a secure lifecycle | APPLICABLE | [secure-development-policy](../../policies/secure-development-policy.md); CI gates land Phase 1 (KAR-CTL-020, 021) |
+| 8.26 | Security requirements set for applications | APPLICABLE | Threat model drives requirements; MODULE.md intake (KAR-CTL-021, 024) |
+| 8.27 | Secure architecture principles applied | APPLICABLE | 26 ADRs + architecture tests as enforcement (KAR-CTL-019, 020) |
+| 8.28 | Secure coding practiced | APPLICABLE | Standards in secure-development-policy; bite from first application code (KAR-CTL-029, Phase 2) |
+| 8.29 | Security testing through development | APPLICABLE | Architecture tests + scans in merge-blocking CI from Phase 1 (KAR-CTL-016, 020) |
+| 8.30 | Outsourced development supervised | NOT_APPLICABLE | No third-party development organization is engaged; AI-assisted work happens inside the same SDLC controls under maintainer review. Revisit: any contracted development |
+| 8.31 | Development, test, production separated | PLANNED (17–19) | Ladder designed (`docs/architecture/environments.md`); staging is a hard pre-production gate (KAR-CTL-018, 030) |
+| 8.32 | Changes controlled | APPLICABLE | PR-only flow + merge-blocking CI (KAR-CTL-015, 016); branch-protection verification pending (EV-007); EXC-001 qualifies the approval leg |
+| 8.33 | Test data selected and protected | APPLICABLE | Synthetic-only rule, currently true by construction (KAR-CTL-038) |
+| 8.34 | Systems protected during audits/tests | PLANNED (20) | Pen-test scoping at Phase 20; no system exists to protect or test |
+
+## Tally (v0.1)
+
+| Status | Count |
+|---|---|
+| APPLICABLE | 50 |
+| PLANNED | 32 |
+| NOT_APPLICABLE | 10 |
+| IMPLEMENTED | 1 |
+| OPERATING | 0 |
+| **Total** | **93** |
+
+Every NOT_APPLICABLE row states its reason and (where one exists) a revisit trigger; the 7.x exclusions and the ISMS scope exclusions are the same facts viewed twice, deliberately.

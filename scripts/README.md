@@ -2,7 +2,7 @@
 
 Verification, drills, and development helpers.
 
-Several are adapted from the legacy, where they are recorded as having genuinely caught defects — notably migration-as-app-role verification, which is *proven to fail on a genuinely defective migration*.
+The legacy's operational scripts are a requirements source for future checks here (notably migration-as-app-role verification, recorded as having genuinely caught a defective migration); everything in this directory is written greenfield against those requirements.
 
 ## Import rules
 
@@ -10,4 +10,4 @@ Several are adapted from the legacy, where they are recorded as having genuinely
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 1: developer tooling (`dev/`) and verification scripts (`checks/`) exist and run in `make verify` and CI._

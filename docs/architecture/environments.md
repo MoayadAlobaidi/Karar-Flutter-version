@@ -33,7 +33,7 @@ A staging environment deferred to "when we need it" is needed exactly when it is
 | **STAGING** | Release rehearsal, pen testing, migration verification | **Synthetic only. Never production data** |
 | **PRODUCTION** | Customers | Real |
 
-**Local development has zero cloud dependency.** A developer clones, runs `make up`, and has a working system — no GCP account, no API key, no shared database.
+**Local development has zero cloud dependency.** A developer clones, runs `make bootstrap` and `make dev`, and has a working system — no GCP account, no API key, no shared database.
 
 ## 4. Mandatory staging passage
 

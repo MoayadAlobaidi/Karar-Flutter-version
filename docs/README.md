@@ -1,6 +1,6 @@
 # Karar Documentation
 
-**Phase 0 — architecture and decisions only.** No application code exists.
+**Phase 1 — foundation in progress.** Executable monorepo and tooling only; no product capability is implemented. Current status lives in the [root README status block](../README.md#status).
 
 ---
 
@@ -58,6 +58,13 @@ Looking up a term: [`glossary.md`](glossary.md).
 | [sealed-access](security/sealed-access.md) | Grant procedures, audit, incident response |
 | [assurance-claims](security/assurance-claims.md) | The Assurance Claim Registry behind architecture test 26 |
 
+## Compliance
+
+| Document | Covers |
+|---|---|
+| [compliance/](compliance/README.md) | SOC 2 / ISO 27001 readiness: control matrix, evidence register, phase compliance gate. **Readiness, not certification** |
+| [policies/](policies/README.md) | Written policies backing the control framework |
+
 ## Legacy
 
 The Phase 0.2 audit of `MoayadAlobaidi/Qarar`. **Source-verified**, not reported.
@@ -86,6 +93,10 @@ Reproducible from the documentation alone — a Phase 0 exit criterion.
 |---|---|
 | [roadmap](roadmap.md) | Phases 0–21, gates, and honest scope |
 | [testing/architecture-tests](testing/architecture-tests.md) | The 26 CI-blocking tests |
+| [documentation-style-guide](documentation-style-guide.md) | Binding rules for everything under `docs/`: vocabulary, ownership, diagrams, claim labelling |
+| [phases/](phases/README.md) | Phase reports and the phase-end update ritual |
+| [phases/PHASE_TEMPLATE](phases/PHASE_TEMPLATE.md) | The required structure of every phase report |
+| [phases/phase-01](phases/phase-01.md) | Phase 1 report — foundation |
 | [MODULE_TEMPLATE](MODULE_TEMPLATE.md) | Required for every module |
 | [phase-0-completion](phase-0-completion.md) | Phase 0 exit-criteria verification |
 | [phase-05-consolidation](phase-05-consolidation.md) | Phase 0.5 consolidation record — D1–D6 resolved, portability canonical |
