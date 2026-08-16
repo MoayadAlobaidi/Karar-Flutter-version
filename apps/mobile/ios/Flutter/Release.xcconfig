@@ -27,6 +27,21 @@
 KARAR_BUNDLE_ID_SUFFIX =
 
 // ---------------------------------------------------------------------------
+// App Transport Security
+// ---------------------------------------------------------------------------
+//
+// A Release or Profile artifact carries no NSAppTransportSecurity key at all
+// and gets the unmodified platform transport policy: TLS validated normally,
+// no exception domain, no arbitrary-load key of any kind.
+//
+// That is not achieved by a setting in this file. Runner/Info.plist has no
+// such key in any configuration, and the local-development exception in
+// Runner/ATSLocalDevelopment.plist is merged into the packaged plist only by
+// the `Verify Packaged Bundle` build phase, only for a Debug build whose
+// compiled KARAR_ENV is LOCAL. There is deliberately nothing here to switch
+// off, because a switch is a thing that can be left in the wrong position.
+
+// ---------------------------------------------------------------------------
 // Release signing
 // ---------------------------------------------------------------------------
 //

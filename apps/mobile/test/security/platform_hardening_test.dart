@@ -1,4 +1,3 @@
-import 'dart:io';
 // PLATFORM NETWORK AND PACKAGING CONTROLS, ENFORCED.
 //
 // The Android manifest, the network security configs and the iOS Info.plist
@@ -10,6 +9,9 @@ import 'dart:io';
 // Assertions are made against the DECLARATIONS, with XML comments stripped:
 // the explanatory prose in those files names the very attributes under test,
 // so a comment must not be able to satisfy — or break — an assertion.
+
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/source_tree.dart';
@@ -241,6 +243,7 @@ void main() {
       if (merged == null) {
         // The merged manifest only exists after a Gradle build. Skipping is
         // honest; silently passing on the source manifest would not be.
+        _requireBuildIfExpected();
         markTestSkipped('no merged manifest present — run `flutter build apk --debug` first');
         return;
       }
@@ -269,6 +272,7 @@ void main() {
       // contributing fails here.
       final merged = _mergedManifestPermissions();
       if (merged == null) {
+        _requireBuildIfExpected();
         markTestSkipped('no merged manifest present — run `flutter build apk --debug` first');
         return;
       }
@@ -573,6 +577,35 @@ final class _MergedPermissions {
 
   /// Everything else: permissions an application or a library defines itself.
   final Set<String> other;
+}
+
+/// The environment variable a lane sets once it has built the APK, mirroring
+/// `KARAR_VERIFY_IOS_ARTIFACT` on the iOS side.
+///
+/// Without it these assertions skip wherever no build output exists, which is
+/// every lane that runs the suite without first building — so the check that
+/// matters most silently never runs. A lane that has built sets this, and a
+/// missing artifact then fails instead of skipping.
+const String _androidGateVariable = 'KARAR_VERIFY_ANDROID_ARTIFACT';
+
+bool get _androidBuildIsExpected {
+  final String value =
+      (Platform.environment[_androidGateVariable] ?? '').trim().toLowerCase();
+  return value == '1' || value == 'true' || value == 'yes';
+}
+
+/// Fails when a build was promised and is absent; otherwise records the skip.
+///
+/// Returning normally means the caller may treat the absence as a skip.
+void _requireBuildIfExpected() {
+  expect(
+    _androidBuildIsExpected,
+    isFalse,
+    reason: '$_androidGateVariable is set, so a built APK and its merged '
+        'manifest must be present — but none was found. Build the debug APK '
+        'before running this suite, or unset the variable. Passing by absence '
+        'is exactly the failure this gate exists to prevent.',
+  );
 }
 
 /// The permissions of the merged manifest an actual build produces, or null

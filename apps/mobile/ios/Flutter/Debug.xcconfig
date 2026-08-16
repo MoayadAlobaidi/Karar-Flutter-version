@@ -4,3 +4,19 @@
 // (com.kararfinance.app). See Release.xcconfig for the full explanation of why
 // this is empty on both sides today.
 KARAR_BUNDLE_ID_SUFFIX =
+
+// ---------------------------------------------------------------------------
+// App Transport Security
+// ---------------------------------------------------------------------------
+//
+// Nothing to set here, and nothing that could be set here would help.
+// Runner/Info.plist carries no NSAppTransportSecurity key in any
+// configuration; the local-development exception lives in
+// Runner/ATSLocalDevelopment.plist and is merged into the packaged plist by
+// the `Verify Packaged Bundle` build phase, which grants it only to a Debug
+// build whose compiled KARAR_ENV is LOCAL.
+//
+// The Xcode configuration is deliberately NOT the gate on its own. Debug and
+// LOCAL are different axes: `flutter build ios --debug
+// --dart-define=KARAR_ENV=DEV` is a Debug build of a deployed environment, and
+// an xcconfig cannot see the dart-defines that say so.

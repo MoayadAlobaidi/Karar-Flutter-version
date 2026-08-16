@@ -10,6 +10,13 @@
 **/.vagrant/
 **/DerivedData/
 Icon?
+
+# Xcode writes here when it is invoked directly rather than through the Flutter
+# tool, which redirects output to apps/mobile/build. This mirrors the Android
+# rule; uncovered, a `git add -A` after verifying the packaged-bundle build
+# phase would commit the built .app.
+/build/
+
 **/Pods/
 **/.symlinks/
 profile

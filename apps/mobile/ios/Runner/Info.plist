@@ -27,56 +27,32 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!--
-	  APP TRANSPORT SECURITY.
+	  APP TRANSPORT SECURITY IS ABSENT FROM THIS FILE, AND THAT IS THE CONTROL.
 
-	  NSAllowsArbitraryLoads is false and is stated rather than omitted. The
-	  platform default is already false, so this line changes no behaviour; it
-	  exists so that a future "just for now" change to true is a visible edit to
-	  an explicit decision instead of the addition of a missing key. The
-	  companion blanket keys — NSAllowsArbitraryLoadsInWebContent,
-	  NSAllowsArbitraryLoadsForMedia and NSAllowsLocalNetworking — are absent,
-	  and a regression test asserts they stay absent.
+	  iOS builds ONE Info.plist for every configuration, so anything written
+	  here ships in every artifact. The narrow localhost exception the LOCAL
+	  profile needs therefore does not live here. It lives in
+	  Runner/ATSLocalDevelopment.plist and is merged into the PACKAGED plist by
+	  the `Verify Packaged Bundle` build phase, and only when that phase can
+	  prove the build is a Debug build compiled for LOCAL.
 
-	  There is exactly ONE exception, for `localhost`, with subdomains excluded.
-	  It exists because ATS applies to loopback connections and the LOCAL
-	  profile runs the API on the developer's own machine at
-	  http://localhost:3000 — the same address the Dart configuration loader
-	  uses as its LOCAL default. IP literals are not listed: ATS exception
-	  domains are matched as domain names, so 127.0.0.1 would not take effect.
-	  iOS local development therefore uses `localhost`, not the IP.
+	  THE SAFE STATE IS THE DEFAULT STATE. There is no switch here with an off
+	  position that has to be set correctly. A DEV, STAGING or PRODUCTION
+	  artifact has no NSAppTransportSecurity key at all and gets the unmodified
+	  platform transport policy: TLS validated normally, no exception domain,
+	  no arbitrary-load key of any kind. Every way the mechanism can fail —
+	  the build phase deleted, the fragment missing, the environment
+	  undetermined, plutil erroring — produces an artifact WITHOUT the
+	  exception, because producing one WITH it takes a positive action that has
+	  to succeed.
 
-	  SCOPE — AND ITS LIMIT, STATED PLAINLY. Unlike Android, where the debug
-	  source set physically replaces the network security config so the release
-	  variant does not contain the exception, iOS builds one Info.plist for
-	  every configuration. This exception is therefore PRESENT in a release
-	  binary. What makes it unreachable is enforced one layer up, in code that
-	  is tested: the configuration loader rejects a non-LOCAL build whose API
-	  base URL is a loopback host (API_BASE_URL_LOCAL_IN_NON_LOCAL_BUILD) and
-	  rejects any non-LOCAL base URL that is not https (API_BASE_URL_INSECURE),
-	  and a release build with no base URL fails outright rather than falling
-	  back. A release binary consequently has no configuration that could ever
-	  direct a request at localhost. The residual risk is a future code path
-	  that hardcodes a loopback URL instead of reading the loader; the mobile
-	  security regression suite asserts that no such literal exists.
+	  The build phase also verifies, in every configuration, that no
+	  arbitrary-load key reached the packaged plist from any other source, and
+	  fails the build if one did. See ios/Scripts/verify_packaged_bundle.sh.
 
 	  NO pinning. Certificate pinning is not a Phase 4 requirement; that
 	  decision is on record and changing it needs an ADR, not an edit here.
 	-->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<false/>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>localhost</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-				<key>NSIncludesSubdomains</key>
-				<false/>
-			</dict>
-		</dict>
-	</dict>
 	<!--
 	  FACE ID PURPOSE STRING.
 
@@ -94,14 +70,16 @@
 	  receives no template, image or derived representation, stores none and
 	  transmits none. Unlocking proves presence to the device, grants no
 	  session, and never replaces signing in. The sentence below says exactly
-	  that in the user's own terms rather than the vendor's.
+	  that in the terms of the user rather than of the vendor.
 
-	  This is the development-language string. Localized copies belong in a
-	  per-language InfoPlist.strings, which is separate work from wiring the
-	  authenticator and is not done here.
+	  This is the development-language value, and it is the fallback iOS uses
+	  when the device language matches no localization. The strings a user
+	  actually sees come from Runner/en.lproj/InfoPlist.strings and
+	  Runner/ar.lproj/InfoPlist.strings; the English there is identical to this
+	  value, so the fallback and the localization cannot say different things.
 	-->
 	<key>NSFaceIDUsageDescription</key>
-	<string>Karar uses Face ID to unlock the app on this device. This is a privacy lock only: it never replaces signing in, and Karar never receives your face data.</string>
+	<string>Face ID unlocks Karar on this device. Your device performs the check and Karar never receives or stores your face data. Unlocking the app does not replace signing in.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
