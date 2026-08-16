@@ -4,6 +4,7 @@ dist/
 build/
 coverage/
 pnpm-lock.yaml
+scripts/checks/.out/
 
 # Flutter project — formatted by `dart format`, not prettier
 apps/mobile/

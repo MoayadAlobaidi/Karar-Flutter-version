@@ -159,7 +159,9 @@ function checkReadmePhase(registry) {
 function phaseReportName(phase) {
   const intPart = Math.floor(phase);
   const padded = String(intPart).padStart(2, '0');
-  const frac = phase === intPart ? '' : `.${String(phase).split('.')[1]}`;
+  // Fractional phases use a dash, not a dot, in the filename (the canonical
+  // Phase 3.5 report is docs/phases/phase-03-5.md).
+  const frac = phase === intPart ? '' : `-${String(phase).split('.')[1]}`;
   return `phase-${padded}${frac}.md`;
 }
 

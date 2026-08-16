@@ -1,6 +1,6 @@
 {
   "description": "Machine-readable registry of the 26 architecture tests (docs/testing/architecture-tests.md) plus the canary-purity test. Read by scripts/checks/architecture.mjs, which enforces the activation gate: a test whose activationPhase has been reached without an implementation fails the run.",
-  "currentPhase": 3,
+  "currentPhase": 3.5,
   "source": "docs/testing/architecture-tests.md",
   "statusValues": {
     "ACTIVE": "The guarded structure exists now; the check runs on every invocation and must pass.",
@@ -53,7 +53,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkControllerComplexity",
-      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) \u2014 domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
+      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) — domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
     },
     {
       "id": 7,
@@ -204,7 +204,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkLifecycleDeclarations",
-      "notes": "Deepened in Phase 2 with the first real schema (audit.audit_events): a module with implementation code must declare the full six-field table (subject relationship, purpose, classification, retention, export treatment, erasure strategy), and six-field tables are validated field by field \u2014 canonical subject/classification/erasure values, export treatment included|excluded (reason)|n/a with 'excluded' requiring a stated reason, and placeholders (TBD/TODO/empty) forbidden. Skeleton modules without code keep the erasure-only obligation. Also parses packages/platform/db/DATA_LIFECYCLE.md (platform-owned tables: schema_migrations now; workstream D appends outbox/jobs rows) with the same six-field rules. Self-test seeds a non-canonical strategy, a code-bearing module without the six-field table, and a placeholder row."
+      "notes": "Deepened in Phase 2 with the first real schema (audit.audit_events): a module with implementation code must declare the full six-field table (subject relationship, purpose, classification, retention, export treatment, erasure strategy), and six-field tables are validated field by field — canonical subject/classification/erasure values, export treatment included|excluded (reason)|n/a with 'excluded' requiring a stated reason, and placeholders (TBD/TODO/empty) forbidden. Skeleton modules without code keep the erasure-only obligation. Also parses packages/platform/db/DATA_LIFECYCLE.md (platform-owned tables: schema_migrations now; workstream D appends outbox/jobs rows) with the same six-field rules. Self-test seeds a non-canonical strategy, a code-bearing module without the six-field table, and a placeholder row."
     },
     {
       "id": 26,
