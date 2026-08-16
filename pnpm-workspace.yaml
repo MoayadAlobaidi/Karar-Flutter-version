@@ -7,7 +7,25 @@ packages:
   # imports resolve as @karar/<module> -> public-api.ts). Directories without
   # a package.json are ignored, so skeleton modules cost nothing here.
   - 'modules/*'
+  # Cross-cutting test suites that belong to no single module (tests/security:
+  # the adversarial isolation and privilege-abuse suite spanning Phase 3
+  # module boundaries).
+  - 'tests/*'
 allowBuilds:
   # Transitive dep of the OTLP HTTP exporters (apps/api). Its postinstall is a
   # version-stub writer the library does not need — never run it.
+  # Prisma requires its postinstall to fetch the query engine; both are the
+  # official Prisma packages, pinned via the lockfile.
+  '@prisma/engines': true
+  # argon2 (modules/identity) compiles its native binding at install time —
+  # that is the official package's normal build, pinned via the lockfile.
+  argon2: true
+  prisma: true
   protobufjs: false
+minimumReleaseAgeExclude:
+  # jose 6.2.9 is the exact signing-library release the identity module was
+  # built and tested against; it was adopted inside the cool-down window to
+  # avoid pinning an older release. No advisory was published against it at
+  # adoption (2026-08-16); the exclusion is version-exact and expires with
+  # the next jose upgrade.
+  - jose@6.2.9

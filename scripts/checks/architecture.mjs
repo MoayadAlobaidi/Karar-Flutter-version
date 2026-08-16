@@ -283,6 +283,13 @@ export function checkModuleBoundary(ctx) {
 // ---------------------------------------------------------------------------
 // Test 4 — No ORM leakage
 // ---------------------------------------------------------------------------
+// Sanctioned Prisma surfaces, and nothing else:
+//   * modules/*/infrastructure/persistence/ — repository adapters;
+//   * packages/platform/src/db/ — the ONE construction path (createPrismaClient
+//     over @prisma/adapter-pg and pg; database-portability.md §2);
+//   * packages/platform/prisma/client/ — the generated client itself.
+// Module code consumes the PrismaHandle through @karar/platform; a Prisma
+// import anywhere else is leakage regardless of which package it sits in.
 export function checkOrmLeakage(ctx) {
   const { root } = ctx;
   const violations = [];
@@ -291,23 +298,574 @@ export function checkOrmLeakage(ctx) {
     ...packagesSrcDirs(root),
     path.join(root, 'modules'),
   ]);
-  const allowed = (file) => /[\\/]infrastructure[\\/]persistence[\\/]/.test(file);
+  const allowed = (file) =>
+    /[\\/]infrastructure[\\/]persistence[\\/]/.test(file) ||
+    isWithin(path.join(root, 'packages', 'platform', 'src', 'db'), file) ||
+    isWithin(path.join(root, 'packages', 'platform', 'prisma', 'client'), file);
   for (const file of files) {
     for (const { specifier, line } of extractImports(loadStripped(file))) {
       const isPrisma =
         specifier === 'prisma' ||
         specifier.startsWith('prisma/') ||
         specifier.startsWith('@prisma/');
-      if (isPrisma && !allowed(file)) {
+      // The raw driver is the same failure class: a pg import outside the
+      // sanctioned zones bypasses the profile/adapter machinery entirely.
+      const isPgDriver = specifier === 'pg' || specifier.startsWith('pg/');
+      if ((isPrisma || isPgDriver) && !allowed(file)) {
         violations.push({
           file: rel(root, file),
           line,
-          detail: `imports '${specifier}' outside infrastructure/persistence/ — ORM types must not leak`,
+          detail: `imports '${specifier}' outside infrastructure/persistence/ or packages/platform/src/db/ — ORM and driver types must not leak`,
         });
       }
     }
   }
   return violationsResult(violations, files.length);
+}
+
+// ---------------------------------------------------------------------------
+// Canonical SQL schema parsing (tests 9, 21, 22)
+// ---------------------------------------------------------------------------
+// The canonical migrations under packages/platform/db/migrations ARE the
+// schema of record (database-portability.md §6); these checks parse them
+// statically. Live-database verification of the same facts is the job of
+// `db:verify` and the adversarial suites (modules/*/__tests__, tests/security)
+// — this runner stays zero-dependency and never opens a connection.
+
+const MIGRATIONS_REL = path.join('packages', 'platform', 'db', 'migrations');
+const ALLOW_LIST_REL = path.join('packages', 'platform', 'db', 'rls-allow-list.json');
+const PRISMA_SCHEMA_DIR_REL = path.join('packages', 'platform', 'prisma', 'schema');
+
+/**
+ * Strips SQL line comments while preserving line structure, string literals
+ * ('' escaping), and dollar-quoted bodies ($$…$$ stay intact — trigger
+ * function sources must not be mistaken for statements).
+ */
+function stripSqlComments(sql) {
+  let out = '';
+  let i = 0;
+  const n = sql.length;
+  let mode = 'code'; // code | line | string | dollar
+  while (i < n) {
+    const c = sql[i];
+    const next = sql[i + 1];
+    if (mode === 'code') {
+      if (c === '-' && next === '-') {
+        mode = 'line';
+        i += 2;
+        continue;
+      }
+      if (c === "'") mode = 'string';
+      else if (c === '$' && next === '$') {
+        mode = 'dollar';
+        out += '$$';
+        i += 2;
+        continue;
+      }
+      out += c;
+      i += 1;
+    } else if (mode === 'line') {
+      if (c === '\n') {
+        mode = 'code';
+        out += c;
+      }
+      i += 1;
+    } else if (mode === 'string') {
+      if (c === "'" && next === "'") {
+        out += "''";
+        i += 2;
+        continue;
+      }
+      if (c === "'") mode = 'code';
+      out += c;
+      i += 1;
+    } else {
+      // dollar-quoted body
+      if (c === '$' && next === '$') {
+        mode = 'code';
+        out += '$$';
+        i += 2;
+        continue;
+      }
+      out += c;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** `platform.jobs` stays qualified; unqualified names normalize to public. */
+function normalizeTableName(raw) {
+  const clean = raw.replace(/"/g, '').trim().toLowerCase().replace(/;$/, '');
+  return clean.includes('.') ? clean : `public.${clean}`;
+}
+
+const COLUMN_LINE_SKIP =
+  /^(constraint|primary\s+key|unique(\s|\()|check(\s|\()|foreign\s+key|exclude|like\s)/i;
+
+/** Splits a CREATE TABLE body on top-level commas (parentheses tracked). */
+function splitTopLevel(body) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const c of body) {
+    if (c === '(') depth += 1;
+    else if (c === ')') depth -= 1;
+    if (c === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  if (current.trim() !== '') parts.push(current);
+  return parts;
+}
+
+/**
+ * Parses every canonical migration: created tables (with columns and their
+ * NOT NULL state), RLS ENABLE/FORCE statements, and CREATE POLICY targets.
+ */
+function parseCanonicalMigrations(root) {
+  const dir = path.join(root, MIGRATIONS_REL);
+  const tables = new Map(); // normalized name -> table record
+  const files = walkFiles(dir, { exts: new Set(['.sql']), includeTests: true });
+  for (const file of files) {
+    const relFile = rel(root, file);
+    const sql = stripSqlComments(readText(file));
+
+    for (const m of sql.matchAll(
+      /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_."][\w."]*)\s*\(/gi,
+    )) {
+      const name = normalizeTableName(m[1]);
+      // Body: from the opening paren to its match.
+      const start = m.index + m[0].length;
+      let depth = 1;
+      let end = start;
+      while (end < sql.length && depth > 0) {
+        if (sql[end] === '(') depth += 1;
+        else if (sql[end] === ')') depth -= 1;
+        end += 1;
+      }
+      const columns = new Map();
+      for (const fragment of splitTopLevel(sql.slice(start, end - 1))) {
+        const trimmed = fragment.trim();
+        if (trimmed === '' || COLUMN_LINE_SKIP.test(trimmed)) continue;
+        const colMatch = trimmed.match(/^"?([a-z_][\w$]*)"?\s/i);
+        if (!colMatch) continue;
+        columns.set(colMatch[1].toLowerCase(), {
+          notNull: /\bNOT\s+NULL\b/i.test(fragment),
+        });
+      }
+      tables.set(name, {
+        name,
+        file: relFile,
+        line: lineOf(sql, m.index),
+        columns,
+        rlsEnabled: false,
+        rlsForced: false,
+        policies: [],
+      });
+    }
+
+    for (const m of sql.matchAll(
+      /\bALTER\s+TABLE\s+(?:ONLY\s+)?([A-Za-z_."][\w."]*)\s+(ENABLE|FORCE|DISABLE|NO\s+FORCE)\s+ROW\s+LEVEL\s+SECURITY/gi,
+    )) {
+      const table = tables.get(normalizeTableName(m[1]));
+      if (!table) continue; // a later migration altering an earlier table would land here; none exist yet
+      const verb = m[2].toUpperCase().replace(/\s+/g, ' ');
+      if (verb === 'ENABLE') table.rlsEnabled = true;
+      if (verb === 'FORCE') table.rlsForced = true;
+      if (verb === 'DISABLE') table.rlsEnabled = false;
+      if (verb === 'NO FORCE') table.rlsForced = false;
+    }
+
+    for (const m of sql.matchAll(
+      /\bCREATE\s+POLICY\s+("?[\w$]+"?)\s+ON\s+([A-Za-z_."][\w."]*)/gi,
+    )) {
+      const table = tables.get(normalizeTableName(m[2]));
+      if (table) table.policies.push(m[1].replace(/"/g, ''));
+    }
+  }
+  return { tables, migrationFiles: files.length };
+}
+
+const ALLOW_LIST_REQUIRED_FIELDS = [
+  'table',
+  'reason',
+  'owner',
+  'compensatingGrants',
+  'reviewPhase',
+];
+
+/** Loads and field-validates the RLS allow-list; shape errors become violations. */
+function loadRlsAllowList(root, violations) {
+  const listPath = path.join(root, ALLOW_LIST_REL);
+  const relPath = rel(root, listPath);
+  if (!fs.existsSync(listPath)) {
+    violations.push({ file: relPath, detail: 'rls-allow-list.json is missing' });
+    return new Map();
+  }
+  let entries;
+  try {
+    entries = readJson(listPath);
+  } catch (err) {
+    violations.push({ file: relPath, detail: `does not parse: ${err.message}` });
+    return new Map();
+  }
+  if (!Array.isArray(entries)) {
+    violations.push({ file: relPath, detail: 'allow-list must be an array of entries' });
+    return new Map();
+  }
+  const byTable = new Map();
+  entries.forEach((entry, i) => {
+    const where = `entry[${i}]${entry?.table ? ` (${entry.table})` : ''}`;
+    for (const field of ALLOW_LIST_REQUIRED_FIELDS) {
+      if (typeof entry?.[field] !== 'string' || entry[field].trim() === '') {
+        violations.push({
+          file: relPath,
+          detail: `${where}: '${field}' is missing or empty — an allow-list hole needs a stated reason, owner, compensating grants, and review phase`,
+        });
+      }
+    }
+    if (typeof entry?.table === 'string' && entry.table.trim() !== '') {
+      const name = normalizeTableName(entry.table);
+      if (byTable.has(name)) {
+        violations.push({ file: relPath, detail: `${where}: duplicate allow-list entry` });
+      }
+      byTable.set(name, entry);
+    }
+  });
+  return byTable;
+}
+
+// ---------------------------------------------------------------------------
+// Test 22 — RLS coverage (three shapes + allow-list integrity)
+// ---------------------------------------------------------------------------
+// Every table created by the canonical migrations is either ENABLE + FORCE
+// ROW LEVEL SECURITY with at least one policy, or carried on the explicit
+// allow-list with all required fields. Three failure shapes detected (the
+// legacy's guard caught only the second, and its own audit table WAS the
+// third): no RLS, enabled-without-policy, FORCEd-without-enabled. A stale
+// allow-list entry (naming a table no migration creates) also fails — dead
+// entries hide real holes.
+export function checkRlsCoverage(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const { tables, migrationFiles } = parseCanonicalMigrations(root);
+  const allowList = loadRlsAllowList(root, violations);
+  const allowListRel = ALLOW_LIST_REL.split(path.sep).join('/');
+
+  for (const [name] of allowList) {
+    if (!tables.has(name)) {
+      violations.push({
+        file: allowListRel,
+        detail: `allow-list entry '${name}' names a table no canonical migration creates — stale entries are removed, not kept`,
+      });
+    }
+  }
+
+  let rlsCount = 0;
+  let allowListedCount = 0;
+  for (const table of tables.values()) {
+    const allowListed = allowList.has(table.name);
+    if (allowListed) allowListedCount += 1;
+    if (table.rlsForced && !table.rlsEnabled) {
+      violations.push({
+        file: table.file,
+        line: table.line,
+        detail: `${table.name}: FORCEd without ENABLE — FORCE alone enforces nothing (the legacy audit table's exact anomaly, RLS-02/P14)`,
+      });
+    }
+    if (table.rlsEnabled && table.policies.length === 0) {
+      violations.push({
+        file: table.file,
+        line: table.line,
+        detail: `${table.name}: RLS enabled with zero policies — default-deny reads as isolation while making the table unusable and the owner path unguarded`,
+      });
+    }
+    if (table.rlsEnabled && table.rlsForced) rlsCount += 1;
+    else if (!allowListed) {
+      violations.push({
+        file: table.file,
+        line: table.line,
+        detail: `${table.name}: not RLS ENABLEd+FORCEd and not on ${allowListRel} — every table is consciously classified (ADR-0022)`,
+      });
+    }
+  }
+
+  return violationsResult(
+    violations,
+    tables.size,
+    `migrations: ${migrationFiles}; tables: ${tables.size}; ENABLE+FORCE: ${rlsCount}; allow-listed: ${allowListedCount}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 9 — Tenant scoping (no repository query path without principal context)
+// ---------------------------------------------------------------------------
+// RLS is the boundary, and the principal context is what arms it: every
+// module persistence file that queries a principal-scoped Prisma delegate
+// (a table that is ENABLE+FORCE and NOT allow-listed) must bind the context —
+// by using the platform's withPrincipalContext/withTenant, by binding the
+// GUCs transaction-locally itself (set_config('app.*', …, true) — the
+// identity scope pattern), or by importing a same-module persistence file
+// that does (IdentityPrismaScope). A querying file with none of these is a
+// repository method reachable without tenant context.
+//
+// The same check owns the SET LOCAL discipline: a session-scoped principal
+// GUC (set_config(…, false) or SET/SET SESSION app.*) outlives its
+// transaction on a pooled connection and hands the next caller a principal.
+const PRISMA_QUERY_METHODS =
+  '(?:findFirst|findFirstOrThrow|findMany|findUnique|findUniqueOrThrow|create|createMany|update|updateMany|upsert|delete|deleteMany|count|aggregate|groupBy)';
+
+/** Prisma delegate (camelCase model) -> normalized table name, from @@map. */
+function parsePrismaDelegateMap(root) {
+  const delegateToTable = new Map();
+  const dir = path.join(root, PRISMA_SCHEMA_DIR_REL);
+  for (const file of walkFiles(dir, { exts: new Set(['.prisma']), includeTests: true })) {
+    const src = readText(file);
+    for (const m of src.matchAll(/\bmodel\s+([A-Za-z_]\w*)\s*\{([\s\S]*?)\n\}/g)) {
+      const model = m[1];
+      const mapMatch = m[2].match(/@@map\(\s*"([^"]+)"\s*\)/);
+      const table = normalizeTableName(mapMatch ? mapMatch[1] : model);
+      delegateToTable.set(model[0].toLowerCase() + model.slice(1), table);
+    }
+  }
+  return delegateToTable;
+}
+
+const TRANSACTION_LOCAL_BIND = /set_config\(\s*'app\.\w+'[^)]*,\s*(?:true|is_local)\s*\)/;
+const SESSION_SCOPED_BIND = /set_config\(\s*'app\.\w+'[^)]*,\s*false\s*\)/;
+const SESSION_SET_GUC = /\bSET\s+(?:SESSION\s+)?app\.\w+/i;
+
+export function checkTenantScoping(ctx) {
+  const { root } = ctx;
+  const violations = [];
+
+  // Principal-scoped tables: RLS'd and not allow-listed (allow-listed tables
+  // are global/bootstrap surfaces whose access rules live in the entry).
+  const shapeErrors = []; // schema/allow-list shape problems belong to test 22
+  const { tables } = parseCanonicalMigrations(root);
+  const allowList = loadRlsAllowList(root, shapeErrors);
+  const principalTables = new Set(
+    [...tables.values()]
+      .filter((t) => t.rlsEnabled && t.rlsForced && !allowList.has(t.name))
+      .map((t) => t.name),
+  );
+  const delegateToTable = parsePrismaDelegateMap(root);
+  const principalDelegates = [...delegateToTable.entries()]
+    .filter(([, table]) => principalTables.has(table))
+    .map(([delegate]) => delegate);
+
+  const principalQuery =
+    principalDelegates.length > 0
+      ? new RegExp(`\\.(${principalDelegates.join('|')})\\.\\s*${PRISMA_QUERY_METHODS}\\s*\\(`, 'g')
+      : null;
+
+  let scanned = 0;
+  for (const mod of moduleNames(root)) {
+    const persistenceDir = path.join(root, 'modules', mod, 'infrastructure', 'persistence');
+    const files = codeFiles([persistenceDir]);
+    scanned += files.length;
+    const sources = new Map(files.map((file) => [file, loadStripped(file)]));
+    const binderFiles = new Set(
+      [...sources.entries()]
+        .filter(
+          ([, src]) =>
+            TRANSACTION_LOCAL_BIND.test(src) || /\bwithPrincipalContext\b|\bwithTenant\b/.test(src),
+        )
+        .map(([file]) => file),
+    );
+    for (const [file, src] of sources) {
+      if (principalQuery === null) break;
+      principalQuery.lastIndex = 0;
+      const queried = new Set();
+      for (const m of src.matchAll(principalQuery)) queried.add(m[1]);
+      if (queried.size === 0) continue;
+      if (binderFiles.has(file)) continue;
+      const importsBinder = [...binderFiles].some((binder) => {
+        const binderBase = path.basename(binder).replace(/\.[cm]?ts$/, '');
+        return extractImports(src).some(
+          (imp) =>
+            imp.specifier.startsWith('.') &&
+            path.basename(imp.specifier).replace(/\.[cm]?[jt]s$/, '') === binderBase,
+        );
+      });
+      if (importsBinder) continue;
+      violations.push({
+        file: rel(root, file),
+        detail: `queries principal-scoped delegate(s) [${[...queried].join(', ')}] with no principal context in reach — no withPrincipalContext/withTenant, no transaction-local set_config('app.*', …, true), and no import of a persistence binder that has one (tenancy.md: RLS is the boundary, the context arms it)`,
+      });
+    }
+  }
+
+  // SET LOCAL discipline, everywhere non-test code runs SQL.
+  const disciplineFiles = codeFiles([
+    ...appsSrcDirs(root),
+    ...packagesSrcDirs(root),
+    path.join(root, 'modules'),
+  ]);
+  for (const file of disciplineFiles) {
+    const src = loadStripped(file);
+    for (const m of src.matchAll(new RegExp(SESSION_SCOPED_BIND, 'g'))) {
+      violations.push({
+        file: rel(root, file),
+        line: lineOf(src, m.index),
+        detail: `set_config('app.*', …, false) binds a principal GUC for the SESSION — on a pooled connection the next caller inherits it; principal GUCs are transaction-local only (set_config(…, true))`,
+      });
+    }
+    for (const m of src.matchAll(new RegExp(SESSION_SET_GUC, 'gi'))) {
+      violations.push({
+        file: rel(root, file),
+        line: lineOf(src, m.index),
+        detail: `session-level '${m[0]}' — principal GUCs are bound with SET LOCAL semantics only, never per session`,
+      });
+    }
+  }
+
+  return violationsResult(
+    violations,
+    scanned + disciplineFiles.length,
+    `principal-scoped tables: ${principalTables.size}; principal delegates: ${principalDelegates.length}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 21 — Pinning (records with legal consequence pin their provenance)
+// ---------------------------------------------------------------------------
+// The declared set of legal-consequence tables, checked against the REAL
+// schema (data-model.md §5). Each canonical pinning dimension maps to the
+// actual column that carries it, or declares a deferral to the phase whose
+// machinery introduces the value — and a deferral whose phase has arrived
+// FAILS the run (the registry's own activation-gate discipline; a pin backed
+// by fabricated values would be worse than an honest deferral). Phase 3
+// reality, recorded in migration 0063: consent_grants pins the operating
+// entity and jurisdiction per acceptance (plus the exact document version);
+// data_protection_role_assignments carries the same per-row entity +
+// jurisdiction pins. PolicyPack versions and SubjectPolicySelection do not
+// exist until Phase 3.5, so those two dimensions are deferred to 3.5 below.
+const LEGAL_CONSEQUENCE_TABLES = [
+  {
+    table: 'public.consent_grants',
+    pins: {
+      jurisdictionAtCreation: { column: 'jurisdiction_ref' },
+      operatingEntityAtCreation: { column: 'operating_entity_id' },
+      policyPackVersionAtCreation: {
+        deferredUntilPhase: 3.5,
+        reason: 'PolicyPack machinery arrives in Phase 3.5; no pack version exists to pin yet',
+      },
+      subjectPolicySelectionVersion: {
+        deferredUntilPhase: 3.5,
+        reason:
+          'SubjectPolicySelection arrives in Phase 3.5; the column is nullable-by-design where no elective options exist (data-model.md §5)',
+      },
+    },
+  },
+  {
+    table: 'public.data_protection_role_assignments',
+    pins: {
+      jurisdictionAtCreation: { column: 'jurisdiction_ref' },
+      operatingEntityAtCreation: { column: 'operating_entity_id' },
+      policyPackVersionAtCreation: {
+        deferredUntilPhase: 3.5,
+        reason: 'PolicyPack machinery arrives in Phase 3.5; no pack version exists to pin yet',
+      },
+      subjectPolicySelectionVersion: {
+        deferredUntilPhase: 3.5,
+        reason:
+          'stored legal decisions carry no subject election; re-reviewed when SubjectPolicySelection lands (Phase 3.5)',
+      },
+    },
+  },
+];
+
+export function checkPinning(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const { tables } = parseCanonicalMigrations(root);
+
+  let currentPhase = null;
+  try {
+    const registry = readJson(path.join(root, REGISTRY_REL));
+    if (typeof registry.currentPhase === 'number') currentPhase = registry.currentPhase;
+  } catch {
+    // loadRegistry reports unreadable registries; deferral gates cannot
+    // evaluate without a phase, which is itself a violation below.
+  }
+
+  const declared = new Set();
+  for (const { table, pins } of LEGAL_CONSEQUENCE_TABLES) {
+    const name = normalizeTableName(table);
+    declared.add(name);
+    const record = tables.get(name);
+    if (!record) {
+      violations.push({
+        file: MIGRATIONS_REL.split(path.sep).join('/'),
+        detail: `legal-consequence declaration for '${name}' matches no table in the canonical migrations — stale declarations are removed, not kept`,
+      });
+      continue;
+    }
+    for (const [dimension, pin] of Object.entries(pins)) {
+      if (pin.column !== undefined) {
+        const column = record.columns.get(pin.column.toLowerCase());
+        if (!column) {
+          violations.push({
+            file: record.file,
+            line: record.line,
+            detail: `${name}: pinning dimension '${dimension}' maps to column '${pin.column}', which does not exist`,
+          });
+        } else if (!column.notNull && pin.nullable !== true) {
+          violations.push({
+            file: record.file,
+            line: record.line,
+            detail: `${name}: pinning column '${pin.column}' (${dimension}) is nullable — a legal-consequence record pins its provenance at creation, always`,
+          });
+        }
+        continue;
+      }
+      if (typeof pin.deferredUntilPhase === 'number') {
+        if (currentPhase === null) {
+          violations.push({
+            file: REGISTRY_REL.split(path.sep).join('/'),
+            detail: `cannot evaluate the '${dimension}' deferral for ${name}: registry currentPhase is unreadable`,
+          });
+        } else if (currentPhase >= pin.deferredUntilPhase) {
+          violations.push({
+            file: record.file,
+            detail: `${name}: pinning dimension '${dimension}' was deferred until phase ${pin.deferredUntilPhase} and phase ${currentPhase} has arrived without the column — the deferral gate works like the registry's activation gate`,
+          });
+        }
+        continue;
+      }
+      violations.push({
+        file: 'scripts/checks/architecture.mjs',
+        detail: `${name}: pinning dimension '${dimension}' declares neither a column nor a numeric deferredUntilPhase`,
+      });
+    }
+  }
+
+  // A table that carries the pinning signature must be declared: canonical
+  // *_at_creation columns, or a per-row operating_entity_id pin.
+  for (const table of tables.values()) {
+    if (declared.has(table.name)) continue;
+    const pinColumns = [...table.columns.keys()].filter(
+      (col) => col.endsWith('_at_creation') || col === 'operating_entity_id',
+    );
+    if (pinColumns.length > 0) {
+      violations.push({
+        file: table.file,
+        line: table.line,
+        detail: `${table.name} carries pinning-signature column(s) [${pinColumns.join(', ')}] but is not declared in LEGAL_CONSEQUENCE_TABLES — records with legal consequence are declared, and the declaration is what test 21 verifies (data-model.md §5)`,
+      });
+    }
+  }
+
+  return violationsResult(
+    violations,
+    tables.size,
+    `declared legal-consequence tables: ${LEGAL_CONSEQUENCE_TABLES.length}; deferred dimensions gate at phase 3.5 (currentPhase ${currentPhase ?? 'unreadable'})`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1309,6 +1867,7 @@ const CHECKS = {
   checkControllerComplexity,
   checkMoneyDiscipline,
   checkEventCatalogue,
+  checkTenantScoping,
   checkProviderBoundary,
   checkDeterministicDomain,
   checkJurisdictionBranching,
@@ -1316,6 +1875,8 @@ const CHECKS = {
   checkPurePackages,
   checkStorageBoundary,
   checkKernelSurface,
+  checkPinning,
+  checkRlsCoverage,
   checkGuardCallSites,
   checkLifecycleDeclarations,
   checkAssuranceClaims,
@@ -1512,10 +2073,125 @@ function buildSelfTestFixture() {
     JSON.stringify({ name: '@karar/admin', dependencies: { pg: '^8.0.0' } }),
   );
 
+  // Tests 9/21/22 seeds: a fixture schema carrying every failure shape.
+  write(
+    'packages/platform/db/migrations/9900_fixture_tables.sql',
+    [
+      '-- fixture: RLS shape 1 — no RLS, not allow-listed',
+      'CREATE TABLE public.fixture_naked (id uuid PRIMARY KEY, tenant_id uuid NOT NULL);',
+      '-- fixture: RLS shape 2 — enabled (and FORCEd) with zero policies',
+      'CREATE TABLE public.fixture_enabled_no_policy (id uuid PRIMARY KEY);',
+      'ALTER TABLE public.fixture_enabled_no_policy ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.fixture_enabled_no_policy FORCE ROW LEVEL SECURITY;',
+      '-- fixture: RLS shape 3 — FORCEd without ENABLE (the legacy audit-table anomaly)',
+      'CREATE TABLE public.fixture_forced_not_enabled (id uuid PRIMARY KEY);',
+      'ALTER TABLE public.fixture_forced_not_enabled FORCE ROW LEVEL SECURITY;',
+      '-- fixture: a healthy principal-scoped table (drives test 9)',
+      'CREATE TABLE public.fixture_scoped (id uuid PRIMARY KEY, tenant_id uuid NOT NULL);',
+      'ALTER TABLE public.fixture_scoped ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.fixture_scoped FORCE ROW LEVEL SECURITY;',
+      'CREATE POLICY fixture_scoped_tenant ON public.fixture_scoped FOR SELECT',
+      "  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);",
+      '-- fixture: a declared legal-consequence table MISSING its jurisdiction pin (test 21)',
+      'CREATE TABLE public.consent_grants (id uuid PRIMARY KEY, operating_entity_id uuid NOT NULL);',
+      'ALTER TABLE public.consent_grants ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.consent_grants FORCE ROW LEVEL SECURITY;',
+      'CREATE POLICY consent_grants_subject ON public.consent_grants FOR SELECT USING (true);',
+      '-- fixture: pinning-signature columns on an UNDECLARED table (test 21)',
+      'CREATE TABLE public.fixture_rulings (id uuid PRIMARY KEY, jurisdiction_at_creation text NOT NULL);',
+      'ALTER TABLE public.fixture_rulings ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.fixture_rulings FORCE ROW LEVEL SECURITY;',
+      'CREATE POLICY fixture_rulings_policy ON public.fixture_rulings FOR SELECT USING (true);',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'packages/platform/db/rls-allow-list.json',
+    JSON.stringify([
+      {
+        table: 'public.fixture_ghost',
+        reason: 'stale: no migration creates this table',
+        owner: 'fixture',
+        compensatingGrants: 'none',
+        reviewPhase: '1',
+      },
+      {
+        table: 'public.fixture_enabled_no_policy',
+        reason: '',
+        owner: 'fixture',
+        compensatingGrants: 'none',
+        reviewPhase: '1',
+      },
+    ]),
+  );
+  write(
+    'packages/platform/prisma/schema/fixture.prisma',
+    ['model FixtureScoped {', '  id String @id', '', '  @@map("fixture_scoped")', '}', ''].join(
+      '\n',
+    ),
+  );
+  // Test 9: a persistence file querying a principal-scoped delegate with no
+  // principal context in reach…
+  write(
+    'modules/alpha/infrastructure/persistence/naked-query-store.ts',
+    [
+      'export class NakedQueryStore {',
+      '  constructor(private readonly handle: { client: never }) {}',
+      '  list() {',
+      '    return (this.handle.client as { fixtureScoped: { findMany(a: object): unknown } }).fixtureScoped.findMany({});',
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  );
+  // …and a session-scoped GUC bind (set_config(…, false) leaks across the pool).
+  write(
+    'modules/alpha/infrastructure/persistence/session-bind.ts',
+    ["export const BIND = `SELECT set_config('app.tenant_id', $1, false)`;", ''].join('\n'),
+  );
+  // The identity-scope pattern: transaction-local bind in the querying file —
+  // the sanctioned shape the negative self-test asserts is NOT flagged.
+  write(
+    'modules/alpha/infrastructure/persistence/scoped-binder.ts',
+    [
+      'type Tx = { fixtureScoped: { findMany(a: object): unknown }; $executeRaw(s: TemplateStringsArray, ...v: unknown[]): unknown };',
+      'export class ScopedBinderStore {',
+      '  constructor(private readonly tx: Tx) {}',
+      '  async list(tenantId: string) {',
+      "    await this.tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;",
+      '    return this.tx.fixtureScoped.findMany({});',
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+  );
+  // Test 4 narrowness: the sanctioned platform construction path must NOT be
+  // flagged (negative case) while the same import elsewhere in platform src is.
+  write('packages/platform/package.json', JSON.stringify({ name: '@karar/platform' }));
+  write(
+    'packages/platform/src/db/prisma.ts',
+    [
+      `import { Pool } from 'pg';`,
+      `import { PrismaPg } from '@prisma/adapter-pg';`,
+      'export const sanctioned = [Pool, PrismaPg];',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'packages/platform/src/telemetry.ts',
+    [
+      `import { PrismaClient } from '@prisma/client';`,
+      'export const leak = PrismaClient;',
+      '',
+    ].join('\n'),
+  );
+
   write(
     'docs/testing/architecture-test-registry.json',
     JSON.stringify({
-      currentPhase: 1,
+      // 4 > 3.5: makes checkPinning's deferral gate DUE in the fixture tree,
+      // proving the gate fails when a deferred pinning phase arrives.
+      currentPhase: 4,
       tests: [
         {
           id: 1,
@@ -1546,6 +2222,30 @@ const SELF_TEST_CASES = [
   { fn: 'checkLayerDirection', expect: /infrastructure/ },
   { fn: 'checkModuleBoundary', expect: /beta/ },
   { fn: 'checkOrmLeakage', expect: /@prisma\/client/ },
+  // Test 4 narrowness: platform src OUTSIDE src/db is still forbidden.
+  { fn: 'checkOrmLeakage', expect: /telemetry/ },
+  // Test 9: a principal-scoped delegate queried with no context in reach…
+  { fn: 'checkTenantScoping', expect: /fixtureScoped/ },
+  // …and a session-scoped principal GUC bind (set_config(…, false)).
+  { fn: 'checkTenantScoping', expect: /SESSION/ },
+  // Test 21: declared table missing its jurisdiction pin…
+  {
+    fn: 'checkPinning',
+    expect: /jurisdictionAtCreation.*jurisdiction_ref|jurisdiction_ref.*does not exist/,
+  },
+  // …an undeclared table carrying the pinning signature…
+  { fn: 'checkPinning', expect: /fixture_rulings/ },
+  // …and a deferral whose phase has arrived (fixture currentPhase 4 > 3.5).
+  { fn: 'checkPinning', expect: /policyPackVersionAtCreation/ },
+  // Test 22, all three shapes plus allow-list integrity.
+  { fn: 'checkRlsCoverage', expect: /fixture_naked/ },
+  {
+    fn: 'checkRlsCoverage',
+    expect: /fixture_enabled_no_policy.*zero policies|zero policies.*fixture_enabled_no_policy/,
+  },
+  { fn: 'checkRlsCoverage', expect: /fixture_forced_not_enabled/ },
+  { fn: 'checkRlsCoverage', expect: /fixture_ghost/ },
+  { fn: 'checkRlsCoverage', expect: /'reason' is missing or empty/ },
   // Test 5: an adapter-suffixed infrastructure class with no port interface.
   { fn: 'checkPortsDeclaredInward', expect: /OrphanRepository/ },
   // Test 6: a controller importing a module's domain, over the route budget.
@@ -1571,16 +2271,35 @@ const SELF_TEST_CASES = [
   { fn: 'checkAdminNoDbDriver', expect: /'pg'/ },
 ];
 
+// Negative cases: seeded shapes a checker must NOT flag — the proof an
+// allowance is exactly as narrow as sanctioned and no narrower.
+const NEGATIVE_SELF_TEST_CASES = [
+  // Test 4: the one sanctioned construction path (platform src/db) is allowed…
+  { fn: 'checkOrmLeakage', forbid: /packages[\\/]platform[\\/]src[\\/]db[\\/]prisma/ },
+  // Test 9: the identity-scope pattern (transaction-local set_config) passes.
+  { fn: 'checkTenantScoping', forbid: /scoped-binder/ },
+];
+
 function runSelfTest() {
   const fixtureRoot = buildSelfTestFixture();
   const failures = [];
   try {
+    const results = new Map();
+    const resultFor = (fn) => {
+      if (!results.has(fn)) {
+        results.set(
+          fn,
+          CHECKS[fn]
+            ? CHECKS[fn]({ root: fixtureRoot })
+            : fn === 'checkAdminNoDbDriver'
+              ? checkAdminNoDbDriver({ root: fixtureRoot })
+              : null,
+        );
+      }
+      return results.get(fn);
+    };
     for (const { fn, expect } of SELF_TEST_CASES) {
-      const result = CHECKS[fn]
-        ? CHECKS[fn]({ root: fixtureRoot })
-        : fn === 'checkAdminNoDbDriver'
-          ? checkAdminNoDbDriver({ root: fixtureRoot })
-          : null;
+      const result = resultFor(fn);
       if (!result) {
         failures.push(`${fn}: unknown check`);
         continue;
@@ -1598,10 +2317,23 @@ function runSelfTest() {
         );
       }
     }
+    for (const { fn, forbid } of NEGATIVE_SELF_TEST_CASES) {
+      const result = resultFor(fn);
+      if (!result) {
+        failures.push(`${fn}: unknown check (negative case)`);
+        continue;
+      }
+      const wrongHit = result.violations.find((v) => forbid.test(`${v.file} ${v.detail}`));
+      if (wrongHit) {
+        failures.push(
+          `${fn}: flagged the sanctioned shape (${forbid}) — the allowance is too narrow: ${wrongHit.file} — ${wrongHit.detail}`,
+        );
+      }
+    }
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
-  return { cases: SELF_TEST_CASES.length, failures };
+  return { cases: SELF_TEST_CASES.length + NEGATIVE_SELF_TEST_CASES.length, failures };
 }
 
 // ---------------------------------------------------------------------------
@@ -1618,7 +2350,9 @@ function main() {
       for (const f of failures) console.error(`  - ${f}`);
       process.exit(1);
     }
-    console.log(`SELF-TEST PASS — all ${cases} checkers fail on seeded violations (not vacuous)`);
+    console.log(
+      `SELF-TEST PASS — all ${cases} cases hold (checkers fail on seeded violations, sanctioned shapes stay unflagged)`,
+    );
     process.exit(0);
   }
 
@@ -1710,7 +2444,9 @@ function main() {
     console.error(`SELF-TEST FAIL (${selfTestFailures.length}/${cases} cases):`);
     for (const f of selfTestFailures) console.error(`  - ${f}`);
   } else {
-    console.log(`SELF-TEST PASS — all ${cases} checkers fail on seeded violations (not vacuous)`);
+    console.log(
+      `SELF-TEST PASS — all ${cases} cases hold (checkers fail on seeded violations, sanctioned shapes stay unflagged)`,
+    );
   }
 
   const ok = failCount === 0 && registryErrors.length === 0 && selfTestFailures.length === 0;

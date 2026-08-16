@@ -1,6 +1,6 @@
 {
   "description": "Machine-readable registry of the 26 architecture tests (docs/testing/architecture-tests.md) plus the canary-purity test. Read by scripts/checks/architecture.mjs, which enforces the activation gate: a test whose activationPhase has been reached without an implementation fails the run.",
-  "currentPhase": 2,
+  "currentPhase": 3,
   "source": "docs/testing/architecture-tests.md",
   "statusValues": {
     "ACTIVE": "The guarded structure exists now; the check runs on every invocation and must pass.",
@@ -53,7 +53,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkControllerComplexity",
-      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) — domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
+      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) \u2014 domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
     },
     {
       "id": 7,
@@ -74,10 +74,10 @@
     {
       "id": 9,
       "name": "Tenant scoping",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_3",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 3,
-      "activationCriterion": "First tenant-scoped tables, repositories, and RLS policies exist (identity/tenancy phase)."
+      "implementedIn": "scripts/checks/architecture.mjs#checkTenantScoping",
+      "notes": "Activated in Phase 3 with the first tenant-scoped repositories. Principal-scoped tables are derived from the canonical migrations (ENABLE+FORCE and not on rls-allow-list.json) and mapped to Prisma delegates via the schema's @@map; every modules/*/infrastructure/persistence file querying such a delegate must have principal context in reach — withPrincipalContext/withTenant, a transaction-local set_config('app.*', …, true) bind, or an import of a same-module persistence binder that has one (the IdentityPrismaScope pattern). The same check enforces SET LOCAL discipline everywhere: set_config('app.*', …, false) and session-level SET app.* fail. Self-test seeds an unscoped principal-delegate query and a session-scoped bind (and asserts the transaction-local binder shape is NOT flagged). Runtime enforcement is layered: withPrincipalContext fails closed on missing keys, and the adversarial suites (modules/*/__tests__, tests/security) prove the RLS boundary on live PostgreSQL."
     },
     {
       "id": 10,
@@ -169,18 +169,18 @@
     {
       "id": 21,
       "name": "Pinning",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_3",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 3,
-      "activationCriterion": "First tables declared to carry legal consequence exist; pinning columns (jurisdictionAtCreation, policyPackVersionAtCreation, operatingEntityAtCreation, subjectPolicySelectionVersion) become checkable in schema."
+      "implementedIn": "scripts/checks/architecture.mjs#checkPinning",
+      "notes": "Activated in Phase 3 with the first legal-consequence tables. The declared set (LEGAL_CONSEQUENCE_TABLES in the checker: consent_grants and data_protection_role_assignments) is verified against the REAL canonical migrations: each of the four pinning dimensions (data-model.md §5) maps to the actual NOT NULL column that carries it — jurisdiction_ref and operating_entity_id in Phase 3, per migration 0063's recorded interpretation — or declares a deferral to the phase whose machinery introduces the value (policyPackVersionAtCreation and subjectPolicySelectionVersion: 3.5, when PolicyPacks and SubjectPolicySelection exist). A deferral whose phase has arrived fails the run, exactly like this registry's activation gate; no dimension is ever satisfied by a fabricated value. Undeclared tables carrying the pinning signature (*_at_creation columns or a per-row operating_entity_id) fail. Self-test seeds a declared table missing its jurisdiction pin, an undeclared *_at_creation table, and a due deferral (fixture currentPhase 4)."
     },
     {
       "id": 22,
       "name": "RLS coverage",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_3",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 3,
-      "activationCriterion": "First tenant-scoped tables and RLS policies exist. All three failure shapes (no RLS, enabled-without-policy, FORCEd-without-enabled) become checkable against a live schema."
+      "implementedIn": "scripts/checks/architecture.mjs#checkRlsCoverage",
+      "notes": "Activated in Phase 3 with the first tenant-scoped tables. Parses every canonical migration (packages/platform/db/migrations/*.sql — the schema of record): each created table is either ENABLE + FORCE ROW LEVEL SECURITY with at least one policy, or carried on packages/platform/db/rls-allow-list.json with table, reason, owner, compensatingGrants, and reviewPhase all non-empty. All three failure shapes detect: no RLS, enabled-without-policy, and FORCEd-without-enabled (the legacy audit table's own anomaly, RLS-01/RLS-02/P14). A stale allow-list entry naming a table no migration creates also fails. Live-database verification of the same facts is db:verify plus the adversarial suites (modules/*/__tests__, tests/security), which probe the policies as karar_app and the owner on real rows. Self-test seeds all three shapes, a stale entry, and an empty reason field."
     },
     {
       "id": 23,
