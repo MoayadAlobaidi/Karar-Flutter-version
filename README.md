@@ -17,7 +17,7 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **3 — in progress** ([phase report](docs/phases/phase-03.md)) |
+| Current phase | **3 — COMPLETE** ([phase report](docs/phases/phase-03.md)); Phase 3.5 not started |
 | Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
 | Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
 | Application implementation | Platform foundation plus identity, tenancy, and access control — no consumer product capabilities are implemented |
@@ -253,7 +253,7 @@ Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never
 
 ## Roadmap and phase discipline
 
-Completed: 0, 0.5, 1, and 2. Current: **3** — identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, adversarial cross-tenant tests. Next: 3.5 (jurisdiction and capability foundation — PolicyPacks, capability availability, `SubjectPolicySelection` resolution).
+Completed: 0, 0.5, 1, 2, and 3 — the last delivering identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests. Next: 3.5 (jurisdiction and capability foundation — PolicyPacks, capability availability, `SubjectPolicySelection` resolution, session tenant binding), not started.
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 

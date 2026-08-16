@@ -69,3 +69,5 @@ An exception is a recorded, bounded deviation from a stated policy or control â€
 ## Closed exceptions
 
 None yet.
+
+**Phase 3 gate re-affirmation (2026-08-16):** EXC-001 OPEN (single maintainer; no exit trigger fired), EXC-002 compensating controls verified as delivered code, EXC-003 unchanged. Recorded in the Phase 3 gate record (phase-compliance-gate.md v0.4).
