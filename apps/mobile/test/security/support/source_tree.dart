@@ -170,6 +170,16 @@ bool isCodeLikePath(String relativePath) =>
 String stripXmlComments(String value) =>
     value.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
 
+/// What an XML or plist file at [relativePath] DECLARES: its contents with
+/// comments removed and whitespace collapsed.
+///
+/// The explanatory prose in the manifests and plists this suite reads names the
+/// very attributes under test, so a comment must not be able to satisfy — or
+/// break — an assertion. Collapsing whitespace lets assertions be written
+/// against the meaningful text rather than against an indentation style.
+String declarations(String relativePath) =>
+    collapseXmlWhitespace(stripXmlComments(readRequiredFile(relativePath)));
+
 /// Removes `//` and `/* */` comments from a Dart, Kotlin or Gradle source
 /// file. The security suite asserts against CODE; the explanatory comments in
 /// these files legitimately name the very things being searched for.

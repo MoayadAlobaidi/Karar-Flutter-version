@@ -116,6 +116,33 @@ Inherited from legacy findings MOB-03, MOB-04, MOB-06, MOB-07:
 
 **Certificate pinning is deliberately not in v1** (challenge C11, retained from Plan v1). The legacy has none either. This is a recorded acceptance with a named owner, not an oversight — it belongs in the risk-acceptance register.
 
+### Android permissions: what Karar declares, and what the device actually sees
+
+These are two different sets, and conflating them understates what the installed application asks for. [`AndroidManifest.xml`](../../apps/mobile/android/app/src/main/AndroidManifest.xml) declares **one** permission. The merged manifest inside a built artifact carries **four** — the manifest merger adds the rest from dependencies, so they cannot be removed by editing that file.
+
+Verified by dumping the merged manifest out of a built APK (`aapt2 dump xmltree --file AndroidManifest.xml`) and cross-read against the merge blame report:
+
+| Permission | Contributed by | Protection level | Why it is there |
+|---|---|---|---|
+| `android.permission.INTERNET` | Karar's own manifest | `normal` | The client exists to talk to the API. The Flutter template declares it only in the debug and profile source sets, which would leave a release build with no network access |
+| `android.permission.USE_BIOMETRIC` | `local_auth_android` plugin module, and independently `androidx.biometric:biometric:1.1.0` | `normal` | The platform authenticator behind the application lock |
+| `android.permission.USE_FINGERPRINT` | `androidx.biometric:biometric:1.1.0` | `normal` | Predecessor of `USE_BIOMETRIC`, deprecated at API 28 and carried for compatibility below it. minSdk is 24, so it covers a range that ships |
+| `com.kararfinance.app[.<env suffix>].DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | `androidx.core:core:1.18.0`, which contributes both the `<permission>` and the `<uses-permission>` | `signature` | Defined **by this application**, not by the platform. Restricts androidx's runtime-registered receivers to code signed with the same key. Grants no platform capability; its name carries the environment's applicationId suffix |
+
+`normal` means granted at install with no runtime prompt — no user-facing consent step exists for any of them, which is precisely why the review has to happen in the repository instead.
+
+**Nothing else is requested**, by Karar or by any dependency: no location, contacts, storage, camera, phone state, or advertising identifier.
+
+The **control** is not this table. It is the merged-manifest assertion in [`platform_hardening_test.dart`](../../apps/mobile/test/security/platform_hardening_test.dart), which reads a real build output and compares the platform-permission set **exactly**, so a dependency that starts contributing a new one fails the build rather than reaching a device unreviewed. A subset check would pass silently when a permission disappeared; an exact match makes both directions a finding. The application-defined permission is matched by shape rather than literal, because its name varies with the environment suffix.
+
+### Android backup and data extraction
+
+`android:allowBackup="false"` is the primary control and the one a reviewer or scanner looks for, but it is **not sufficient on its own**. Android documents that for an application running on and targeting API 31 or higher, `allowBackup="false"` disables cloud backup but does **not** disable device-to-device transfer; and that a backup mode whose section is missing from the rules resource is *fully enabled for all content*, not off. This build targets API 36, so both statements apply to what ships.
+
+Session tokens live in Keystore-backed encrypted preferences, in the `sharedpref` domain. The wrapping key does not leave the Keystore, so a transferred copy would be ciphertext rather than usable credentials — but "the copy that left the device is useless" is a weaker claim than "no copy left the device", and only the second is a control.
+
+All three attributes are therefore set: `allowBackup="false"` (all API levels), `fullBackupContent="false"` (the API 23–30 opt-out, redundant behind `allowBackup` and stated anyway), and `dataExtractionRules` pointing at [`data_extraction_rules.xml`](../../apps/mobile/android/app/src/main/res/xml/data_extraction_rules.xml), which declares every extraction mode and excludes every documented domain from each. The rules resource, its packaging into the APK, and the exclusion of all nine domains are asserted in the platform-hardening suite.
+
 ## 8. Generated SDK, never hand-written
 
 OpenAPI-first (ADR-0009). The Dart client is generated from `packages/api-contracts` and committed. Hand-editing it is a CI failure.
@@ -151,3 +178,38 @@ A flavor supplies: app name, bundle identifier, icons, splash, **design tokens**
 | Format a number produced by a model | The model produces no numbers |
 | Hold environment credentials | Control plane mediates (ADR-0021) |
 | Show a figure it cannot attribute to a platform response | Empty state instead |
+
+## 12. Client dependency governance
+
+The registry-level vendor relationship (pub.dev, consumption only) is recorded in the [vendor and subprocessor register](../compliance/vendor-and-subprocessor-register.md); the pinning control itself is KAR-CTL-028 in the [control matrix](../compliance/control-matrix.md), owned by the Engineering Owner. Neither is a record of an *individual* client dependency, and the ones that carry credential material or contribute to the shipped manifest need one. This section is that record.
+
+### The pinning rule
+
+**Every direct dependency of [`apps/mobile/pubspec.yaml`](../../apps/mobile/pubspec.yaml) — main and dev, SDK packages excepted — carries an exact version. No caret, no range.** `pubspec.lock` is committed alongside it.
+
+A range would not be a weaker version of the rule, it would be its absence: a republished upstream could change what builds without changing what was reviewed. Pinning a direct dependency does **not** pin its federated implementations or its transitive closure — those resolve on their own constraints and the lockfile is what records them. That is the lockfile's job, and it is not a reason to leave a direct dependency ranged. If a dependency is ever found where an exact pin is technically untenable, the range is stated next to it in the pubspec with the constraint that forces it. There is no such dependency today.
+
+**Known gap, stated rather than implied.** `flutter pub get --enforce-lockfile` is what turns the lockfile from a record into an enforced boundary: it fails on any resolution that would deviate, transitive dependencies included. It resolves clean against the committed lockfile. **CI does not use it** — the mobile jobs run plain `flutter pub get` — so today the exact pins hold the direct set still while the transitive closure is recorded but not enforced on the build machine. Closing that is a CI change, not a pubspec one.
+
+### Dependencies with their own record
+
+| Dependency | Owner | Review trigger | Why it is tracked here |
+|---|---|---|---|
+| `flutter_secure_storage` 11.0.0 | Security Owner | Any version change; any move in its `minCompileSdk` floor; a pub.dev retraction or publisher change; an SCA finding; each phase gate while it remains | The only place session tokens are written. See the provenance and `compileSdk` note below |
+| `local_auth` 3.0.2 | Security Owner | Any version change; any change to the permissions its platform implementations contribute to the merged manifest; an SCA finding; each phase gate while it remains | Decides whether the application lock opens, and its Android implementation contributes two permissions to the shipped artifact (§7) |
+
+#### `flutter_secure_storage` 11.0.0 — provenance
+
+Checked against public pub.dev at Phase 4: it is the current stable release, published 2026-08-06, not retracted, and its archive `sha256` matches the committed lockfile exactly (`15e8c8fe…debace6`; the same digest is recorded by the local pub cache for the archive actually downloaded). A frozen resolution from a **clean** pub cache — `PUB_CACHE` pointed at an empty directory, `flutter pub get --enforce-lockfile` — succeeded, so the pin resolves from the registry rather than from a warm local cache.
+
+#### Why the Android build compiles against SDK 37
+
+This is a requirement of that one dependency, not a general upgrade, and the evidence is in the build rather than in anyone's recollection:
+
+- `flutter_secure_storage` 11.0.0 declares `compileSdk = 37` for its own Android library module (`android/build.gradle` in the published package).
+- The Android Gradle Plugin propagates that as a floor for consumers: it writes `minCompileSdk=37` into the module's AAR metadata (`build/flutter_secure_storage/intermediates/aar_metadata/…/aar-metadata.properties` in a real build) and refuses to build a consuming module whose `compileSdk` is lower.
+- Every other plugin module in this build declares a floor of 36 or less (`local_auth_android`, `shared_preferences_android`, `flutter_plugin_android_lifecycle` at 36; the JNI modules at 35). **37 is this dependency's floor and nothing else's.**
+
+The consequence is recorded where it bites: `android/app/build.gradle.kts` pins `compileSdk = 37` rather than taking `flutter.compileSdkVersion`, and `android/gradle.properties` acknowledges AGP's "maximum recommended compile SDK is 36" warning instead of silencing it by downgrading the plugin that holds session tokens. `targetSdk` is untouched, so no new runtime behaviour is opted into, and `minSdk` stays at 24.
+
+**Review trigger for the pin itself:** it is removed when `flutter_secure_storage`'s floor drops to the Flutter default, or when the Flutter default reaches 37 — whichever comes first. Until then it is a dependency-driven constraint, not a preference.

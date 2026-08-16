@@ -10,9 +10,29 @@ version: 1.0.0+1
 environment:
   sdk: ^3.13.0
 
-# Direct dependencies are pinned to exact versions. A fintech client must build
-# byte-identically from a clean checkout; pubspec.lock records the transitive
-# closure and is committed alongside this file.
+# EVERY direct dependency — main and dev, SDK packages excepted — carries an
+# exact version, with no caret and no range. A fintech client must build
+# identically from a clean checkout; pubspec.lock records the transitive closure
+# and is committed alongside this file.
+#
+# A range here would not be a smaller version of that rule, it would be the
+# absence of it: a range lets a republished upstream change what builds without
+# changing what is reviewed. If a dependency is ever found where an exact pin is
+# technically untenable, the range is stated NEXT TO IT with the constraint that
+# forces it — never left to be inferred. There is no such dependency today.
+#
+# Pinning a direct dependency does not pin its federated implementations or its
+# transitive closure; those resolve on their own constraints and pubspec.lock is
+# what records them. That is the lockfile's job, not this file's, and it is not
+# a reason to leave a direct dependency ranged.
+#
+# `flutter pub get --enforce-lockfile` is the check that turns the lockfile into
+# an enforced boundary rather than a record — it fails on any resolution that
+# would deviate, transitive included. It resolves clean here. CI currently runs
+# plain `flutter pub get`, so today the exact pins above are what hold the
+# direct set still; the transitive closure is recorded but not enforced on the
+# build machine. Stated rather than implied, because the difference is the whole
+# strength of the control.
 dependencies:
   flutter:
     sdk: flutter
@@ -22,9 +42,11 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  # Version is dictated by flutter_localizations; `any` lets the SDK pin it and
-  # pubspec.lock records the resolved version.
-  intl: any
+  # The version flutter_localizations requires (it declares `intl: ^0.20.3`),
+  # written out rather than left to `any`. The SDK constraint still governs
+  # which versions are admissible; this states which one actually ships, so a
+  # Flutter SDK upgrade that moves it is a visible diff here.
+  intl: 0.20.3
 
   cupertino_icons: 1.0.8
 
@@ -51,14 +73,17 @@ dependencies:
   # The platform authenticator behind the application lock. The device
   # compares and answers yes or no: no template, image or derived
   # representation is received, stored or transmitted, and no key ceremony of
-  # this client's own design wraps it. Ranged rather than pinned because the
-  # federated platform implementations (local_auth_android / local_auth_darwin)
-  # resolve independently; pubspec.lock records the closure actually built.
-  local_auth: ^3.0.2
+  # this client's own design wraps it. Exact-pinned like everything else, and
+  # deliberately so for this one: it is the dependency that decides whether the
+  # lock opens, and it contributes permissions to the shipped manifest
+  # (see android/app/src/main/AndroidManifest.xml and the merged-manifest
+  # allow-list in test/security/platform_hardening_test.dart).
+  local_auth: 3.0.2
 
   # Annotations usable from pure-Dart domain code (@immutable) without
-  # dragging in the Flutter framework.
-  meta: ^1.19.0
+  # dragging in the Flutter framework. The Flutter SDK constrains this to
+  # ^1.18.3; 1.19.0 is the version inside that constraint which ships.
+  meta: 1.19.0
 
 dev_dependencies:
   flutter_test:
@@ -66,9 +91,11 @@ dev_dependencies:
 
   flutter_lints: 6.0.0
 
-  # Used only by tool/generate_api_client.dart.
+  # Used only by tool/generate_api_client.dart. Dev dependencies are pinned on
+  # the same rule as main ones: a generator that changes without a reviewed diff
+  # changes committed output.
   yaml: 3.1.3
-  path: ^1.9.0
+  path: 1.9.1
 
 flutter:
   uses-material-design: true

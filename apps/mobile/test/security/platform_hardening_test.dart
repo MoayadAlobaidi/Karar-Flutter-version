@@ -19,6 +19,8 @@ const String _releaseNetworkConfig =
     'android/app/src/main/res/xml/network_security_config.xml';
 const String _debugNetworkConfig =
     'android/app/src/debug/res/xml/network_security_config.xml';
+const String _dataExtractionRules =
+    'android/app/src/main/res/xml/data_extraction_rules.xml';
 const String _appGradle = 'android/app/build.gradle.kts';
 const String _infoPlist = 'ios/Runner/Info.plist';
 
@@ -30,8 +32,34 @@ const List<String> _permittedCleartextHosts = <String>[
   '10.0.2.2',
 ];
 
-String _declarations(String relativePath) =>
-    collapseXmlWhitespace(stripXmlComments(readRequiredFile(relativePath)));
+/// Every domain Android's backup rules can name. Each declared extraction mode
+/// must exclude all of them, so "excluded" cannot come to mean "excluded except
+/// the one domain nobody listed".
+const List<String> _backupDomains = <String>[
+  'root',
+  'file',
+  'database',
+  'sharedpref',
+  'external',
+  'device_root',
+  'device_file',
+  'device_database',
+  'device_sharedpref',
+];
+
+/// Every extraction mode the rules resource must declare. A mode with no
+/// section is not off — Android documents a missing section as fully enabled
+/// for all content — so the absence of one of these is the defect being
+/// guarded against.
+const List<String> _dataExtractionModes = <String>[
+  'cloud-backup',
+  'device-transfer',
+  'cross-platform-transfer',
+];
+
+/// Alias for the shared reader, so the assertions below read as they did when
+/// this helper was declared here.
+String _declarations(String relativePath) => declarations(relativePath);
 
 void main() {
   group('Android release network policy', () {
@@ -105,6 +133,54 @@ void main() {
       expect(manifest, contains('android:allowBackup="false"'));
     });
 
+    test('a data-extraction rules resource is declared, because allowBackup does not '
+        'cover device transfer', () {
+      // Android's documented limit: for an application running on and targeting
+      // API 31 or higher, allowBackup="false" disables cloud backup but does
+      // NOT disable device-to-device transfer. targetSdk is the Flutter default
+      // (36 with this SDK), so the gap applies to what ships. The rules
+      // resource is what closes it, and a missing resource is documented to
+      // leave the transfer modes fully enabled rather than off.
+      expect(
+        manifest,
+        contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
+      );
+      expect(manifest, contains('android:fullBackupContent="false"'));
+    });
+
+    test('every extraction mode is declared and excludes every domain', () {
+      final rules = _declarations(_dataExtractionRules);
+
+      for (final mode in _dataExtractionModes) {
+        expect(
+          rules,
+          contains('<$mode>'),
+          reason: 'an undeclared <$mode> section is fully enabled for all content, '
+              'not off',
+        );
+
+        final section = RegExp('<$mode>(.*?)</$mode>', dotAll: true)
+            .firstMatch(rules)
+            ?.group(1);
+        expect(section, isNotNull);
+        for (final domain in _backupDomains) {
+          expect(
+            section,
+            contains('<exclude domain="$domain" />'),
+            reason: '$mode does not exclude the $domain domain. Session tokens live '
+                'in sharedpref, and a domain left unnamed is a domain left in',
+          );
+        }
+      }
+
+      expect(
+        rules,
+        isNot(contains('<include')),
+        reason: 'an include element would re-admit content to a mode this file exists '
+            'to empty',
+      );
+    });
+
     test('INTERNET is declared, and the app itself requests nothing else', () {
       expect(
         manifest,
@@ -124,19 +200,39 @@ void main() {
       );
     });
 
-    test('the permissions a dependency contributes are known and accounted for', () {
-      // This file declares one permission, but the SHIPPED artifact declares
-      // three: the manifest merger adds USE_BIOMETRIC and USE_FINGERPRINT from
-      // androidx.biometric, which local_auth_android depends on. Asserting only
-      // on this file would let the suite pass while the installed app requests
-      // permissions nobody reviewed, so the merged set is the property under
-      // test and this list is the review record.
+    test('the platform permissions of a real build are exactly the reviewed set', () {
+      // THIS IS THE AUTHORITATIVE PERMISSION CONTROL. The source manifest
+      // declares one permission; the artifact a device installs declares four.
+      // The manifest merger, not this repository's source, decides that — so
+      // the merged output is the property under test, and the sets below are
+      // the review record for what it is allowed to contain.
       //
-      // Both are `normal` protection level: granted at install, no runtime
-      // prompt, no privacy disclosure obligation beyond naming them here.
-      // USE_FINGERPRINT is the pre-API-28 predecessor of USE_BIOMETRIC and is
-      // contributed for backwards compatibility; minSdk is 24, so it applies.
-      const Set<String> reviewedContributedPermissions = <String>{
+      // Provenance and protection level of each platform permission, verified
+      // against the merge blame report of a real build:
+      //
+      //   INTERNET        `normal`  — declared by this project's own manifest.
+      //   USE_BIOMETRIC   `normal`  — contributed by the local_auth_android
+      //                               plugin module, and independently by
+      //                               androidx.biometric 1.1.0.
+      //   USE_FINGERPRINT `normal`  — contributed by androidx.biometric 1.1.0.
+      //                               The predecessor of USE_BIOMETRIC,
+      //                               deprecated at API 28 and carried for
+      //                               compatibility below it; minSdk is 24, so
+      //                               it covers a range that ships.
+      //
+      // `normal` means granted at install with no runtime prompt, so none of
+      // these produces a user-facing consent step — which is exactly why the
+      // review has to happen here instead.
+      //
+      // The comparison is EXACT, not a subset check. A subset check passes when
+      // a permission disappears, which would let a dependency swap go unnoticed
+      // in the direction that changes behaviour silently; and it invites the
+      // allow-list to be padded with permissions that are not actually present.
+      // Either half of a mismatch is a finding: a new entry means a dependency
+      // started asking for something nobody reviewed, and a missing entry means
+      // this record has gone stale.
+      const Set<String> expectedPlatformPermissions = <String>{
+        'android.permission.INTERNET',
         'android.permission.USE_BIOMETRIC',
         'android.permission.USE_FINGERPRINT',
       };
@@ -149,15 +245,46 @@ void main() {
         return;
       }
       expect(
-        merged.difference(<String>{
-          'android.permission.INTERNET',
-          ...reviewedContributedPermissions,
-        }),
-        isEmpty,
-        reason: 'a dependency contributed a permission that has not been '
-            'reviewed. Add it to this list deliberately, with the reason, or '
-            'remove the dependency that brings it in.',
+        merged.platform,
+        expectedPlatformPermissions,
+        reason: 'the permission set of a built artifact no longer matches the '
+            'reviewed record. Adding an entry is a deliberate act with a stated '
+            'reason, or the dependency that brings it in goes.',
       );
+    });
+
+    test('the only non-platform permission is the signature-level one androidx '
+        'defines for this application', () {
+      // The fourth permission in the merged manifest is not a platform
+      // capability at all: androidx.core contributes both a <permission>
+      // declaration and its matching <uses-permission> for
+      // DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION, at protection level
+      // `signature`, so receivers androidx registers at runtime are reachable
+      // only by code signed with the same key.
+      //
+      // It is matched by shape rather than by literal because its name carries
+      // the applicationId, which changes with the environment suffix — the
+      // release artifact and the local one do not spell it the same way. The
+      // shape is still narrow: any OTHER custom permission a dependency starts
+      // contributing fails here.
+      final merged = _mergedManifestPermissions();
+      if (merged == null) {
+        markTestSkipped('no merged manifest present — run `flutter build apk --debug` first');
+        return;
+      }
+
+      final expected = RegExp(
+        r'^com\.kararfinance\.app(\.[a-z]+)?\.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION$',
+      );
+      for (final permission in merged.other) {
+        expect(
+          expected.hasMatch(permission),
+          isTrue,
+          reason: '$permission is a custom permission no review covers. It reached a '
+              'built artifact from a dependency, so the decision is which '
+              'dependency goes, not which line here changes.',
+        );
+      }
     });
   });
 
@@ -286,17 +413,20 @@ void main() {
       plist = _declarations(_infoPlist);
     });
 
-    test('arbitrary loads are disabled', () {
-      expect(
-        plist,
-        contains('<key>NSAllowsArbitraryLoads</key> <false/>'),
-        reason: 'stated rather than omitted, so turning it on is a visible edit to an '
-            'explicit decision',
-      );
-    });
-
-    test('no blanket ATS relaxation key is present', () {
+    // The Android equivalents above are asserted against a release source set
+    // that a debug build replaces, so "the exception is not in the release
+    // artifact" is a property of this repository. iOS has no source sets: it
+    // builds ONE Info.plist for every configuration, so the same property
+    // cannot be established here at all. It is established in the packaged
+    // artifact instead — see ios_packaged_bundle_test.dart, which reads the
+    // plist inside the built `.app`. What is asserted HERE is the one thing
+    // this file can see: that the shared plist declares no exception for the
+    // build to inherit.
+    test('the shared plist declares no transport security of any kind', () {
       for (final key in <String>[
+        'NSAppTransportSecurity',
+        'NSExceptionDomains',
+        'NSAllowsArbitraryLoads',
         'NSAllowsArbitraryLoadsInWebContent',
         'NSAllowsArbitraryLoadsForMedia',
         'NSAllowsLocalNetworking',
@@ -304,34 +434,38 @@ void main() {
         expect(
           plist,
           isNot(contains(key)),
-          reason: '$key relaxes ATS for a whole class of traffic rather than one host',
+          reason: 'anything declared in this file is in EVERY iOS artifact, '
+              'including DEV, STAGING and PRODUCTION. $key must not be one of '
+              'them; a deployed build relies on the platform transport policy.',
         );
       }
     });
 
-    test('the only exception domain is loopback', () {
-      final exceptionBlock =
-          RegExp(r'<key>NSExceptionDomains</key> <dict>(.*?)</dict> </dict>')
-              .firstMatch(plist)
-              ?.group(1);
+    test('the local-development exception is a fragment, scoped by a build phase', () {
+      final fragment = _declarations('ios/Runner/ATSLocalDevelopment.plist');
       expect(
-        exceptionBlock,
-        isNotNull,
-        reason: 'the local-development exception must be declared explicitly',
-      );
-
-      final domains = RegExp(r'<key>([^<]+)</key>')
-          .allMatches(exceptionBlock!)
-          .map((RegExpMatch match) => match.group(1)!)
-          .where((String key) => !key.startsWith('NS'))
-          .toList(growable: false);
-
-      expect(
-        domains,
-        <String>['localhost'],
+        fragment,
+        contains('<key>localhost</key>'),
         reason: 'ATS applies to loopback, so the LOCAL profile needs this one '
             'exception. No routable host may be added.',
       );
+      expect(
+        fragment,
+        contains('<key>NSAllowsArbitraryLoads</key> <false/>'),
+        reason: 'stated rather than omitted, so turning it on is a visible edit to an '
+            'explicit decision',
+      );
+      for (final key in <String>[
+        'NSAllowsArbitraryLoadsInWebContent',
+        'NSAllowsArbitraryLoadsForMedia',
+        'NSAllowsLocalNetworking',
+      ]) {
+        expect(
+          fragment,
+          isNot(contains(key)),
+          reason: '$key relaxes ATS for a whole class of traffic rather than one host',
+        );
+      }
     });
 
     test('the bundle identifier is the owned reverse-domain identifier', () {
@@ -425,10 +559,30 @@ void main() {
   });
 }
 
-/// The permission set of the merged manifest an actual build produces, or null
+/// The permissions a merged manifest requests, split by who defines them.
+///
+/// The split matters because the two halves are checked differently: platform
+/// permissions have fixed names and are matched exactly, while an
+/// application-defined one carries the applicationId and therefore varies with
+/// the environment suffix.
+final class _MergedPermissions {
+  const _MergedPermissions(this.platform, this.other);
+
+  /// `android.permission.*` — capabilities the operating system grants.
+  final Set<String> platform;
+
+  /// Everything else: permissions an application or a library defines itself.
+  final Set<String> other;
+}
+
+/// The permissions of the merged manifest an actual build produces, or null
 /// when no build output is present. The merger — not this repository's source —
 /// decides what the installed application requests.
-Set<String>? _mergedManifestPermissions() {
+///
+/// Every merged manifest under the build directory is read and the results
+/// unioned, so a permission present in one variant and not another is still
+/// caught.
+_MergedPermissions? _mergedManifestPermissions() {
   final Directory intermediates =
       Directory('android/app/build/intermediates/merged_manifest');
   final Directory fallback = Directory('build/app/intermediates/merged_manifest');
@@ -441,13 +595,20 @@ Set<String>? _mergedManifestPermissions() {
       .where((File file) => file.path.endsWith('AndroidManifest.xml'));
   if (manifests.isEmpty) return null;
 
-  final Set<String> declared = <String>{};
+  final Set<String> platform = <String>{};
+  final Set<String> other = <String>{};
   for (final File manifest in manifests) {
-    declared.addAll(
-      RegExp(r'<uses-permission[^>]*android:name="(android\.permission\.[^"]+)"')
-          .allMatches(manifest.readAsStringSync())
-          .map((RegExpMatch match) => match.group(1)!),
-    );
+    // Comments are stripped first, on the same rule as every other assertion in
+    // this file: the merger copies the source manifest's prose into its output,
+    // and that prose names permissions.
+    final String declarations = stripXmlComments(manifest.readAsStringSync());
+    for (final RegExpMatch match
+        in RegExp(r'<uses-permission[^>]*android:name="([^"]+)"')
+            .allMatches(declarations)) {
+      final String name = match.group(1)!;
+      (name.startsWith('android.permission.') ? platform : other).add(name);
+    }
   }
-  return declared;
+  if (platform.isEmpty && other.isEmpty) return null;
+  return _MergedPermissions(platform, other);
 }

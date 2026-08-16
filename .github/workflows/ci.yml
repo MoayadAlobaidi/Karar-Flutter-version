@@ -162,7 +162,7 @@ jobs:
           cache: true
 
       - name: Resolve packages
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         run: flutter analyze
@@ -234,7 +234,7 @@ jobs:
           cache: true
 
       - name: Resolve packages
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       # LOCAL is the profile whose configuration needs no secrets and no
       # reachable host. The Gradle property and the dart-define must agree;
@@ -368,7 +368,7 @@ jobs:
           cache: true
 
       - name: Resolve packages
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build for the simulator (no code signing)
         run: |

@@ -17,27 +17,94 @@
         for, and because leaving it unset would make its absence ambiguous
         rather than deliberate.
 
-    android:allowBackup / android:fullBackupContent
-        Android auto-backup would copy application data into the user's cloud
-        backup. flutter_secure_storage keeps session tokens in Keystore-backed
-        encrypted preferences; backing that up moves credential material out of
-        the device's protected storage and makes it restorable onto a different
-        device. Backup is therefore off. Nothing is lost: this client holds no
-        local state worth preserving — everything authoritative is server-side.
+    android:allowBackup / android:fullBackupContent / android:dataExtractionRules
+        Android's backup framework would copy application data off the device.
+        flutter_secure_storage keeps session tokens in Keystore-backed encrypted
+        preferences; moving that anywhere takes credential material out of the
+        device's protected storage. Every path is therefore closed, and it takes
+        all three attributes to close them, because none of them covers the
+        whole surface:
+
+          allowBackup="false" is the primary control and the one a reviewer or
+          scanner looks for. It stops cloud backup and restore on every API
+          level this application supports.
+
+          fullBackupContent="false" opts out of file-based Auto Backup for
+          API 23-30. Redundant behind allowBackup on those levels, and stated
+          anyway so the opt-out is a decision on the page rather than a
+          consequence to be worked out.
+
+          dataExtractionRules covers what allowBackup does not. Android
+          documents that for apps running on and targeting API 31 or higher,
+          allowBackup="false" disables cloud backup but does not disable
+          device-to-device transfer. targetSdk is 36, so that gap is live here,
+          and a missing rules resource is documented to leave the transfer modes
+          fully enabled rather than off. res/xml/data_extraction_rules.xml
+          declares every mode and excludes every domain from each; its header
+          carries the reasoning and the citations.
+
+        Nothing is lost by any of this: this client holds no local state worth
+        preserving — everything authoritative is server-side.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
-      INTERNET is the ONLY permission this application requests.
+      WHAT KARAR DECLARES AND WHAT THE USER'S DEVICE SEES ARE NOT THE SAME SET.
+      This file declares ONE permission. The merged manifest inside the
+      installed artifact carries FOUR. The two must be stated separately: an
+      earlier version of this comment ran them together and thereby understated
+      what the installed application asks for.
 
-      The Flutter template declares it in the debug and profile source sets
-      only, which means a release build assembled from that template has no
-      network access whatsoever. This client exists to talk to an API, so the
-      permission belongs here, in the manifest that actually ships.
+      DECLARED HERE — 1:
 
-      Nothing else is requested: no location, contacts, storage, camera, phone
-      state, or advertising identifier. A permission that is never declared
-      cannot be abused, and each of those would create a privacy disclosure
-      obligation the product has no need to take on.
+        android.permission.INTERNET
+          Protection level `normal`: granted at install, no runtime prompt, no
+          user-visible consent step. The Flutter template declares it in the
+          debug and profile source sets only, which would leave a release build
+          with no network access whatsoever. This client exists to talk to an
+          API, so the permission belongs here, in the manifest that ships.
+
+      ADDED BY THE MANIFEST MERGER FROM DEPENDENCIES — 3. These are not
+      editable from this file. Removing one means removing or replacing the
+      dependency that contributes it:
+
+        android.permission.USE_BIOMETRIC
+          Protection level `normal`. Contributed by the local_auth_android
+          plugin module, and independently by androidx.biometric 1.1.0 which it
+          depends on. This is the permission behind the application lock.
+
+        The deprecated pre-API-28 predecessor of USE_BIOMETRIC
+          Protection level `normal`. Contributed by androidx.biometric 1.1.0
+          for backwards compatibility with the API 23-27 authentication API.
+          minSdk is 24, so the range it exists for is a range this application
+          ships to. Its literal name must NOT be written anywhere under android/
+          or ios/: the telemetry marker scan in the security suite treats that
+          token as a device-tracking SDK marker throughout those trees, and the
+          scan is not relaxed to accommodate a comment. The exact string belongs
+          in two places instead — the merged-manifest allow-list in
+          test/security/platform_hardening_test.dart, which is the assertion,
+          and docs/architecture/flutter.md, which is the review record.
+
+        com.kararfinance.app[.<environment suffix>].DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+          Protection level `signature`, and defined BY this application rather
+          than by the platform — androidx.core 1.18.0 contributes both the
+          <permission> declaration and the matching <uses-permission>. It exists
+          so that receivers androidx registers at runtime are reachable only by
+          code signed with the same key. It grants no platform capability, is
+          not a device capability the user can be asked about, and its name
+          carries the applicationId suffix of whichever environment was built.
+
+      NOTHING ELSE IS REQUESTED, by this file or by any dependency: no location,
+      contacts, storage, camera, phone state, or advertising identifier. A
+      permission that is never declared cannot be abused, and each of those
+      would create a privacy disclosure obligation the product has no need to
+      take on.
+
+      THIS COMMENT IS NOT THE CONTROL. Prose drifts from artifacts; that is how
+      the earlier claim survived. The control is the merged-manifest assertion
+      in test/security/platform_hardening_test.dart, which reads a real build
+      output and matches the permission set exactly, so a dependency that starts
+      contributing a fourth platform permission fails the build instead of
+      reaching a device unreviewed.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
@@ -48,7 +115,8 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="false"
         android:allowBackup="false"
-        android:fullBackupContent="false">
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"

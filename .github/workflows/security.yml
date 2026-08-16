@@ -318,7 +318,7 @@ jobs:
 
       - name: Resolve packages
         working-directory: apps/mobile
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Dart dependency report (report-only)
         working-directory: apps/mobile

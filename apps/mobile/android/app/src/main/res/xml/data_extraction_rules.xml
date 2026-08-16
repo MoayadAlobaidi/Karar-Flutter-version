@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NOTHING LEAVES THE DEVICE THROUGH THE BACKUP FRAMEWORK.
+
+  This file exists because android:allowBackup="false" is not sufficient on its
+  own. Android's own documentation states the limit: for apps running on and
+  targeting Android 12 (API 31) or higher, allowBackup="false" disables
+  cloud backup but "doesn't disable device-to-device transfers for the app".
+  This build targets API 36, so it is squarely inside that range — the manifest
+  attribute closes the cloud path and leaves the transfer path open.
+
+  What the transfer path would carry is the reason this matters:
+  flutter_secure_storage keeps session tokens in Keystore-backed encrypted
+  preferences, which live in the `sharedpref` domain. The wrapping key is held
+  in the Android Keystore and does not itself transfer, so what would move is
+  ciphertext rather than usable credentials — but "the copy that left the device
+  is useless" is a weaker statement than "no copy left the device", and only the
+  second one is a control.
+
+  The default is the wrong way round for this application. Per the same
+  documentation, a missing section is not a neutral state: "If there are no
+  rules for a particular backup mode, such as if the <device-transfer> section
+  is missing, that mode is fully enabled for all content". Every mode is
+  therefore declared, and every declared mode excludes every domain.
+
+  Every domain in the documented set is listed explicitly rather than relying on
+  `root` to imply the rest. `root` and `device_root` cover the internal storage
+  roots; `external` is outside them; and the device-protected (Direct Boot)
+  domains are a separate tree from the credential-protected ones. Listing all
+  nine costs nothing and removes the question of which one subsumes which.
+
+  <cross-platform-transfer> is declared for the same reason, and is safe to
+  declare on older platforms: the framework's rules parser scans for the one
+  section it is looking for and steps over every tag that is not it, so a
+  section a given release does not recognise is skipped rather than rejected.
+  That property is what makes the section additive at all — it ships in the same
+  file to devices whose parsers predate it.
+
+  Auto Backup's own always-excluded set (the no-backup and cache directories) is
+  unaffected by any of this; it is excluded by the platform regardless.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </device-transfer>
+    <cross-platform-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cross-platform-transfer>
+</data-extraction-rules>
