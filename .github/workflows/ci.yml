@@ -76,11 +76,19 @@ jobs:
         env:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
-          # Enables the readiness-integration suite (stops/starts the compose
-          # postgres container) so EV-216's evidence is collected in CI, not
-          # only on a maintainer laptop.
-          KARAR_INTEGRATION: '1'
         run: pnpm test
+
+      # The readiness suite STOPS AND RESTARTS the compose postgres container
+      # to prove recovery (EV-216). It must own the container alone: run
+      # concurrently with the other 80+ database suites it kills their
+      # connections mid-test (observed on the Phase 3 PR), so it runs as its
+      # own step after the main suite, gated by KARAR_INTEGRATION as before.
+      - name: Readiness recovery suite (restarts postgres)
+        env:
+          KARAR_ENV: local
+          POSTGRES_PORT: '5432'
+          KARAR_INTEGRATION: '1'
+        run: pnpm --filter @karar/api exec vitest run src/readiness.integration.test.ts
 
       - name: Stop local PostgreSQL
         if: always()

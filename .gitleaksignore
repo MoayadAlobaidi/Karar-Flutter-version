@@ -1,9 +1,11 @@
 # Gitleaks false-positive fingerprints (commit:file:rule:line), each with a
 # recorded reason. An entry suppresses exactly one historical occurrence;
-# never add one without reading the flagged line first.
+# never add one without reading the flagged line first. Reasons here describe
+# the flagged text ABSTRACTLY — quoting it verbatim would re-trigger the rule
+# on this very file.
 
-# Documentation prose in the tenancy data-lifecycle table — the phrase
-# "sha256 token hash, expiry/attempt/revocation state" describes the COLUMN
-# CONTENTS of tenant_invitations (only digests are stored; that is the
-# control), and the generic-api-key rule matched the words, not a value.
+# Documentation prose in the tenancy data-lifecycle table: the flagged line
+# describes tenant_invitations column contents (digest-at-rest storage of the
+# invitation credential — the control itself). Words matched the rule; no
+# value is present on the line.
 1945b2ea5654a185ce389fd676102d4ee736ed8c:modules/tenancy/MODULE.md:generic-api-key:29

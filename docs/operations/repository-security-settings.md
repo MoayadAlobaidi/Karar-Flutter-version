@@ -114,6 +114,21 @@ visible as step annotations and the JSON report is uploaded as the
   every remaining finding has a documented exception in the evidence register.
 - Owner: Engineering Owner. Review no later than Phase 2 kickoff.
 
+## Code-scanning dismissal record — CodeQL alert 1 (2026-08-16)
+
+CodeQL flagged `js/insufficient-password-hash` (high) on the rate-limit key
+digester (`packages/platform/src/ratelimit/keys.ts`), tracing the refresh
+flow's `idKey(tokenHash)` call. Dismissed as a false positive with this
+rationale: the digested value is the SHA-256 of a 256-bit random refresh
+token — not a human-chosen password — and the HMAC-SHA256-under-pepper
+digest is a pseudonymized rate-limit bucket key, not a verification hash.
+Key-stretching defends low-entropy secrets against brute force; it adds
+nothing against a 256-bit random and would break constant-key lookups.
+Passwords themselves are hashed with argon2id with parameter versioning
+(`modules/identity`, KAR-CTL-066). Dismissals are per-alert, reasoned, and
+reversible in the code-scanning UI; never dismiss without a written
+rationale here.
+
 ## Dependency-management note — @types/node majors (2026-08-16)
 
 Dependabot PR #3 (`@types/node` 25 → 26) was closed without merging: the types
