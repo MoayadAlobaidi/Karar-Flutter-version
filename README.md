@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **3.5 — COMPLETE** ([phase report](docs/phases/phase-03-5.md)); Phase 4 not started |
-| Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
+| Current phase | **4 — in progress** ([phase report](docs/phases/phase-04.md)) |
+| Last completed phase | 3.5 (jurisdiction and capability foundation, [report](docs/phases/phase-03-5.md)) |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, and the jurisdiction and capability foundation — **no consumer product capability is implemented or reachable** |
 | Cloud | None provisioned; local development is cloud-free |

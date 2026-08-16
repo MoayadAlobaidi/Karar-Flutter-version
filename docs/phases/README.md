@@ -35,5 +35,6 @@ The two gates are deliberately separate documents with separate owners: engineer
 | [`phase-02.md`](phase-02.md) | 2 — Platform and data foundation: PostgreSQL, kernel, audit, events/outbox/jobs, observability |
 | [`phase-03.md`](phase-03.md) | 3 — Identity, tenancy and access control: authentication, sessions, users, tenancy, RLS, RBAC, consent, kill switches |
 | [`phase-03-5.md`](phase-03-5.md) | 3.5 — Jurisdiction and capability foundation: Country/Jurisdiction, PolicyPacks, availability, entitlements, tenant binding, bootstrap |
+| [`phase-04.md`](phase-04.md) | 4 — Flutter and mobile security foundation: app architecture, authentication and session UX, tenant selection, capability-aware navigation, Arabic RTL, accessibility, mobile security |
 
 Phases 0 and 0.5 predate this template; their records are [`../phase-0-completion.md`](../phase-0-completion.md) and [`../phase-05-consolidation.md`](../phase-05-consolidation.md).
