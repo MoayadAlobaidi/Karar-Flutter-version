@@ -1,0 +1,103 @@
+// The forgot-password screen.
+//
+// ENUMERATION RESISTANCE: the acknowledgement is one sentence for existing,
+// unknown, disabled and cooling-down addresses alike. `ForgotPasswordViewState`
+// has a single acknowledged branch carrying `NeutralReceipt`, which holds
+// nothing, so there is no second rendering to accidentally introduce.
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../shared/shared.dart';
+import '../../authentication/presentation/localization/identity_failure_messages.dart';
+import '../../authentication/presentation/localization/identity_strings.dart';
+import '../../authentication/presentation/routes/identity_routes.dart';
+import '../../authentication/presentation/widgets/identity_scaffold.dart';
+import 'password_recovery_providers.dart';
+
+/// Requests a password reset.
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
+  const ForgotPasswordScreen({super.key});
+
+  @override
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
+  final TextEditingController _email = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _email.text = ref.read(forgotPasswordControllerProvider.notifier).rememberedEmail;
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() =>
+      ref.read(forgotPasswordControllerProvider.notifier).submit(email: _email.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final IdentityStrings strings = IdentityStrings.of(context);
+    final ForgotPasswordViewState state = ref.watch(forgotPasswordControllerProvider);
+
+    if (state.isAcknowledged) {
+      return IdentityScaffold(
+        title: strings.forgotPasswordTitle,
+        onBack: () => context.pop(),
+        children: <Widget>[
+          KararStateView.empty(
+            icon: KararIcons.statusSuccess,
+            title: strings.forgotPasswordAcknowledgementTitle,
+            message: strings.forgotPasswordAcknowledgementMessage,
+          ),
+          const IdentityGap.large(),
+          KararButton(
+            label: strings.resetPasswordTitle,
+            isFullWidth: true,
+            size: KararButtonSize.large,
+            onPressed: () => context.go(IdentityRoutes.resetPassword),
+          ),
+        ],
+      );
+    }
+
+    return IdentityScaffold(
+      title: strings.forgotPasswordTitle,
+      onBack: () => context.pop(),
+      children: <Widget>[
+        if (state.failure != null)
+          IdentityFailureNotice(
+            message: identityFailureMessage(strings, state.failure!),
+          ),
+        IdentityBody(strings.forgotPasswordSubtitle),
+        const IdentityGap.large(),
+        KararTextField(
+          label: strings.signInEmailLabel,
+          controller: _email,
+          isRequired: true,
+          isEnabled: !state.isSubmitting,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          errorText: state.emailViolation == null
+              ? null
+              : emailViolationMessage(strings, state.emailViolation!),
+          onSubmitted: (_) => _submit(),
+        ),
+        const IdentityGap.large(),
+        KararButton(
+          label: strings.forgotPasswordAction,
+          onPressed: state.isSubmitting ? null : _submit,
+          isLoading: state.isSubmitting,
+          isFullWidth: true,
+          size: KararButtonSize.large,
+        ),
+      ],
+    );
+  }
+}

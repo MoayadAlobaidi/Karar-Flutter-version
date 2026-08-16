@@ -1,1 +1,40 @@
 #include "Generated.xcconfig"
+
+// ---------------------------------------------------------------------------
+// Bundle identity
+// ---------------------------------------------------------------------------
+//
+// PRODUCT_BUNDLE_IDENTIFIER is `com.kararfinance.app$(KARAR_BUNDLE_ID_SUFFIX)`.
+// The suffix is empty here and in Debug.xcconfig, so every iOS build currently
+// produced carries the production identifier.
+//
+// This is an ASYMMETRY WITH ANDROID and it is deliberate, not an oversight.
+// Android derives its suffix from `-Pkarar.env` and cross-checks it against
+// the compiled `--dart-define=KARAR_ENV`, so a DEV package cannot claim
+// production identity. iOS has no equivalent hook: `PRODUCT_BUNDLE_IDENTIFIER`
+// is resolved by Xcode from build settings, and the Flutter tool does not
+// forward dart-defines into them. Doing this properly on iOS means adding
+// per-environment Xcode build configurations and schemes, which is a
+// release-engineering change that belongs with the first real iOS
+// distribution — not something to half-build now and leave to rot.
+//
+// Until then the extension point is declared rather than implied: set
+// KARAR_BUNDLE_ID_SUFFIX (for example to `.dev`) when those configurations are
+// added. No App Store record exists for any of these identifiers, and this
+// phase creates none, so nothing is reserved and nothing is at risk of being
+// squatted by the delay.
+
+KARAR_BUNDLE_ID_SUFFIX =
+
+// ---------------------------------------------------------------------------
+// Release signing
+// ---------------------------------------------------------------------------
+//
+// No signing identity, team identifier or provisioning profile is set here,
+// and no certificate or profile is committed anywhere in this repository.
+// Release signing material is supplied EXTERNALLY at release time by the
+// release operator or a release pipeline, and is never checked in.
+//
+// Every artifact this repository's CI produces is a simulator or debug build,
+// which requires no signing material at all. No CI job holds an Apple
+// credential, and none needs one.

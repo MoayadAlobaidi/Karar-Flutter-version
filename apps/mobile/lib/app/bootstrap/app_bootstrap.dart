@@ -27,6 +27,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import '../../core/errors/result.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/storage/preferences_key_value_store.dart';
+import '../../features/session_management/presentation/app_lock_providers.dart';
 import '../configuration/app_configuration.dart';
 import '../dependency_injection/providers.dart';
 import '../lifecycle/startup_coordinator.dart';
@@ -60,6 +61,12 @@ Future<void> bootstrapKararApp({List<Override> overrides = const <Override>[]}) 
       // dependency graph the shell needs before its first frame.
       final coordinator = container.read(startupCoordinatorProvider);
       unawaited(coordinator.start());
+
+      // The app-lock watcher must observe the whole process: the app is most
+      // often backgrounded from protected content, so no individual screen is
+      // reliably mounted at that moment. Installing it on the container rather
+      // than in the tree is what makes the lock apply everywhere.
+      container.read(appLockBackgroundWatcherProvider).attach();
 
       runApp(
         UncontrolledProviderScope(

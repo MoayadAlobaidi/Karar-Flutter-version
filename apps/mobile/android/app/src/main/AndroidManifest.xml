@@ -1,8 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RELEASE MANIFEST.
+
+  Attributes on <application> that are security controls rather than defaults:
+
+    android:networkSecurityConfig
+        Points at res/xml/network_security_config.xml, which forbids cleartext
+        and trusts only the system certificate store. The debug source set
+        supplies its own copy of that resource with a loopback-only cleartext
+        exception; the release variant does not contain the exception at all.
+
+    android:usesCleartextTraffic="false"
+        Ignored on API 24+ when a network security config is present, and
+        minSdk is 24 — so this line changes no behaviour. It is here because it
+        is the attribute reviewers, scanners and store review processes look
+        for, and because leaving it unset would make its absence ambiguous
+        rather than deliberate.
+
+    android:allowBackup / android:fullBackupContent
+        Android auto-backup would copy application data into the user's cloud
+        backup. flutter_secure_storage keeps session tokens in Keystore-backed
+        encrypted preferences; backing that up moves credential material out of
+        the device's protected storage and makes it restorable onto a different
+        device. Backup is therefore off. Nothing is lost: this client holds no
+        local state worth preserving — everything authoritative is server-side.
+-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      INTERNET is the ONLY permission this application requests.
+
+      The Flutter template declares it in the debug and profile source sets
+      only, which means a release build assembled from that template has no
+      network access whatsoever. This client exists to talk to an API, so the
+      permission belongs here, in the manifest that actually ships.
+
+      Nothing else is requested: no location, contacts, storage, camera, phone
+      state, or advertising identifier. A permission that is never declared
+      cannot be abused, and each of those would create a privacy disclosure
+      obligation the product has no need to take on.
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="karar_mobile"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="false"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

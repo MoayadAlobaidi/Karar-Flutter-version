@@ -48,6 +48,14 @@ dependencies:
   # Non-sensitive preferences only (locale, theme, biometric-lock choice).
   shared_preferences: 2.5.5
 
+  # The platform authenticator behind the application lock. The device
+  # compares and answers yes or no: no template, image or derived
+  # representation is received, stored or transmitted, and no key ceremony of
+  # this client's own design wraps it. Ranged rather than pinned because the
+  # federated platform implementations (local_auth_android / local_auth_darwin)
+  # resolve independently; pubspec.lock records the closure actually built.
+  local_auth: ^3.0.2
+
   # Annotations usable from pure-Dart domain code (@immutable) without
   # dragging in the Flutter framework.
   meta: ^1.19.0

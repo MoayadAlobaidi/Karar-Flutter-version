@@ -1,1 +1,6 @@
 #include "Generated.xcconfig"
+
+// Bundle identifier suffix. Empty means production identity
+// (com.kararfinance.app). See Release.xcconfig for the full explanation of why
+// this is empty on both sides today.
+KARAR_BUNDLE_ID_SUFFIX =

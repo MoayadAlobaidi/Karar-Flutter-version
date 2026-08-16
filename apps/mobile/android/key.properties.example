@@ -1,0 +1,27 @@
+# TEMPLATE ONLY — contains no key material and never will.
+#
+# Copy to `key.properties` (git-ignored, alongside this file) immediately
+# before a release build, and delete it immediately afterwards. Nothing in this
+# repository creates, generates or reads a keystore other than through the four
+# values below.
+#
+# A release pipeline should NOT write this file. Prefer the environment
+# variables, which take precedence and never touch disk:
+#
+#   KARAR_ANDROID_KEYSTORE_PATH       absolute path to the keystore
+#   KARAR_ANDROID_KEYSTORE_PASSWORD   keystore password
+#   KARAR_ANDROID_KEY_ALIAS           alias of the signing key
+#   KARAR_ANDROID_KEY_PASSWORD        password for that alias
+#
+# If any of the four is missing, the release build type gets NO signing
+# configuration and Gradle emits an UNSIGNED artifact. It does not fall back to
+# the debug key. An unsigned release APK cannot be installed or uploaded, which
+# is the intended failure mode.
+#
+# No CI job in this repository supplies any of these values, and none needs to:
+# CI builds debug and simulator artifacts only.
+
+storeFile=<absolute-path-supplied-at-release-time>
+storePassword=<supplied-at-release-time>
+keyAlias=<supplied-at-release-time>
+keyPassword=<supplied-at-release-time>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RELEASE NETWORK POLICY. This file applies to every build type except debug,
+  which supplies its own copy of this resource from src/debug/res/xml.
+
+  Three decisions, all deliberate:
+
+    * cleartextTrafficPermitted="false" with NO domain exceptions. There is no
+      host, anywhere, that this application will talk to over plain HTTP in a
+      release build. The build configuration is checked independently: the Dart
+      configuration loader rejects a non-LOCAL build whose API base URL is not
+      https, and rejects a loopback host outside LOCAL.
+
+    * trust-anchors lists ONLY the system store. User-installed certificate
+      authorities are excluded, so a certificate added to the device by a proxy,
+      an MDM profile or a persuaded user does not become trusted by this app.
+      This is the whole reason the file has an explicit trust-anchors block:
+      omitting it would inherit the platform default, which trusts user CAs on
+      API 23 and below and is silent about intent everywhere else.
+
+    * NO <pin-set>. Certificate pinning is NOT a Phase 4 requirement; the
+      architecture decision is on record and revisiting it needs a new ADR, not
+      an edit here. TLS is validated by the platform trust store, and the
+      transport refuses invalid certificates outright rather than prompting.
+
+  There is deliberately no <debug-overrides> element. A debug-overrides block
+  is honoured whenever android:debuggable is true, which couples a security
+  decision to a manifest flag that tooling can set. Scoping by source set
+  instead means the release resource simply does not contain the exception.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -26,6 +26,57 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!--
+	  APP TRANSPORT SECURITY.
+
+	  NSAllowsArbitraryLoads is false and is stated rather than omitted. The
+	  platform default is already false, so this line changes no behaviour; it
+	  exists so that a future "just for now" change to true is a visible edit to
+	  an explicit decision instead of the addition of a missing key. The
+	  companion blanket keys — NSAllowsArbitraryLoadsInWebContent,
+	  NSAllowsArbitraryLoadsForMedia and NSAllowsLocalNetworking — are absent,
+	  and a regression test asserts they stay absent.
+
+	  There is exactly ONE exception, for `localhost`, with subdomains excluded.
+	  It exists because ATS applies to loopback connections and the LOCAL
+	  profile runs the API on the developer's own machine at
+	  http://localhost:3000 — the same address the Dart configuration loader
+	  uses as its LOCAL default. IP literals are not listed: ATS exception
+	  domains are matched as domain names, so 127.0.0.1 would not take effect.
+	  iOS local development therefore uses `localhost`, not the IP.
+
+	  SCOPE — AND ITS LIMIT, STATED PLAINLY. Unlike Android, where the debug
+	  source set physically replaces the network security config so the release
+	  variant does not contain the exception, iOS builds one Info.plist for
+	  every configuration. This exception is therefore PRESENT in a release
+	  binary. What makes it unreachable is enforced one layer up, in code that
+	  is tested: the configuration loader rejects a non-LOCAL build whose API
+	  base URL is a loopback host (API_BASE_URL_LOCAL_IN_NON_LOCAL_BUILD) and
+	  rejects any non-LOCAL base URL that is not https (API_BASE_URL_INSECURE),
+	  and a release build with no base URL fails outright rather than falling
+	  back. A release binary consequently has no configuration that could ever
+	  direct a request at localhost. The residual risk is a future code path
+	  that hardcodes a loopback URL instead of reading the loader; the mobile
+	  security regression suite asserts that no such literal exists.
+
+	  NO pinning. Certificate pinning is not a Phase 4 requirement; that
+	  decision is on record and changing it needs an ADR, not an edit here.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
