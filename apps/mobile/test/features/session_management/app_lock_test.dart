@@ -275,11 +275,13 @@ void main() {
     });
   });
 
-  group('the default adapter', () {
+  group('the fallback adapter', () {
     test('reports unsupported and never reports success', () async {
-      // No platform authenticator plugin is a dependency of this build, so the
-      // control degrades to unavailable rather than claiming a lock it cannot
-      // enforce.
+      // Bound wherever no platform authenticator can be reached — the test
+      // host, and any platform this client is not shipped for. The control
+      // degrades to unavailable rather than claiming a lock it cannot enforce.
+      // The plugin-backed adapter's own mapping is asserted in
+      // platform_local_authenticator_test.dart.
       const UnsupportedLocalAuthenticator authenticator = UnsupportedLocalAuthenticator();
 
       expect(await authenticator.availability(), LocalAuthAvailability.unsupported);

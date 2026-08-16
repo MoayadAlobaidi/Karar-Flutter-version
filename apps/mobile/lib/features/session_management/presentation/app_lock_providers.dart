@@ -28,10 +28,13 @@ import '../domain/app_lock.dart';
 
 /// The platform authenticator.
 ///
-/// Overridden in tests, and replaced with the plugin-backed implementation
-/// when the dependency lands.
+/// Bound to the plugin-backed adapter on the platforms this client ships to,
+/// and to `UnsupportedLocalAuthenticator` everywhere else — including the host
+/// the test suite runs on, where no prompt can appear. Which one it is, is a
+/// data-layer decision; this provider only composes it. Overridden in tests
+/// that drive the lock state machine.
 final Provider<LocalAuthenticator> localAuthenticatorProvider =
-    Provider<LocalAuthenticator>((Ref ref) => const UnsupportedLocalAuthenticator());
+    Provider<LocalAuthenticator>((Ref ref) => platformLocalAuthenticator());
 
 /// How long the application may be backgrounded before it re-locks.
 final Provider<AppLockPolicy> appLockPolicyProvider =

@@ -77,6 +77,31 @@
 			</dict>
 		</dict>
 	</dict>
+	<!--
+	  FACE ID PURPOSE STRING.
+
+	  Required by the platform before the application lock may ask the device to
+	  authenticate its owner. Without this key iOS terminates the process on the
+	  first Face ID evaluation, so its absence is not a graceful degradation.
+
+	  It is the ONLY usage-description key in this file. Nothing else is
+	  requested: no camera, contacts, location, photo library, microphone or
+	  tracking. Each of those would create a privacy disclosure obligation this
+	  product has no need to take on.
+
+	  WHAT THE STRING HAS TO BE HONEST ABOUT. The lock is a LOCAL PRIVACY
+	  CONTROL. The device performs the comparison and answers yes or no; Karar
+	  receives no template, image or derived representation, stores none and
+	  transmits none. Unlocking proves presence to the device, grants no
+	  session, and never replaces signing in. The sentence below says exactly
+	  that in the user's own terms rather than the vendor's.
+
+	  This is the development-language string. Localized copies belong in a
+	  per-language InfoPlist.strings, which is separate work from wiring the
+	  authenticator and is not done here.
+	-->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Karar uses Face ID to unlock the app on this device. This is a privacy lock only: it never replaces signing in, and Karar never receives your face data.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

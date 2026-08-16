@@ -1,3 +1,4 @@
+import 'dart:io';
 // PLATFORM NETWORK AND PACKAGING CONTROLS, ENFORCED.
 //
 // The Android manifest, the network security configs and the iOS Info.plist
@@ -104,7 +105,7 @@ void main() {
       expect(manifest, contains('android:allowBackup="false"'));
     });
 
-    test('INTERNET is declared, and it is the only permission requested', () {
+    test('INTERNET is declared, and the app itself requests nothing else', () {
       expect(
         manifest,
         contains('<uses-permission android:name="android.permission.INTERNET"/>'),
@@ -120,6 +121,42 @@ void main() {
         <String>{'android.permission.INTERNET'},
         reason: 'every additional permission is a privacy disclosure obligation this '
             'product does not need to take on',
+      );
+    });
+
+    test('the permissions a dependency contributes are known and accounted for', () {
+      // This file declares one permission, but the SHIPPED artifact declares
+      // three: the manifest merger adds USE_BIOMETRIC and USE_FINGERPRINT from
+      // androidx.biometric, which local_auth_android depends on. Asserting only
+      // on this file would let the suite pass while the installed app requests
+      // permissions nobody reviewed, so the merged set is the property under
+      // test and this list is the review record.
+      //
+      // Both are `normal` protection level: granted at install, no runtime
+      // prompt, no privacy disclosure obligation beyond naming them here.
+      // USE_FINGERPRINT is the pre-API-28 predecessor of USE_BIOMETRIC and is
+      // contributed for backwards compatibility; minSdk is 24, so it applies.
+      const Set<String> reviewedContributedPermissions = <String>{
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
+      };
+
+      final merged = _mergedManifestPermissions();
+      if (merged == null) {
+        // The merged manifest only exists after a Gradle build. Skipping is
+        // honest; silently passing on the source manifest would not be.
+        markTestSkipped('no merged manifest present — run `flutter build apk --debug` first');
+        return;
+      }
+      expect(
+        merged.difference(<String>{
+          'android.permission.INTERNET',
+          ...reviewedContributedPermissions,
+        }),
+        isEmpty,
+        reason: 'a dependency contributed a permission that has not been '
+            'reviewed. Add it to this list deliberately, with the reason, or '
+            'remove the dependency that brings it in.',
       );
     });
   });
@@ -386,4 +423,31 @@ void main() {
       );
     });
   });
+}
+
+/// The permission set of the merged manifest an actual build produces, or null
+/// when no build output is present. The merger — not this repository's source —
+/// decides what the installed application requests.
+Set<String>? _mergedManifestPermissions() {
+  final Directory intermediates =
+      Directory('android/app/build/intermediates/merged_manifest');
+  final Directory fallback = Directory('build/app/intermediates/merged_manifest');
+  final Directory root = intermediates.existsSync() ? intermediates : fallback;
+  if (!root.existsSync()) return null;
+
+  final Iterable<File> manifests = root
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((File file) => file.path.endsWith('AndroidManifest.xml'));
+  if (manifests.isEmpty) return null;
+
+  final Set<String> declared = <String>{};
+  for (final File manifest in manifests) {
+    declared.addAll(
+      RegExp(r'<uses-permission[^>]*android:name="(android\.permission\.[^"]+)"')
+          .allMatches(manifest.readAsStringSync())
+          .map((RegExpMatch match) => match.group(1)!),
+    );
+  }
+  return declared;
 }
