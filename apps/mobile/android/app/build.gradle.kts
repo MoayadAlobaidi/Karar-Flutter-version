@@ -99,42 +99,96 @@ fun dartDefine(key: String): String? {
 
 fun dartDefinedEnvironment(): String? = dartDefine("KARAR_ENV")?.uppercase()
 
-dartDefinedEnvironment()?.let { compiled ->
-    if (compiled != requestedEnvironment) {
+// LOCAL still cross-checks when dart-defines are present; the non-LOCAL rules
+// below are stricter and require them.
+if (requestedEnvironment == "LOCAL") {
+    dartDefinedEnvironment()?.let { compiled ->
+        if (compiled != requestedEnvironment) {
+            throw GradleException(
+                "Environment mismatch: the package is being built as '$requestedEnvironment' " +
+                    "(-Pkarar.env) but the Dart code is compiled for '$compiled' " +
+                    "(--dart-define=KARAR_ENV). These must be the same value.",
+            )
+        }
+    }
+}
+
+/// A build for a deployed environment MUST carry the endpoint it talks to,
+/// and MUST have been compiled for that environment.
+///
+/// The Dart configuration loader also rejects a missing, loopback, plain-HTTP
+/// or credential-bearing base URL, so such a build fails closed at runtime into
+/// CONFIG_INVALID rather than falling back to a development endpoint. That is
+/// correct, but it is discovered on a device: the artifact is already produced,
+/// signed and distributable, and it carries the PRODUCTION package identity
+/// while being incapable of reaching any backend. A release that cannot work
+/// should not be buildable.
+///
+/// The Dart guard alone is also not sufficient for a second reason. Invoking
+/// Gradle DIRECTLY (`./gradlew assembleRelease -Pkarar.env=PRODUCTION`) passes
+/// no dart-defines at all, so nothing is compiled for the environment and
+/// nothing validates it. An earlier version of this check skipped validation
+/// whenever dart-defines were absent, which made a direct invocation a complete
+/// bypass. Absence is now the failure, not the exemption.
+///
+/// LOCAL is exempt: it has a documented default endpoint and is the only
+/// environment a developer can build without arguments.
+fun rejectLocalOnlyHost(host: String, environment: String, url: String) {
+    val lowered = host.lowercase()
+    val isLoopback =
+        lowered == "localhost" ||
+            lowered == "127.0.0.1" ||
+            lowered == "::1" ||
+            lowered == "[::1]" ||
+            lowered == "0.0.0.0" ||
+            // The Android emulator's alias for the host machine.
+            lowered == "10.0.2.2" ||
+            lowered.startsWith("127.") ||
+            lowered.endsWith(".local") ||
+            lowered.endsWith(".localhost") ||
+            lowered.endsWith(".internal") ||
+            lowered.endsWith(".test")
+    if (isLoopback) {
         throw GradleException(
-            "Environment mismatch: the package is being built as '$requestedEnvironment' " +
-                "(-Pkarar.env) but the Dart code is compiled for '$compiled' " +
-                "(--dart-define=KARAR_ENV). These must be the same value.",
+            "Local-only endpoint: a $environment build was given " +
+                "KARAR_API_BASE_URL='$url', whose host '$host' resolves only on a " +
+                "developer machine. A deployed build cannot reach it.",
         )
     }
 }
 
-/// A build for a deployed environment MUST carry the endpoint it talks to.
-///
-/// The Dart configuration loader rejects a missing, loopback, plain-HTTP or
-/// credential-bearing base URL, so such a build fails closed at runtime into
-/// CONFIG_INVALID rather than falling back to a development endpoint. That is
-/// correct behaviour, but it is discovered on a device: the artifact is
-/// produced, signed and distributable, and it carries the PRODUCTION package
-/// identity while being incapable of reaching any backend. A release that
-/// cannot work should not be buildable in the first place.
-///
-/// LOCAL is exempt: it has a documented default endpoint. DEV, STAGING and
-/// PRODUCTION do not, and none is inferred.
-//
-// Gradle cannot see the dart-defines when it is invoked directly, so this
-// check only fires on a Flutter-driven build — which is the only way a
-// distributable artifact is produced.
-if (requestedEnvironment != "LOCAL" && project.findProperty("dart-defines") != null) {
-    val baseUrl = dartDefine("KARAR_API_BASE_URL")
-    if (baseUrl == null) {
+if (requestedEnvironment != "LOCAL") {
+    if (project.findProperty("dart-defines") == null) {
         throw GradleException(
+            "Unconfigured $requestedEnvironment build: no dart-defines were passed, " +
+                "so nothing was compiled for this environment and no endpoint was " +
+                "supplied. This happens when Gradle is invoked directly rather than " +
+                "through the Flutter tool. Build through `flutter build`, which " +
+                "passes the compiled configuration, or build LOCAL.",
+        )
+    }
+
+    val compiledEnvironment = dartDefinedEnvironment()
+        ?: throw GradleException(
+            "Missing environment: a $requestedEnvironment build must be given " +
+                "--dart-define=KARAR_ENV, so the packaged identity and the compiled " +
+                "configuration are the same environment rather than assumed to be.",
+        )
+    if (compiledEnvironment != requestedEnvironment) {
+        throw GradleException(
+            "Environment mismatch: the package is being built as '$requestedEnvironment' " +
+                "(-Pkarar.env) but the Dart code is compiled for '$compiledEnvironment' " +
+                "(--dart-define=KARAR_ENV). These must be the same value.",
+        )
+    }
+
+    val baseUrl = dartDefine("KARAR_API_BASE_URL")
+        ?: throw GradleException(
             "Missing endpoint: a $requestedEnvironment build must be given " +
                 "--dart-define=KARAR_API_BASE_URL. Without it the application " +
                 "compiles, packages and installs, then refuses to start because " +
                 "no backend is configured. Supply the endpoint, or build LOCAL.",
         )
-    }
     if (!baseUrl.startsWith("https://")) {
         throw GradleException(
             "Insecure endpoint: a $requestedEnvironment build was given " +
@@ -142,6 +196,25 @@ if (requestedEnvironment != "LOCAL" && project.findProperty("dart-defines") != n
                 "permitted only for the local loopback in debug builds.",
         )
     }
+
+    // Authority = everything between the scheme and the first '/', '?' or '#'.
+    val authority = baseUrl.removePrefix("https://").substringBefore('/')
+        .substringBefore('?').substringBefore('#')
+    if (authority.contains('@')) {
+        throw GradleException(
+            "Credentials in endpoint: a $requestedEnvironment build was given a " +
+                "KARAR_API_BASE_URL containing userinfo before '@'. Credentials " +
+                "embedded in a URL are shipped inside the artifact and readable by " +
+                "anyone who unpacks it.",
+        )
+    }
+    if (authority.isEmpty()) {
+        throw GradleException(
+            "Malformed endpoint: a $requestedEnvironment build was given " +
+                "KARAR_API_BASE_URL='$baseUrl', which has no host.",
+        )
+    }
+    rejectLocalOnlyHost(authority.substringBefore(':'), requestedEnvironment, baseUrl)
 }
 
 // ---------------------------------------------------------------------------
