@@ -1,0 +1,37 @@
+// Prisma mapping for the subject-policy module's table (migration 0083).
+// The SQL migration remains authoritative; this file maps it exactly so
+// `make prisma-drift` stays meaningful (base.prisma header).
+//
+// Deliberately NOT expressed here, enforced by the migration and its tests
+// instead: CHECK constraints (status vocabulary, withdrawn_at pairing, the
+// effective-window ordering), the immutability/transition triggers, RLS
+// enable/force with the tenant+user principal policy, and grants. The
+// subject-policy repository runs every statement inside a principal-context
+// transaction (SET LOCAL app.tenant_id / app.user_id) or the policy returns
+// nothing — failing closed.
+//
+// Cross-module references (user_id, tenant_id, capability_id, profile_ref,
+// recorded_by) are plain scalars by design (data-model.md §2): no relation
+// crosses a module boundary, and option CONTENT never enters this table.
+
+model SubjectPolicySelection {
+  id                  String    @id @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  capabilityId        String    @map("capability_id")
+  profileRef          String    @map("profile_ref")
+  profileVersion      String    @map("profile_version")
+  jurisdictionRef     String    @map("jurisdiction_ref")
+  policyPackVersion   String    @map("policy_pack_version")
+  effectiveFrom       DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo         DateTime? @map("effective_to") @db.Timestamptz(6)
+  status              String
+  selectionSource     String    @map("selection_source")
+  recordedBy          String    @map("recorded_by") @db.Uuid
+  profileSnapshotHash String?   @map("profile_snapshot_hash")
+  withdrawnAt         DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, tenantId, capabilityId, effectiveFrom, createdAt], map: "subject_policy_selections_resolution_idx")
+  @@map("subject_policy_selections")
+}

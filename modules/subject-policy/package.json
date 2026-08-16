@@ -1,0 +1,25 @@
+{
+  "name": "@karar/subject-policy",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SubjectPolicySelection — the common mechanism recording which pack-permitted profile option a subject elected per capability, with pinned jurisdiction/pack/profile versions and provenance; capability-owned content never enters this module (jurisdiction-policy.md §7).",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/audit": "workspace:*",
+    "@karar/capability-registry": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}
