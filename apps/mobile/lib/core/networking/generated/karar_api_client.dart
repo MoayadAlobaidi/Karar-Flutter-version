@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.5.0
-// Digest:     59c10783
+// Digest:     a3e666d2
 // Generator:  tool/generate_api_client.dart 1.0.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -577,6 +577,54 @@ final class KararApiClient {
     return ListApplicableConsentDocumentsResponseDto.fromJson(response.requireObject(location: 'listApplicableConsentDocuments'));
   }
 
+  /// List the jurisdiction references the caller may declare
+  ///
+  /// The register entries `POST /jurisdiction/self-declaration` accepts, so a client can offer a chooser instead of a free-text field that would invite an identifier the register does not hold. It is a READ: it writes nothing, activates no PolicyPack, and approves nothing.
+  /// The listing and the declaration decide declarability through the same rule, so an entry offered here is an entry the declaration accepts. Retired entries, entries outside their reviewed effective window, and entries whose country does not resolve are omitted — fail closed.
+  /// SELECTABLE IS NOT APPROVED. `approvalRecorded` is stated on every entry and is false for all of them: no jurisdiction in this register is legally approved, and declaring one records an UNVERIFIED assignment that clears no capability.
+  /// Authentication is required; a tenant binding is NOT — an onboarding client needs the chooser before it can bind. The declaration itself keeps its own binding requirement.
+  /// SAFE FIELDS ONLY. The register's governance record — the provenance of each declaration, the lifecycle stage, the review status, the reviewed effective window — is internal and appears nowhere in this response.
+  ///
+  /// `GET /jurisdiction/declarable-references` — requires a session.
+  Future<ListDeclarableJurisdictionReferencesResponseDto> listDeclarableJurisdictionReferences({
+    CancellationToken? cancellation,
+    TimeoutProfile timeouts = TimeoutProfile.standard,
+  }) async {
+    final response = await _transport.send(
+      ApiRequest(
+        method: HttpMethod.get,
+        path: '/jurisdiction/declarable-references',
+        requiresAuthentication: true,
+        cancellation: cancellation,
+        timeouts: timeouts,
+      ),
+    );
+    return ListDeclarableJurisdictionReferencesResponseDto.fromJson(response.requireObject(location: 'listDeclarableJurisdictionReferences'));
+  }
+
+  /// List the caller's OWN memberships, across tenants
+  ///
+  /// Every membership the AUTHENTICATED caller holds that is ACTIVE and inside its effective window right now — the set of tenants they may bind to. This is what makes tenant switching reachable from a bound session: the bootstrap surface reports the CURRENT binding only, so without this read a client has no switch target to offer.
+  /// Authentication is required; a tenant binding deliberately is NOT. Selection precedes binding, so the read must work before a binding exists — and it is never narrowed to the current one when it does.
+  /// OWN means own. There is no user or tenant parameter anywhere: the subject is the session's subject, RLS bounds the rows to the caller's own, and a `?userId=`, `?tenantId=`, or `x-tenant-id` is ignored by construction (asserted by test). An empty array is a real answer — this caller holds no usable membership anywhere; a read that could not be performed is 503.
+  ///
+  /// `GET /tenancy/memberships` — requires a session.
+  Future<ListOwnTenantMembershipsResponseDto> listOwnTenantMemberships({
+    CancellationToken? cancellation,
+    TimeoutProfile timeouts = TimeoutProfile.standard,
+  }) async {
+    final response = await _transport.send(
+      ApiRequest(
+        method: HttpMethod.get,
+        path: '/tenancy/memberships',
+        requiresAuthentication: true,
+        cancellation: cancellation,
+        timeouts: timeouts,
+      ),
+    );
+    return ListOwnTenantMembershipsResponseDto.fromJson(response.requireObject(location: 'listOwnTenantMemberships'));
+  }
+
   /// List memberships of the caller's own tenant
   ///
   /// Requires an ACTIVE membership and the tenancy.member.read permission (PolicyService, deny-by-default). RLS bounds the rows to the caller's tenant beneath both checks.
@@ -596,6 +644,31 @@ final class KararApiClient {
       ),
     );
     return ListTenantMembersResponseDto.fromJson(response.requireObject(location: 'listTenantMembers'));
+  }
+
+  /// Read the text of the document version in force, with its language
+  ///
+  /// The legal text a subject must READ before accepting, supplied by the platform. The client never composes, summarizes, translates, or substitutes legal wording; when the platform has no content to serve this route says so and the client shows its own unavailable state.
+  /// The caller names a DOCUMENT, never a version: the server chooses the version in force, so no unpublished draft and no superseded version is reachable. The document must be the one applicable to the caller (the effective operating entity is resolved server-side); any other entity's document answers 404, exactly as an unknown id does, so the route is not an oracle for the wider catalogue.
+  /// WHAT IS SERVED IS WHAT WAS PUBLISHED. The bytes are hashed and compared against the version's pinned `contentHash` before anything is returned; a mismatch is refused (503) rather than displayed with a warning, because a grant pins a version id and reading one text while accepting another is the failure this check exists to prevent.
+  /// `language` describes the CONTENT and arrives with it. The catalogue records no language, so the listing carries none — a language field there could only be invented.
+  ///
+  /// `GET /consent/documents/{documentId}/content` — requires a session.
+  Future<ReadConsentDocumentContentResponseDto> readConsentDocumentContent({
+    required String documentId,
+    CancellationToken? cancellation,
+    TimeoutProfile timeouts = TimeoutProfile.standard,
+  }) async {
+    final response = await _transport.send(
+      ApiRequest(
+        method: HttpMethod.get,
+        path: '/consent/documents/${Uri.encodeComponent(documentId)}/content',
+        requiresAuthentication: true,
+        cancellation: cancellation,
+        timeouts: timeouts,
+      ),
+    );
+    return ReadConsentDocumentContentResponseDto.fromJson(response.requireObject(location: 'readConsentDocumentContent'));
   }
 
   /// Read the caller's OWN consent status for a purpose

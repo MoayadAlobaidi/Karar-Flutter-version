@@ -844,6 +844,27 @@ final class ContractReader {
         throw ContractError('Enum $className declares a value that collides with '
             'the generated "unknown" member.');
       }
+      // A wire value made only of separators, or one starting with a digit,
+      // cannot become a Dart identifier. Fail here with the offending value
+      // rather than emitting source that will not parse.
+      if (member.isEmpty || RegExp(r'^[0-9]').hasMatch(member)) {
+        throw ContractError('Enum $className declares the value "$wire", which '
+            'cannot be expressed as a Dart identifier. Rename it in the '
+            'contract.');
+      }
+      // Distinct wire values must stay distinct in Dart. Because every
+      // non-alphanumeric character separates, "a/b" and "a-b" both reduce to
+      // `aB` — two members with one name is uncompilable, so it is caught here
+      // where the cause is still visible.
+      final Object? collidingWire = members.entries
+          .where((MapEntry<String, String> entry) => entry.value == member)
+          .map((MapEntry<String, String> entry) => entry.key)
+          .firstOrNull;
+      if (collidingWire != null) {
+        throw ContractError('Enum $className declares "$wire" and '
+            '"$collidingWire", which both become the Dart member `$member`. '
+            'Rename one in the contract.');
+      }
       members[wire] = member;
     }
     final sorted = <String, String>{
@@ -1340,11 +1361,24 @@ String _camel(String value) {
   return pascal[0].toLowerCase() + pascal.substring(1);
 }
 
+/// Splits a wire name into words for identifier construction.
+///
+/// EVERY non-alphanumeric character separates, rather than a fixed list of
+/// them. The fixed list was `_ - . ` and space, which is fine until a wire
+/// value contains anything else: a media type like `text/markdown` kept its
+/// slash all the way into the emitted Dart, producing `text/markdown(...)` as
+/// an enum member — uncompilable. The contract is allowed to contain such
+/// values, so the generator has to be the side that copes.
+///
+/// Generalising is strictly safer than extending the list: the four original
+/// separators are all non-alphanumeric, so their behaviour is unchanged, and
+/// no future value can reintroduce the same failure.
 List<String> _words(String value) {
   final buffer = StringBuffer();
   for (var index = 0; index < value.length; index++) {
     final character = value[index];
-    if (character == '_' || character == '-' || character == ' ' || character == '.') {
+    final isAlphanumeric = RegExp(r'[A-Za-z0-9]').hasMatch(character);
+    if (!isAlphanumeric) {
       buffer.write(' ');
       continue;
     }

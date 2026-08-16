@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.5.0
-// Digest:     59c10783
+// Digest:     a3e666d2
 // Generator:  tool/generate_api_client.dart 1.0.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -511,6 +511,90 @@ final class CreateTenantInvitationResponseDto {
 
   @override
   String toString() => 'CreateTenantInvitationResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class DeclarableJurisdictionReferenceDto {
+  const DeclarableJurisdictionReferenceDto({
+    required this.approvalRecorded,
+    required this.code,
+    required this.countryCode,
+    required this.countryDisplayNameKey,
+    required this.jurisdictionId,
+    required this.type,
+  });
+
+  /// Decodes the contract representation.
+  factory DeclarableJurisdictionReferenceDto.fromJson(Map<String, Object?> json) => DeclarableJurisdictionReferenceDto(
+        approvalRecorded: json['approvalRecorded']! as bool,
+        code: json['code']! as String,
+        countryCode: json['countryCode']! as String,
+        countryDisplayNameKey: json['countryDisplayNameKey']! as String,
+        jurisdictionId: json['jurisdictionId']! as String,
+        type: DeclarableJurisdictionReferenceTypeDto.fromWire(json['type']! as String),
+      );
+
+  /// Whether the platform's register records a COMPLETED legal approval for this entry. False for every entry today. A selectable jurisdiction is a declarable one; it is not an approved one, and a declaration into it stays UNVERIFIED.
+  final bool approvalRecorded;
+
+  /// The register's own reference token — the same value, mirroring the row.
+  final String code;
+
+  /// ISO 3166-1 alpha-2. A jurisdiction is NOT a country: one country may carry several regimes (a national one and a financial free zone).
+  final String countryCode;
+
+  /// Localisation key for the entry's country, from the country register. Display names live in locale bundles, never in the register, and a jurisdiction entry carries no name of its own — so none is invented here. A client composes its label from this key, the type, and the code.
+  final String countryDisplayNameKey;
+
+  /// The identifier to post back to /jurisdiction/self-declaration. Reference DATA: clients never branch on it — behaviour differences resolve through policy packs (architecture test 12).
+  final String jurisdictionId;
+
+  /// Structural kind of the regime — what distinguishes AE from AE-DIFC.
+  final DeclarableJurisdictionReferenceTypeDto type;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'approvalRecorded': approvalRecorded,
+        'code': code,
+        'countryCode': countryCode,
+        'countryDisplayNameKey': countryDisplayNameKey,
+        'jurisdictionId': jurisdictionId,
+        'type': type.toWire(),
+      };
+
+  @override
+  String toString() => 'DeclarableJurisdictionReferenceDto()';
+}
+
+/// Structural kind of the regime — what distinguishes AE from AE-DIFC.
+enum DeclarableJurisdictionReferenceTypeDto {
+  financialFreeZone('FINANCIAL_FREE_ZONE'),
+  national('NATIONAL'),
+  specialRegime('SPECIAL_REGIME'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const DeclarableJurisdictionReferenceTypeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static DeclarableJurisdictionReferenceTypeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
 }
 
 /// Contract object.
@@ -1129,7 +1213,6 @@ final class ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionD
     this.classification,
     required this.contentHash,
     this.effectiveAt,
-    required this.storageRef,
     required this.version,
     required this.versionId,
   });
@@ -1139,18 +1222,16 @@ final class ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionD
         classification: json['classification'] == null ? null : ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto.fromWire(json['classification']! as String),
         contentHash: json['contentHash']! as String,
         effectiveAt: json['effectiveAt'] == null ? null : DateTime.parse(json['effectiveAt']! as String).toUtc(),
-        storageRef: json['storageRef']! as String,
         version: json['version']! as String,
         versionId: json['versionId']! as String,
       );
 
   final ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto? classification;
 
+  /// sha256 of the canonical document bytes. The content route serves only bytes that match it, so a client may re-check what it displayed against what it later accepts.
   final String contentHash;
 
   final DateTime? effectiveAt;
-
-  final String storageRef;
 
   final String version;
 
@@ -1161,7 +1242,6 @@ final class ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionD
         'classification': classification?.toWire(),
         'contentHash': contentHash,
         'effectiveAt': effectiveAt?.toUtc().toIso8601String(),
-        'storageRef': storageRef,
         'version': version,
         'versionId': versionId,
       };
@@ -1195,6 +1275,60 @@ final class ListApplicableConsentDocumentsResponseDto {
 
   @override
   String toString() => 'ListApplicableConsentDocumentsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListDeclarableJurisdictionReferencesResponseDto {
+  const ListDeclarableJurisdictionReferencesResponseDto({
+    required this.references,
+  });
+
+  /// Decodes the contract representation.
+  factory ListDeclarableJurisdictionReferencesResponseDto.fromJson(Map<String, Object?> json) => ListDeclarableJurisdictionReferencesResponseDto(
+        references: (json['references']! as List<Object?>)
+            .map((Object? element) => DeclarableJurisdictionReferenceDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+      );
+
+  final List<DeclarableJurisdictionReferenceDto> references;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'references': references
+            .map((DeclarableJurisdictionReferenceDto element) => element.toJson())
+            .toList(growable: false),
+      };
+
+  @override
+  String toString() => 'ListDeclarableJurisdictionReferencesResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnTenantMembershipsResponseDto {
+  const ListOwnTenantMembershipsResponseDto({
+    required this.memberships,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTenantMembershipsResponseDto.fromJson(Map<String, Object?> json) => ListOwnTenantMembershipsResponseDto(
+        memberships: (json['memberships']! as List<Object?>)
+            .map((Object? element) => MembershipDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+      );
+
+  final List<MembershipDto> memberships;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'memberships': memberships
+            .map((MembershipDto element) => element.toJson())
+            .toList(growable: false),
+      };
+
+  @override
+  String toString() => 'ListOwnTenantMembershipsResponseDto()';
 }
 
 /// Contract object.
@@ -1407,6 +1541,97 @@ final class OperatingEntitySummaryDto {
 
   @override
   String toString() => 'OperatingEntitySummaryDto()';
+}
+
+/// Contract object.
+@immutable
+final class ReadConsentDocumentContentResponseDto {
+  const ReadConsentDocumentContentResponseDto({
+    required this.content,
+    required this.contentHash,
+    required this.documentId,
+    this.effectiveAt,
+    required this.format,
+    required this.language,
+    required this.version,
+    required this.versionId,
+  });
+
+  /// Decodes the contract representation.
+  factory ReadConsentDocumentContentResponseDto.fromJson(Map<String, Object?> json) => ReadConsentDocumentContentResponseDto(
+        content: json['content']! as String,
+        contentHash: json['contentHash']! as String,
+        documentId: json['documentId']! as String,
+        effectiveAt: json['effectiveAt'] == null ? null : DateTime.parse(json['effectiveAt']! as String).toUtc(),
+        format: ReadConsentDocumentContentResponseFormatDto.fromWire(json['format']! as String),
+        language: json['language']! as String,
+        version: json['version']! as String,
+        versionId: json['versionId']! as String,
+      );
+
+  /// The document text, server-supplied. No internal storage locator appears anywhere in this response.
+  final String content;
+
+  /// sha256 the served bytes were verified against.
+  final String contentHash;
+
+  final String documentId;
+
+  final DateTime? effectiveAt;
+
+  final ReadConsentDocumentContentResponseFormatDto format;
+
+  /// BCP-47 tag of the text, as the content source recorded it. Never inferred; content whose language cannot be stated is not served.
+  final String language;
+
+  final String version;
+
+  /// The exact version displayed — post this to /consent/acceptances.
+  final String versionId;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'content': content,
+        'contentHash': contentHash,
+        'documentId': documentId,
+        'effectiveAt': effectiveAt?.toUtc().toIso8601String(),
+        'format': format.toWire(),
+        'language': language,
+        'version': version,
+        'versionId': versionId,
+      };
+
+  @override
+  String toString() => 'ReadConsentDocumentContentResponseDto()';
+}
+
+/// Contract enumeration.
+enum ReadConsentDocumentContentResponseFormatDto {
+  textMarkdown('text/markdown'),
+  textPlain('text/plain'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const ReadConsentDocumentContentResponseFormatDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ReadConsentDocumentContentResponseFormatDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
 }
 
 /// Contract object.
