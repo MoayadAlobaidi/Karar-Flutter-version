@@ -114,6 +114,34 @@ visible as step annotations and the JSON report is uploaded as the
   every remaining finding has a documented exception in the evidence register.
 - Owner: Engineering Owner. Review no later than Phase 2 kickoff.
 
+## Phase 3 close — security-suppression review (2026-08-16, EV-318)
+
+Every Phase 3 suppression was re-reviewed before merging PR #5. Scope and
+findings:
+
+- **Gitleaks** (2 entries in `.gitleaksignore`): both fingerprints are
+  commit+file+rule+line exact; both historical lines were re-read at their
+  pinned commits and are documentation prose (the tenancy data-lifecycle
+  description and the prior revision of the ignore file's own comment). No
+  credential, token, private key, MFA seed, verification/recovery code, or
+  password exists at either location, and per-occurrence fingerprints cannot
+  suppress future findings. No regex, path, directory, or rule-level
+  suppression exists anywhere.
+- **CodeQL** (1 dismissed alert, recorded below): the dismissal is
+  per-alert; the workflow runs plain `codeql-action init`/`analyze` with no
+  query exclusions, path ignores, or configuration file — no global
+  suppression exists. Actual password hashing is argon2id with versioned
+  parameters (`Argon2PasswordHasher`); the flagged path digests rate-limit
+  subject keys.
+- **Regression pair**: `modules/identity/__tests__/password-hash-format.test.ts`
+  pins passwords to versioned argon2id PHC strings (never a bare digest) and
+  `packages/platform/src/ratelimit/ratelimit.test.ts` pins subject keys to
+  HMAC digests (never the raw identifier) — a change that confused the two
+  purposes fails one of them.
+
+This review is maintainer-directed agent review, not organizationally
+independent human assurance. Registered as EV-318.
+
 ## Code-scanning dismissal record — CodeQL alert 1 (2026-08-16)
 
 CodeQL flagged `js/insufficient-password-hash` (high) on the rate-limit key
