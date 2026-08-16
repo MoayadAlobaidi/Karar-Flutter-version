@@ -14,7 +14,7 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appName => 'قرار';
+  String get appName => 'كرار';
 
   @override
   String get actionContinue => 'متابعة';
@@ -287,7 +287,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String legalDocumentLanguageNotice(String language) {
-    return 'هذا المستند مقدم من قرار باللغة $language.';
+    return 'هذا المستند مقدم من كرار باللغة $language.';
   }
 
   @override

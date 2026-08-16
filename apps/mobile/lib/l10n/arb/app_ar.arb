@@ -1,7 +1,7 @@
 {
   "@@locale": "ar",
 
-  "appName": "قرار",
+  "appName": "كرار",
 
   "actionContinue": "متابعة",
   "actionCancel": "إلغاء",
@@ -69,7 +69,7 @@
   "languageEnglish": "English",
   "languageArabic": "العربية",
 
-  "legalDocumentLanguageNotice": "هذا المستند مقدم من قرار باللغة {language}.",
+  "legalDocumentLanguageNotice": "هذا المستند مقدم من كرار باللغة {language}.",
   "legalDocumentUnavailable": "هذا المستند غير متاح حاليا.",
 
   "signInTitle": "تسجيل الدخول",

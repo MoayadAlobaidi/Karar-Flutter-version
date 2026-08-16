@@ -3,13 +3,21 @@
 
   Arabic is a first-class product language, not a translation afterthought: the
   Flutter catalogue ships lib/l10n/arb/app_ar.arb and the application name in
-  Arabic is قرار. A system prompt that stays English while the rest of the
+  Arabic is كرار. A system prompt that stays English while the rest of the
   application is Arabic is the point at which a user stops reading it, and a
   purpose string nobody reads is a privacy disclosure that has not been made.
+
+  The spelling is كرار, not قرار. Both are pronounceable readings of the Latin
+  name, but قرار is the Arabic word "decision" and is the legacy system's name
+  — documentation-style-guide.md reserves "Qarar" for that system and this
+  platform is "Karar". The two were mixed here: the launcher said قرار while
+  twelve in-app messages said كرار, so a user met one name on the home screen
+  and another in a security notice. `brand_name_test.dart` now holds them
+  together.
 
   This is written as Arabic, not as a word-for-word rendering of the English.
   It carries the same four facts: the unlock is local to this device, the
   device performs the comparison, Karar neither receives nor stores the face
   data, and unlocking does not stand in for signing in.
 */
-"NSFaceIDUsageDescription" = "يفتح Face ID تطبيق قرار على هذا الجهاز. تتم المطابقة داخل جهازك، ولا يتلقى قرار بيانات وجهك ولا يخزّنها. وفتح التطبيق لا يغني عن تسجيل الدخول.";
+"NSFaceIDUsageDescription" = "يفتح Face ID تطبيق كرار على هذا الجهاز. تتم المطابقة داخل جهازك، ولا يتلقى كرار بيانات وجهك ولا يخزّنها. وفتح التطبيق لا يغني عن تسجيل الدخول.";
