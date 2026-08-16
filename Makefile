@@ -8,7 +8,7 @@ SHELL := /bin/bash
 # CI set the variable explicitly.
 export KARAR_ENV ?= local
 
-.PHONY: help doctor bootstrap dev down reset-local generate lint test architecture-test security-scan docs-check verify db-create db-migrate db-verify db-reset-local
+.PHONY: prisma-generate prisma-drift help doctor bootstrap dev down reset-local generate lint test architecture-test security-scan docs-check verify db-create db-migrate db-verify db-reset-local
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -88,3 +88,9 @@ db-verify: ## Report applied/pending/drift; --strict fails on pending
 db-reset-local: ## Drop and recreate the LOCAL database (guarded: KARAR_ENV=local)
 	pnpm --filter @karar/platform build >/dev/null
 	pnpm --filter @karar/platform db:reset-local
+
+prisma-generate: ## Regenerate the Prisma client from the schema folder
+	pnpm --filter @karar/platform exec prisma generate --schema prisma/schema
+
+prisma-drift: ## Fail if any mapped Prisma model diverges from the live database
+	node scripts/db/prisma-mapping-check.mjs

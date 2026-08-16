@@ -29,6 +29,13 @@ const READER_DIRS = [
   path.join('packages', 'platform', 'src', 'db'),
 ];
 
+/**
+ * Individual files sanctioned as environment readers. prisma.config.ts is
+ * Prisma-CLI-only composition config (db pull for the drift check) — it never
+ * runs inside the application, and the CLI offers no injection seam.
+ */
+const READER_FILES = [path.join('packages', 'platform', 'prisma.config.ts')];
+
 function walk(dir: string, out: string[]): string[] {
   let entries: string[];
   try {
@@ -63,7 +70,11 @@ describe('no direct environment access outside the sanctioned readers', () => {
     const violations: string[] = [];
     for (const file of files) {
       const relative = path.relative(REPO_ROOT, file);
-      if (READER_DIRS.some((dir) => relative.startsWith(dir + path.sep))) continue;
+      if (
+        READER_DIRS.some((dir) => relative.startsWith(dir + path.sep)) ||
+        READER_FILES.includes(relative)
+      )
+        continue;
       const source = stripComments(readFileSync(file, 'utf8'));
       const dereferences = source.match(/process\.env\s*[.[]/g) ?? [];
       if (dereferences.length > 0) {

@@ -1,0 +1,21 @@
+// Prisma maps the canonical SQL schema — it is NOT a second migration system.
+// The forward-only SQL migrations under packages/platform/db/migrations remain
+// authoritative; `make prisma-drift` fails CI when this mapping and the real
+// database shape diverge. Prisma types never leave infrastructure/persistence
+// code (architecture test 4). Multi-file schema: each Phase 3 module owns its
+// own .prisma file in this folder; this file owns datasource + generator only.
+//
+// Prisma 7: no connection URL lives in the schema. The runtime client is
+// constructed with @prisma/adapter-pg over the SAME pg Pool the platform's
+// PostgresPersistenceAdapter builds from a ConnectionProfile (app role) —
+// profiles stay the single source of connection truth. CLI operations that
+// need a database (drift diff) receive the URL on the command line.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../client"
+}
+
+datasource db {
+  provider = "postgresql"
+}

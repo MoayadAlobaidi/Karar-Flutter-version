@@ -1,0 +1,171 @@
+// Prisma mapping for the identity tables (migrations 0030-0033). The SQL
+// migrations remain authoritative — this file mirrors them field-for-field
+// and `make prisma-drift` fails when they diverge (see base.prisma).
+//
+// Consumed ONLY by modules/identity/infrastructure/persistence (architecture
+// test 4). Row-level security is FORCEd on every model here; repositories
+// reach these tables inside transactions that set the `app.user_id` GUC —
+// a query outside that discipline sees no rows rather than wrong rows.
+
+model IdentityAccount {
+  id              String    @id @db.Uuid
+  email           String
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  status          String    @default("active")
+  disabledReason  String?   @map("disabled_reason")
+  mfaRequired     Boolean   @default(false) @map("mfa_required")
+  tokenVersion    Int       @default(1) @map("token_version")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  passwordCredential  PasswordCredential?
+  emailVerifications  EmailVerification[]
+  passwordResets      PasswordResetRequest[]
+  sessions            Session[]
+  refreshTokenFamilies RefreshTokenFamily[]
+  mfaEnrolment        MfaEnrolment?
+  mfaRecoveryCodes    MfaRecoveryCode[]
+
+  @@map("identity_accounts")
+}
+
+model PasswordCredential {
+  accountId     String   @id @map("account_id") @db.Uuid
+  passwordHash  String   @map("password_hash")
+  paramsVersion Int      @map("params_version")
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  account IdentityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("password_credentials")
+}
+
+model EmailVerification {
+  id          String    @id @db.Uuid
+  accountId   String    @map("account_id") @db.Uuid
+  codeHash    String    @map("code_hash")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account IdentityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt(sort: Desc)], map: "email_verifications_account_idx")
+  @@map("email_verifications")
+}
+
+model PasswordResetRequest {
+  id                String    @id @db.Uuid
+  accountId         String    @map("account_id") @db.Uuid
+  codeHash          String    @unique(map: "password_reset_requests_code_hash_unique") @map("code_hash")
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(5) @map("max_attempts")
+  consumedAt        DateTime? @map("consumed_at") @db.Timestamptz(6)
+  requestedIpDigest String?   @map("requested_ip_digest")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account IdentityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt(sort: Desc)], map: "password_reset_requests_account_idx")
+  @@map("password_reset_requests")
+}
+
+model Session {
+  id                String    @id @db.Uuid
+  accountId         String    @map("account_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt        DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
+  idleExpiresAt     DateTime? @map("idle_expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason     String?   @map("revoked_reason")
+  ipDigest          String?   @map("ip_digest")
+  userAgentSummary  String?   @map("user_agent_summary")
+  tenantBinding     String?   @map("tenant_binding") @db.Uuid
+
+  account  IdentityAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  families RefreshTokenFamily[]
+
+  @@index([accountId, createdAt(sort: Desc)], map: "sessions_account_idx")
+  @@map("sessions")
+}
+
+model RefreshTokenFamily {
+  id            String    @id @db.Uuid
+  sessionId     String    @map("session_id") @db.Uuid
+  accountId     String    @map("account_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String?   @map("revoked_reason")
+
+  session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  account IdentityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  tokens  RefreshToken[]
+
+  @@index([sessionId], map: "refresh_token_families_session_idx")
+  @@index([accountId], map: "refresh_token_families_account_idx")
+  @@map("refresh_token_families")
+}
+
+model RefreshToken {
+  id           String    @id @db.Uuid
+  familyId     String    @map("family_id") @db.Uuid
+  tokenHash    String    @unique(map: "refresh_tokens_token_hash_unique") @map("token_hash")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt       DateTime? @map("used_at") @db.Timestamptz(6)
+  supersededBy String?   @map("superseded_by") @db.Uuid
+
+  family     RefreshTokenFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  supersededByToken RefreshToken?  @relation("RefreshTokenLineage", fields: [supersededBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  supersedes        RefreshToken[] @relation("RefreshTokenLineage")
+
+  @@index([familyId], map: "refresh_tokens_family_idx")
+  @@map("refresh_tokens")
+}
+
+model MfaEnrolment {
+  accountId        String    @id @map("account_id") @db.Uuid
+  type             String    @default("totp")
+  secretCiphertext Bytes     @map("secret_ciphertext")
+  keyVersion       String    @map("key_version")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  confirmedAt      DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  disabledAt       DateTime? @map("disabled_at") @db.Timestamptz(6)
+
+  account IdentityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("mfa_enrolments")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @db.Uuid
+  accountId String    @map("account_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account IdentityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, codeHash], map: "mfa_recovery_codes_unique")
+  @@index([accountId], map: "mfa_recovery_codes_account_idx")
+  @@map("mfa_recovery_codes")
+}
+
+// Append-only (grants + trigger + RLS); account_id is an opaque reference
+// with no relation on purpose — the history survives account erasure.
+model AuthenticationSecurityEvent {
+  id         String   @id @db.Uuid
+  accountId  String?  @map("account_id") @db.Uuid
+  eventType  String   @map("event_type")
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  ipDigest   String?  @map("ip_digest")
+  metadata   Json?
+
+  @@index([accountId, eventType, occurredAt(sort: Desc)], map: "authentication_security_events_account_idx")
+  @@index([occurredAt], map: "authentication_security_events_occurred_idx")
+  @@map("authentication_security_events")
+}

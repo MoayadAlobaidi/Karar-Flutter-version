@@ -37,3 +37,7 @@ export {
   type IntegrityCanaryContract,
 } from './canary.js';
 export { InMemoryTestEncryptionProvider } from './in-memory-test-encryption-provider.js';
+export {
+  LocalDevEncryptionEnvironmentError,
+  LocalDevEncryptionProvider,
+} from './local-dev-encryption-provider.js';
