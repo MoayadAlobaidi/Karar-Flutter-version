@@ -66,6 +66,7 @@ export {
   type ActivationDenied,
   type AlreadyActive,
   type AuditAppendFailed,
+  type DeclarationNotPermitted,
   type NotActive,
   type NotFound,
   type PackInvalid,
@@ -108,3 +109,26 @@ export {
   type RetirePackVersionError,
   type RetirePackVersionInput,
 } from './application/use-cases/pack-activation.js';
+export {
+  DeclareOwnJurisdiction,
+  type DeclareOwnJurisdictionError,
+  type DeclareOwnJurisdictionInput,
+  type DeclaredJurisdiction,
+} from './application/use-cases/self-declaration.js';
+
+// presentation — the ONE subject-facing route (self-declaration). Operator
+// assignment, verification, and pack activation stay off the consumer API.
+export {
+  JURISDICTION_PRINCIPAL_SOURCE,
+  type JurisdictionPrincipal,
+  type JurisdictionPrincipalSource,
+} from './presentation/http/principal-source.js';
+export {
+  JURISDICTION_USE_CASES,
+  JurisdictionController,
+  type JurisdictionUseCases,
+} from './presentation/http/jurisdiction.controller.js';
+export {
+  JurisdictionApiModule,
+  type JurisdictionApiModuleOptions,
+} from './presentation/jurisdiction-api.module.js';

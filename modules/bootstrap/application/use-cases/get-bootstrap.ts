@@ -18,6 +18,15 @@
  * binding is ROUTING; every tenant-bound endpoint re-checks membership and
  * RLS bounds the rows regardless of what this view says.
  *
+ * ENRICHMENT FAILURE POSTURE: a jurisdiction, PolicyPack, or capability
+ * resolution that could not be PERFORMED fails the call
+ * (`resolution_unavailable` -> 503). Returning a 200 whose sections are empty
+ * would be a correct denial reported as a legitimate absence, which is the
+ * one answer a client cannot act on: it would stop asking and retry nothing.
+ * The operating-entity section is the deliberate exception — its read failure
+ * degrades that section alone to UNAVAILABLE, because the rest of the context
+ * is complete without it and the state says so explicitly.
+ *
  * AUDIT POSTURE (fail closed, matching identity's `auditOrFail` and the
  * capability module's AUDIT_APPEND_FAILED stance): the accountability record
  * is part of the operation, not a side effect. Every audit write is
@@ -53,11 +62,23 @@ import type {
   JurisdictionContextPort,
   JurisdictionStateView,
   OperatingEntityReferencePort,
-  OperatingEntityReferenceView,
+  OperatingEntityStateView,
   PolicyPackStatusPort,
   PolicyPackStatusView,
 } from '../ports/context-enrichment.js';
 import type { AuditTrail } from '../ports/audit-trail.js';
+
+/**
+ * The capability section as the client receives it: the resolution STATE and
+ * the list, structurally inseparable. A 200 therefore always states that the
+ * resolution succeeded, so an empty `items` is a real answer rather than
+ * something the client has to infer from the status line alone. A failed
+ * resolution never reaches here — it fails the request.
+ */
+export interface ResolvedCapabilitiesView {
+  readonly state: 'RESOLVED';
+  readonly items: readonly ClientCapabilityView[];
+}
 
 export interface BootstrapView {
   readonly user: { readonly userId: string; readonly emailVerified: boolean };
@@ -65,9 +86,10 @@ export interface BootstrapView {
   readonly binding: BindingStateView;
   /** Typed state, never null — NONE is the unresolved case (fail closed). */
   readonly jurisdiction: JurisdictionStateView;
-  readonly operatingEntity: OperatingEntityReferenceView | null;
+  /** Tagged state, never null — the entity is never fabricated. */
+  readonly operatingEntity: OperatingEntityStateView;
   readonly policyPack: PolicyPackStatusView | null;
-  readonly capabilities: readonly ClientCapabilityView[];
+  readonly capabilities: ResolvedCapabilitiesView;
 }
 
 export interface GetBootstrapDependencies {
@@ -125,13 +147,41 @@ export class GetBootstrap {
       // The TYPED state travels onward as a whole: nothing here inspects a
       // jurisdiction identifier to decide anything (architecture test 12) —
       // downstream resolvers key on `kind` and fail closed on NONE.
-      const jurisdiction = await this.deps.jurisdiction.stateFor(subject);
+      const governing = await this.deps.jurisdiction.stateFor(subject);
+      if (governing.kind === 'UNAVAILABLE') {
+        // Everything downstream keys on this state. Reporting NONE here would
+        // publish a fail-closed jurisdiction the subject may not be in, and
+        // would drag the pack and capability sections down with it silently.
+        return Result.err(
+          this.resolutionUnavailable('the governing assignment could not be read', governing.retryable),
+        );
+      }
+      const jurisdiction = governing;
       const enrichmentSubject = { ...subject, jurisdiction };
       const [operatingEntity, policyPack, capabilities] = await Promise.all([
         this.deps.operatingEntity.effectiveFor(subject),
         this.deps.policyPack.statusFor(enrichmentSubject),
         this.deps.capabilities.resolveFor(enrichmentSubject),
       ]);
+
+      if (policyPack.kind === 'UNAVAILABLE') {
+        return Result.err(
+          this.resolutionUnavailable(
+            'the active policy pack could not be read',
+            policyPack.retryable,
+          ),
+        );
+      }
+      if (capabilities.kind === 'UNAVAILABLE') {
+        // The whole point of the port change: an empty list here would deny
+        // correctly and lie about why. The request fails instead.
+        return Result.err(
+          this.resolutionUnavailable(
+            'capability resolution did not complete',
+            capabilities.retryable,
+          ),
+        );
+      }
 
       return Result.ok({
         user: {
@@ -141,9 +191,13 @@ export class GetBootstrap {
         session: { sessionId: principal.sessionId },
         binding,
         jurisdiction,
+        // An entity read failure degrades this ONE section to UNAVAILABLE
+        // rather than failing the call: the binding, jurisdiction, and
+        // capability answers above are complete and useful without it, and
+        // the state says plainly that the reference is not known.
         operatingEntity,
-        policyPack,
-        capabilities,
+        policyPack: policyPack.kind === 'ACTIVE' ? policyPack.status : null,
+        capabilities: { state: 'RESOLVED', items: capabilities.capabilities },
       });
     } catch (error) {
       return Result.err({
@@ -222,6 +276,11 @@ export class GetBootstrap {
       return { ok: false, error: this.auditUnavailable() };
     }
     return { ok: true, binding: { kind: 'BOUND', tenant: choice } };
+  }
+
+  /** The message stays server-side; the edge emits the code alone. */
+  private resolutionUnavailable(message: string, retryable: boolean): GetBootstrapError {
+    return { kind: 'resolution_unavailable', message, retryable };
   }
 
   private auditUnavailable(): GetBootstrapError {

@@ -3,6 +3,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "types": ["node"]
   },
   "include": [
@@ -10,6 +12,7 @@
     "domain/**/*",
     "application/**/*",
     "infrastructure/**/*",
+    "presentation/**/*",
     "__tests__/**/*"
   ],
   "exclude": ["dist", "node_modules"],

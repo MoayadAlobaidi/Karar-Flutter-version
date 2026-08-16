@@ -68,6 +68,10 @@ export type {
   RoleAssignmentQuery,
   RoleAssignmentRepository,
 } from './application/ports/repositories.js';
+export type {
+  OperatingEntitySummary,
+  OperatingEntitySummaryReader,
+} from './application/ports/entity-summary-reader.js';
 export {
   InvalidOperatingEntityInputError,
   type AuditAppendFailed,
@@ -125,6 +129,11 @@ export {
   type SetTenantDefaultEntityInput,
   type SetUserContractingEntityInput,
 } from './application/use-cases/entity-assignments.js';
+export {
+  GetEffectiveOperatingEntitySummary,
+  type GetEffectiveOperatingEntitySummaryError,
+  type GetEffectiveOperatingEntitySummaryInput,
+} from './application/use-cases/entity-summary.js';
 export {
   AdvanceEntityMigration,
   ProposeEntityMigration,

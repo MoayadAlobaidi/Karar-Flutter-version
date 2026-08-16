@@ -28,7 +28,7 @@ import type {
   JurisdictionContextPort,
   JurisdictionStateView,
   OperatingEntityReferencePort,
-  OperatingEntityReferenceView,
+  OperatingEntityStateView,
   PolicyPackStatusPort,
   PolicyPackStatusView,
 } from '../../application/ports/context-enrichment.js';
@@ -186,9 +186,14 @@ export const JURISDICTION: JurisdictionStateView = {
   kind: 'VERIFIED',
   assignment: { jurisdictionId: 'IQ' },
 };
-export const ENTITY: OperatingEntityReferenceView = {
-  id: 'ee000000-0000-4000-8000-0000000000ee',
-  name: 'Karar Operating Entity',
+export const ENTITY: OperatingEntityStateView = {
+  kind: 'ASSIGNED',
+  entity: {
+    id: 'ee000000-0000-4000-8000-0000000000ee',
+    name: 'Karar Operating Entity',
+    jurisdictionRef: 'QA',
+    contactReference: 'mailbox:privacy',
+  },
 };
 export const POLICY_PACK: PolicyPackStatusView = { version: 'iq/v1', status: 'ACTIVE' };
 export const CAPABILITIES: readonly ClientCapabilityView[] = Object.freeze([
@@ -213,12 +218,32 @@ export function enrichment(overrides?: {
       effectiveFor: () => Promise.resolve(ENTITY),
     },
     policyPack: overrides?.policyPack ?? {
-      statusFor: () => Promise.resolve(POLICY_PACK),
+      statusFor: () => Promise.resolve({ kind: 'ACTIVE' as const, status: POLICY_PACK }),
     },
     capabilities: overrides?.capabilities ?? {
-      resolveFor: () => Promise.resolve(CAPABILITIES),
+      resolveFor: () => Promise.resolve({ kind: 'RESOLVED' as const, capabilities: CAPABILITIES }),
     },
   };
 }
+
+/**
+ * The failure side of each enrichment port — a dependency that did not
+ * answer. Used by the negative suite to prove a failing port produces 503 and
+ * NOT a 200 with an empty list.
+ */
+export const unavailableEnrichment = {
+  jurisdiction: {
+    stateFor: () => Promise.resolve({ kind: 'UNAVAILABLE' as const, retryable: true }),
+  },
+  policyPack: {
+    statusFor: () => Promise.resolve({ kind: 'UNAVAILABLE' as const, retryable: true }),
+  },
+  capabilities: {
+    resolveFor: () => Promise.resolve({ kind: 'UNAVAILABLE' as const, retryable: false }),
+  },
+  operatingEntity: {
+    effectiveFor: () => Promise.resolve({ kind: 'UNAVAILABLE' as const }),
+  },
+};
 
 export const fixedClock = { now: () => new Date('2026-08-16T12:00:00.000Z') };

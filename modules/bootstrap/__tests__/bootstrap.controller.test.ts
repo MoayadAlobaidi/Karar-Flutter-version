@@ -63,7 +63,7 @@ function fakes(
             jurisdiction: JURISDICTION,
             operatingEntity: ENTITY,
             policyPack: POLICY_PACK,
-            capabilities: CAPABILITIES,
+            capabilities: { state: 'RESOLVED' as const, items: CAPABILITIES },
           }),
         );
       },

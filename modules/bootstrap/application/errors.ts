@@ -15,6 +15,23 @@ export interface ContextUnavailable {
   readonly message: string;
 }
 
+/**
+ * A context-enrichment dependency (jurisdiction assignments, the PolicyPack
+ * activation ledger, the capability resolver) did not answer. Distinct from
+ * a resolution that answered "none": this one has no answer at all, so the
+ * request fails rather than returning a context whose empty sections would
+ * be indistinguishable from a legitimate absence.
+ *
+ * `message` is for logs and tests. It never reaches the caller — the problem
+ * mapper emits the code alone (see presentation/http/problems.ts).
+ */
+export interface ResolutionUnavailable {
+  readonly kind: 'resolution_unavailable';
+  readonly message: string;
+  /** Whether retrying the same request may succeed. */
+  readonly retryable: boolean;
+}
+
 export interface InvalidTenantSelection {
   readonly kind: 'invalid_tenant_selection';
   readonly message: string;
@@ -35,7 +52,7 @@ export interface MembershipRevokedConcurrently {
   readonly message: string;
 }
 
-export type GetBootstrapError = Unauthenticated | ContextUnavailable;
+export type GetBootstrapError = Unauthenticated | ContextUnavailable | ResolutionUnavailable;
 
 export type SetTenantBindingError =
   | Unauthenticated

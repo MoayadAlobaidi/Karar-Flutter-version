@@ -1,0 +1,393 @@
+{
+  "@@locale": "en",
+
+  "appName": "Karar",
+  "@appName": {
+    "description": "Product name shown in the task switcher and the about screen."
+  },
+
+  "actionContinue": "Continue",
+  "@actionContinue": {
+    "description": "Primary action that advances a multi-step flow."
+  },
+  "actionCancel": "Cancel",
+  "@actionCancel": {
+    "description": "Action that abandons the current flow without saving."
+  },
+  "actionConfirm": "Confirm",
+  "@actionConfirm": {
+    "description": "Action that accepts a destructive or irreversible dialog."
+  },
+  "actionSave": "Save",
+  "@actionSave": {
+    "description": "Action that commits edits in a form."
+  },
+  "actionClose": "Close",
+  "@actionClose": {
+    "description": "Action that dismisses a dialog, sheet, or banner."
+  },
+  "actionBack": "Back",
+  "@actionBack": {
+    "description": "Action that returns to the previous screen."
+  },
+  "actionNext": "Next",
+  "@actionNext": {
+    "description": "Action that moves to the next step."
+  },
+  "actionDone": "Done",
+  "@actionDone": {
+    "description": "Action that completes a flow."
+  },
+  "actionRetry": "Try again",
+  "@actionRetry": {
+    "description": "Action that re-runs a request that failed."
+  },
+  "actionDismiss": "Dismiss",
+  "@actionDismiss": {
+    "description": "Action that hides a banner without taking its offered action."
+  },
+  "actionEdit": "Edit",
+  "@actionEdit": {
+    "description": "Action that opens an item for modification."
+  },
+  "actionRemove": "Remove",
+  "@actionRemove": {
+    "description": "Action that detaches an item from a list."
+  },
+  "actionSubmit": "Submit",
+  "@actionSubmit": {
+    "description": "Action that sends a completed form."
+  },
+  "actionRefresh": "Refresh",
+  "@actionRefresh": {
+    "description": "Action that reloads the current screen from the server."
+  },
+  "actionCopy": "Copy",
+  "@actionCopy": {
+    "description": "Action that copies a value to the clipboard."
+  },
+  "actionSelectAll": "Select all",
+  "@actionSelectAll": {
+    "description": "Action that selects every item in a list."
+  },
+
+  "fieldOptionalSuffix": "{label} (optional)",
+  "@fieldOptionalSuffix": {
+    "description": "Field label marked as not required. Composed with a placeholder so the parenthetical can move or change form per language.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Middle name"
+      }
+    }
+  },
+  "fieldRequiredMarker": "Required",
+  "@fieldRequiredMarker": {
+    "description": "Screen-reader announcement appended to a required field label."
+  },
+  "fieldRequiredIndicator": "*",
+  "@fieldRequiredIndicator": {
+    "description": "The visible mark next to a required field label. A key rather than a literal because not every typographic convention uses an asterisk."
+  },
+  "fieldClear": "Clear {label}",
+  "@fieldClear": {
+    "description": "Accessibility label for the button that empties a text field.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Email address"
+      }
+    }
+  },
+  "fieldShowValue": "Show {label}",
+  "@fieldShowValue": {
+    "description": "Accessibility label for the control that reveals an obscured field.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Password"
+      }
+    }
+  },
+  "fieldHideValue": "Hide {label}",
+  "@fieldHideValue": {
+    "description": "Accessibility label for the control that obscures a revealed field.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Password"
+      }
+    }
+  },
+  "fieldCharacterCount": "{used} of {limit} characters",
+  "@fieldCharacterCount": {
+    "description": "Character budget shown under a length-limited field.",
+    "placeholders": {
+      "used": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "fieldErrorAnnouncement": "{label} has an error. {message}",
+  "@fieldErrorAnnouncement": {
+    "description": "Live announcement made when a field transitions into an error state.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Email address"
+      },
+      "message": {
+        "type": "String",
+        "example": "Enter a valid email address."
+      }
+    }
+  },
+
+  "statusSuccess": "Success",
+  "@statusSuccess": {
+    "description": "Text label for a successful status. Status is never conveyed by colour alone."
+  },
+  "statusWarning": "Warning",
+  "@statusWarning": {
+    "description": "Text label for a warning status."
+  },
+  "statusError": "Error",
+  "@statusError": {
+    "description": "Text label for an error status."
+  },
+  "statusInfo": "Information",
+  "@statusInfo": {
+    "description": "Text label for an informational status."
+  },
+  "statusPending": "Pending",
+  "@statusPending": {
+    "description": "Text label for work the platform has accepted but not finished."
+  },
+  "statusNeutral": "Not started",
+  "@statusNeutral": {
+    "description": "Text label for an inactive or not-yet-begun status."
+  },
+
+  "stateLoading": "Loading",
+  "@stateLoading": {
+    "description": "Accessible label announced while content is being fetched."
+  },
+  "stateLoadingWithSubject": "Loading {subject}",
+  "@stateLoadingWithSubject": {
+    "description": "Accessible label announced while a named section is being fetched.",
+    "placeholders": {
+      "subject": {
+        "type": "String",
+        "example": "your profile"
+      }
+    }
+  },
+  "stateEmptyTitle": "Nothing here yet",
+  "@stateEmptyTitle": {
+    "description": "Default heading for an empty list. The client shows an empty state rather than invented content."
+  },
+  "stateEmptyDescription": "There is nothing to show on this screen right now.",
+  "@stateEmptyDescription": {
+    "description": "Default body copy for an empty list."
+  },
+  "stateErrorTitle": "Something went wrong",
+  "@stateErrorTitle": {
+    "description": "Default heading for a failed request."
+  },
+  "stateErrorDescription": "We could not load this screen. Check your connection and try again.",
+  "@stateErrorDescription": {
+    "description": "Default body copy for a failed request."
+  },
+  "stateOfflineTitle": "You are offline",
+  "@stateOfflineTitle": {
+    "description": "Heading shown when the device has no usable network connection."
+  },
+  "stateOfflineDescription": "Reconnect to load the latest information.",
+  "@stateOfflineDescription": {
+    "description": "Body copy shown when the device has no usable network connection."
+  },
+  "stateErrorReference": "Reference {reference}",
+  "@stateErrorReference": {
+    "description": "Support reference identifier shown under an error so a report can be traced.",
+    "placeholders": {
+      "reference": {
+        "type": "String",
+        "example": "b7f1c2"
+      }
+    }
+  },
+
+  "a11yDialog": "Dialog",
+  "@a11yDialog": {
+    "description": "Role announced when a modal dialog opens."
+  },
+  "a11ySheet": "Sheet",
+  "@a11ySheet": {
+    "description": "Role announced when a bottom sheet opens."
+  },
+  "a11yBanner": "Notice",
+  "@a11yBanner": {
+    "description": "Role announced when an inline banner appears."
+  },
+  "a11yNavigationBar": "Main navigation",
+  "@a11yNavigationBar": {
+    "description": "Accessible label for the bottom navigation bar."
+  },
+  "a11yTabPosition": "Tab {position} of {total}",
+  "@a11yTabPosition": {
+    "description": "Position announcement for a navigation destination.",
+    "placeholders": {
+      "position": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "a11yBusy": "Busy",
+  "@a11yBusy": {
+    "description": "Announced on a control that is running an action and cannot be pressed again."
+  },
+  "a11ySelected": "Selected",
+  "@a11ySelected": {
+    "description": "Announced on the currently selected item."
+  },
+  "a11yDragHandle": "Drag to resize",
+  "@a11yDragHandle": {
+    "description": "Accessible label for the grab handle at the top of a sheet."
+  },
+  "a11yFieldWithRequired": "{label}, required",
+  "@a11yFieldWithRequired": {
+    "description": "Spoken name of a required field. A placeholder rather than concatenation, because the separator between the two parts is not a comma in every language.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Email address"
+      }
+    }
+  },
+  "a11yControlBusy": "{label}, busy",
+  "@a11yControlBusy": {
+    "description": "Spoken name of a control that is running an action.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Continue"
+      }
+    }
+  },
+  "a11yTitleWithSubtitle": "{title}. {subtitle}",
+  "@a11yTitleWithSubtitle": {
+    "description": "Joins a row title and its supporting line into one spoken phrase.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Language"
+      },
+      "subtitle": {
+        "type": "String",
+        "example": "English"
+      }
+    }
+  },
+  "a11yBannerTitled": "{role}: {title}",
+  "@a11yBannerTitled": {
+    "description": "Spoken name of a titled inline banner, combining its role and its heading.",
+    "placeholders": {
+      "role": {
+        "type": "String",
+        "example": "Notice"
+      },
+      "title": {
+        "type": "String",
+        "example": "Verification pending"
+      }
+    }
+  },
+
+  "selectionCount": "{count, plural, =0{No items selected} =1{1 item selected} other{{count} items selected}}",
+  "@selectionCount": {
+    "description": "Count of selected list items. Uses a plural so no language has to concatenate a number onto a noun.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "paginationPosition": "Page {page} of {total}",
+  "@paginationPosition": {
+    "description": "Pager position indicator.",
+    "placeholders": {
+      "page": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "retryCountdown": "{seconds, plural, =1{Try again in 1 second} other{Try again in {seconds} seconds}}",
+  "@retryCountdown": {
+    "description": "Cooldown message before a rate-limited action can be repeated.",
+    "placeholders": {
+      "seconds": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "lastUpdatedAt": "Last updated {timestamp}",
+  "@lastUpdatedAt": {
+    "description": "Freshness stamp for server-provided content.",
+    "placeholders": {
+      "timestamp": {
+        "type": "DateTime",
+        "format": "yMMMd Hm",
+        "isCustomDateFormat": "true"
+      }
+    }
+  },
+
+  "languageSettingTitle": "Language",
+  "@languageSettingTitle": {
+    "description": "Title of the app language setting."
+  },
+  "languageSystemDefault": "System default",
+  "@languageSystemDefault": {
+    "description": "Language option that follows the device setting."
+  },
+  "languageEnglish": "English",
+  "@languageEnglish": {
+    "description": "Name of the English language, always written in English."
+  },
+  "languageArabic": "العربية",
+  "@languageArabic": {
+    "description": "Name of the Arabic language, always written in Arabic."
+  },
+
+  "legalDocumentLanguageNotice": "This document is provided by Karar in {language}.",
+  "@legalDocumentLanguageNotice": {
+    "description": "Shown above a legal document that the server supplied in a language other than the current interface language. Legal documents are never translated on the device.",
+    "placeholders": {
+      "language": {
+        "type": "String",
+        "example": "English"
+      }
+    }
+  },
+  "legalDocumentUnavailable": "This document is not available right now.",
+  "@legalDocumentUnavailable": {
+    "description": "Shown when a legal document could not be fetched. No cached or substituted text is displayed."
+  }
+}

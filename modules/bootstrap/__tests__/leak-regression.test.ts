@@ -56,46 +56,61 @@ const hostile = enrichment({
   operatingEntity: {
     effectiveFor: () =>
       Promise.resolve({
-        id: 'ee000000-0000-4000-8000-0000000000ee',
-        name: 'Karar Operating Entity',
-        // Forbidden: internal licence details and register internals.
-        licences: [{ number: 'CBI-2026-001', status: 'EVIDENCED', evidenceRef: 'vault://x' }],
-        registerRowId: 'internal-42',
-        amanatEnabled: true,
+        kind: 'ASSIGNED',
+        entity: {
+          id: 'ee000000-0000-4000-8000-0000000000ee',
+          name: 'Karar Operating Entity',
+          jurisdictionRef: 'QA',
+          contactReference: 'mailbox:privacy',
+          // Forbidden: internal licence details and register internals.
+          licences: [{ number: 'CBI-2026-001', status: 'EVIDENCED', evidenceRef: 'vault://x' }],
+          registerRowId: 'internal-42',
+          registrationNumber: 'CR-99887',
+          contractingCapacity: true,
+          amanatEnabled: true,
+        },
+        // Forbidden: controller/processor legal analysis riding alongside.
+        dataProtectionRole: 'JOINT_CONTROLLER',
       } as never),
   },
   policyPack: {
     statusFor: () =>
       Promise.resolve({
-        version: 'iq/v1',
-        status: 'ACTIVE',
-        // Forbidden: the full pack content.
-        content: { rules: ['...thousands of lines...'], retention: { days: 400 } },
-        internalAudit: { lastReviewedBy: 'staff:1', notes: 'internal' },
+        kind: 'ACTIVE',
+        status: {
+          version: 'iq/v1',
+          status: 'ACTIVE',
+          // Forbidden: the full pack content.
+          content: { rules: ['...thousands of lines...'], retention: { days: 400 } },
+          internalAudit: { lastReviewedBy: 'staff:1', notes: 'internal' },
+        },
       } as never),
   },
   capabilities: {
     resolveFor: () =>
-      Promise.resolve([
-        {
-          id: 'TRANSACTIONS',
-          status: 'UNAVAILABLE',
-          requirements: [
-            {
-              kind: 'IDENTITY_VERIFICATION',
-              detail: 'Verify your identity',
-              // Forbidden: internal reasoning and evidence on a requirement.
-              internalReason: 'policy pack rule 7.3',
-              rawEvidence: { consentGrantId: 'cg-1' },
-            },
-          ],
-          // Forbidden: implementation/deployment internals and licence data.
-          implementation: 'NOT_IMPLEMENTED',
-          deployment: { production: 'NOT_DEPLOYED' },
-          requiredLicences: ['CBI-PAYMENTS'],
-          hiddenReason: 'pending legal review',
-        },
-      ] as never),
+      Promise.resolve({
+        kind: 'RESOLVED',
+        capabilities: [
+          {
+            id: 'TRANSACTIONS',
+            status: 'UNAVAILABLE',
+            requirements: [
+              {
+                kind: 'IDENTITY_VERIFICATION',
+                detail: 'Verify your identity',
+                // Forbidden: internal reasoning and evidence on a requirement.
+                internalReason: 'policy pack rule 7.3',
+                rawEvidence: { consentGrantId: 'cg-1' },
+              },
+            ],
+            // Forbidden: implementation/deployment internals and licence data.
+            implementation: 'NOT_IMPLEMENTED',
+            deployment: { production: 'NOT_DEPLOYED' },
+            requiredLicences: ['CBI-PAYMENTS'],
+            hiddenReason: 'pending legal review',
+          },
+        ],
+      } as never),
   },
 });
 
@@ -129,14 +144,21 @@ describe('§48 — the serializer emits ONLY the declared safe fields', () => {
     ]);
     expect(Object.keys(response.jurisdiction).sort()).toEqual(['jurisdictionId', 'state']);
     expect(response.jurisdiction).toEqual({ state: 'VERIFIED', jurisdictionId: 'IQ' });
-    expect(Object.keys(response.operatingEntity ?? {}).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(response.operatingEntity).sort()).toEqual(['entity', 'state']);
+    expect(Object.keys(response.operatingEntity.entity ?? {}).sort()).toEqual([
+      'contactReference',
+      'id',
+      'jurisdictionRef',
+      'name',
+    ]);
     expect(Object.keys(response.policyPack ?? {}).sort()).toEqual(['status', 'version']);
-    expect(Object.keys(response.capabilities[0] ?? {}).sort()).toEqual([
+    expect(Object.keys(response.capabilities).sort()).toEqual(['items', 'state']);
+    expect(Object.keys(response.capabilities.items[0] ?? {}).sort()).toEqual([
       'id',
       'requirements',
       'status',
     ]);
-    expect(Object.keys(response.capabilities[0]?.requirements[0] ?? {}).sort()).toEqual([
+    expect(Object.keys(response.capabilities.items[0]?.requirements[0] ?? {}).sort()).toEqual([
       'detail',
       'kind',
     ]);
@@ -158,6 +180,9 @@ describe('§48 — the serializer emits ONLY the declared safe fields', () => {
       'CBI-2026-001', // internal licence details
       'evidenceRef',
       'registerRowId',
+      'CR-99887', // register internals (registration number)
+      'contractingCapacity', // stored legal analysis
+      'JOINT_CONTROLLER', // controller/processor legal analysis
       'amanatEnabled', // Amanat existence
       'AMANAT',
       'thousands of lines', // full PolicyPack content
@@ -180,38 +205,49 @@ describe('§48 — the serializer emits ONLY the declared safe fields', () => {
 
     // Exactly the entries the client-safe port emitted — no more, no fewer,
     // and no bootstrap-invented status or requirement.
-    expect(response.capabilities).toEqual([
-      {
-        id: 'TRANSACTIONS',
-        status: 'UNAVAILABLE',
-        requirements: [{ kind: 'IDENTITY_VERIFICATION', detail: 'Verify your identity' }],
-      },
-    ]);
+    expect(response.capabilities).toEqual({
+      state: 'RESOLVED',
+      items: [
+        {
+          id: 'TRANSACTIONS',
+          status: 'UNAVAILABLE',
+          requirements: [{ kind: 'IDENTITY_VERIFICATION', detail: 'Verify your identity' }],
+        },
+      ],
+    });
   });
 
-  it('an EMPTY client-safe result stays empty — no default or fabricated capability appears', async () => {
+  it('an EMPTY client-safe result stays empty and says so — no default or fabricated capability appears', async () => {
     const useCase = new GetBootstrap({
       resolveTenantContext: new FakeResolve([{ kind: 'UNBOUND' }]),
       bindSession: new UnreachableBind(),
       revokeSession: new UnreachableRevoke(),
-      ...enrichment({ capabilities: { resolveFor: () => Promise.resolve([]) } }),
+      ...enrichment({
+        capabilities: {
+          resolveFor: () => Promise.resolve({ kind: 'RESOLVED' as const, capabilities: [] }),
+        },
+      }),
       auditTrail: new RecordingAudit(),
       clock: fixedClock,
     });
     const result = await useCase.execute(principal(), CLIENT);
     if (!result.ok) throw new Error('expected a bootstrap view');
-    expect(toBootstrapResponse(result.value).capabilities).toEqual([]);
+    // The state is what distinguishes this from a swallowed failure.
+    expect(toBootstrapResponse(result.value).capabilities).toEqual({
+      state: 'RESOLVED',
+      items: [],
+    });
   });
 
-  it('unresolved enrichment serializes as explicit nulls, never as fabricated defaults', async () => {
+  it('unresolved enrichment serializes as explicit states and nulls, never as fabricated defaults', async () => {
     const useCase = new GetBootstrap({
       resolveTenantContext: new FakeResolve([{ kind: 'UNBOUND' }]),
       bindSession: new UnreachableBind(),
       revokeSession: new UnreachableRevoke(),
       ...enrichment({
         jurisdiction: { stateFor: () => Promise.resolve({ kind: 'NONE' as const }) },
-        operatingEntity: { effectiveFor: () => Promise.resolve(null) },
-        policyPack: { statusFor: () => Promise.resolve(null) },
+        operatingEntity: { effectiveFor: () => Promise.resolve({ kind: 'UNASSIGNED' as const }) },
+        policyPack: { statusFor: () => Promise.resolve({ kind: 'NONE' as const }) },
       }),
       auditTrail: new RecordingAudit(),
       clock: fixedClock,
@@ -222,8 +258,28 @@ describe('§48 — the serializer emits ONLY the declared safe fields', () => {
     // Unresolved jurisdiction is the TYPED NONE state, not a null that could
     // be mistaken for "fine"; the identifier is null because none exists.
     expect(response.jurisdiction).toEqual({ state: 'NONE', jurisdictionId: null });
-    expect(response.operatingEntity).toBeNull();
+    expect(response.operatingEntity).toEqual({ state: 'UNASSIGNED', entity: null });
     expect(response.policyPack).toBeNull();
+  });
+
+  it('an operating-entity READ FAILURE degrades that section only, and never invents an entity', async () => {
+    const useCase = new GetBootstrap({
+      resolveTenantContext: new FakeResolve([{ kind: 'UNBOUND' }]),
+      bindSession: new UnreachableBind(),
+      revokeSession: new UnreachableRevoke(),
+      ...enrichment({
+        operatingEntity: { effectiveFor: () => Promise.resolve({ kind: 'UNAVAILABLE' as const }) },
+      }),
+      auditTrail: new RecordingAudit(),
+      clock: fixedClock,
+    });
+    const result = await useCase.execute(principal(), CLIENT);
+    if (!result.ok) throw new Error('expected a bootstrap view');
+    const response = toBootstrapResponse(result.value);
+    expect(response.operatingEntity).toEqual({ state: 'UNAVAILABLE', entity: null });
+    // The rest of the context is complete: the failure is scoped, not spread.
+    expect(response.capabilities.state).toBe('RESOLVED');
+    expect(response.policyPack).not.toBeNull();
   });
 
   it('tenant choices carry only the safe selection fields (no status, no entity binding, no membership plumbing)', async () => {

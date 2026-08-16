@@ -1,0 +1,166 @@
+# jurisdiction surface — path-item fragments (ADR-0009: authored by hand,
+# never generated from code). The phase lead merges these into openapi.yaml via
+# $ref per path, e.g.:
+#   /jurisdiction/self-declaration:
+#     $ref: './paths/jurisdiction.yaml#/~1jurisdiction~1self-declaration'
+#
+# ONE route, and the contract rules that keep it narrow:
+#   * Subject and tenant identity come ONLY from the authenticated session's
+#     server-side binding. The single body field is the declared jurisdiction
+#     reference, which is DATA validated against the register — never an
+#     identity. `?userId=`, `x-tenant-id`, and body `userId`/`tenantId` are
+#     ignored by construction (asserted by test).
+#   * The recorded assignment is ALWAYS source USER_DECLARED and verification
+#     status UNVERIFIED. Neither is a request parameter; both are fixed by the
+#     use case and independently CHECK-enforced by migration 0072. A caller
+#     cannot request verification, and this route never grants it.
+#   * IT WIDENS NOTHING. An UNVERIFIED effective state is a denial in the
+#     capability ceiling, so a declaration changes which denial reason a
+#     subject sees and clears no capability. It creates no legal approval,
+#     activates no PolicyPack, and verifies nothing.
+#   * A VERIFIED assignment is never superseded — a subject cannot erase its
+#     own verification by declaring something else (409).
+#   * History is preserved: the open assignment is ended and a successor
+#     inserted; nothing is rewritten and nothing is deleted.
+#   * Deliberately absent from this surface: operator assignment
+#     administration, verification writes, jurisdiction-settings writes, and
+#     PolicyPack activation. Those are control-plane surfaces (ADR-0021).
+
+/jurisdiction/self-declaration:
+  post:
+    operationId: declareOwnJurisdiction
+    summary: Declare the caller's own jurisdiction (unverified)
+    description: >-
+      Records the authenticated subject's own jurisdiction so that onboarding
+      can proceed: without an assignment there is no governing jurisdiction, no
+      PolicyPack resolves for the subject, and consent acceptance can pin no
+      provenance.
+
+      The result is ALWAYS an UNVERIFIED, USER_DECLARED assignment. Verification
+      is a separate, provider-sourced assignment this route cannot create, and
+      the response states the resulting verification state explicitly so a
+      client cannot mistake a successful declaration for verification.
+
+      Re-declaring the jurisdiction already in effect is a no-op that returns
+      the standing assignment with `recorded: false`, so a client retry does not
+      churn the assignment history.
+    tags: [jurisdiction]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [jurisdictionId]
+            properties:
+              jurisdictionId:
+                type: string
+                pattern: '^[A-Za-z0-9-]{2,32}$'
+                description: >-
+                  A jurisdiction reference code from the platform register,
+                  verified server-side. An identifier the register does not hold
+                  is refused (400) rather than stored as free text.
+    responses:
+      '200':
+        description: The declaration was recorded, or was already in effect.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/DeclaredJurisdiction'
+      '400':
+        description: >-
+          The body is malformed, or the identifier is not one this platform
+          recognises (code INVALID_JURISDICTION_DECLARATION).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '409':
+        description: >-
+          The session is not bound to a tenant (code TENANT_BINDING_REQUIRED —
+          bind one through the platform bootstrap surface first), or a verified
+          assignment is in effect and a self-declaration never supersedes one
+          (code DECLARATION_NOT_PERMITTED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        description: >-
+          The assignment store or the audit trail did not answer (code
+          JURISDICTION_DECLARATION_UNAVAILABLE, retryable). The document carries
+          no store text and no register internals.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  DeclaredJurisdiction:
+    type: object
+    required: [state, jurisdictionId, source, effectiveFrom, recorded]
+    properties:
+      state:
+        type: string
+        enum: [UNVERIFIED]
+        description: >-
+          Always UNVERIFIED. Stated as a field rather than left to
+          documentation, so a client cannot read a successful declaration as
+          verification.
+      jurisdictionId:
+        type: string
+        description: >-
+          The declared jurisdiction as DATA (display, pack selection). Clients
+          never branch on it — behaviour differences resolve through policy
+          packs (architecture test 12).
+      source:
+        type: string
+        enum: [USER_DECLARED]
+      effectiveFrom:
+        type: string
+        format: date-time
+      recorded:
+        type: boolean
+        description: >-
+          False when the caller re-declared the jurisdiction already in effect;
+          the standing assignment is returned and no new history window opens.
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        type: integer
+      code:
+        type: string
+        description: >-
+          Machine-readable reason (AUTHENTICATION_REQUIRED,
+          INVALID_JURISDICTION_DECLARATION, TENANT_BINDING_REQUIRED,
+          DECLARATION_NOT_PERMITTED, JURISDICTION_DECLARATION_UNAVAILABLE).
+      detail:
+        type: string
+      retryable:
+        type: boolean
+        description: Present where retrying is meaningful (the 503 path).
+      requestId:
+        type: string
+        description: >-
+          The caller's own request correlation id, echoed so a client-reported
+          failure joins to the server-side log line. The cause never crosses
+          the edge.
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

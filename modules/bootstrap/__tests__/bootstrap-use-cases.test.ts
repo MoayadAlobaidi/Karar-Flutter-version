@@ -244,7 +244,8 @@ describe('GET /platform/bootstrap — binding resolution', () => {
       assignment: { jurisdictionId: 'IQ' },
     });
     expect(result.value.policyPack?.version).toBe('iq/v1');
-    expect(result.value.capabilities).toHaveLength(1);
+    expect(result.value.capabilities.state).toBe('RESOLVED');
+    expect(result.value.capabilities.items).toHaveLength(1);
   });
 });
 

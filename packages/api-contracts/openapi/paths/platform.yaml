@@ -14,8 +14,19 @@
 #   * The bootstrap response carries CLIENT-SAFE data only: capability output
 #     arrives pre-filtered from the client-safe resolver (hidden capabilities
 #     never appear in any state), PolicyPack is version/status only (never
-#     content), operating entity is id/name only (never licence details), and
-#     the serializer emits a closed field set (leak-regression tested).
+#     content), the operating entity is the reviewed safe projection (never
+#     licence details, registration numbers, contracting capacity, entity
+#     status, or controller/processor analysis), and the serializer emits a
+#     closed field set (leak-regression tested).
+#   * ABSENCE AND FAILURE ARE DIFFERENT ANSWERS. A resolution that succeeded
+#     with nothing to report is a 200 carrying an explicit state (capabilities
+#     `state: RESOLVED` with an empty `items`; jurisdiction `NONE`; policyPack
+#     null; operatingEntity `UNASSIGNED`). A resolution that could not be
+#     PERFORMED is a 503 (code BOOTSTRAP_UNAVAILABLE) — never a 200 whose
+#     empty sections would read as a legitimate absence. The single exception
+#     is the operating-entity read, whose failure degrades that section alone
+#     to state `UNAVAILABLE` because the rest of the context is complete
+#     without it.
 #   * No admin write endpoints exist on this surface.
 
 /platform/bootstrap:
@@ -49,7 +60,20 @@
       '401':
         $ref: '#/components/ProblemResponse'
       '503':
-        $ref: '#/components/ProblemResponse'
+        description: >-
+          A context resolution could not be PERFORMED — tenant-context
+          resolution, the audit append, the jurisdiction assignment read, the
+          PolicyPack activation ledger, or capability resolution (code
+          BOOTSTRAP_UNAVAILABLE, one code for one remedy). This is NOT the
+          same answer as an empty result: a successful resolution with nothing
+          to report is a 200. The document carries `retryable` and, when the
+          caller supplied one, `requestId`; it deliberately carries no detail,
+          no capability identifiers, no policy or licence internals, and no
+          store text.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
 
 /platform/tenant-binding:
   post:
@@ -176,17 +200,7 @@ components:
               The assigned jurisdiction as DATA (display, pack selection);
               null when the state is NONE.
       operatingEntity:
-        oneOf:
-          - type: 'null'
-          - type: object
-            required: [id, name]
-            properties:
-              id:
-                type: string
-                format: uuid
-              name:
-                type: string
-        description: Safe reference only — never licence or register detail.
+        $ref: '#/components/OperatingEntityState'
       policyPack:
         oneOf:
           - type: 'null'
@@ -197,15 +211,12 @@ components:
                 type: string
               status:
                 type: string
-        description: Version and status only — never pack content.
-      capabilities:
-        type: array
         description: >-
-          CLIENT-SAFE capability views, passed through from the client-safe
-          resolver unenriched. Hidden capabilities never appear, in any
-          state; requirements are actionable only.
-        items:
-          $ref: '#/components/CapabilityView'
+          Version and status only — never pack content. Null means no pack is
+          active for the resolved jurisdiction; a ledger that could not be
+          read answers 503 instead, never null.
+      capabilities:
+        $ref: '#/components/CapabilitiesSection'
   BindingState:
     oneOf:
       - type: object
@@ -246,6 +257,71 @@ components:
       roleHint:
         type: string
         description: Informational only — authoritative roles live in the authorization module.
+  OperatingEntityState:
+    type: object
+    required: [state, entity]
+    description: >-
+      Which legal person the caller contracted with, as a STATE plus the
+      reviewed safe projection. ASSIGNED carries the entity; UNASSIGNED means
+      no binding exists; UNAVAILABLE means the read failed and the reference
+      is not known. The entity is never fabricated, and `entity` is explicitly
+      null (not omitted) in both absent states.
+    properties:
+      state:
+        type: string
+        enum: [ASSIGNED, UNASSIGNED, UNAVAILABLE]
+      entity:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/OperatingEntitySummary'
+  OperatingEntitySummary:
+    type: object
+    required: [id, name, jurisdictionRef, contactReference]
+    description: >-
+      The reviewed safe field set. Deliberately absent and never to be added:
+      licence records and evidence references, registration numbers and other
+      register internals, contracting capacity, controller/processor legal
+      analysis, data-protection role assignments, entity status, and
+      administrative timestamps.
+    properties:
+      id:
+        type: string
+        format: uuid
+      name:
+        type: string
+        description: >-
+          The registered legal name — the register holds no separate trading
+          name, and none is invented.
+      jurisdictionRef:
+        type: [string, 'null']
+        description: >-
+          The regime the entity is registered in, as DATA for display. Clients
+          never branch on it (architecture test 12).
+      contactReference:
+        type: [string, 'null']
+        description: >-
+          A published role-mailbox reference for data-protection contact, where
+          the register carries one. Never a named person.
+  CapabilitiesSection:
+    type: object
+    required: [state, items]
+    description: >-
+      The resolution STATE and the list, structurally inseparable. A 200 always
+      carries state RESOLVED, so an EMPTY `items` is a stated answer rather
+      than something the client must infer; a resolution that failed answers
+      503 and never reaches this shape.
+    properties:
+      state:
+        type: string
+        enum: [RESOLVED]
+      items:
+        type: array
+        description: >-
+          CLIENT-SAFE capability views, passed through from the client-safe
+          resolver unenriched. Hidden capabilities never appear, in any
+          state; requirements are actionable only.
+        items:
+          $ref: '#/components/CapabilityView'
   CapabilityView:
     type: object
     required: [id, status, requirements]
@@ -316,11 +392,23 @@ components:
         description: >-
           Machine-readable reason (e.g. AUTHENTICATION_REQUIRED,
           MEMBERSHIP_REQUIRED, BINDING_CONFLICT,
-          MEMBERSHIP_REVOKED_CONCURRENTLY).
+          MEMBERSHIP_REVOKED_CONCURRENTLY, BOOTSTRAP_UNAVAILABLE).
       detail:
         type: string
       reason:
         type: string
+      retryable:
+        type: boolean
+        description: >-
+          Present where retrying is meaningful (the 503 path): true for a
+          transient dependency fault, false where a retry cannot change the
+          answer. Absent rather than guessed.
+      requestId:
+        type: string
+        description: >-
+          The caller's own request correlation id, echoed so a client-reported
+          failure joins to the server-side log line that holds the cause. The
+          cause itself never crosses the edge.
   ProblemResponse:
     description: RFC 7807 problem document.
     content:

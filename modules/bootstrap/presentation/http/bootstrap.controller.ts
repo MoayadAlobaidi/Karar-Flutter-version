@@ -59,7 +59,7 @@ export class BootstrapController {
       this.principalSource.clientContextOf(request),
     );
     if (!result.ok) {
-      const problem = problemForBootstrapError(result.error);
+      const problem = problemForBootstrapError(result.error, principal.requestId);
       reply.status(problem.status).send(problem.body);
       return;
     }
@@ -86,7 +86,7 @@ export class BootstrapController {
       this.principalSource.clientContextOf(request),
     );
     if (!result.ok) {
-      const problem = problemForBootstrapError(result.error);
+      const problem = problemForBootstrapError(result.error, principal.requestId);
       reply.status(problem.status).send(problem.body);
       return;
     }
