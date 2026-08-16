@@ -1,0 +1,106 @@
+// Prisma mapping for the consent module's tables (migrations 0064-0065).
+// The SQL migrations remain authoritative; this file maps them exactly so
+// `make prisma-drift` stays meaningful (base.prisma header).
+//
+// Deliberately NOT expressed here, enforced by the migrations and their
+// tests instead: CHECK constraints (the publication rule, status
+// vocabularies, withdrawn_at pairing), the immutability/transition
+// triggers, RLS enable/force and the consent_grants principal policy, and
+// grants. The consent repositories run every consent_grants statement
+// inside a principal-context transaction (SET LOCAL app.tenant_id /
+// app.user_id) or the policy returns nothing — failing closed.
+//
+// Cross-module references (entity_id on legal_documents, user_id/tenant_id/
+// operating_entity_id on consent_grants) are plain scalars by design
+// (data-model.md §2): no relation crosses a module boundary.
+
+model LegalDocument {
+  id              String   @id @db.Uuid
+  entityId        String   @map("entity_id") @db.Uuid
+  jurisdictionRef String   @map("jurisdiction_ref")
+  purposeRefs     String[] @map("purpose_refs")
+  kind            String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  versions LegalDocumentVersion[]
+
+  @@unique([entityId, jurisdictionRef, kind], map: "legal_documents_entity_jurisdiction_kind_key")
+  @@map("legal_documents")
+}
+
+model LegalDocumentVersion {
+  id             String    @id @db.Uuid
+  documentId     String    @map("document_id") @db.Uuid
+  version        String
+  contentHash    String    @map("content_hash")
+  storageRef     String    @map("storage_ref")
+  classification String?
+  author         String
+  reviewer       String?
+  reason         String?
+  effectiveAt    DateTime? @map("effective_at") @db.Timestamptz(6)
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  priorVersionId String?   @map("prior_version_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document     LegalDocument          @relation(fields: [documentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  priorVersion LegalDocumentVersion?  @relation("VersionChain", fields: [priorVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  successors   LegalDocumentVersion[] @relation("VersionChain")
+  grants       ConsentGrant[]
+  evaluations  ReconsentEvaluation[]
+
+  @@unique([documentId, version], map: "legal_document_versions_document_id_version_key")
+  @@index([documentId, effectiveAt], map: "legal_document_versions_document_idx")
+  @@map("legal_document_versions")
+}
+
+model ConsentGrant {
+  id                     String    @id @db.Uuid
+  userId                 String    @map("user_id") @db.Uuid
+  tenantId               String    @map("tenant_id") @db.Uuid
+  operatingEntityId      String    @map("operating_entity_id") @db.Uuid
+  jurisdictionRef        String    @map("jurisdiction_ref")
+  purposeRef             String    @map("purpose_ref")
+  consentVersion         String    @map("consent_version")
+  legalDocumentVersionId String    @map("legal_document_version_id") @db.Uuid
+  grantedAt              DateTime  @map("granted_at") @db.Timestamptz(6)
+  withdrawnAt            DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  status                 String
+  evidenceReference      String    @map("evidence_reference")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  legalDocumentVersion LegalDocumentVersion @relation(fields: [legalDocumentVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, tenantId, operatingEntityId, purposeRef, jurisdictionRef, grantedAt], map: "consent_grants_resolution_idx")
+  @@index([legalDocumentVersionId], map: "consent_grants_version_idx")
+  @@map("consent_grants")
+}
+
+model ReconsentEvaluation {
+  id                     String   @id @db.Uuid
+  legalDocumentVersionId String   @map("legal_document_version_id") @db.Uuid
+  purposeRef             String   @map("purpose_ref")
+  evaluation             String
+  evaluatedBy            String   @map("evaluated_by")
+  evaluatedAt            DateTime @map("evaluated_at") @db.Timestamptz(6)
+  affectedQueryNotes     String   @map("affected_query_notes")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  legalDocumentVersion LegalDocumentVersion @relation(fields: [legalDocumentVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([legalDocumentVersionId, purposeRef], map: "reconsent_evaluations_version_purpose_key")
+  @@index([legalDocumentVersionId], map: "reconsent_evaluations_version_idx")
+  @@map("reconsent_evaluations")
+}
+
+model ProcessingBasisReference {
+  id              String   @id @db.Uuid
+  purposeRef      String   @map("purpose_ref")
+  jurisdictionRef String   @map("jurisdiction_ref")
+  basisRef        String   @map("basis_ref")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([purposeRef, jurisdictionRef], map: "processing_basis_references_purpose_jurisdiction_key")
+  @@map("processing_basis_references")
+}

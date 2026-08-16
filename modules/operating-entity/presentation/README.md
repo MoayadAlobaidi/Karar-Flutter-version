@@ -10,4 +10,9 @@ May import this module's `application/`. **Never another module's `domain/`.**
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 3: deliberately empty. Entity administration is a Super Admin surface
+(operating-entity.md §10) and mounts behind the control-plane gateway when
+that phase lands (ADR-0021) — the authorized use cases exist in
+`application/use-cases/`, and the authored contract for the deferred surface
+is `packages/api-contracts/openapi/paths/operating-entity.yaml`. Decision
+recorded in [`../MODULE.md`](../MODULE.md)._

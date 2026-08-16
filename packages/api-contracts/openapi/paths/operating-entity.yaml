@@ -1,0 +1,161 @@
+# operating-entity admin surface — path-item fragments (ADR-0009: authored
+# by hand, never generated from code; endpoints are added here BEFORE they
+# are implemented).
+#
+# IMPLEMENTATION DEFERRED, DELIBERATELY: entity administration is a Super
+# Admin surface (operating-entity.md §10) and Super Admin surfaces mount
+# behind the control-plane gateway (ADR-0021), which arrives in Phase 8.
+# The Phase 3 use cases exist and are authorization-gated
+# (entity.entity.manage / entity.migration.approve via the PolicyService
+# port); this fragment records the contract they will serve so the Phase 8
+# mounting is a wiring change, not a design one. Decision recorded in
+# modules/operating-entity/MODULE.md.
+#
+# Contract rules made visible here:
+#   * Every operation requires platform-operator authorization; none is
+#     reachable with a consumer session.
+#   * No operation edits an entity binding on an existing record: bindings
+#     move only through the EntityMigration workflow, and completed
+#     migrations are immutable history.
+#   * Licence rows never imply a legal fact: the status vocabulary carries
+#     provenance (CLAIMED_UNVERIFIED / EVIDENCED / EXPIRED / REVOKED), and
+#     EVIDENCED requires an evidence reference.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`.
+
+/admin/operating-entities:
+  post:
+    operationId: createOperatingEntity
+    summary: Register an operating entity (platform operator only; control-plane mounted, Phase 8)
+    tags: [operating-entity-admin]
+    security:
+      - controlPlaneAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              [
+                legalName,
+                registrationNumber,
+                registeredJurisdictionRef,
+                contractingCapacity,
+                dataProtectionContact,
+              ]
+            properties:
+              legalName: { type: string, minLength: 1 }
+              registrationNumber: { type: string, minLength: 1 }
+              registeredJurisdictionRef: { type: string, minLength: 1 }
+              contractingCapacity: { type: boolean }
+              dataProtectionContact: { type: string, minLength: 1 }
+    responses:
+      '201':
+        description: The registered entity.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components-notes/OperatingEntity'
+      '403': { description: Not a platform operator. }
+
+/admin/operating-entities/{entityId}:
+  get:
+    operationId: getOperatingEntity
+    summary: Read one operating entity (platform operator only; control-plane mounted, Phase 8)
+    tags: [operating-entity-admin]
+    security:
+      - controlPlaneAuth: []
+    parameters:
+      - name: entityId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      '200':
+        description: The entity.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components-notes/OperatingEntity'
+      '403': { description: Not a platform operator. }
+      '404': { description: Unknown entity. }
+
+/admin/operating-entities/{entityId}/status:
+  put:
+    operationId: updateOperatingEntityStatus
+    summary: Change an entity's status, with a recorded reason (control-plane mounted, Phase 8)
+    tags: [operating-entity-admin]
+    security:
+      - controlPlaneAuth: []
+    parameters:
+      - name: entityId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status, reason]
+            properties:
+              status: { type: string, enum: [ACTIVE, SUSPENDED, RETIRED] }
+              reason: { type: string, minLength: 1 }
+    responses:
+      '200': { description: Status changed; audited with before/after. }
+      '403': { description: Not a platform operator. }
+      '404': { description: Unknown entity. }
+
+/admin/entity-migrations:
+  post:
+    operationId: proposeEntityMigration
+    summary: Propose an entity-binding migration (never a silent update; control-plane mounted, Phase 8)
+    description: >-
+      Opens the audited EntityMigration workflow (ADR-0024 §5): PROPOSED ->
+      RECONSENT_EVALUATED -> AWAITING_ACCEPTANCE -> MIGRATED | BLOCKED.
+      Completing a migration rebinds the FORWARD assignment only; records
+      that pinned their entity at creation keep it forever.
+    tags: [operating-entity-admin]
+    security:
+      - controlPlaneAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [scope, subjectRef, fromEntity, toEntity, reason]
+            properties:
+              scope: { type: string, enum: [TENANT_DEFAULT, USER_CONTRACTING] }
+              subjectRef: { type: string, minLength: 1 }
+              fromEntity: { type: string, format: uuid }
+              toEntity: { type: string, format: uuid }
+              reason: { type: string, minLength: 1 }
+    responses:
+      '201': { description: The proposed migration, status PROPOSED. }
+      '403': { description: Not a platform operator (entity.migration.approve). }
+
+# Note: not OpenAPI components — a named shape the merged document lifts
+# into #/components/schemas when the phase lead composes openapi.yaml.
+components-notes:
+  OperatingEntity:
+    type: object
+    required:
+      [
+        id,
+        legalName,
+        registrationNumber,
+        registeredJurisdictionRef,
+        contractingCapacity,
+        dataProtectionContact,
+        status,
+      ]
+    properties:
+      id: { type: string, format: uuid }
+      legalName: { type: string }
+      registrationNumber: { type: string }
+      registeredJurisdictionRef: { type: string }
+      contractingCapacity: { type: boolean }
+      dataProtectionContact: { type: string }
+      status: { type: string, enum: [ACTIVE, SUSPENDED, RETIRED] }

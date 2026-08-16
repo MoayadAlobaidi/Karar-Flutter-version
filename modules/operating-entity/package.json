@@ -1,0 +1,24 @@
+{
+  "name": "@karar/operating-entity",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The legal person providing the service: relationship-scoped data-protection roles, licences as typed references, entity bindings, and the audited EntityMigration workflow (ADR-0024).",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/audit": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}
