@@ -28,25 +28,35 @@ export {
 
 // application — principals, errors, ports, use cases
 export {
+  requireAuthenticated,
   requirePrincipal,
   requireRedeemer,
+  requireSessionActor,
+  type AuthenticatedActor,
   type MissingPrincipalContext,
   type PrincipalActor,
   type RedeemerActor,
 } from './application/principal.js';
 export type {
   AlreadyMember,
+  BindingFailed,
   CreateInvitationError,
+  FirstPartyTenantUnavailable,
   GetOwnTenantError,
+  GrantFirstPartyMembershipError,
   InvalidInvitationInput,
   InvitationNotFound,
   InvitationNotRedeemable,
   ListMembersError,
+  ListOwnMembershipsError,
   MembershipNotFound,
+  MembershipRevokedConcurrently,
   NotAuthorized,
   RedeemInvitationError,
+  ResolveTenantContextError,
   RevokeInvitationError,
   StoreFailure,
+  SwitchTenantError,
   TenantNotFound,
 } from './application/errors.js';
 export {
@@ -56,8 +66,22 @@ export {
   type PolicyService,
   type TenancyPermission,
 } from './application/ports/policy-service.js';
-export type { TenantRepository } from './application/ports/tenant-repository.js';
-export type { MembershipRepository } from './application/ports/membership-repository.js';
+export type {
+  MemberTenantRepository,
+  TenantRepository,
+} from './application/ports/tenant-repository.js';
+export type {
+  MembershipRepository,
+  OwnMembershipRepository,
+} from './application/ports/membership-repository.js';
+export type {
+  BindSessionTenantPort,
+  BindingClientContext,
+  RebindSessionTenantPort,
+  ReboundSessionView,
+  RevokeSessionPort,
+  SessionBindingDenial,
+} from './application/ports/session-binding.js';
 export {
   RedemptionPrivilegeViolation,
   type CreateInvitationRecord,
@@ -95,6 +119,25 @@ export {
   type InvitationRedeemed,
   type RedeemInvitationInput,
 } from './application/use-cases/redeem-invitation.js';
+export {
+  ListOwnMemberships,
+  membershipActiveAt,
+} from './application/use-cases/list-own-memberships.js';
+export {
+  ResolveTenantContext,
+  type TenantChoice,
+  type TenantContextResolution,
+} from './application/use-cases/resolve-tenant-context.js';
+export {
+  SwitchTenant,
+  type SwitchTenantInput,
+  type TenantSwitched,
+} from './application/use-cases/switch-tenant.js';
+export {
+  FIRST_PARTY_MEMBER_ROLE_HINT,
+  GrantFirstPartyMembership,
+  type FirstPartyMembershipGranted,
+} from './application/use-cases/grant-first-party-membership.js';
 
 // infrastructure — implementations for the composition root
 export { PrismaTenantRepository } from './infrastructure/persistence/prisma-tenant-repository.js';

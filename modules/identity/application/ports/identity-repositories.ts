@@ -143,6 +143,33 @@ export interface SessionRepository {
     readonly now: Date;
     readonly exceptSessionId?: SessionId;
   }): Promise<number>;
+  /**
+   * Owner-scoped, ATOMIC first-bind claim: sets tenant_binding on the
+   * caller's own LIVE session iff it is currently null
+   * (`UPDATE … WHERE revoked_at IS NULL AND tenant_binding IS NULL`).
+   * 'not_bindable' covers every refusal identically — revoked/unknown
+   * session or an existing binding (switch is the other path).
+   */
+  setTenantBinding(input: {
+    readonly accountId: UserId;
+    readonly sessionId: SessionId;
+    readonly tenantBinding: string;
+    readonly now: Date;
+  }): Promise<'bound' | 'not_bindable'>;
+  /**
+   * Owner-scoped, ATOMIC switch: in ONE transaction revokes the old session
+   * AND its refresh-token families (guarded on the session still being
+   * unrevoked), then inserts the replacement bundle carrying the new
+   * binding. 'stale_session' = the old session was already revoked or
+   * unknown; nothing is written.
+   */
+  rebindSession(input: {
+    readonly accountId: UserId;
+    readonly oldSessionId: SessionId;
+    readonly reason: RevocationReason;
+    readonly bundle: NewSessionBundle;
+    readonly now: Date;
+  }): Promise<'rebound' | 'stale_session'>;
   /** Bootstrap: resolve a presented token hash to its token+family+session. */
   findByTokenHash(tokenHash: string): Promise<PresentedRefreshToken | null>;
   /**

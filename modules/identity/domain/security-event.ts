@@ -32,6 +32,8 @@ export const SECURITY_EVENT_TYPES = [
   'refresh_reuse_detected',
   'session_revoked',
   'sessions_revoked_bulk',
+  'session_tenant_bound',
+  'session_tenant_rebound',
   'password_reset_requested',
   'password_reset_failed',
   'password_reset_completed',

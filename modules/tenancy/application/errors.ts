@@ -51,10 +51,48 @@ export interface StoreFailure {
   readonly message: string;
 }
 
+/** The identity-side binding seam refused or failed (Phase 3.5 switch path). */
+export interface BindingFailed {
+  readonly kind: 'binding_failed';
+  readonly message: string;
+}
+
+/**
+ * The target membership vanished while the switch was in flight; the
+ * compensating check revoked the replacement session — the caller ends
+ * unbound/denied, never bound without membership.
+ */
+export interface MembershipRevokedConcurrently {
+  readonly kind: 'membership_revoked_concurrently';
+  readonly message: string;
+}
+
+/** The configured first-party tenant is absent, inactive, or not first-party. */
+export interface FirstPartyTenantUnavailable {
+  readonly kind: 'first_party_tenant_unavailable';
+  readonly message: string;
+}
+
 export type GetOwnTenantError =
   | MissingPrincipalContext
   | TenantNotFound
   | MembershipNotFound
+  | StoreFailure;
+
+export type ListOwnMembershipsError = MissingPrincipalContext | StoreFailure;
+
+export type ResolveTenantContextError = MissingPrincipalContext | StoreFailure;
+
+export type SwitchTenantError =
+  | MissingPrincipalContext
+  | MembershipNotFound
+  | BindingFailed
+  | MembershipRevokedConcurrently
+  | StoreFailure;
+
+export type GrantFirstPartyMembershipError =
+  | MissingPrincipalContext
+  | FirstPartyTenantUnavailable
   | StoreFailure;
 
 export type ListMembersError =

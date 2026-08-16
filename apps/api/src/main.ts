@@ -53,7 +53,7 @@ async function bootstrap(): Promise<void> {
 
   // Phase 3 module surface: identity, users, tenancy, consent, authorization,
   // control-plane — composed once, outside Nest (composition/phase3-modules.ts).
-  const composition = composePhase3Modules({ config, env: process.env, dbAdapter });
+  const composition = composePhase3Modules({ config, env: process.env, dbAdapter, logger });
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.forRoot({

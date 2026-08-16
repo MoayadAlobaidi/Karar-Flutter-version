@@ -1,0 +1,44 @@
+-- 0080_tenant_members_self_select
+--
+-- SELF-arm SELECT policy on public.tenant_members (tenancy module;
+-- modules/tenancy/MODULE.md; Phase 3.5 session-tenant binding, KAR-RSK-021).
+--
+-- WHY THIS ARM EXISTS: tenant selection precedes tenant binding. Before a
+-- session carries a `tenant_binding`, no `app.tenant_id` GUC can honestly be
+-- bound (the session row is the only sanctioned tenant source at the edge —
+-- migration 0031, tenancy.md §6), so the 0042 tenant-scoped SELECT policy
+-- exposes nothing to a freshly authenticated principal. Yet that principal
+-- must be able to answer "which tenants am I a member of?" to select one at
+-- all (bootstrap resolution: UNBOUND / AUTO_BIND / TENANT_SELECTION_REQUIRED).
+-- This arm admits exactly that read: a transaction bound to app.user_id ONLY
+-- sees the principal's OWN membership rows — across tenants, and nothing else.
+--
+-- Policy shape: PostgreSQL ORs permissive policies per command, so SELECT on
+-- tenant_members now passes when EITHER
+--   * tenant_id = app.tenant_id   (0042 — the own-tenant roster), OR
+--   * user_id   = app.user_id     (this arm — the principal's own rows).
+-- The NULLIF fail-closed pattern holds: with no user GUC bound the predicate
+-- is NULL and admits nothing; '' (the withPrincipalContext shadow value for
+-- absent keys) behaves identically.
+--
+-- ADVERSARIAL EXPECTATION (asserted in
+-- modules/tenancy/__tests__/tenant-context.integration.test.ts, non-empty
+-- case FIRST per the AZ2 lesson): a principal bound only to app.user_id
+-- reads their OWN membership rows non-empty, and reads ZERO rows belonging
+-- to any other user — the arm never exposes a roster, only the caller's own
+-- rows. INSERT/UPDATE policies are untouched: self-listing is a read-only
+-- capability, and membership creation remains bound to the 0042 arms
+-- (tenant scope AND redeemer binding).
+--
+-- Data lifecycle: unchanged — no new table, no new column; the 0042/ADR-0026
+-- declaration for public.tenant_members continues to apply.
+--
+-- rollback: forward-only (README.md). A failed apply leaves nothing — one
+-- transaction. Deliberate reversal would be
+-- DROP POLICY tenant_members_self_select ON public.tenant_members —
+-- restoring the Phase 3 state in which no principal can list their own
+-- memberships before binding (the KAR-RSK-021 dormant surface).
+
+CREATE POLICY tenant_members_self_select ON public.tenant_members
+  FOR SELECT
+  USING (user_id = NULLIF(current_setting('app.user_id', true), '')::uuid);

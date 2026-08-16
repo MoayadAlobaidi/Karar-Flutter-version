@@ -51,6 +51,29 @@ export function sessionOnlyPrincipalFrom(request: unknown): SessionOnlyPrincipal
   return { userId: principal.userId, sessionId: principal.sessionId };
 }
 
+/**
+ * bootstrap's BootstrapPrincipal: session-scoped, tenant OPTIONAL (the whole
+ * point of the surface is reporting and changing the binding state), and
+ * carrying the email-verified flag from the same authenticated read.
+ */
+export function bootstrapPrincipalFrom(request: unknown): {
+  readonly userId: UserId;
+  readonly sessionId: string;
+  readonly tenantId: TenantId | null;
+  readonly emailVerified: boolean;
+} | null {
+  const principal = principalOf(request);
+  if (principal === null) {
+    return null;
+  }
+  return {
+    userId: principal.userId,
+    sessionId: principal.sessionId,
+    tenantId: principal.tenantId,
+    emailVerified: principal.emailVerified,
+  };
+}
+
 /** authorization's PolicyActor: tenant present only when the session binds one. */
 export function policyActorFrom(request: unknown): {
   readonly userId: UserId;

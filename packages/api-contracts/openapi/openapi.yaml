@@ -8,18 +8,19 @@
 openapi: 3.1.0
 info:
   title: Karar API
-  version: 0.3.0
+  version: 0.4.0
   description: >-
     Contract-first API surface for the Karar platform. Phase 3 exposes
     authentication and session lifecycle (identity), own-profile management
     (users), tenant membership and invitations (tenancy), and consumer
     consent (consent). SDKs are generated from this file and committed.
-    Phase 3 reachability note: tenant-bound endpoints (users, tenancy except
-    invitation redemption, consent) require the session to carry a
-    server-side tenant binding; Phase 3 issues sessions unbound and ships no
-    binding mechanism, so those endpoints answer 401 until it lands — the
-    contracts are authoritative for the shapes, not yet exercisable
-    end-to-end.
+    Tenant-bound endpoints (users, tenancy except invitation redemption,
+    consent) require the session to carry a server-side tenant binding.
+    Phase 3.5 supplies it: GET /platform/bootstrap binds automatically when
+    the caller has exactly one active membership and otherwise reports the
+    selection state, and POST /platform/tenant-binding binds or switches
+    explicitly. A session that is still unbound reaches no tenant-scoped
+    endpoint.
 paths:
   /auth/register:
     $ref: './paths/identity.yaml#/~1auth~1register'
@@ -77,3 +78,7 @@ paths:
     $ref: './paths/consent.yaml#/~1consent~1withdrawals'
   /consent/status:
     $ref: './paths/consent.yaml#/~1consent~1status'
+  /platform/bootstrap:
+    $ref: './paths/platform.yaml#/~1platform~1bootstrap'
+  /platform/tenant-binding:
+    $ref: './paths/platform.yaml#/~1platform~1tenant-binding'

@@ -12,6 +12,11 @@
   },
   "dependencies": {
     "@karar/audit": "workspace:*",
+    "@karar/bootstrap": "workspace:*",
+    "@karar/capability": "workspace:*",
+    "@karar/capability-registry": "workspace:*",
+    "@karar/jurisdiction": "workspace:*",
+    "@karar/jurisdiction-policy": "workspace:*",
     "@karar/authorization": "workspace:*",
     "@karar/consent": "workspace:*",
     "@karar/control-plane": "workspace:*",

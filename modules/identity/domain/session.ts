@@ -59,6 +59,7 @@ export const REVOCATION_REASONS = [
   'refresh_reuse_detected',
   'account_disabled',
   'global_revocation',
+  'tenant_switch',
 ] as const;
 export type RevocationReason = (typeof REVOCATION_REASONS)[number];
 

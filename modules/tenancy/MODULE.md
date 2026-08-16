@@ -13,8 +13,13 @@ Tenant model, memberships, secure invitations, and the isolation boundary.
   `0041`–`0044`, all RLS ENABLE+FORCE), the repository ports over `withPrincipalContext`,
   the `PolicyService` port (implemented by the authorization module), the
   `GetOwnTenant` / `ListMembers` / `CreateInvitation` / `RevokeInvitation` /
-  `RedeemInvitation` use cases, and the `TenancyApiModule` HTTP surface.
-- **Phase:** 3
+  `RedeemInvitation` use cases, and the `TenancyApiModule` HTTP surface. Phase 3.5 added the
+  session-tenant selection/binding layer (KAR-RSK-021): the `0080` self-arm on
+  `tenant_members` and `0081` member-arm on `tenants`, the
+  `ListOwnMemberships` / `ResolveTenantContext` / `SwitchTenant` /
+  `GrantFirstPartyMembership` use cases, and the session-binding ports the identity module
+  satisfies structurally.
+- **Phase:** 3 (3.5 additions above)
 - **Capability:** —  (platform)
 - **Highest classification:** CONFIDENTIAL
 
@@ -96,6 +101,14 @@ attack all three at once. `public.tenants` is the recorded global-table decision
 ENABLE+FORCE with a self-row policy (`id = app.tenant_id`) instead of an allow-list hole;
 `karar_app` holds SELECT only, and provisioning stays with the control plane.
 
+**Phase 3.5 self/member arms (0080, 0081):** tenant SELECTION precedes tenant binding, so an
+authenticated principal with ONLY `app.user_id` bound may read (a) their OWN `tenant_members`
+rows across tenants (0080 self-arm) and (b) the `tenants` rows of tenants they hold an ACTIVE
+membership in (0081 member-arm). Both arms are fail-closed NULLIF predicates keyed on
+`app.user_id`; neither exposes any other user's rows or any roster, and the adversarial suite
+(`__tests__/tenant-context.integration.test.ts`) proves the non-empty own case FIRST, then
+other-user invisibility.
+
 Inherited defects, now guarded by tests rather than avoided by intent:
 
 - **AZ2** — *an empty roster is indistinguishable from correct isolation.* The adversarial
@@ -116,13 +129,41 @@ Redemption denial answers avoid oracles: unknown token, other tenant's token, an
 invitations are indistinguishable to the caller. Failed redemptions are attempt-capped per
 invitation and audited with DENIED outcomes.
 
-**The tenant-bound surface is dormant until sessions carry a tenant binding.** This module's
-principal source contract takes tenant identity ONLY from server-side session state
-(`identity_sessions.tenant_binding`); Phase 3 issues sessions unbound and redemption does not
-bind them, so `/tenancy/tenant`, `/tenancy/members`, and invitation create/revoke answer 401
-for every caller — only redemption (tenantless by design) is reachable. The binding mechanism
-belongs to the phase that first needs the surface live (phase-03 Known limitations;
-KAR-RSK-021).
+**Session-tenant binding (Phase 3.5, closes KAR-RSK-021).** This module's principal source
+contract still takes tenant identity ONLY from server-side session state
+(`identity_sessions.tenant_binding`); what changed is that the binding now has a mechanism:
+`ResolveTenantContext` (0/1/many active memberships → UNBOUND / AUTO_BIND /
+TENANT_SELECTION_REQUIRED, with a tenant STATUS check so a disabled tenant invalidates the
+choice), `SwitchTenant` (server-side ACTIVE-membership verification of the TARGET, full rebind
+through the identity seam — old session + refresh families revoked atomically, new bound
+session issued — then RE-verification with a compensating revocation of the replacement
+session if the membership vanished concurrently: the caller ends unbound/denied, never bound
+without membership), and the bootstrap module's surface drives them. Redemption STILL does not
+bind sessions (tested): binding comes only from bootstrap GET auto-bind or
+POST /platform/tenant-binding. Binding remains ROUTING, not authority — every tenant-bound
+request re-verifies membership and RLS bounds the rows.
+
+**Audit posture on the switch path: FAIL CLOSED, by reversing.** `SwitchTenant` inspects every
+`AuditTrail.record` result — the same stance as identity's `auditOrFail` and the capability
+module's `AUDIT_APPEND_FAILED`, so one concern has one posture across the codebase. If the
+SUCCESS record cannot be written, the replacement session is **revoked** (the compensation the
+membership race already uses) and the caller is failed with `store_failure`; a tenant binding
+nobody can account for does not stand. On the denial path nothing is bound and the session is
+already revoked, so there is nothing to reverse, but the failure is still surfaced. Cost,
+stated: an audit outage signs the switching caller out rather than binding them silently.
+Evidence: the fail-closed case in `__tests__/tenant-context.integration.test.ts`.
+
+**First-party enrolment (§35 mechanism).** `GrantFirstPartyMembership(userId)` creates the
+first-party-tenant membership (MEMBER role hint) under the full principal context (the 0042
+INSERT policy binds the row to the principal), idempotently and audited. The tenant id comes
+exclusively from typed configuration (`KARAR_FIRST_PARTY_TENANT_ID`; local default is the
+documented synthetic tenant `scripts/db/seed-local-first-party.mjs` creates — direct SQL as
+the bootstrap superuser because `karar_app` holds SELECT only on `tenants` and no runtime
+provisioning path exists). Invoked by the local/dev seed path and tests NOW; **production
+wiring — invoking it from registration/e-mail-verification — is documented Phase 4 entry
+work.** It is never inserted secretly inside identity. The seed leaves
+`tenants.default_operating_entity_id` NULL; binding an operating entity is a lead-integration
+step through the operating-entity module.
 
 ---
 

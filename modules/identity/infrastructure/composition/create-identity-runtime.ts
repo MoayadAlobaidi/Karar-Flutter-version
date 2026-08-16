@@ -42,6 +42,10 @@ import {
   RevokeOtherSessions,
   RevokeSession,
 } from '../../application/use-cases/session-lifecycle.js';
+import {
+  BindSessionTenant,
+  RebindSessionTenant,
+} from '../../application/use-cases/session-tenant-binding.js';
 import { ResendVerification, VerifyEmail } from '../../application/use-cases/verify-email.js';
 import { Argon2PasswordHasher } from '../crypto/argon2-password-hasher.js';
 import { JoseTokenSigner } from '../crypto/jose-token-signer.js';
@@ -85,6 +89,8 @@ export interface IdentityUseCases {
   readonly revokeSession: RevokeSession;
   readonly revokeOtherSessions: RevokeOtherSessions;
   readonly logout: Logout;
+  readonly bindSessionTenant: BindSessionTenant;
+  readonly rebindSessionTenant: RebindSessionTenant;
   readonly forgotPassword: ForgotPassword;
   readonly resetPassword: ResetPassword;
   readonly changePassword: ChangePassword;
@@ -149,6 +155,8 @@ export function createIdentityRuntime(options: IdentityRuntimeOptions): Identity
     revokeSession: new RevokeSession(deps),
     revokeOtherSessions: new RevokeOtherSessions(deps),
     logout: new Logout(deps),
+    bindSessionTenant: new BindSessionTenant(deps),
+    rebindSessionTenant: new RebindSessionTenant(deps),
     forgotPassword: new ForgotPassword(deps),
     resetPassword: new ResetPassword(deps),
     changePassword: new ChangePassword(deps),

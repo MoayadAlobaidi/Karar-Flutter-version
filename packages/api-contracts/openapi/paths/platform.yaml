@@ -1,0 +1,329 @@
+# platform bootstrap surface — path-item fragments (ADR-0009: authored by
+# hand, never generated from code). The phase lead merges these into
+# openapi.yaml via $ref per path, e.g.:
+#   /platform/bootstrap:
+#     $ref: './paths/platform.yaml#/~1platform~1bootstrap'
+#
+# Contract rules made visible here:
+#   * Tenant identity comes ONLY from the authenticated session's server-side
+#     binding. GET consults no query, header, or body value at all; POST reads
+#     exactly ONE body field — tenantId — and only as a SELECTION among the
+#     caller's own server-verified active memberships, never as a principal.
+#     A `?tenantId=` or `x-tenant-id` header is ignored everywhere, by
+#     construction (asserted by test).
+#   * The bootstrap response carries CLIENT-SAFE data only: capability output
+#     arrives pre-filtered from the client-safe resolver (hidden capabilities
+#     never appear in any state), PolicyPack is version/status only (never
+#     content), operating entity is id/name only (never licence details), and
+#     the serializer emits a closed field set (leak-regression tested).
+#   * No admin write endpoints exist on this surface.
+
+/platform/bootstrap:
+  get:
+    operationId: getPlatformBootstrap
+    summary: The authenticated client's bootstrap context
+    description: >-
+      Returns the caller's user/session context, tenant-binding state,
+      jurisdiction assignment and verification status, operating-entity
+      reference, PolicyPack version/status, and client-visible capabilities
+      with actionable requirements.
+
+      SIDE EFFECT (documented on purpose): when the session is UNBOUND and
+      the caller holds EXACTLY ONE active membership in an active tenant,
+      this endpoint AUTO-BINDS the session to that tenant before answering
+      (no token rotation — existing tokens keep working and pick the binding
+      up server-side). The auto-bind is audited. With zero usable
+      memberships the state is UNBOUND; with several it is
+      TENANT_SELECTION_REQUIRED and binding requires an explicit
+      POST /platform/tenant-binding.
+    tags: [platform]
+    security:
+      - sessionAuth: []
+    responses:
+      '200':
+        description: The bootstrap context for the authenticated session.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/BootstrapContext'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/platform/tenant-binding:
+  post:
+    operationId: setPlatformTenantBinding
+    summary: Bind the session to a tenant, or switch it to another
+    description: >-
+      Explicit tenant selection. The body's tenantId is a CHOICE among the
+      caller's own active memberships — the server verifies an ACTIVE
+      membership in an ACTIVE tenant before any binding changes, and an
+      arbitrary, revoked, expired, or disabled-tenant target is refused
+      (403, code MEMBERSHIP_REQUIRED) without revealing whether the tenant
+      exists.
+
+      UNBOUND session: FIRST BIND — the session gains the tenant binding with
+      NO token rotation; the response is the bound bootstrap-shaped binding
+      state (kind BOUND, no tokens).
+
+      BOUND session: SWITCH — the current session and its refresh-token
+      families are revoked atomically and a BRAND-NEW session bound to the
+      target is issued; the response (kind SWITCHED) carries the NEW access
+      and refresh tokens, and every prior token is dead. If the target
+      membership is revoked concurrently with the switch, the replacement
+      session is revoked too (409, code MEMBERSHIP_REVOKED_CONCURRENTLY) —
+      the caller signs in again; a session is never left bound without
+      membership.
+    tags: [platform]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [tenantId]
+            properties:
+              tenantId:
+                type: string
+                format: uuid
+                description: >-
+                  The selected tenant — must be one of the caller's own
+                  active memberships; verified server-side, never trusted.
+    responses:
+      '200':
+        description: Binding changed.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/TenantBound'
+                - $ref: '#/components/TenantSwitched'
+              discriminator:
+                propertyName: kind
+      '400':
+        description: Malformed body (code INVALID_TENANT_SELECTION).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '403':
+        description: >-
+          No active membership in the requested tenant (code
+          MEMBERSHIP_REQUIRED — uniform for arbitrary, revoked, expired, and
+          disabled-tenant targets).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: >-
+          The binding changed under the caller (codes BINDING_CONFLICT,
+          MEMBERSHIP_REVOKED_CONCURRENTLY). Re-authenticate or retry
+          bootstrap.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  BootstrapContext:
+    type: object
+    required: [user, session, binding, jurisdiction, operatingEntity, policyPack, capabilities]
+    properties:
+      user:
+        type: object
+        required: [userId, emailVerified]
+        properties:
+          userId:
+            type: string
+            format: uuid
+          emailVerified:
+            type: boolean
+      session:
+        type: object
+        required: [sessionId]
+        properties:
+          sessionId:
+            type: string
+            format: uuid
+      binding:
+        $ref: '#/components/BindingState'
+      jurisdiction:
+        type: object
+        required: [state, jurisdictionId]
+        properties:
+          state:
+            type: string
+            enum: [NONE, UNVERIFIED, VERIFIED]
+            description: >-
+              The typed, fail-closed effective-jurisdiction state. Clients key
+              on THIS, never on the identifier — behaviour differences resolve
+              through policy packs, not through country branches. NONE is the
+              unresolved case (no assignment).
+          jurisdictionId:
+            type: [string, 'null']
+            description: >-
+              The assigned jurisdiction as DATA (display, pack selection);
+              null when the state is NONE.
+      operatingEntity:
+        oneOf:
+          - type: 'null'
+          - type: object
+            required: [id, name]
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+        description: Safe reference only — never licence or register detail.
+      policyPack:
+        oneOf:
+          - type: 'null'
+          - type: object
+            required: [version, status]
+            properties:
+              version:
+                type: string
+              status:
+                type: string
+        description: Version and status only — never pack content.
+      capabilities:
+        type: array
+        description: >-
+          CLIENT-SAFE capability views, passed through from the client-safe
+          resolver unenriched. Hidden capabilities never appear, in any
+          state; requirements are actionable only.
+        items:
+          $ref: '#/components/CapabilityView'
+  BindingState:
+    oneOf:
+      - type: object
+        required: [kind]
+        properties:
+          kind:
+            type: string
+            enum: [UNBOUND]
+      - type: object
+        required: [kind, tenant]
+        properties:
+          kind:
+            type: string
+            enum: [BOUND]
+          tenant:
+            $ref: '#/components/TenantChoice'
+      - type: object
+        required: [kind, choices]
+        properties:
+          kind:
+            type: string
+            enum: [TENANT_SELECTION_REQUIRED]
+          choices:
+            type: array
+            items:
+              $ref: '#/components/TenantChoice'
+    discriminator:
+      propertyName: kind
+  TenantChoice:
+    type: object
+    required: [tenantId, name, roleHint]
+    properties:
+      tenantId:
+        type: string
+        format: uuid
+      name:
+        type: string
+      roleHint:
+        type: string
+        description: Informational only — authoritative roles live in the authorization module.
+  CapabilityView:
+    type: object
+    required: [id, status, requirements]
+    properties:
+      id:
+        type: string
+      status:
+        type: string
+      requirements:
+        type: array
+        items:
+          type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+            detail:
+              type: string
+  TenantBound:
+    type: object
+    required: [kind, binding]
+    properties:
+      kind:
+        type: string
+        enum: [BOUND]
+      binding:
+        $ref: '#/components/BindingState'
+  TenantSwitched:
+    type: object
+    required: [kind, binding, tokens]
+    properties:
+      kind:
+        type: string
+        enum: [SWITCHED]
+      binding:
+        $ref: '#/components/BindingState'
+      tokens:
+        type: object
+        required:
+          [accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, sessionId]
+        properties:
+          accessToken:
+            type: string
+          accessTokenExpiresAt:
+            type: string
+            format: date-time
+          refreshToken:
+            type: string
+            description: The NEW refresh token — every prior token is dead.
+          refreshTokenExpiresAt:
+            type: string
+            format: date-time
+          sessionId:
+            type: string
+            format: uuid
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        type: integer
+      code:
+        type: string
+        description: >-
+          Machine-readable reason (e.g. AUTHENTICATION_REQUIRED,
+          MEMBERSHIP_REQUIRED, BINDING_CONFLICT,
+          MEMBERSHIP_REVOKED_CONCURRENTLY).
+      detail:
+        type: string
+      reason:
+        type: string
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

@@ -5,6 +5,7 @@ export { ConfigurationError } from './configuration-error.js';
 export { redisEndpointFromEnv, type RedisEndpoint } from './redis-endpoint.js';
 export {
   KARAR_ENVS,
+  LOCAL_FIRST_PARTY_TENANT_ID,
   LOG_LEVELS,
   loadConfig,
   type AppConfig,
