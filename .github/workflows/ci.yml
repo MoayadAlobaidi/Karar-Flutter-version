@@ -245,6 +245,16 @@ jobs:
             -Pkarar.env=LOCAL \
             --dart-define=KARAR_ENV=LOCAL
 
+      # The merged manifest only exists once something has been built, so these
+      # assertions skip on every lane that runs the suite without building —
+      # which is every other lane. This is the one place they can actually run.
+      # The gate variable turns a missing artifact into a failure here, so the
+      # step cannot pass by having nothing to look at.
+      - name: Verify the merged manifest
+        env:
+          KARAR_VERIFY_ANDROID_ARTIFACT: '1'
+        run: flutter test test/security/platform_hardening_test.dart
+
       # What the manifest says AFTER merging, which is the only version that
       # ships. Source assertions live in the Dart security suite; this checks
       # the artifact.
@@ -351,7 +361,8 @@ jobs:
   mobile-ios:
     name: mobile-ios
     runs-on: macos-latest
-    timeout-minutes: 45
+    # Three builds: LOCAL and STAGING for the simulator, PRODUCTION for device.
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -417,3 +428,43 @@ jobs:
           test ! -f "$bundle/embedded.mobileprovision" \
             || { echo "FAIL: a provisioning profile was embedded"; exit 1; }
           echo "OK: no provisioning profile, no signing identity."
+
+      # The artifact-level suite, against the LOCAL bundle just built. The gate
+      # variable makes a missing bundle a failure rather than a skip.
+      - name: Verify the packaged LOCAL bundle
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # BUILDING ONLY LOCAL WOULD TEST THE WRONG THING.
+      #
+      # LOCAL is the one environment permitted to carry the loopback exception,
+      # so a lane that builds nothing else can never observe the property that
+      # matters: that a DEPLOYED artifact carries no transport-security key at
+      # all. These two builds are that observation.
+      #
+      # STAGING is built with the SAME Xcode configuration as LOCAL above, which
+      # is the point — it proves the exception is gated on the environment
+      # rather than on Debug-vs-Release, so `--debug` against a deployed
+      # environment cannot smuggle it in.
+      - name: Build the simulator app for STAGING
+        run: |
+          flutter build ios --simulator --debug \
+            --dart-define=KARAR_ENV=STAGING
+
+      - name: Verify the packaged STAGING bundle carries no exception
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # The artifact that would actually ship. Unsigned, because no identity
+      # exists in CI and none is needed to read the packaged plist.
+      - name: Build the device app for PRODUCTION (no code signing)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=KARAR_ENV=PRODUCTION
+
+      - name: Verify the packaged PRODUCTION bundle carries no exception
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
