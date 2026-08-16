@@ -847,7 +847,9 @@ final class ContractReader {
       // A wire value made only of separators, or one starting with a digit,
       // cannot become a Dart identifier. Fail here with the offending value
       // rather than emitting source that will not parse.
-      if (member.isEmpty || RegExp(r'^[0-9]').hasMatch(member)) {
+      if (member.isEmpty ||
+          RegExp(r'^[0-9]').hasMatch(member) ||
+          _dartReservedWords.contains(member)) {
         throw ContractError('Enum $className declares the value "$wire", which '
             'cannot be expressed as a Dart identifier. Rename it in the '
             'contract.');
@@ -1352,6 +1354,25 @@ String _pascal(String value) {
   final words = _words(value);
   return words.map(_capitalize).join();
 }
+
+/// Dart words that cannot be used as a plain identifier.
+///
+/// A wire value of `CLASS` or `SWITCH` lowercases to a reserved word and would
+/// be emitted as an enum constant, producing a file that does not parse. The
+/// analyzer would catch it eventually; naming the offending contract value at
+/// generation time is the difference between a one-line fix and a hunt.
+///
+/// Only the genuinely reserved words are listed — the built-in identifiers
+/// (`async`, `await`, `covariant` and friends) are legal as member names.
+const Set<String> _dartReservedWords = <String>{
+  'assert', 'break', 'case', 'catch', 'class', 'const', 'continue', 'default',
+  'do', 'else', 'enum', 'extends', 'false', 'final', 'finally', 'for', 'if',
+  'in', 'is', 'new', 'null', 'rethrow', 'return', 'super', 'switch', 'this',
+  'throw', 'true', 'try', 'var', 'void', 'while', 'with',
+  // Not reserved by the language, but every enum the generator emits already
+  // declares these, so a wire value matching one collides.
+  'index', 'values', 'wireValue', 'toString', 'hashCode', 'runtimeType',
+};
 
 String _camel(String value) {
   final pascal = _pascal(value);

@@ -75,12 +75,42 @@ void main() {
       );
     });
 
+    test('the only nested-block dependencies are SDK-sourced ones', () {
+      // An empty constraint means a nested block follows. `sdk: flutter` is
+      // legitimate and carries no version. `git:`, `path:` and `hosted:` also
+      // parse to an empty constraint — and those bypass the pinning rule
+      // entirely, because the next test skips empty constraints. Without this
+      // assertion, adding `flutter_secure_storage:` with a `git:` block below
+      // it would leave a suite named "every direct dependency is pinned"
+      // passing while the package floated on a branch.
+      final List<String> nested = <String>[
+        for (final _Declared entry in declared)
+          if (entry.value.isEmpty) entry.key,
+      ];
+      const Set<String> sdkSourced = <String>{
+        'flutter',
+        'flutter_test',
+        'flutter_localizations',
+      };
+      final Set<String> offending = nested.toSet().difference(sdkSourced);
+      expect(
+        offending,
+        isEmpty,
+        reason: 'these direct dependencies use a nested block rather than an '
+            'inline version, which hides the constraint from the check below: '
+            '${offending.join(', ')}. A git: or path: source is not a reviewed '
+            'release at all; a hosted: block may be pinned but is not visible '
+            'here. Either way it is a deliberate decision, so state the reason '
+            'beside the entry and amend this test.',
+      );
+    });
+
     test('no direct dependency uses a range, a wildcard, or "any"', () {
       final List<String> ranged = <String>[];
       for (final _Declared entry in declared) {
         final String constraint = entry.value;
-        // An empty value introduces a nested block (`sdk: flutter`), which the
-        // next test covers.
+        // An empty value introduces a nested block, which the test above
+        // constrains to SDK-sourced packages only.
         if (constraint.isEmpty) continue;
         final bool isExact = RegExp(r'^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$')
             .hasMatch(constraint);
@@ -123,6 +153,21 @@ void main() {
               'biometric prompt; it must never float',
         );
       }
+    });
+
+    test('no dependency_overrides section exists', () {
+      // An override silently replaces a resolved version for the whole graph,
+      // including the pinned direct set above. It is the one construct that
+      // makes every other assertion in this file untrue without editing any
+      // line they read.
+      final List<String> lines = File('pubspec.yaml').readAsLinesSync();
+      expect(
+        lines.where((String line) => line.trimRight() == 'dependency_overrides:'),
+        isEmpty,
+        reason: 'dependency_overrides bypasses the pins above. If one is ever '
+            'genuinely needed, record why beside it and amend this test '
+            'deliberately.',
+      );
     });
 
     test('the committed lockfile records hosted sources with checksums', () {

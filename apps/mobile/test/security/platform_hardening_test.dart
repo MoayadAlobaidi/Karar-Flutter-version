@@ -280,6 +280,17 @@ void main() {
       final expected = RegExp(
         r'^com\.kararfinance\.app(\.[a-z]+)?\.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION$',
       );
+      // Iterating a set proves nothing about an EMPTY set. androidx.core
+      // contributes this permission on every variant, so an empty collection
+      // means the reader broke rather than that the artifact is clean — and a
+      // broken reader would make every assertion here silently vacuous.
+      expect(
+        merged.other,
+        isNotEmpty,
+        reason: 'no custom permission was found at all. androidx.core '
+            'contributes one to every variant, so this means the merged '
+            'manifest was not parsed, not that the artifact is clean.',
+      );
       for (final permission in merged.other) {
         expect(
           expected.hasMatch(permission),

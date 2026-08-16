@@ -133,17 +133,45 @@ if (requestedEnvironment == "LOCAL") {
 ///
 /// LOCAL is exempt: it has a documented default endpoint and is the only
 /// environment a developer can build without arguments.
+/// Extracts the host from an authority, correctly for IPv6.
+///
+/// `authority.substringBefore(':')` is wrong the moment the host is an IPv6
+/// literal: RFC 3986 requires those to be bracketed, so `[::1]:8443` yields
+/// `[` — which matches no rule, and let a PRODUCTION build with an `https://
+/// [::1]:8443` endpoint succeed. Bracketing is the ONLY valid way to write an
+/// IPv6 host in a URL, so before this the IPv6 loopback rules were unreachable
+/// code that a source-presence test still reported as present.
+///
+/// The trailing dot is stripped too. `localhost.` is the fully-qualified form
+/// of `localhost` and resolves identically, but equals neither.
+fun hostOf(authority: String): String {
+    val host =
+        if (authority.startsWith("[")) {
+            // Up to the closing bracket; the port, if any, follows it.
+            authority.substringAfter('[').substringBefore(']')
+        } else {
+            authority.substringBefore(':')
+        }
+    return host.trimEnd('.')
+}
+
 fun rejectLocalOnlyHost(host: String, environment: String, url: String) {
     val lowered = host.lowercase()
+    // An IPv6 literal may be written expanded, abbreviated, or with an
+    // IPv4-mapped tail, and all of them reach the same interface. Compare on
+    // the collapsed form rather than trying to enumerate the spellings.
+    val collapsed = lowered.replace("0", "").replace(":", "")
+    val isIpv6Loopback =
+        (lowered.contains(':') && collapsed == "1") ||
+            lowered == "::ffff:127.0.0.1" ||
+            lowered == "::"
     val isLoopback =
         lowered == "localhost" ||
-            lowered == "127.0.0.1" ||
-            lowered == "::1" ||
-            lowered == "[::1]" ||
             lowered == "0.0.0.0" ||
             // The Android emulator's alias for the host machine.
             lowered == "10.0.2.2" ||
             lowered.startsWith("127.") ||
+            isIpv6Loopback ||
             lowered.endsWith(".local") ||
             lowered.endsWith(".localhost") ||
             lowered.endsWith(".internal") ||
@@ -214,7 +242,7 @@ if (requestedEnvironment != "LOCAL") {
                 "KARAR_API_BASE_URL='$baseUrl', which has no host.",
         )
     }
-    rejectLocalOnlyHost(authority.substringBefore(':'), requestedEnvironment, baseUrl)
+    rejectLocalOnlyHost(hostOf(authority), requestedEnvironment, baseUrl)
 }
 
 // ---------------------------------------------------------------------------

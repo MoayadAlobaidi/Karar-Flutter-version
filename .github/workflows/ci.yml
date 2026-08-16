@@ -245,6 +245,66 @@ jobs:
             -Pkarar.env=LOCAL \
             --dart-define=KARAR_ENV=LOCAL
 
+      # THE ENVIRONMENT GUARD, PROVEN BY INVOCATION RATHER THAN BY INSPECTION.
+      #
+      # The Dart suite asserts each guard rule is PRESENT in the build script.
+      # That is not the same as the rule holding, and the difference was not
+      # hypothetical: the script contained a "::1" rule, the test asserted the
+      # string was there and passed, and a PRODUCTION build with an
+      # `https://[::1]:8443` endpoint still succeeded — because the host was
+      # parsed by splitting on the first colon, which yields '[' for a
+      # bracketed IPv6 literal. A presence check certified a rule that did not
+      # hold.
+      #
+      # This lane already installs JDK 17 and already runs Gradle, so there is
+      # no reason not to invoke it. Each case must be REFUSED, and refused for
+      # the stated reason.
+      - name: A deployed build with an unusable endpoint must be refused
+        working-directory: apps/mobile/android
+        run: |
+          set -uo pipefail
+          refuse() {
+            defines="$(printf 'KARAR_ENV=PRODUCTION' | base64),$(printf 'KARAR_API_BASE_URL=%s' "$1" | base64)"
+            if output="$(./gradlew -q :app:tasks -Pkarar.env=PRODUCTION \
+              -Pdart-defines="$defines" 2>&1)"; then
+              echo "FAIL: '$1' was accepted for a PRODUCTION build"; exit 1
+            fi
+            echo "$output" | grep -q "$2" \
+              || { echo "FAIL: '$1' was refused, but not for '$2':"; echo "$output" | tail -5; exit 1; }
+            echo "  refused: $1"
+          }
+          refuse 'https://[::1]:8443'          'Local-only endpoint'
+          refuse 'https://[0:0:0:0:0:0:0:1]'   'Local-only endpoint'
+          refuse 'https://localhost.'          'Local-only endpoint'
+          refuse 'https://localhost'           'Local-only endpoint'
+          refuse 'https://127.0.0.1'           'Local-only endpoint'
+          refuse 'https://10.0.2.2:8080'       'Local-only endpoint'
+          refuse 'https://api.internal'        'Local-only endpoint'
+          refuse 'http://api.karar.qa'         'Insecure endpoint'
+          refuse 'https://user:pw@api.karar.qa' 'Credentials in endpoint'
+          echo "OK: every unusable endpoint was refused."
+
+      - name: A deployed build with no configuration at all must be refused
+        working-directory: apps/mobile/android
+        run: |
+          set -uo pipefail
+          if output="$(./gradlew -q :app:tasks -Pkarar.env=PRODUCTION 2>&1)"; then
+            echo "FAIL: a PRODUCTION build with no dart-defines succeeded"; exit 1
+          fi
+          echo "$output" | grep -q 'Unconfigured PRODUCTION build' \
+            || { echo "FAIL: refused for another reason:"; echo "$output" | tail -5; exit 1; }
+          echo "OK: the direct-Gradle path is guarded too."
+
+      # A routable endpoint must still build, so the guard is not simply
+      # refusing everything.
+      - name: A deployed build with a usable endpoint is accepted
+        working-directory: apps/mobile/android
+        run: |
+          set -euo pipefail
+          defines="$(printf 'KARAR_ENV=PRODUCTION' | base64),$(printf 'KARAR_API_BASE_URL=https://api.karar.qa' | base64)"
+          ./gradlew -q :app:tasks -Pkarar.env=PRODUCTION -Pdart-defines="$defines" >/dev/null
+          echo "OK: a routable https endpoint is accepted."
+
       # The merged manifest only exists once something has been built, so these
       # assertions skip on every lane that runs the suite without building —
       # which is every other lane. This is the one place they can actually run.
@@ -447,10 +507,30 @@ jobs:
       # is the point — it proves the exception is gated on the environment
       # rather than on Debug-vs-Release, so `--debug` against a deployed
       # environment cannot smuggle it in.
+      # THE GUARD IS PROVEN BY A BUILD THAT MUST FAIL.
+      #
+      # A guard is only worth what its negative case proves. This asserts the
+      # build is REFUSED, and checks the reason so that an unrelated failure
+      # cannot be mistaken for the guard working.
+      - name: A deployed build with no endpoint must be refused
+        run: |
+          set -uo pipefail
+          if output="$(flutter build ios --release --no-codesign \
+            --dart-define=KARAR_ENV=PRODUCTION 2>&1)"; then
+            echo "FAIL: a PRODUCTION build with no endpoint succeeded"; exit 1
+          fi
+          echo "$output" | grep -q 'Missing endpoint' \
+            || { echo "FAIL: build failed for some other reason:"; echo "$output" | tail -20; exit 1; }
+          echo "OK: refused, and refused for the stated reason."
+
+      # The endpoint below is a syntactically valid host used only to satisfy
+      # the build-time guard. Nothing contacts it, the artifact is unsigned and
+      # never distributed, and no DNS record is implied by it.
       - name: Build the simulator app for STAGING
         run: |
           flutter build ios --simulator --debug \
-            --dart-define=KARAR_ENV=STAGING
+            --dart-define=KARAR_ENV=STAGING \
+            --dart-define=KARAR_API_BASE_URL=https://api.invalid-for-ci.example
 
       - name: Verify the packaged STAGING bundle carries no exception
         env:
@@ -462,7 +542,8 @@ jobs:
       - name: Build the device app for PRODUCTION (no code signing)
         run: |
           flutter build ios --release --no-codesign \
-            --dart-define=KARAR_ENV=PRODUCTION
+            --dart-define=KARAR_ENV=PRODUCTION \
+            --dart-define=KARAR_API_BASE_URL=https://api.invalid-for-ci.example
 
       - name: Verify the packaged PRODUCTION bundle carries no exception
         env:

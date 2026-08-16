@@ -82,6 +82,89 @@ plutil -replace KararBuildEnvironment -string \
     || fail "could not record the build environment in the packaged plist"
 
 # ---------------------------------------------------------------------------
+# The endpoint a deployed build was compiled with
+# ---------------------------------------------------------------------------
+#
+# The Android build refuses to produce a DEV, STAGING or PRODUCTION package
+# without a usable endpoint, on the grounds that such an artifact carries the
+# real package identity, is distributable, and can never work. iOS had no
+# equivalent: the same `flutter build ipa --dart-define=KARAR_ENV=PRODUCTION`
+# with no endpoint produced a complete PRODUCTION IPA. One platform refused
+# and the other shipped.
+#
+# These are the same rules as android/app/build.gradle.kts, deliberately, so
+# the two platforms cannot drift into disagreeing about what is buildable.
+compiled_base_url=""
+if [ -n "${DART_DEFINES:-}" ]; then
+    for entry in $(printf '%s' "$DART_DEFINES" | tr ',' ' '); do
+        decoded="$(printf '%s' "$entry" | base64 -D 2>/dev/null || true)"
+        case "$decoded" in
+            KARAR_API_BASE_URL=*)
+                compiled_base_url="${decoded#KARAR_API_BASE_URL=}"
+                ;;
+        esac
+    done
+fi
+
+if [ -n "$compiled_environment" ] && [ "$compiled_environment" != "LOCAL" ]; then
+    [ -n "$compiled_base_url" ] || fail "Missing endpoint: a \
+$compiled_environment build was compiled with no KARAR_API_BASE_URL. It would \
+carry the $compiled_environment package identity and be unable to reach any \
+API. Pass --dart-define=KARAR_API_BASE_URL=https://..."
+
+    case "$compiled_base_url" in
+        https://*) ;;
+        *) fail "Insecure endpoint: a $compiled_environment build was given \
+KARAR_API_BASE_URL='$compiled_base_url'. A deployed build must use https." ;;
+    esac
+
+    authority="${compiled_base_url#https://}"
+    authority="${authority%%/*}"
+    authority="${authority%%\?*}"
+    authority="${authority%%#*}"
+
+    case "$authority" in
+        *@*) fail "Credentials in endpoint: a $compiled_environment build was \
+given a KARAR_API_BASE_URL containing userinfo before '@'. Credentials \
+embedded in a URL ship inside the artifact." ;;
+    esac
+    [ -n "$authority" ] || fail "Malformed endpoint: a $compiled_environment \
+build was given KARAR_API_BASE_URL='$compiled_base_url', which has no host."
+
+    # An IPv6 literal is bracketed in a URL, so splitting on the first colon
+    # would yield '['. The trailing dot is stripped because `localhost.` is the
+    # fully-qualified form of `localhost` and resolves identically.
+    case "$authority" in
+        \[*) host="${authority#\[}"; host="${host%%\]*}" ;;
+        *)   host="${authority%%:*}" ;;
+    esac
+    host="$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')"
+    while :; do
+        case "$host" in *.) host="${host%.}" ;; *) break ;; esac
+    done
+
+    local_only=0
+    case "$host" in
+        localhost|0.0.0.0|10.0.2.2) local_only=1 ;;
+        127.*) local_only=1 ;;
+        ::ffff:127.0.0.1|::) local_only=1 ;;
+        *.local|*.localhost|*.internal|*.test) local_only=1 ;;
+    esac
+    # Any spelling of the IPv6 loopback: strip zeroes and colons and see if a
+    # lone 1 remains, which covers ::1 and 0:0:0:0:0:0:0:1 alike.
+    case "$host" in
+        *:*)
+            if [ "$(printf '%s' "$host" | tr -d '0:')" = "1" ]; then
+                local_only=1
+            fi
+            ;;
+    esac
+    [ "$local_only" -eq 0 ] || fail "Local-only endpoint: a \
+$compiled_environment build was given KARAR_API_BASE_URL='$compiled_base_url', \
+whose host '$host' resolves only on a developer machine."
+fi
+
+# ---------------------------------------------------------------------------
 # The local HTTP exception
 # ---------------------------------------------------------------------------
 if [ "${CONFIGURATION:-}" = "Debug" ] && [ "$compiled_environment" = "LOCAL" ]; then

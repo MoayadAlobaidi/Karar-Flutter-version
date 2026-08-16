@@ -28,11 +28,10 @@ environment:
 #
 # `flutter pub get --enforce-lockfile` is the check that turns the lockfile into
 # an enforced boundary rather than a record — it fails on any resolution that
-# would deviate, transitive included. It resolves clean here. CI currently runs
-# plain `flutter pub get`, so today the exact pins above are what hold the
-# direct set still; the transitive closure is recorded but not enforced on the
-# build machine. Stated rather than implied, because the difference is the whole
-# strength of the control.
+# would deviate, transitive included. Every CI invocation passes it, so the
+# transitive closure is enforced on the build machine and not merely recorded.
+# The exact pins above remain the control for the direct set; the two together
+# are what make the resolution reproducible.
 dependencies:
   flutter:
     sdk: flutter
