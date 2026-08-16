@@ -1,6 +1,6 @@
 # Data Model
 
-**ADRs:** 0005, 0006, 0008, 0022, 0026 · **Phase:** 2–3
+**ADRs:** 0005, 0006, 0008, 0022, 0026 · **Phase:** 2–3.5
 
 ---
 
@@ -61,7 +61,7 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
 | `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
 
-**As implemented in Phases 2–3** — 26 migrations (`0001`–`0065`, number ranges owned per workstream with deliberate gaps), 37 tables. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`, every one RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
+**As implemented in Phases 2–3.5** — 48 tables across `platform`, `audit`, and `public` (number ranges owned per workstream, with deliberate gaps that stay gaps). Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
 
 | Table | Purpose | Classification |
 |---|---|---|
@@ -82,6 +82,18 @@ The Phase 3 domain tables, by owning module (purpose, classification, and lifecy
 | [`control-plane`](../../modules/control-plane/MODULE.md) | `kill_switches`, `kill_switch_history` (`0053`) |
 | [`operating-entity`](../../modules/operating-entity/MODULE.md) | `operating_entities`, `entity_jurisdiction_permissions`, `entity_licences`, `data_protection_role_assignments`, `operating_entity_assignments`, `entity_migrations` (`0060`–`0063`) |
 | [`consent`](../../modules/consent/MODULE.md) | `legal_documents`, `legal_document_versions`, `consent_grants`, `reconsent_evaluations`, `processing_basis_references` (`0064`–`0065`) |
+
+The Phase 3.5 domain tables, same convention:
+
+| Module | Tables (migrations) |
+|---|---|
+| [`jurisdiction`](../../modules/jurisdiction/MODULE.md) | `countries`, `jurisdictions`, `user_jurisdiction_assignments`, `tenant_jurisdiction_assignments`, `jurisdiction_settings`, `policy_pack_activations` (`0070`–`0075`) |
+| [`capability`](../../modules/capability/MODULE.md) | `capability_availability`, `capability_availability_history`, `tenant_capability_entitlements`, `tenant_capability_entitlement_history` (`0076`–`0077`) |
+| [`subject-policy`](../../modules/subject-policy/MODULE.md) | `subject_policy_selections` (`0083`) |
+
+Two Phase 3.5 migrations create no table: `0080` and `0081` add the self- and member-arm policies that make tenant *selection* possible before a session is bound ([`tenancy.md` §6](tenancy.md)). [`modules/bootstrap`](../../modules/bootstrap/MODULE.md) owns no persistent data at all — it composes views over the modules above.
+
+Four of the new tables are **append-only ledgers** written by trigger rather than by the application (`capability_availability_history`, `tenant_capability_entitlement_history`) or by insert-only grant (`policy_pack_activations`), each immutable against the table owner as well as `karar_app` (§10). Two more are immutable by trigger with supersession as the only lifecycle: `subject_policy_selections`, and the assignment tables, whose single permitted UPDATE closes an open row's `effective_to`.
 
 ## 4. Columns every tenant-owned table carries
 
@@ -114,7 +126,11 @@ subject_policy_selection_version         TEXT     NULL   -- where the capability
 
 Architecture test 21 asserts the pinning columns exist on every table declared to carry legal consequence. `EntityMigration` is an explicit, audited operation with a re-consent evaluation step — never an `UPDATE`.
 
-**As implemented in Phase 3:** two tables carry declared legal consequence — `consent_grants` and `data_protection_role_assignments` — and both pin the jurisdiction reference and the operating entity at creation, so an assignment change never silently migrates a consent (proven by the consent module's integration suite). The policy-pack-version and subject-selection dimensions of the pinning block above cannot exist before PolicyPacks do; architecture test 21 carries an explicit activation gate that begins requiring them at Phase 3.5.
+**As implemented:** two tables carry declared legal consequence — `consent_grants` and `data_protection_role_assignments`. Phase 3 pinned the jurisdiction reference and the operating entity at creation, so an assignment change never silently migrates a consent (proven by the consent module's integration suite), and deferred the other two dimensions behind architecture test 21's activation gate, because PolicyPacks and `SubjectPolicySelection` did not yet exist. Phase 3.5 built both, so the gate came due and migration [`0086`](../../packages/platform/db/migrations/0086_legal_consequence_pack_pins.sql) completes the block on both tables.
+
+The landed shape is a **pair per dimension**: a nullable version column plus a `NOT NULL` pin-state column saying, per row, why the value is what it is, tied together by a CHECK so "no version recorded" can never be silent. The states distinguish a real pin (`PINNED`) from a capability that declares no elective options (`NOT_APPLICABLE`) from a row that genuinely predates the machinery (`PRE_POLICY_PACK`, `PRE_SUBJECT_POLICY_SELECTION`) — and a cutoff CHECK makes the historical states unusable for new rows, so they state a fact about history rather than offering an escape hatch.
+
+> **A sentinel string in a `*_version` column would read like a version.** No version was ever resolved for pre-Phase-3.5 rows, and the pin-state column is what lets the schema say that instead of implying otherwise. Both tables are append-only evidence, so existing rows were backfilled with the honest historical state and nothing was rewritten.
 
 The legacy validates the pattern independently: its Zakat assessments snapshot the jurisprudential settings in force into every assessment, which is exactly this rule applied to one capability.
 
@@ -141,6 +157,8 @@ The legacy validates the pattern independently: its Zakat assessments snapshot t
 This exists because the legacy discovered, during an erasure review, that one production table holds statement-derived data belonging to no user and **therefore cannot be erased on request** (finding P7). Phase 5 builds normalisation, dedup, and categorisation — all of which naturally produce data derived from a subject without belonging to one.
 
 **`NON_PERSONAL_BY_DESIGN` is a decision requiring justification, not a description of an accident.** And **pseudonymization is not anonymization** — data whose subject linkage can be restored remains personal data and cannot claim `ANONYMIZE_IRREVERSIBLY` or `NON_PERSONAL_BY_DESIGN`.
+
+**On the retention field, as of Phase 3.5:** PolicyPacks now exist, so the rule "from the PolicyPack, per jurisdiction — never a constant in code" has a mechanism behind it. It does not yet have numbers. `qa/v1` names the retention categories the platform already carries — `audit-events`, `consent-evidence`, `user-profile` — and declares each `PENDING_LEGAL_REVIEW` with its open question ([`jurisdiction-policy.md` §13](jurisdiction-policy.md)). That is the honest intermediate state: the prose deferrals became typed, resolvable states rather than durations someone invented, and the interim policy-configuration placeholders stay placeholders until legal review decides.
 
 ## 7. Data classification on every column
 
@@ -234,7 +252,9 @@ Architecture test 22 detects all three failure shapes the legacy exhibits:
 | Enabled but no policy | The only shape the legacy's own guard tested for |
 | **FORCEd but not enabled** | The admin audit log itself (RLS-02) |
 
-**Active since Phase 3** (CODE): 37 tables scanned — 17 RLS-enabled and FORCEd, 27 allow-listed in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, 7 deliberately both (identity's bootstrap-armed tables). Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
+**Active since Phase 3** (CODE); after Phase 3.5: 48 tables scanned — 22 RLS-enabled and FORCEd, 33 allow-listed in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, 7 deliberately both (identity's bootstrap-armed tables). Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
+
+The six new allow-list entries are all Phase 3.5 reference or deployment-wide configuration with no tenant or subject column to scope on: the country and jurisdiction registers, jurisdiction settings, the pack-activation ledger, and capability availability with its history. The five new ENABLE+FORCE tables are the ones that do have a subject or tenant: both jurisdiction-assignment tables, subject policy selections, and the tenant entitlement table with its history. Each carries its own compensating grants — `karar_app` holds `SELECT` only on the reference and configuration tables, and `SELECT`+`INSERT` only on the ledgers. A tenant predicate on capability availability would fabricate a relationship that does not exist and break resolution for every tenant at once, which is the reason recorded in the entry.
 
 ## 13. Migrations
 

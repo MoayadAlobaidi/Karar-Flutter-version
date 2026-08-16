@@ -14,9 +14,9 @@ Named explicitly in Plan v2 §0.8.
 
 [`../architecture/extension-pattern.md`](../architecture/extension-pattern.md).
 
-Write `MODULE.md` first — all seventeen checklist points, before any code. Then: a new module directory, a `CapabilityDescriptor`, permissions, events in the catalogue, a Flutter feature folder, OpenAPI paths, projections, tests.
+Write `MODULE.md` first — all seventeen checklist points, before any code. Then: a new module directory, a descriptor entry, permissions declared in `MODULE.md` and seeded by migration, events in the catalogue, a Flutter feature folder, OpenAPI paths, projections, tests.
 
-Then register the **append-only** seams: a `CapabilityId` union member, a PolicyPack clause, availability rows, an admin nav entry, a root module import, a route.
+Then register the **append-only** seams: a `CAPABILITY_IDS` union member, its descriptor, the matching database CHECK constraint, a PolicyPack clause, availability rows, an admin nav entry, a root module import, a route. Step by step with the honest starting values: [Q55](#55-how-do-i-add-a-capability-in-practice).
 
 **Nothing existing is modified.** If adding a capability requires *editing* logic in an unrelated module, the seam is wrong and gets fixed before you proceed. Verify with the diff check in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
@@ -28,13 +28,14 @@ Worked example: [`../scenarios/b-add-amanat.md`](../scenarios/b-add-amanat.md).
 
 **You add a jurisdiction, not a country.** Country is an attribute; jurisdiction is the policy key.
 
-- **Code:** one PolicyPack under `packages/jurisdiction-policy/src/packs/<j>/v1/` — deltas only. Plus locale resources and any jurisdiction-specific provider adapters.
-- **Configuration:** jurisdiction record, operating-entity assignment, availability rows, legal document versions, provider enablement, plan availability.
+- **Code:** an entry in `packages/jurisdiction-policy/src/jurisdiction.ts` and one PolicyPack under `src/packs/`. Plus locale resources and any jurisdiction-specific provider adapters.
+- **Migration:** a `countries` row if the country is new, and a `jurisdictions` row. The registers change by reviewed migration only — no runtime path exists to edit them.
+- **Runtime:** jurisdiction assignments, pack activation for the environment, availability rows, entitlements, legal document versions.
 - **External:** legal clearance per capability, an operating-entity and licensing decision, and a residency determination.
 
 **Financial rules usually do not change.** A jurisdiction maps to an existing ruleset version unless rules genuinely differ — divergence requires evidence, not anticipation.
 
-Worked example: [`../scenarios/a-new-country.md`](../scenarios/a-new-country.md).
+Step by step: [Q54](#54-how-do-i-add-a-jurisdiction-in-practice). Worked example: [`../scenarios/a-new-country.md`](../scenarios/a-new-country.md).
 
 ### 3. How do I add an operating entity?
 
@@ -149,9 +150,9 @@ Use cases ask `EffectivePolicy` a question; they never branch on jurisdiction. (
 
 ### 17. How do I know if a capability is available?
 
-Ask the resolver. Every gate is AND: declared jurisdiction → PolicyPack clearance → operating entity permitted and licensed → availability row → environment → tenant entitlement → subscription and flags → integrations and consent.
+Ask the resolver. Eight gates, all AND, in this order: descriptor (implemented and deployed here) → environment → jurisdiction and PolicyPack clearance → availability row → tenant entitlement → consent → operating-entity licence → provider.
 
-**Deny by default: no availability row means `DISABLED`.** Every denial carries a machine-readable reason. ([`../architecture/capability-registry.md`](../architecture/capability-registry.md))
+**Deny by default: no availability row means `DISABLED`, and no entitlement row means denied.** Every denial carries a machine-readable reason internally; only actionable ones reach a client. Reading one: [Q57](#57-how-do-i-read-an-availability-denial). ([`../architecture/capability-registry.md` §4](../architecture/capability-registry.md))
 
 ### 18. Where do I check capability availability?
 
@@ -273,11 +274,11 @@ Not a new adapter — the one `PostgresPersistenceAdapter` serves every approved
 
 ### 38. What is the current phase?
 
-Phase 3 — identity, tenancy, and access control, in progress. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-03.md`](../phases/phase-03.md).
+Phase 3.5 — the jurisdiction and capability foundation. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-03-5.md`](../phases/phase-03-5.md).
 
 ### 39. What is explicitly out of scope right now?
 
-Financial product capabilities and policy resolution. Phase 3 delivers identity, users, tenancy, operating entities, RBAC, consent, and kill switches — with no budgets, transactions, Zakat, or AI; no jurisdiction PolicyPacks or capability availability (Phase 3.5); and no cloud provisioned. The full out-of-scope list is in [`../phases/phase-03.md`](../phases/phase-03.md).
+Consumer product capabilities. Phase 3.5 delivers the policy and capability machinery — Country/Jurisdiction, typed PolicyPacks, `EffectivePolicy`, `SubjectPolicySelection`, the capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the client bootstrap surface — but **no capability is implemented or reachable**: every registry entry is `NOT_IMPLEMENTED` and deployed nowhere. Still out: budgets, transactions, Zakat, AI, Amanat, subscriptions, the Flutter consumer UI, the Super Admin surfaces, and any cloud infrastructure. The full list is in [`../phases/phase-03-5.md`](../phases/phase-03-5.md).
 
 ---
 
@@ -360,3 +361,101 @@ Twice, like capability checks (Q18): mount `requirePermission('x.y.z')` on the c
 ### 53. What can restrict my endpoint at runtime — and what happens during an outage?
 
 Restrict-only kill switches (`NEW_REGISTRATIONS`, `PASSWORD_LOGIN`, `SESSION_REFRESH`, `TENANT_INVITATIONS`). A switch can only **deny** its operation: inactive, missing, and expired all mean unrestricted, and no state enables or widens anything. An active restriction answers 503 `OPERATION_RESTRICTED`; when switch state cannot be read at all, guarded operations fail **closed** with 503 `DEPENDENCY_UNAVAILABLE` — an outage must not silently enable. Every change is versioned, append-only ledgered, and audited with actor and reason. ([`../../modules/control-plane/MODULE.md`](../../modules/control-plane/MODULE.md))
+
+---
+
+## Jurisdiction, capability, and policy
+
+Added in Phase 3.5, when policy resolution and capability availability became real.
+
+### 54. How do I add a jurisdiction in practice?
+
+Six steps, in this order. Nothing here decides a legal question — it declares one so that legal review can answer it.
+
+1. **Declare the regime.** Add an entry to `JURISDICTIONS` in `packages/jurisdiction-policy/src/jurisdiction.ts`: code, country code, `type` (`NATIONAL`, `FINANCIAL_FREE_ZONE`, `SPECIAL_REGIME`), `status: 'DRAFT'`, the honest `reviewStatus`, null effective dates, and a `provenance` string saying who declared it and on what footing. If the country is new, add it to `COUNTRIES` too — a country carries no rule, only a display key, a formatting-default currency, and the ISO code's own status.
+2. **Migrate the registers.** One reviewed migration inserting the `countries` and `jurisdictions` rows, matching the code exactly. There is no runtime write path for either register and no permission that could create one — a regime declaration changes by review, never at runtime.
+3. **Write the pack.** A new file under `packages/jurisdiction-policy/src/packs/`, versioned `<jurisdiction>/v1`. Start it `DRAFT` with `approvalReference: null` and **every decision slot explicitly `PENDING_LEGAL_REVIEW` or `UNRESOLVED` with the open question stated**. Leave `clearedCapabilities` empty. Copy `qa-v1.ts` for the shape, never for the content.
+4. **Name a strategy for anything you clear.** A cleared capability with no resolution strategy fails `validatePack` — there is no default, anywhere. Add it to `POLICY_PACKS` so the build knows the version exists.
+5. **Activate it where it may run.** `canActivate` refuses a `DRAFT` pack outside `local`, so a draft governs local development and tests and nothing else. Activation writes one row in the append-only `policy_pack_activations` ledger through the module's use case, which re-checks the same predicate.
+6. **Assign subjects.** `user_jurisdiction_assignments` / `tenant_jurisdiction_assignments`, with an honest `source`. Remember that `USER_DECLARED` is CHECK-bound to `UNVERIFIED`: a user picking a country never becomes a verified assignment, and a capability requiring verification will deny.
+
+Canonical: [`../architecture/jurisdiction-policy.md` §9](../architecture/jurisdiction-policy.md). Worked end to end: [`../scenarios/a-new-country.md`](../scenarios/a-new-country.md).
+
+### 55. How do I add a capability in practice?
+
+After `MODULE.md` (Q1, Q19), the registration seams — every one an addition, and **every one starting at "no"**:
+
+1. `CAPABILITY_IDS` in `packages/capability-registry/src/index.ts` gains a member.
+2. `CAPABILITY_REGISTRY` gains a descriptor. Start it honestly: `lifecycle: 'PLANNED'`, `implementation: 'NOT_IMPLEMENTED'`, `deployment: {}`, `declaredJurisdictions: []`. Set `disclosureBearing` truthfully, and `clientExposure: 'HIDDEN'` if its denials must not be advertised — the validator *requires* `HIDDEN` for a disclosure-bearing descriptor with no declared jurisdiction.
+3. A migration widens the `capability_id` CHECK on `capability_availability` and `tenant_capability_entitlements` to match the union. The closed set stays closed at the database too.
+4. The PolicyPack gains a clause where legal review has cleared it: an entry in `clearedCapabilities`, a `resolutionStrategies` entry (mandatory), an `approvalPolicies` entry as `DECIDED` if disclosure-bearing (the pack fails validation without it), and `subjectPolicyOptions` only if it offers elections.
+5. Availability rows and entitlements: **create none.** A missing availability row is `DISABLED` and a missing entitlement denies, which is the correct state the day a capability is registered.
+6. Root module import, admin nav entry, GoRouter route.
+
+`implementation` moves to `IMPLEMENTED` when the code exists; `deployment` gains an environment when it is genuinely deployed there. The validator rejects a descriptor claiming `DEPLOYED` while `NOT_IMPLEMENTED`, and no `lifecycle` value ever makes anything reachable. If any of this requires *editing* an unrelated module, stop — the seam is wrong ([`../architecture/extension-pattern.md` §3.1](../architecture/extension-pattern.md)).
+
+### 56. How do I add a capability-scoped profile — an option set a subject elects?
+
+Two halves that must not merge.
+
+**The pack bounds the set.** Add a `SubjectPolicyOptionSet` under the pack's `subjectPolicyOptions` for your capability: an option-set id, its version, and the permitted option ids. That is the ceiling.
+
+**Your capability owns the content.** The option *meaning* — what `nisab-basis:gold` computes — is a type in your bounded context, like `ZakatMethodologyProfile`. It does not go in `modules/subject-policy`, and it does not go in the pack: the pack carries references only.
+
+Then record elections through `modules/subject-policy`. It stores universal metadata only — ids, capability, profile reference and version, jurisdiction, pack version, effective dates, status, provenance, snapshot hash — and validates every recording against the pack's permitted set through the `SubjectOptionSource` port. **A selection may narrow or choose; it may never expand.** An option outside the set, a capability that declares no subject policy, and a stale pack version are all typed denials.
+
+Three consequences worth knowing before you design around it: rows are **immutable** (re-election inserts a new row and supersedes the old one, so historical results replay under the conventions that produced them), the module publishes **no events and exposes no HTTP** (an election is `CONFIDENTIAL` and purpose-limited — a published event would be a side channel), and there is **no generic preferences store** to fall back on. If your capability declares no elective options, that is the common case and costs nothing. ([`../architecture/jurisdiction-policy.md` §7](../architecture/jurisdiction-policy.md), [`../../modules/subject-policy/MODULE.md`](../../modules/subject-policy/MODULE.md))
+
+### 57. How do I read an availability denial?
+
+A denial names the **gate** that stopped it and the **reason**, and the gate tells you which lever is even relevant. Read them in order — the first failure wins, so a `NOT_IMPLEMENTED` denial says nothing about whether the entitlement would have passed.
+
+| Gate | Reason | What it actually means |
+|---|---|---|
+| 1 Descriptor | `NOT_IMPLEMENTED`, `NOT_DEPLOYED` | The code does not exist, or is not deployed in this environment. **No row, pack, or grant can change this** |
+| 2 Environment | `WRONG_ENVIRONMENT` | A row exists, but for a different deployment |
+| 3 Jurisdiction | `JURISDICTION_ABSENT` | The principal has no assignment |
+| | `JURISDICTION_UNVERIFIED` | They have one, but the clearance requires a verified assignment |
+| | `JURISDICTION_NOT_CLEARED` | The pack's cleared set and the descriptor's `declaredJurisdictions` do not intersect here |
+| | `POLICY_PACK_NOT_APPROVED` | The pack cannot govern this environment |
+| 4 Availability | `DISABLED` | No row, or a row saying so. `INTERNAL_ONLY`/`PARTNER_ONLY` also deny — no audience model exists to check |
+| 5 Entitlement | `ENTITLEMENT_MISSING`, `ENTITLEMENT_EXPIRED` | No row for this tenant, revoked, or the window has lapsed |
+| 6 Consent | `CONSENT_REQUIRED`, `RECONSENT_REQUIRED` | Where the pack's basis *is* consent. **No published document also denies** |
+| | `PROCESSING_BASIS_UNRESOLVED` | The pack names no resolvable basis — fail closed |
+| 7 Licence | `LICENCE_MISSING`, `LICENCE_EXPIRED` | A pack-required licence type is absent, unevidenced, revoked, or lapsed |
+| 8 Provider | `PENDING_PROVIDER`, `PROVIDER_UNAVAILABLE` | A pack-required provider kind is not configured or is down |
+
+Today **every real capability denies at gate 1**, so that is the expected answer in any environment.
+
+Two rules that catch people out. A denial at gates 1–4 **cannot** be fixed by adding an entitlement, consent, licence, or provider — those gates run first, and a ceiling denial while a grant-like row exists is audited as `capability.resolution.denied_above_ceiling`. And what you see in a **client** response is not the internal reason: hidden capabilities and non-actionable reasons are omitted from client output entirely, so debug against the internal resolver, never against the bootstrap response. ([`../architecture/capability-registry.md` §4–§5](../architecture/capability-registry.md))
+
+### 58. How do I run the Phase 3.5 suites?
+
+They are ordinary workspace projects, so `make test` runs them all. Individually:
+
+```bash
+pnpm --filter @karar/jurisdiction-policy test   # pure: packs, lifecycle, validation, strategies, EffectivePolicy
+pnpm --filter @karar/capability-registry test   # pure: registry invariants
+pnpm --filter @karar/jurisdiction test          # module + live-PostgreSQL integration
+pnpm --filter @karar/capability test            # gates, client exposure, restrict-only property harness
+pnpm --filter @karar/subject-policy test        # selections, supersession, leak regression
+pnpm --filter @karar/bootstrap test             # bootstrap composition, binding, leak regression
+```
+
+The two pure packages need nothing running. The module suites include live-PostgreSQL integration tests on scratch databases (Q48, Q51): `make dev` first, and set `POSTGRES_PORT=5433` in `.env` if a host PostgreSQL already holds 5432.
+
+The capability module's `restrict-only.property.test.ts` is worth reading before you change a gate: it generates configurations exhaustively over the ceiling core and then sweeps randomized grant-like inputs across them, asserting that the resolved outcome never exceeds the ceiling. If you reorder the gates, that is the test that will tell you.
+
+### 59. How do I get a working tenant locally?
+
+A session must be bound to a tenant before any tenant-scoped endpoint works, and binding requires a membership in a real tenant. Locally:
+
+```bash
+POSTGRES_PORT=5433 KARAR_ENV=local node scripts/db/seed-local-first-party.mjs
+```
+
+That creates the first-party tenant row named by `KARAR_FIRST_PARTY_TENANT_ID` — which defaults, in `local` only, to the documented synthetic UUID exported by the platform config. **Outside `local` the variable is required**, and a boot without it fails with a clear configuration error. Domain code never sees the literal; it reads the typed config.
+
+The seed writes as the bootstrap superuser and creates the tenant **only**. Membership is deliberately not seeded there — `GrantFirstPartyMembership` is an audited use case in `modules/tenancy`, and burying a grant inside a seed script would put authority where nobody reviews it. Tenant provisioning has no runtime path at all this phase (`karar_app` holds `SELECT` only on `public.tenants`), which is why the seed needs the superuser and why real environments provision through the control plane.
+
+With a membership in place, `GET /platform/bootstrap` reports the binding state and auto-binds a session that has exactly one usable membership; `POST /platform/tenant-binding` binds or switches explicitly. A switch issues a **new session and refresh family** and kills the old tokens, so re-read the response rather than reusing what you had. ([`../architecture/tenancy.md` §6](../architecture/tenancy.md))

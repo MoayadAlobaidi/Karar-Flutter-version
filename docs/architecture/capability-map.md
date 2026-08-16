@@ -8,19 +8,28 @@ Capability × bounded context × owning module × dependencies × jurisdiction a
 
 ## 1. Consumer capabilities
 
-| Capability | Module | Classification | QA | SA/AE/OM | Entity licences | External providers | Phase |
-|---|---|---|---|---|---|---|---|
-| `FINANCIAL_ACCOUNTS` | `financial-accounts` | `HIGHLY_SENSITIVE_FINANCIAL` | planned | `DISABLED` | none | none in v1 | 5 |
-| `TRANSACTIONS` | `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | planned | `DISABLED` | none | none in v1 | 5 |
-| `BUDGETS` | `budgets` | `HIGHLY_SENSITIVE_FINANCIAL` | planned | `DISABLED` | none | none | 9 |
-| `GOALS` | `goals` | `HIGHLY_SENSITIVE_FINANCIAL` | planned | `DISABLED` | none | none | 9 |
-| `INSIGHTS` | `insights` | `HIGHLY_SENSITIVE_FINANCIAL` | planned | `DISABLED` | none | none | 6 |
-| `ZAKAT` | `zakat` | `HIGHLY_SENSITIVE_FINANCIAL` | planned | `DISABLED` | none | metal price feed | 9 |
-| `AI_ADVISOR` | `ai` | `CONFIDENTIAL` | planned | `DISABLED` | none | AI provider | 7 |
-| `AMANAT` | `amanat` | **`SEALED`** | **`PENDING_LEGAL_REVIEW`** | **`DISABLED`** | TBD per jurisdiction | death + recipient verification | 14 |
-| `FUNDRAISING` | — | — | **not planned** | **not planned** | unknown | licensed provider | — |
+The registry's three separated state dimensions are canonical in [`capability-registry.md` §3](capability-registry.md); this table adds the module, classification, provider, and phase view of the same set. Since Phase 3.5 the registry state columns are read from `packages/capability-registry/src/index.ts`, not from intent.
 
-**`declaredJurisdictions` for `AMANAT` is `[]`** — it is unreachable regardless of configuration until per-jurisdiction legal clearance exists.
+| Capability | Module | Classification | Lifecycle | Implementation | Deployed | `declaredJurisdictions` | Entity licences | External providers | Phase |
+|---|---|---|---|---|---|---|---|---|---|
+| `TRANSACTIONS` | `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none in v1 | 5 |
+| `BUDGETS` | `budgets` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none | 9 |
+| `GOALS` | `goals` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none | 9 |
+| `INSIGHTS` | `insights` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none | 6 |
+| `AI_ADVISOR` | `ai` | `CONFIDENTIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | AI provider | 7 |
+| `ZAKAT` | `zakat` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | metal price feed | 9 |
+| `AMANAT` | `amanat` | **`SEALED`** | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | **`[]`** | TBD per jurisdiction | death + recipient verification | 14 |
+
+> **No capability is available anywhere.** The availability and entitlement tables ship with no rows, and the descriptor gate denies every id before any row, pack, or entitlement is consulted.
+
+`AMANAT` is additionally `clientExposure: HIDDEN` and disclosure-bearing, so it is omitted from client output in every state — never returned as unavailable. With `declaredJurisdictions: []` its clearance intersection is empty for every regime, so **no PolicyPack can reach it** until a real declaration exists in reviewed code.
+
+Two entries that a reader may expect here and will not find in the registry:
+
+| Name | Status |
+|---|---|
+| `FINANCIAL_ACCOUNTS` | A bounded context (`modules/financial-accounts`, Phase 5), **not a registry capability id.** The closed union has seven members and this is not one of them |
+| `FUNDRAISING` | **Deliberately absent from the runtime registry.** Documentation-only future concept: no id, no descriptor, nothing in the platform can reference it |
 
 ## 2. Platform capabilities
 
@@ -33,7 +42,10 @@ Capability × bounded context × owning module × dependencies × jurisdiction a
 | `OPERATING_ENTITY` | `operating-entity` | Legal person, controller/processor, migration | 3 |
 | `CONSENT` | `consent` | Consent triple, legal documents, re-consent | 3 |
 | `AUDIT` | `audit` | Append-only records | 2 |
-| `CAPABILITY_REGISTRY` | `capability-registry` | Descriptors, availability, entitlement | 3.5 |
+| `JURISDICTION` | `jurisdiction` | Country and jurisdiction registers, assignments, restrict-only settings, the pack-activation ledger | 3.5 |
+| `CAPABILITY` | `capability` | Availability resolution over eight gates, availability rows, tenant entitlements, the client-safe projection | 3.5 |
+| `SUBJECT_POLICY` | `subject-policy` | `SubjectPolicySelection` — immutable, version-pinned elections; content stays capability-owned | 3.5 |
+| `BOOTSTRAP` | `bootstrap` | The authenticated client bootstrap surface and tenant binding; owns no data | 3.5 |
 | `DOCUMENTS` | `documents` | Evidence, file references, object storage port | 13 |
 | `SEALED_VAULT` | `sealed-vault` | Grant-gated sealed storage | 13 |
 | `NOTIFICATIONS` | `notifications` | Delivery behind channel ports | 9 |
@@ -46,9 +58,12 @@ Capability × bounded context × owning module × dependencies × jurisdiction a
 |---|---|---|
 | `shared-kernel` | The nine universals | **zero** |
 | `financial-engine` | Calculators, ruleset registry | **zero** |
-| `jurisdiction-policy` | PolicyPacks, resolution, subject profiles | **zero** |
+| `jurisdiction-policy` | Country and Jurisdiction models, typed PolicyPacks, the decision union, lifecycle and validation predicates, the strategy registry, `EffectivePolicy` | **zero** |
+| `capability-registry` | The closed `CapabilityId` union, descriptors, the three state dimensions, registry validation | **zero** (depends only on `jurisdiction-policy`) |
 | `state-machine` | ~100 lines: states, transitions, guards, audit hook | **zero** |
 | `api-contracts` | OpenAPI spec, event catalogue | build-time only |
+
+Architecture test 17 currently guards the four packages it was configured with; `capability-registry` is framework-free by declaration (its only dependency is `@karar/jurisdiction-policy`) and is not yet in the checker's list.
 
 ## 4. Dependency map
 

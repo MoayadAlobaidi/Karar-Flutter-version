@@ -6,25 +6,25 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 ## Policy and jurisdiction
 
-**Country** — geography, ISO 3166-1 alpha-2. Keys currency defaults, languages, formatting, addresses, phone numbers. **An attribute, not the policy key.**
+**Country** — geography, ISO 3166-1 alpha-2. Keys currency defaults, languages, formatting, addresses, phone numbers. **An attribute, not the policy key** — a country row carries no business rule, consent requirement, capability clearance, or legal conclusion.
 
-**Jurisdiction** — the legal regime governing a person or record. **The policy key.** Usually 1:1 with country and not always: UAE free zones (DIFC, ADGM) are distinct regimes.
+**Jurisdiction** — the legal regime governing a person or record. **The policy key.** Usually 1:1 with country and not always: UAE free zones (DIFC, ADGM) are distinct regimes, and nothing in the platform assumes one jurisdiction per country. Carries its own review lifecycle, so a declared regime is never mistaken for a reviewed one.
 
 **OperatingEntity** — the legal person providing the service and bearing responsibility. Determines controllership, contracting party, licensing, invoicing, liability, and who releases disclosed data. Orthogonal to country and jurisdiction.
 
-**SubjectPolicySelection** — the platform mechanism recording which elective option-set version a subject chose, with versioning, pinning, and provenance. The fourth policy dimension, recovered from the legacy's Zakat capability. The option *content* is capability-scoped (e.g. `ZakatMethodologyProfile`), and elections are potentially sensitive and purpose-limited.
+**SubjectPolicySelection** — the platform mechanism recording which pack-permitted option a subject elected per capability, with the jurisdiction, pack version, and profile version pinned at recording. The fourth policy dimension, recovered from the legacy's Zakat capability. It stores universal metadata only: the option *content* is capability-scoped (e.g. `ZakatMethodologyProfile`), there is no generic preferences store, rows are immutable with supersession, and elections are `CONFIDENTIAL` at minimum and purpose-limited.
 
 **ZakatMethodologyProfile** — the Zakat bounded context's own elective option set (nisab basis, valuation convention, doubtful portions, calendar), elected through `SubjectPolicySelection`.
 
-**PolicyPack** — typed, versioned, tested **code** carrying policy with legal or business consequence. Changed only by pull request, review, tests, staging, deploy.
+**PolicyPack** — typed, versioned, tested **code** carrying policy with legal or business consequence, keyed to one jurisdiction and semantically versioned (`qa/v1`). Changed only by pull request, review, tests, staging, deploy; a published version is immutable, so a change is a new version. The database stores which version is *operative*, never what a pack says.
 
-**JurisdictionSettings** — audited **database** configuration carrying operational availability. Changed by an authorized operator without a deploy.
+**JurisdictionSettings** — audited **database** configuration carrying operational availability. Changed by an authorized operator without a deploy. Its landed shape is a capability disable list and an AI-suspension flag — there is no field that could name an enablement.
 
-**Restrict-only invariant** — *database settings may only ever restrict what the code pack permits; they can never expand it.* The platform's central governance control.
+**Restrict-only invariant** — *database settings may only ever restrict what the code pack permits; they can never expand it.* The platform's central governance control. Structural in two places: the settings type cannot express an addition, and the capability resolver's ceiling gates run before any grant-like input.
 
-**EffectivePolicy** — the merged result of pack, settings, and subject profile. **What use cases ask.** They never read a country code and never branch on jurisdiction.
+**EffectivePolicy** — the single typed resolution result: the resolved pack's decisions with settings merged restrict-only, the capability ceiling with each capability's named strategy, every undecided slot surfaced as a typed reason, and full provenance. **What use cases ask.** They never read a country code and never branch on jurisdiction.
 
-**PolicyResolutionStrategy** — how a long-lived record's governing policy version is chosen: `AT_CREATION`, `AT_EVALUATION`, `MOST_RESTRICTIVE`, and others. Registered, extensible. **No default exists** — an unspecified strategy is a load-time error.
+**PolicyResolutionStrategy** — how a long-lived record's governing policy version is chosen: `AT_CREATION`, `AT_EVALUATION`, `MOST_RESTRICTIVE`, and others. A registry, not an enum — extensible without touching the resolver. **No default exists anywhere** — an unnamed or unregistered strategy fails pack validation.
 
 **Pinning** — storing `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, and `subjectPolicySelectionVersion` on a record, permanently, so it stays explainable.
 
@@ -36,13 +36,13 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **Capability** — a governed unit of platform functionality with an owner, a classification, a jurisdictional clearance, and an entitlement model. The unit of extension.
 
-**CapabilityDescriptor** — the static, compile-time declaration in `<module>/capability.ts`.
+**CapabilityDescriptor** — the static, compile-time declaration of one capability: its id, the three separated state dimensions, `declaredJurisdictions`, whether it is disclosure-bearing, and its client exposure. Lives as an entry in `packages/capability-registry`, not as a per-module file, because the registry is a closed union its validator must see whole.
 
-**declaredJurisdictions** — the **maximum** legally-cleared set. Configuration may restrict it; nothing may exceed it.
+**declaredJurisdictions** — a descriptor's **ceiling input**, not a grant. Clearance is the intersection of this list with the PolicyPack's cleared set, so an empty list is unreachable by any pack.
 
-**CapabilityAvailability** — the audited database record of `(capability × jurisdiction × environment × tenant) → AvailabilityState`.
+**CapabilityAvailability** — the audited database record of the operator-configured exposure state per `(environment, jurisdiction?, capability)`. Configuration, not a health signal, and one gate among eight.
 
-**Deny by default** — *a capability with no availability row is `DISABLED`.* Code existing is never sufficient for exposure.
+**Deny by default** — *a capability with no availability row is `DISABLED`, and no entitlement row denies.* Code existing is never sufficient for exposure, and the tables ship with no rows at all — the ground state is absence, not a row saying "off".
 
 **Registered seam** — an append-only extension point: a union member, a policy clause, a nav entry, a module import, a route. **Nothing existing is modified.**
 
@@ -191,6 +191,34 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 **RLS allow-list** — [`../packages/platform/db/rls-allow-list.json`](../packages/platform/db/rls-allow-list.json): the only sanctioned way a table exists without tenant/user RLS policies. One entry per table with a written reason and compensating controls; architecture test 22 fails any table that is neither `ENABLE`+`FORCE` nor listed.
 
 **Token version (`tv`)** — a per-account counter carried in every access token. Security-relevant account changes (disabling an account, resetting a password) bump it, and the request guard re-reads the account on every request, so previously issued tokens die immediately — no waiting for expiry. Access tokens carry `{sub, sid, iss, aud, iat, exp, tv}` and nothing else; roles are never in the token.
+
+---
+
+## Jurisdiction, capability, and policy (Phase 3.5)
+
+**Assignment source** — where a jurisdiction assignment came from: `USER_DECLARED`, `PROVIDER_VERIFIED`, `OPERATOR_ASSIGNED`, `CONTRACT_DERIVED`. A **separate axis** from verification status, and CHECK-constrained against it: `USER_DECLARED` is bound to `UNVERIFIED`, so a user selecting a country never becomes a verified assignment by any path short of a new provider-verified row.
+
+**Availability state** — the *configured* exposure state stored on a `capability_availability` row: `AVAILABLE`, `BETA`, `INTERNAL_ONLY`, `PARTNER_ONLY`, `DISABLED`, `PENDING_PROVIDER`, `PENDING_LEGAL_REVIEW`, `PENDING_REGULATORY_REVIEW`. Only the first two permit exposure. `INTERNAL_ONLY` and `PARTNER_ONLY` deny in this phase — no audience model exists to check a principal against, and a state that cannot be checked must not widen access. Distinct from a **denial reason**: a row stores a state, a resolution reports a reason.
+
+**Bootstrap context** — what `GET /platform/bootstrap` returns to an authenticated client: who it is, its binding state, and the client-safe jurisdiction, operating-entity, PolicyPack, and capability view. Composed over other modules' state; the surface owns no data. Not to be confused with a **bootstrap arm** (an RLS clause) or with the pre-sign-in deployment-routing problem in [`architecture/infrastructure-portability.md`](architecture/infrastructure-portability.md).
+
+**Ceiling** — the maximum a configuration may reach: the descriptor's implementation, deployment, and declared jurisdictions intersected with the PolicyPack's cleared set. Configuration narrows it; **nothing widens it**.
+
+**Client exposure** — the descriptor field deciding whether a capability may appear in client output at all: `ACTIONABLE` or `HIDDEN`. A `HIDDEN` capability is **omitted in every state, including allowed** — never returned as unavailable with a reason, because naming the reason would advertise that it exists.
+
+**Denial reason** — the resolver's answer for *why* a capability was not exposed, and at which gate. Modelled separately from availability state, and including reasons no row can hold (`NOT_IMPLEMENTED`, `JURISDICTION_NOT_CLEARED`, `ENTITLEMENT_MISSING`, …). Only four are surfaceable to a client — consent, re-consent, and the two entitlement reasons — plus `PENDING_PROVIDER` where a descriptor opts in; everything else omits the capability entirely.
+
+**EffectiveJurisdictionState** — the three-arm value consumers read instead of a nullable assignment row: `NONE`, `UNVERIFIED`, `VERIFIED`. Three arms because a capability requiring a verified regime must deny on the first two alike, and a union makes forgetting one a compile error.
+
+**Entitlement** — a per-`(tenant, capability)` grant that satisfies **one gate and nothing else**. Deliberately carries no subscription, plan, or price concept: `sourceRef` is an opaque seam a future subscription module fills. Missing means denied.
+
+**Gate order** — the eight ordered AND conditions of availability resolution: descriptor, environment, jurisdiction and pack, availability row, entitlement, consent, licence, provider. The order *is* the restrict-only control — the first four consume no grant-like input, so no entitlement, consent, licence, or provider status can flip a ceiling denial.
+
+**Pack lifecycle** — a PolicyPack's stage: `DRAFT`, `PENDING_LEGAL_REVIEW`, `APPROVED`, `RETIRED`. Only `APPROVED` **with a non-empty `approvalReference`** may govern a non-local environment; an approved claim without evidence is refused everywhere. `RETIRED` versions never activate again but stay resolvable for the records made under them.
+
+**PolicyDecision** — the three-arm union every decision slot in a pack holds: `DECIDED` (with the basis that carries the actual claim), `PENDING_LEGAL_REVIEW`, or `UNRESOLVED`. **A pending decision is a valid pack state**; a *required* decision absent entirely is a validation failure. The distinction between "we know we have not decided" and "nobody asked".
+
+**Tenant binding** — the tenant a session is bound to. First bind sets it without token rotation; a **switch** revokes the session and its refresh families and issues a new session, so no token survives pointing at the previous tenant. **Binding is routing, not authority**: per-request membership checks and RLS remain the boundary.
 
 ---
 

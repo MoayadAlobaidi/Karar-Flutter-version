@@ -1,7 +1,7 @@
 # Backend Architecture
 
 **Stack:** NestJS · strict TypeScript · PostgreSQL · node-postgres in the platform foundation · Prisma for domain repositories since Phase 3 (both confined to infrastructure code — §6)
-**ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–3
+**ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–3.5
 
 ---
 
@@ -45,7 +45,7 @@ karar/
 
 `apps/admin` carrying no database driver is enforced, not assumed: the Super Admin talks to the control plane over HTTP and never to Postgres.
 
-`packages/` holds six packages. `@karar/platform` (Phase 2) is the backend platform library `api` and `worker` share; it is deliberately **not** one of the four pure packages — it depends on `pg`, `pino`, and `@opentelemetry/api`. `shared-kernel`, `financial-engine`, `jurisdiction-policy`, and `state-machine` are unchanged and stay framework-free (architecture test 17).
+`packages/` holds seven packages. `@karar/platform` (Phase 2) is the backend platform library `api` and `worker` share; it is deliberately **not** one of the pure packages — it depends on `pg`, `pino`, and `@opentelemetry/api`. `shared-kernel`, `financial-engine`, `jurisdiction-policy`, and `state-machine` stay framework-free under architecture test 17; `jurisdiction-policy` gained its real contents in Phase 3.5 and `capability-registry` joined alongside it, declaring `@karar/jurisdiction-policy` as its only dependency.
 
 ## 3. Module anatomy
 
@@ -54,9 +54,7 @@ Every module has the same shape. Deviation is a review comment.
 ```
 modules/<name>/
 ├── public-api.ts        ← the only legal import surface
-├── capability.ts        ← static CapabilityDescriptor
 ├── MODULE.md            ← ownership. CI fails if absent
-├── permissions.ts
 ├── domain/
 ├── application/
 │   ├── use-cases/
@@ -70,11 +68,11 @@ modules/<name>/
 └── __tests__/
 ```
 
-Wiring is **ordinary NestJS module imports**. The capability registry governs availability and entitlement; it does not resolve dependencies and performs no dynamic loading (ADR-0016).
+Wiring is **ordinary NestJS module imports**. The capability registry governs availability and entitlement; it does not resolve dependencies and performs no dynamic loading (ADR-0016). The static descriptor is an entry in `packages/capability-registry` rather than a per-module file, and permissions are declared in `MODULE.md` and seeded by migration — see [`extension-pattern.md` §5](extension-pattern.md).
 
-### Modules with code, as of Phase 3
+### Modules with code, as of Phase 3.5
 
-Eight bounded contexts have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. One phrase each:
+Twelve bounded contexts have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. One phrase each:
 
 | Module | Landed mechanics (Phase) |
 |---|---|
@@ -86,8 +84,12 @@ Eight bounded contexts have implementations; each `MODULE.md` is the authority o
 | `operating-entity` | Entity register, licences as typed references, relationship-scoped data-protection role assignments, entity bindings and the audited EntityMigration workflow; HTTP contract-only this phase (3) |
 | `consent` | Legal documents with reviewed re-consent classification on publication, immutable entity-pinned grants, fail-closed `AssertConsentFor` (3) |
 | `control-plane` | Kill-switch slice only: restrict-only switches, fail-closed on store outage, versioned append-only history; the gateway itself is Phase 8 (3) |
+| `jurisdiction` | Country and jurisdiction registers, effective-dated user and tenant assignments with separated source/verification axes, restrict-only settings, the append-only pack-activation ledger; no HTTP surface (3.5) |
+| `capability` | Deny-by-default availability resolution over eight ordered gates, availability rows and tenant entitlements with trigger-written ledgers, the one client-safe projection; no HTTP surface (3.5) |
+| `subject-policy` | Immutable, version-pinned records of a subject's pack-permitted elections; option content stays capability-owned; no events, no HTTP surface (3.5) |
+| `bootstrap` | `GET /platform/bootstrap` and `POST /platform/tenant-binding`; composes client-safe views and owns no data (3.5) |
 
-Access tokens are ES256 and carry `{sub, sid, iss, aud, iat, exp, tv}` and nothing else — roles are re-derived from the database on every request, so a revoked grant takes effect immediately.
+Access tokens are ES256 and carry `{sub, sid, iss, aud, iat, exp, tv}` and nothing else — roles are re-derived from the database on every request, so a revoked grant takes effect immediately. Since Phase 3.5 a session also carries a **tenant binding**, set through the bootstrap surface and never from client input; binding selects context while per-request membership checks and RLS remain authoritative ([`tenancy.md` §6](tenancy.md)).
 
 ## 4. Request lifecycle
 
@@ -208,7 +210,9 @@ State change and event enqueue commit in **one transaction**. The relay publishe
 
 Use cases return `Result<T, DomainError>`. Exceptions are for genuinely exceptional conditions, not for expected business outcomes — "insufficient balance" is a result, not a throw.
 
-`presentation/` maps errors to RFC 7807 problem responses. **Every capability denial carries a machine-readable reason** (`CAPABILITY_UNAVAILABLE`, `PENDING_LEGAL_REVIEW`, `CONSENT_REQUIRED`, `ENTITLEMENT_MISSING`), so the client can render an honest state rather than an unexplained absence.
+`presentation/` maps errors to RFC 7807 problem responses. **Every capability denial carries a machine-readable reason internally**, so a denial is always explainable to an operator rather than an unexplained absence.
+
+**What reaches a client is a narrower set, decided in one place.** Since Phase 3.5 only actionable reasons cross the edge — `CONSENT_REQUIRED`, `RECONSENT_REQUIRED`, `ENTITLEMENT_MISSING`, `ENTITLEMENT_EXPIRED`, and `PENDING_PROVIDER` where the descriptor opts in. Legal, jurisdictional, and not-yet-built reasons are not rendered as an unavailable capability; the capability is **omitted entirely**, because naming the reason would advertise that it exists ([`capability-registry.md` §5](capability-registry.md)).
 
 ## 10. Security controls at the edge
 

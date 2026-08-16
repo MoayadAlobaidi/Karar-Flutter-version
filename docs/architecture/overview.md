@@ -55,11 +55,11 @@ The invariant that makes this a control rather than a convention:
 
 > **Database settings may only ever *restrict* what code permits. They can never expand it.**
 
-An operator can disable a capability in a jurisdiction instantly. An operator **cannot enable one** where the PolicyPack has not cleared it — that requires reviewed, tested, deployed code. See [`jurisdiction-policy.md`](jurisdiction-policy.md), ADR-0015.
+An operator can disable a capability in a jurisdiction instantly. An operator **cannot enable one** where the PolicyPack has not cleared it — that requires reviewed, tested, deployed code. As implemented in Phase 3.5 the settings type has no field that could express an enablement, so the invariant is structural rather than checked. See [`jurisdiction-policy.md`](jurisdiction-policy.md), ADR-0015.
 
 ### 3.5 Deny by default
 
-A capability with no availability row is `DISABLED`. Code existing is never sufficient for exposure. Every gate is AND; every denial carries a machine-readable reason. See [`capability-registry.md`](capability-registry.md), ADR-0016.
+A capability with no availability row is `DISABLED`. Code existing is never sufficient for exposure. Every gate is AND; every denial carries a machine-readable reason internally, and only actionable reasons reach a client — the rest are omitted rather than explained. See [`capability-registry.md`](capability-registry.md), ADR-0016.
 
 ## 4. The shape of the system
 
@@ -241,6 +241,8 @@ Items 5 and 6 rank immediately after clear architecture, and **neither justifies
 
 ## 12. Status
 
-**This is Phase 0.** No application code exists. Everything here is a decision, not an implementation.
+Phases 0–3 are complete and Phase 3.5 delivered the jurisdiction and capability foundation. What exists is the platform substrate — identity, users, tenancy, operating entities, RBAC, consent, kill switches, PostgreSQL RLS, and now Country/Jurisdiction with typed PolicyPacks, the capability registry with deny-by-default availability and tenant entitlements, `SubjectPolicySelection`, session tenant binding, and the authenticated client bootstrap surface.
+
+**No consumer product capability is implemented.** Every entry in the capability registry is `NOT_IMPLEMENTED` and deployed nowhere, no jurisdiction is approved, no PolicyPack is approved, and no capability is reachable anywhere. The rest of this document remains largely a set of decisions; the per-document phase headers and the implemented-state notes inside them say which parts have landed.
 
 The roadmap is in `docs/roadmap.md`. **The critical path to a shippable Qatar B2C v1 is Phases 0–9.** Phases 10–21 are an architectural *option*, not a schedule — the seams are what keep that option cheap.
