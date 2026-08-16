@@ -77,8 +77,9 @@ if (!environmentSuffixes.containsKey(requestedEnvironment)) {
 ///
 /// Returns null when the build was invoked through Gradle directly rather than
 /// through the Flutter tool, in which case there is nothing to cross-check.
-fun dartDefinedEnvironment(): String? {
+fun dartDefine(key: String): String? {
     val encoded = project.findProperty("dart-defines") as String? ?: return null
+    val prefix = "$key="
     for (entry in encoded.split(",")) {
         val decoded: String =
             try {
@@ -88,13 +89,15 @@ fun dartDefinedEnvironment(): String? {
                 // not a define this build set; skip it rather than guess.
                 continue
             }
-        if (decoded.startsWith("KARAR_ENV=")) {
-            val value = decoded.removePrefix("KARAR_ENV=").trim().uppercase()
+        if (decoded.startsWith(prefix)) {
+            val value = decoded.removePrefix(prefix).trim()
             return if (value.isEmpty()) null else value
         }
     }
     return null
 }
+
+fun dartDefinedEnvironment(): String? = dartDefine("KARAR_ENV")?.uppercase()
 
 dartDefinedEnvironment()?.let { compiled ->
     if (compiled != requestedEnvironment) {
@@ -102,6 +105,41 @@ dartDefinedEnvironment()?.let { compiled ->
             "Environment mismatch: the package is being built as '$requestedEnvironment' " +
                 "(-Pkarar.env) but the Dart code is compiled for '$compiled' " +
                 "(--dart-define=KARAR_ENV). These must be the same value.",
+        )
+    }
+}
+
+/// A build for a deployed environment MUST carry the endpoint it talks to.
+///
+/// The Dart configuration loader rejects a missing, loopback, plain-HTTP or
+/// credential-bearing base URL, so such a build fails closed at runtime into
+/// CONFIG_INVALID rather than falling back to a development endpoint. That is
+/// correct behaviour, but it is discovered on a device: the artifact is
+/// produced, signed and distributable, and it carries the PRODUCTION package
+/// identity while being incapable of reaching any backend. A release that
+/// cannot work should not be buildable in the first place.
+///
+/// LOCAL is exempt: it has a documented default endpoint. DEV, STAGING and
+/// PRODUCTION do not, and none is inferred.
+//
+// Gradle cannot see the dart-defines when it is invoked directly, so this
+// check only fires on a Flutter-driven build — which is the only way a
+// distributable artifact is produced.
+if (requestedEnvironment != "LOCAL" && project.findProperty("dart-defines") != null) {
+    val baseUrl = dartDefine("KARAR_API_BASE_URL")
+    if (baseUrl == null) {
+        throw GradleException(
+            "Missing endpoint: a $requestedEnvironment build must be given " +
+                "--dart-define=KARAR_API_BASE_URL. Without it the application " +
+                "compiles, packages and installs, then refuses to start because " +
+                "no backend is configured. Supply the endpoint, or build LOCAL.",
+        )
+    }
+    if (!baseUrl.startsWith("https://")) {
+        throw GradleException(
+            "Insecure endpoint: a $requestedEnvironment build was given " +
+                "KARAR_API_BASE_URL='$baseUrl', which is not https. Cleartext is " +
+                "permitted only for the local loopback in debug builds.",
         )
     }
 }
