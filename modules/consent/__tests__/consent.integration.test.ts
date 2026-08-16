@@ -353,6 +353,7 @@ describe.skipIf(unreachable !== null)('consent (live PostgreSQL)', () => {
       legalDocumentVersionId: v1,
       purposeRef: PURPOSE,
       evidenceReference: 'request:test-accept-1',
+      policyPin: { policyPackVersion: 'zz-test/v1', subjectPolicySelectionVersion: null },
       now: NOW,
     });
     expect(accepted.ok).toBe(true);
@@ -446,6 +447,7 @@ describe.skipIf(unreachable !== null)('consent (live PostgreSQL)', () => {
       legalDocumentVersionId: v1,
       purposeRef: PURPOSE,
       evidenceReference: 'request:test-accept-2',
+      policyPin: { policyPackVersion: 'zz-test/v1', subjectPolicySelectionVersion: null },
       now: NOW,
     });
     expect(reGranted.ok).toBe(true);
@@ -463,6 +465,7 @@ describe.skipIf(unreachable !== null)('consent (live PostgreSQL)', () => {
       legalDocumentVersionId: v1,
       purposeRef: PURPOSE,
       evidenceReference: 'request:test-accept-3',
+      policyPin: { policyPackVersion: 'zz-test/v1', subjectPolicySelectionVersion: null },
       now: NOW,
     });
     expect(again.ok).toBe(true);
@@ -598,6 +601,7 @@ describe.skipIf(unreachable !== null)('consent (live PostgreSQL)', () => {
       legalDocumentVersionId: v4,
       purposeRef: PURPOSE,
       evidenceReference: 'request:test-accept-4',
+      policyPin: { policyPackVersion: 'zz-test/v1', subjectPolicySelectionVersion: null },
       now: NOW,
     });
     expect(reAccepted.ok).toBe(true);
@@ -717,6 +721,7 @@ describe.skipIf(unreachable !== null)('consent (live PostgreSQL)', () => {
       legalDocumentVersionId: v1,
       purposeRef: PURPOSE,
       evidenceReference: 'request:test-carol-1',
+      policyPin: { policyPackVersion: 'zz-test/v1', subjectPolicySelectionVersion: null },
       now: NOW,
     });
     expect(refused.ok).toBe(false);

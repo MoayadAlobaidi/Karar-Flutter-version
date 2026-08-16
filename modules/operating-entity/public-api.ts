@@ -31,9 +31,11 @@ export {
 } from './domain/entity-licence.js';
 export {
   DATA_PROTECTION_ROLES,
+  POLICY_PACK_PIN_STATES,
   roleAssignmentActiveAt,
   type DataProtectionRole,
   type DataProtectionRoleAssignment,
+  type PolicyPackPinState,
 } from './domain/role-assignment.js';
 export {
   ASSIGNMENT_SCOPES,

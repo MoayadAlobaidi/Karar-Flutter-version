@@ -35,6 +35,19 @@ identity is erased. Canonical migration headers carry the same declarations
 (`packages/platform/db/migrations/0064`–`0065`); mirrored rows live in
 [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md).
 
+**Pinning block on `consent_grants` (migration 0086, data-model.md §5).** The row pins four
+dimensions at creation and none of them can be rewritten afterwards — the guard trigger now
+covers the pin columns as well as the original content. `jurisdiction_ref` and
+`operating_entity_id` came with Phase 3; `policy_pack_version` and
+`subject_policy_selection_version` complete the block, each paired with a NOT NULL
+`*_pin_state` column so an absent version always says why (`PINNED`, `NOT_APPLICABLE` where
+the purpose declares no elective option set, or `PRE_*` for rows predating the machinery,
+which a cutoff CHECK refuses for anything created from Phase 3.5 on). The added columns are
+policy version strings and typed states — no new subject data, so the lifecycle row above is
+unchanged. `RecordOwnAcceptance` takes the provenance as input
+(`RecordOwnAcceptanceInput.policyPin`) and the edge obtains it through
+`ConsentPolicyPinSource`: this module resolves no policy and invents no version.
+
 **RLS decisions, per table:** `consent_grants` is a SUBJECT table — RLS ENABLED and FORCEd on
 both principal GUCs (`app.tenant_id` AND `app.user_id`, bound by the platform's
 `withPrincipalContext`, never from client input), proven on non-empty data by the adversarial

@@ -37,6 +37,18 @@ subject is erased. Canonical migration headers carry the same declarations
 (`packages/platform/db/migrations/0060`–`0063`); mirrored rows live in
 [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md).
 
+**Pinning block on `data_protection_role_assignments` (migration 0086, data-model.md §5).**
+The row already pinned `jurisdiction_ref` and `operating_entity_id`; `policy_pack_version`
+completes it, paired with a NOT NULL `policy_pack_pin_state` so an absent version says why,
+and a cutoff CHECK refuses the historical `PRE_POLICY_PACK` state for anything created from
+Phase 3.5 on. The subject-selection dimension is declared NOT applicable in the schema and
+CHECK-bound to that single value — a decision between legal persons about a relationship
+carries no subject election, so no version column exists to hold a permanent NULL. Both pin
+columns are covered by the guard trigger: an assignment is still corrected only by ending it
+and recording a successor. `CreateRoleAssignment` takes `policyPackVersion` as input; this
+module resolves no policy. The added columns carry policy version strings and typed states —
+no new subject data, so the lifecycle row above is unchanged.
+
 **RLS decision:** all six tables are platform-global legal records, deliberately allow-listed
 from RLS with per-table justifications and compensating controls in
 [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) —

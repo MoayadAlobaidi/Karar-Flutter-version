@@ -18,7 +18,7 @@
 
 import { Result } from '@karar/shared-kernel';
 
-import type { ConsentGrant } from '../../domain/consent-grant.js';
+import type { ConsentGrant, ConsentPolicyPin } from '../../domain/consent-grant.js';
 import {
   documentCoversPurpose,
   type LegalDocument,
@@ -59,6 +59,13 @@ export interface RecordOwnAcceptanceInput {
   readonly purposeRef: string;
   /** Evidence of the acceptance act (request/session reference). */
   readonly evidenceReference: string;
+  /**
+   * The resolved policy provenance to pin (data-model.md §5). Supplied by the
+   * caller from the EffectivePolicy it already resolved: this module reads no
+   * pack and runs no resolver, so a pin it was not given is a pin it will not
+   * invent — and the schema refuses an unpinned grant outright.
+   */
+  readonly policyPin: ConsentPolicyPin;
   readonly now: Date;
 }
 
@@ -85,6 +92,17 @@ export class RecordOwnAcceptance {
   ): Promise<Result<ConsentGrant, RecordOwnAcceptanceError>> {
     const purposeRef = PurposeRef.of(input.purposeRef);
     requireNonEmpty('evidenceReference', input.evidenceReference);
+    const policyPackVersion = requireNonEmpty(
+      'policyPin.policyPackVersion',
+      input.policyPin.policyPackVersion,
+    );
+    const selectionVersion =
+      input.policyPin.subjectPolicySelectionVersion === null
+        ? null
+        : requireNonEmpty(
+            'policyPin.subjectPolicySelectionVersion',
+            input.policyPin.subjectPolicySelectionVersion,
+          );
 
     let version: LegalDocumentVersion | null;
     let document: LegalDocument | null;
@@ -149,6 +167,13 @@ export class RecordOwnAcceptance {
       withdrawnAt: null,
       status: 'ACTIVE' as const,
       evidenceReference: input.evidenceReference,
+      // Pinned at creation, forever. An absent selection is recorded as the
+      // declared NOT_APPLICABLE case, not as an unexplained NULL.
+      policyPackVersion,
+      policyPackPinState: 'PINNED' as const,
+      subjectPolicySelectionVersion: selectionVersion,
+      subjectPolicySelectionPinState:
+        selectionVersion === null ? ('NOT_APPLICABLE' as const) : ('PINNED' as const),
     });
     let supersededIds: ReadonlyArray<string>;
     try {
@@ -170,6 +195,9 @@ export class RecordOwnAcceptance {
         jurisdictionRef: grant.jurisdictionRef,
         consentVersion: grant.consentVersion,
         legalDocumentVersionId: grant.legalDocumentVersionId,
+        policyPackVersion: grant.policyPackVersion,
+        subjectPolicySelectionVersion: grant.subjectPolicySelectionVersion,
+        subjectPolicySelectionPinState: grant.subjectPolicySelectionPinState,
       },
     });
     return audited.ok ? Result.ok(grant) : audited;
@@ -437,5 +465,6 @@ export class AssertConsentFor {
   }
 }
 
-/** Re-exported so consumers of these flows name the same principal shape. */
-export type { ConsentPrincipal };
+/** Re-exported so consumers of these flows name the same principal shape and
+ * the same policy-pin input. */
+export type { ConsentPolicyPin, ConsentPrincipal };

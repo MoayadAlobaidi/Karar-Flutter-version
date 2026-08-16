@@ -23,7 +23,10 @@ import type {
   OperatingEntityStatus,
 } from '../../domain/operating-entity.js';
 import type { EntityLicence, EntityLicenceStatus } from '../../domain/entity-licence.js';
-import type { DataProtectionRoleAssignment } from '../../domain/role-assignment.js';
+import type {
+  DataProtectionRoleAssignment,
+  PolicyPackPinState,
+} from '../../domain/role-assignment.js';
 import type {
   AssignmentScope,
   OperatingEntityAssignment,
@@ -218,6 +221,8 @@ export class PrismaRoleAssignmentRepository implements RoleAssignmentRepository 
         contractReference: assignment.contractReference,
         createdBy: assignment.createdBy,
         createdAt: assignment.createdAt,
+        policyPackVersion: assignment.policyPackVersion,
+        policyPackPinState: assignment.policyPackPinState,
       },
     });
   }
@@ -270,6 +275,8 @@ function toRoleAssignment(row: {
   contractReference: string | null;
   createdBy: string;
   createdAt: Date;
+  policyPackVersion: string | null;
+  policyPackPinState: string;
 }): DataProtectionRoleAssignment {
   return {
     id: row.id,
@@ -283,6 +290,8 @@ function toRoleAssignment(row: {
     contractReference: row.contractReference,
     createdBy: row.createdBy,
     createdAt: row.createdAt,
+    policyPackVersion: row.policyPackVersion,
+    policyPackPinState: row.policyPackPinState as PolicyPackPinState,
   };
 }
 

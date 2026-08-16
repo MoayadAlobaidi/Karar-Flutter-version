@@ -7,5 +7,15 @@
   },
   "include": ["fixtures.ts", "__tests__/**/*"],
   "exclude": ["dist", "node_modules"],
-  "references": [{ "path": "../../packages/platform" }, { "path": "../../packages/shared-kernel" }]
+  "references": [
+    {
+      "path": "../../packages/capability-registry"
+    },
+    {
+      "path": "../../packages/platform"
+    },
+    {
+      "path": "../../packages/shared-kernel"
+    }
+  ]
 }

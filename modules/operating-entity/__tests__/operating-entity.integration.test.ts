@@ -341,6 +341,7 @@ describe.skipIf(unreachable !== null)('operating-entity (live PostgreSQL)', () =
       role: 'PROCESSOR',
       effectiveFrom: new Date('2026-01-01T00:00:00Z'),
       contractReference: 'dpa:bank-x-2026',
+      policyPackVersion: 'zz-test/v1',
       now: NOW,
     });
     expect(first.ok).toBe(true);
@@ -366,6 +367,7 @@ describe.skipIf(unreachable !== null)('operating-entity (live PostgreSQL)', () =
       role: 'CONTROLLER',
       effectiveFrom: endedAt,
       contractReference: 'dpa:bank-x-2026-amended',
+      policyPackVersion: 'zz-test/v1',
       now: NOW,
     });
     expect(second.ok).toBe(true);

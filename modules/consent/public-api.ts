@@ -25,8 +25,13 @@ export {
 } from './domain/legal-document.js';
 export {
   CONSENT_GRANT_STATUSES,
+  POLICY_PACK_PIN_STATES,
+  SUBJECT_POLICY_SELECTION_PIN_STATES,
   type ConsentGrant,
   type ConsentGrantStatus,
+  type ConsentPolicyPin,
+  type PolicyPackPinState,
+  type SubjectPolicySelectionPinState,
 } from './domain/consent-grant.js';
 export {
   resolveConsentStatus,
@@ -58,6 +63,10 @@ export type {
   ConsentGrantRepository,
   ConsentPrincipal,
 } from './application/ports/consent-grant-repository.js';
+export type {
+  ConsentPolicyPinRequest,
+  ConsentPolicyPinSource,
+} from './application/ports/policy-pin-source.js';
 export type {
   ProcessingBasisRepository,
   ReconsentEvaluationRepository,

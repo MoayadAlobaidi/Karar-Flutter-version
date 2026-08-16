@@ -19,6 +19,13 @@ import type { JurisdictionRef, PurposeRef } from './refs.js';
 export const DATA_PROTECTION_ROLES = ['CONTROLLER', 'JOINT_CONTROLLER', 'PROCESSOR'] as const;
 export type DataProtectionRole = (typeof DATA_PROTECTION_ROLES)[number];
 
+/** Why the policy-pack version column holds what it holds (migration 0086).
+ * PRE_POLICY_PACK describes rows written before PolicyPacks existed; the
+ * schema's cutoff CHECK refuses it for anything created from Phase 3.5 on,
+ * so no use case here can produce it. */
+export const POLICY_PACK_PIN_STATES = ['PINNED', 'PRE_POLICY_PACK'] as const;
+export type PolicyPackPinState = (typeof POLICY_PACK_PIN_STATES)[number];
+
 export interface DataProtectionRoleAssignment {
   readonly id: string;
   readonly operatingEntityId: OperatingEntityId;
@@ -34,6 +41,15 @@ export interface DataProtectionRoleAssignment {
   readonly contractReference: string | null;
   readonly createdBy: string;
   readonly createdAt: Date;
+  /** The PolicyPack version in force when the decision was recorded, pinned
+   * at creation (data-model.md §5) and never rewritten — the schema's guard
+   * trigger refuses a change. Null only where the pin state says why.
+   *
+   * There is no subject-selection dimension here: a decision between legal
+   * persons carries no subject election, and migration 0086 CHECK-binds the
+   * table's declaration of that to NOT_APPLICABLE. */
+  readonly policyPackVersion: string | null;
+  readonly policyPackPinState: PolicyPackPinState;
 }
 
 /** Whether the assignment's effective window covers instant `at`. */

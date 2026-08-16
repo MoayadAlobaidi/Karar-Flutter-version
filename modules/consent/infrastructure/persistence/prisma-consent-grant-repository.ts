@@ -18,7 +18,12 @@ import {
 } from '@karar/platform/dist/db/principal-context.js';
 import type { TenantId, UserId } from '@karar/shared-kernel';
 
-import type { ConsentGrant, ConsentGrantStatus } from '../../domain/consent-grant.js';
+import type {
+  ConsentGrant,
+  ConsentGrantStatus,
+  PolicyPackPinState,
+  SubjectPolicySelectionPinState,
+} from '../../domain/consent-grant.js';
 import type { JurisdictionRef, OperatingEntityRef, PurposeRef } from '../../domain/refs.js';
 import type {
   ConsentGrantRepository,
@@ -76,6 +81,10 @@ export class PrismaConsentGrantRepository implements ConsentGrantRepository {
           withdrawnAt: grant.withdrawnAt,
           status: grant.status,
           evidenceReference: grant.evidenceReference,
+          policyPackVersion: grant.policyPackVersion,
+          policyPackPinState: grant.policyPackPinState,
+          subjectPolicySelectionVersion: grant.subjectPolicySelectionVersion,
+          subjectPolicySelectionPinState: grant.subjectPolicySelectionPinState,
         },
       });
       return { supersededIds };
@@ -144,6 +153,10 @@ function toGrant(row: {
   withdrawnAt: Date | null;
   status: string;
   evidenceReference: string;
+  policyPackVersion: string | null;
+  policyPackPinState: string;
+  subjectPolicySelectionVersion: string | null;
+  subjectPolicySelectionPinState: string;
 }): ConsentGrant {
   return {
     id: row.id,
@@ -158,5 +171,10 @@ function toGrant(row: {
     withdrawnAt: row.withdrawnAt,
     status: row.status as ConsentGrantStatus,
     evidenceReference: row.evidenceReference,
+    policyPackVersion: row.policyPackVersion,
+    policyPackPinState: row.policyPackPinState as PolicyPackPinState,
+    subjectPolicySelectionVersion: row.subjectPolicySelectionVersion,
+    subjectPolicySelectionPinState:
+      row.subjectPolicySelectionPinState as SubjectPolicySelectionPinState,
   };
 }
