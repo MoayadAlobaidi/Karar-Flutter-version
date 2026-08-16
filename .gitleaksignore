@@ -9,3 +9,9 @@
 # invitation credential — the control itself). Words matched the rule; no
 # value is present on the line.
 1945b2ea5654a185ce389fd676102d4ee736ed8c:modules/tenancy/MODULE.md:generic-api-key:29
+
+# The first revision of THIS file quoted the flagged prose verbatim in its
+# reason comment, so the full-history scan flags that historical revision
+# forever even though the comment was reworded. Same non-finding as above,
+# one commit later.
+a44cc35da98bcc5cba1472f442c69ef56b44bf66:.gitleaksignore:generic-api-key:6
