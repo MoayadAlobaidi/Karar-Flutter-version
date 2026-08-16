@@ -1,13 +1,24 @@
 # Phase 3.5 — Jurisdiction and capability foundation
 
-**Branch:** `claude/karar-v2-phase-3-5-jurisdiction-capabilities` · **Started:** 16 August 2026 · **Status:** in progress
+**Branch:** `claude/karar-v2-phase-3-5-jurisdiction-capabilities` · **Started:** 16 August 2026 · **Status:** COMPLETE (closed 16 August 2026)
 **Base:** Phase 3 merge commit `fe3864a` on `main`.
 
 Verification sections are filled by the phase lead after running the commands — they record executed results, never intentions.
 
 ## Close-out record
 
-_Filled by the phase lead at close, in the shape [`phase-03.md`](phase-03.md) uses: completion date, final branch and merge reference, final implementation head, CI and Security run URLs, final canonical counts, clean-clone verification, compliance-gate outcome, evidence range, independent-review result, security-suppression review, carried risks, and scope confirmation._
+- **Completion date:** 16 August 2026.
+- **Final branch:** `claude/karar-v2-phase-3-5-jurisdiction-capabilities`, merged into `main` through PR #6 (merge commit recorded in the PR; the branch was deleted after ancestry verification).
+- **Final implementation head:** `5411b0d` — the last commit before the documentation-only close-out commit that completes this report.
+- **CI and Security runs:** all 12 checks green at `5411b0d` — CI run [31953306622](https://github.com/MoayadAlobaidi/Karar-Flutter-version/actions/runs/31953306622) and Security run [31953306623](https://github.com/MoayadAlobaidi/Karar-Flutter-version/actions/runs/31953306623); 8 of the 12 are branch-protection-required. Re-verified green on the close-out head before merge.
+- **Final canonical counts** (clean-clone run at `5411b0d`, 16 August 2026): workspace **1109 passed / 5 skipped (1114)** across **105 passed / 1 skipped (106)** files; readiness suite run separately **5 passed**; architecture **24 passed / 0 failed / 4 skipped**, registry errors 0, self-test **56/56**; documentation checks **7/7**; Prisma drift **43 mapped tables match**; **38 migrations**, all applied from zero; **48 tables** = 22 RLS ENABLE+FORCE + 33 allow-listed (7 both); **30 merged OpenAPI paths**; 24 module directories (12 with code) and 7 packages.
+- **Clean-clone verification:** PASS. A fresh clone of `5411b0d` reused nothing — no `node_modules`, `dist`, generated Prisma client, database, Docker volume, Redis data, environment file, or local key material. Pinned toolchain verified (Node 25.9.0, pnpm 11.18.0, Flutter 3.47.0); frozen-lockfile install; the full compose stack (PostgreSQL, Redis, MinIO, OpenTelemetry) started from empty volumes; roles, database and all 38 migrations applied from zero with checksums verified and drift clean; the whole `make verify` gate green; the readiness suite run in isolation; the worker booted and drained cleanly on SIGTERM. Three phase-specific invariants were proven directly rather than inferred: `qa/v1` is DRAFT with an empty cleared-capability set and a null approval reference, and `canActivate` **denies production, staging and dev while permitting only local**; all seven capabilities are NOT_IMPLEMENTED and deployed nowhere, with Amanat hidden, declaring no jurisdiction, and its descriptor frozen; and the local-only encryption and mail providers **refuse to construct in production, staging and dev** while constructing in local. Stack removed with volumes. Window 16:10–16:12 UTC. This is maintainer reproducibility verification, not independent organizational testing.
+- **Security-suppression review:** PR #6 introduced **no new suppressions**. `.gitleaksignore` is unchanged from Phase 3 (two exact-fingerprint entries reviewed at that close as EV-318), there are zero open code-scanning alerts, and the single dismissed alert also predates this phase. Both pre-existing suppressions were re-confirmed as narrow and correct.
+- **Compliance gate:** recorded in [`../compliance/phase-compliance-gate.md`](../compliance/phase-compliance-gate.md) with its outcome and every deferred item's reason, owner, target, residual risk, and closure condition.
+- **Evidence:** EV-401–EV-429 reconciled against the executed runs; nothing is OPERATING or EVIDENCED.
+- **Independent review:** 0 BLOCKING / 7 HIGH / 11 MEDIUM / 13 LOW. Every HIGH and MEDIUM was resolved before the PR. Agent review is technical review, not organizational independence.
+- **Carried risks and limitations:** consent acceptance is unreachable until a jurisdiction assignment and pack activation have a write path; bootstrap cannot yet distinguish a resolution failure from a legitimate empty capability set; the bootstrap response carries no safe operating-entity summary; the capability-clearance bridge fails closed and must be completed before any real capability is marked implemented or deployed. All four are Phase 4 entry work.
+- **Scope confirmation:** no Phase 4 implementation, no financial, AI, Zakat, Amanat or subscription scope, and no cloud or DNS configuration was created in Phase 3.5. `apps/mobile/lib` still contains only its Phase 1 placeholder. No legacy Qarar code was copied — a repository-wide scan finds zero occurrences in any source file.
 
 ---
 

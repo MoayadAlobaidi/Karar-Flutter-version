@@ -1,6 +1,8 @@
 # Risk Treatment Plan
 
-**Status:** ACTIVE register · **Owner:** Security Owner · **Version:** 0.4 · **Date:** 2026-08-16 · **Review:** every phase gate
+**Status:** ACTIVE register · **Owner:** Security Owner · **Version:** 0.5 · **Date:** 2026-08-16 · **Review:** every phase gate
+
+**v0.5 (2026-08-16, Phase 3.5 close):** every row re-checked at the gate; **row 021's closure confirmed** (gate record v0.6). No treatment slipped its phase, so there is no slipped-treatment finding at this gate. **A treatment row exists for every open risk** — rows 001–018, 020, 022–030 against the register's open rows, with 019 and 021 carrying their closures. **Phase 3.5 is COMPLETE; Phase 4 is NOT STARTED**, and the several rows naming Phase 4 state when a treatment step next falls due, not that any of it has begun.
 
 **v0.4 (2026-08-16, Phase 3.5):** rows 022–030 added with their risks; row 021 records its closure and hands its surviving residual to row 030.
 

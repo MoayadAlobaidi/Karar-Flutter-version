@@ -1,6 +1,6 @@
 # Threat Model
 
-**Status:** Phase 0 — design-stage model. **No system exists, no data is held, no penetration test has been performed.**
+**Status:** Design-stage model, extended per phase — **current through Phase 3.5 (COMPLETE); Phase 4 NOT STARTED.** **No system is deployed in any environment, no data is held, no capability is available anywhere, and no penetration test has been performed.** Sections 1–4 remain the Phase 0 design-stage model; the per-phase threat tables below are added as each phase's surface lands and describe mechanisms that exist in-repo with passing tests, never mechanisms in service.
 **Basis:** Karar's architecture as documented, plus 128 findings from the legacy audit of `MoayadAlobaidi/Qarar`.
 
 ---
@@ -211,7 +211,7 @@ Phase 3 has no deployment.
 | Pooled-connection principal leakage | GUCs are bound with `set_config(…, is_local => true)` (SET LOCAL semantics) inside one transaction, and absent optional keys are bound to `''` to shadow stale session values; architecture test 9 fails any session-scoped bind (`set_config(…, false)`, `SET app.*`) | Hygiene probes issue a context-free query on the SAME pool after tenant work and assert empty GUCs and zero visible rows | `tests/security/__tests__/cross-tenant-isolation.integration.test.ts` (adapter and Prisma pools) | EV-308 | A driver or pooler that replays session state outside the platform adapter would bypass the discipline; only the two sanctioned pools exist in Phase 3 | Platform |
 | RBAC privilege escalation and delegation abuse | Deny-by-default against a closed, migration-seeded catalogue (no wildcards, structurally — CHECK grammar in migration 0050); `authorization.role.assign` is PLATFORM_ADMIN-only with the peer-delegation rule enforced in the AssignRole use case; assignment writes are RLS-bound to the transaction's target principal (migration 0052), so a compromised path cannot scatter grants across users; revoked assignments immutable by trigger even for the owner | Grants and revocations audited with actor and reason; catalogue drift blocked by the DB-seed == code-catalogue test | `modules/authorization/__tests__/authorization.integration.test.ts`, `role-use-cases.test.ts`; `tests/security/__tests__/privilege-abuse.integration.test.ts` | EV-309 | No HTTP surface for role administration exists in Phase 3, so abuse requires code execution — and equally, no operator can grant or revoke over HTTP until the control plane arrives; a tenant-scope/role-scope mismatch smuggled past the use case never authorizes cross-scope (resolver applies scope at read time) but is not database-rejected | Authorization |
 | Kill-switch abuse (operational denial or unauthorized restriction) | Restrict-only by construction: a switch can only DENY an operation, never enable one; closed id registry (CHECK, no INSERT grant); every UPDATE must increment `version` by exactly one and auto-appends the append-only history ledger via a SECURITY DEFINER trigger (migration 0053); operate is gated on `controlplane.killswitch.operate` through the PolicyService and audited | History ledger is the tamper-evident record of every state that ever held; store outage on guarded reads fails CLOSED (503), never silently open | `modules/control-plane/__tests__/kill-switch.integration.test.ts`; `tests/security/__tests__/privilege-abuse.integration.test.ts` | EV-310 | Guards are mounted: registration/login/refresh carry identity's `RequireOperationAllowed` and invitation issue/redeem carry tenancy's, both consumer-declared gates bound to the one `CheckKillSwitch` (`modules/identity/__tests__/kill-switch-mounts.test.ts`, the restriction case in `modules/tenancy/__tests__/tenancy.controller.test.ts`, and the composed 503 problem-document proof in `apps/api/src/errors/error-boundary.composed.test.ts`); remaining residuals: no kill-switch HTTP operate surface exists this phase (runbooks call the use case), and denial visibility depends on the api's error boundary translating the guard exception (pinned by the composed test) | Control plane |
-| Consent evidence tampering or unclassified republication | Grants are immutable evidence: pinned entity/jurisdiction/version columns never move, transitions limited by trigger to ACTIVE→WITHDRAWN and ACTIVE→SUPERSEDED, no DELETE grant (migration 0065); publication is impossible without a reviewed classification (CHECK constraints in migration 0064 — no default, either way); published versions immutable even for the owner; re-consent evaluation is a recorded decision per version and purpose, never a default | Consent status resolution reads the immutable rows; architecture test 21 (`checkPinning`) blocks the merge on missing pins | `modules/consent/__tests__/consent.integration.test.ts`; `tests/security/__tests__/privilege-abuse.integration.test.ts` | EV-311 | PolicyPack version and SubjectPolicySelection pins are deferred to Phase 3.5 with a gate that fails the build when 3.5 arrives without the columns (fabricating values now would be worse); which purposes legally REQUIRE consent per jurisdiction resolves in 3.5 — until then the basis-reference table fails closed | Consent |
+| Consent evidence tampering or unclassified republication | Grants are immutable evidence: pinned entity/jurisdiction/version columns never move, transitions limited by trigger to ACTIVE→WITHDRAWN and ACTIVE→SUPERSEDED, no DELETE grant (migration 0065); publication is impossible without a reviewed classification (CHECK constraints in migration 0064 — no default, either way); published versions immutable even for the owner; re-consent evaluation is a recorded decision per version and purpose, never a default | Consent status resolution reads the immutable rows; architecture test 21 (`checkPinning`) blocks the merge on missing pins | `modules/consent/__tests__/consent.integration.test.ts`; `tests/security/__tests__/privilege-abuse.integration.test.ts` | EV-311 | **Resolved and re-stated at the Phase 3.5 close:** the PolicyPack-version and SubjectPolicySelection pins landed as migration `0086`, and architecture test 21 now enforces them rather than gating on their arrival (KAR-CTL-084). The *mechanism* for "which purposes legally require consent per jurisdiction" also landed — but **no pack decides any of it**: `qa/v1` carries every consent and processing-basis slot as an explicit `PENDING_LEGAL_REVIEW`, so the basis-reference table **still fails closed**. A further consequence, recorded rather than smoothed over: **`POST /consent/acceptances` now answers 503 `DEPENDENCY_UNAVAILABLE` for every caller, including in `local`** — a valid grant must pin jurisdiction, active pack version, operating entity, and legal-document version, and no runtime write path exists for the jurisdiction assignment or the pack activation. Refusing is correct (a grant whose provenance nobody resolved must not be written, and the schema refuses it independently), but consent acceptance is **unreachable**, not merely gated. Phase 4 owns restoring it | Consent |
 | Privileged insider with database credentials | `karar_app` holds NOBYPASSRLS and minimal per-table DML (no DELETE on evidence tables, SELECT-only on catalogues, pinned by explicit REVOKEs in 0034/0054); `karar_migrator` owns the schema but FORCE keeps it inside RLS policies, and append-only/immutability triggers raise even for the owner; `SET ROLE`, DDL in `public`, trigger disabling, and `session_replication_role` all refuse for the app role | Live probes of `pg_roles` attributes and denial paths in the adversarial suites | `tests/security/__tests__/privilege-abuse.integration.test.ts`; `packages/platform/src/db/contract.test.ts` | EV-312 | A cluster superuser can drop any trigger — compose-local only in Phase 3; cluster access control and off-host audit shipping are later-phase controls (same residual as the Phase 2 audit row) | Platform |
 | Silent capability loss outside local (mail, encryption) | Fail-closed constructors: `LocalDevEncryptionProvider` (`packages/platform/src/keys/local-dev-encryption-provider.ts`) and `LocalMailSink` (`packages/platform/src/notifications/local-mail-sink.ts`) THROW outside `KARAR_ENV=local`, so a non-local deployment cannot silently swallow customer mail or encrypt under a dev key | Boot fails loudly; nothing to detect at runtime because construction refuses | `packages/platform/src/keys/keys.test.ts`, `packages/platform/src/notifications/local-mail-sink.test.ts` | EV-313 | The flip side is availability: no real mail or KMS provider exists yet, so identity flows that need them cannot run outside local until those providers land | Platform |
 
@@ -223,13 +223,30 @@ arrive by forward migration together with the surface that calls them. No
 permission returns credential material; no role holds a cross-tenant consumer
 read; `amanat.content.read` does not exist for any role.
 
-Tenant-binding residual, stated once here for the security reader: sessions
-are issued with `tenant_binding = null` and no binding mechanism exists in
-Phase 3, so every tenant-bound endpoint answers 401 for every caller — the
-fail-closed posture is the point (an unbound session can reach nothing
-tenant-scoped), but it also means the tenant-bound surface is dormant, not
-merely guarded. The full statement, endpoint list, and ownership live in the
-Phase 3 report's Known limitations and risk KAR-RSK-021.
+Tenant-binding residual **as it stood in Phase 3, and how Phase 3.5 changed
+it** — kept here because the Phase 3 posture explains why the Phase 3.5
+mechanism is shaped the way it is. Through Phase 3, sessions were issued with
+`tenant_binding = null` and no binding mechanism existed, so every
+tenant-bound endpoint answered 401 for every caller: fail-closed was the point
+(an unbound session could reach nothing tenant-scoped), but the surface was
+dormant rather than merely guarded, and that dormancy was carried as
+KAR-RSK-021.
+
+**Phase 3.5 delivered the binding mechanism and KAR-RSK-021 is CLOSED**
+(confirmed at the Phase 3.5 gate). A session's tenant binding now moves
+null → value only from a **server-side membership read, never from the
+request**; membership is re-verified at bind time; a switch atomically revokes
+the old session **and its refresh family** before issuing the new bound one.
+The tenant-bound surface is therefore **live and guarded, no longer dormant**
+— reachable once a session carries a binding, with no route contract changed
+to make that true. The residual the mechanism does **not** remove is that
+**RLS cannot re-check membership**: once a transaction binds `app.tenant_id`
+from a session row, it sees that tenant's rows for the life of the
+transaction, so the window between a membership revocation and the next
+resolution is real. It is bounded by re-verification on every bootstrap read
+and by revocation on detection, not by the database, and it is carried as its
+own risk, KAR-RSK-030, rather than folded into the closure. See the
+Phase 3.5 rows below and KAR-CTL-091.
 
 ## Phase 3.5 jurisdiction, capability, and tenant-binding threats
 
@@ -240,10 +257,12 @@ restrict-only jurisdiction settings, the compile-time capability registry with
 deny-by-default availability resolution, tenant capability entitlements,
 subject policy selections, session tenant binding and switching, and the
 authenticated bootstrap surface), mapped to their controls. Evidence refs
-`EV-401..EV-414` are placeholders the compliance workstream registers in the
-evidence index. Test paths name the suites that exist on this branch; none of
-this section claims a control is operating in any deployed environment —
-Phase 3.5 has no deployment, and no capability in the registry is built.
+`EV-401..EV-414` were placeholders at drafting and are now **defined rows in
+the [evidence register](../compliance/evidence-register.md)**, one per threat
+row below, all `COLLECTED`. Test paths name suites that exist on this branch;
+none of this section claims a control is operating in any deployed
+environment — **Phase 3.5 is COMPLETE and has no deployment, no capability in
+the registry is built, and no capability resolves available anywhere.**
 
 | Threat | Preventive control | Detective control | Test reference | Evidence | Residual risk | Owner |
 |---|---|---|---|---|---|---|
@@ -295,9 +314,9 @@ Recorded with owners, per the legacy's missing risk-acceptance register (its wor
 
 | | |
 |---|---|
-| That Karar is secure | No system exists |
-| That the controls work | None are implemented |
-| Any regulatory position | No approval, licence, or certification is claimed |
+| That Karar is secure | No system is deployed in any environment |
+| That the controls work | As of the Phase 3.5 close, 62 of 93 controls are `IMPLEMENTED` — meaning **the mechanism exists in-repo with passing tests**, nothing more. **No control is `OPERATING` or `EVIDENCED`**, none has an operating history, and none has been exercised by production traffic, because there is none |
+| Any regulatory position | No approval, licence, or certification is claimed. No SOC 2 report exists and no examination has been performed; no ISO certification is held or sought at this stage |
 | Residency risk | Open question — see `../architecture/data-residency.md` |
 
 **An independent security assessment by a party that did not build the system is a Phase 20 gate**, and nothing produced in-house substitutes for it.

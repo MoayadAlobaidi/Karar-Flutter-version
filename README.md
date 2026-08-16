@@ -17,9 +17,9 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **3.5 — in progress** ([phase report](docs/phases/phase-03-5.md)); last completed: 3 ([report](docs/phases/phase-03.md)) |
+| Current phase | **3.5 — COMPLETE** ([phase report](docs/phases/phase-03-5.md)); Phase 4 not started |
 | Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
-| Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
+| Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, and the jurisdiction and capability foundation — **no consumer product capability is implemented or reachable** |
 | Cloud | None provisioned; local development is cloud-free |
 | Compliance | Readiness framework in place; **no certification is claimed** |
@@ -260,7 +260,7 @@ Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never
 
 ## Roadmap and phase discipline
 
-Completed: 0, 0.5, 1, 2, and 3 — the last delivering identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests. Current: **3.5** — jurisdiction and capability foundation: Country/Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface.
+Completed: 0, 0.5, 1, 2, 3, and 3.5 — Phase 3 delivered identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests; Phase 3.5 added Country and Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface. Next: 4 (Flutter foundation — app architecture, authentication and session UX, tenant selection, capability-aware navigation, Arabic RTL, accessibility, mobile security), not started.
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 

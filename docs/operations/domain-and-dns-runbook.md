@@ -1,6 +1,8 @@
 # Domain and DNS Ownership and Renewal
 
-**Status:** ACTIVE runbook · **Owner:** Operations Owner · **Version:** 0.1 · **Date:** 2026-08-16 · **Review:** every phase gate
+**Status:** ACTIVE runbook · **Owner:** Operations Owner · **Version:** 0.2 · **Date:** 2026-08-16 · **Review:** every phase gate
+
+**v0.2 (2026-08-16, Phase 3.5 close):** re-checked at the Phase 3.5 gate. **Nothing changed, and nothing was verified** — all seven §3 hardening rows remain **TO_VERIFY**, because no repository-verifiable evidence of any registrar or DNS setting exists and none was obtained. **Exactly three things are confirmed facts: the domain is registered, Cloudflare is the registrar, and Cloudflare is the authoritative DNS provider.** Everything else in §1 is `NOT_CONFIGURED` and everything in §3 is unverified. EV-427 therefore stays `PENDING` at the gate rather than being recorded against this file — **a self-written document is not evidence of a registrar setting**, which is the whole reason this row exists. Owner: Security Owner; target the Phase 4 gate, or immediately on any DNS record creation or proxy enablement. **Phase 3.5 is COMPLETE; Phase 4 is NOT STARTED**, and no DNS or hosting change is scheduled or made.
 
 The operational companion to the `kararfinance.com` row in the
 [asset inventory](../compliance/asset-inventory.md) and the Cloudflare row in

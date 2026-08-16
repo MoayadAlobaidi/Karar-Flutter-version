@@ -6,11 +6,14 @@ The control framework and evidence structure for Karar V2's SOC 2 Type II and IS
 
 **Nothing.** Karar holds no SOC 2 report, no ISO/IEC 27001 certificate, no regulatory approval, and claims none (Assurance Claim Registry AC-009). No control in this directory is asserted as OPERATING or EVIDENCED, and no evidence row anywhere is EVIDENCED. As of Phase 3.5 (2026-08-16) there is still no cloud, no customer, and no production environment; what exists is a documented control set, registers with honest contents, Phase-1 CI tooling with first-run evidence collected, and Phase-2 platform, Phase-3 identity/tenancy/access-control, and Phase-3.5 jurisdiction/capability/binding code whose controls are IMPLEMENTED in the matrix's narrow sense — mechanisms in-repo with tests run locally and in CI, deployed nowhere. Any document or conversation representing more than that is wrong and should be corrected against this page.
 
-Three Phase 3.5 facts belong here rather than buried in a register, because they are the ones most easily misread as progress toward a claim:
+**Phase status: Phase 3.5 is COMPLETE (gate executed 2026-08-16, outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS). Phase 4 is NOT STARTED.** The gate record is in [phase-compliance-gate.md](phase-compliance-gate.md); it carries eleven deferred items, each with a reason, owner, target, residual risk, and closure condition, and one evidence row (EV-427) that can cite nothing and says so.
+
+Four Phase 3.5 facts belong here rather than buried in a register, because they are the ones most easily misread as progress toward a claim:
 
 - **No capability is available anywhere.** Every capability in the registry is `NOT_IMPLEMENTED` and deployed in no environment, so the availability resolver denies all of them before reaching any later gate.
 - **No policy pack and no jurisdiction is approved.** The one drafted pack, `qa/v1`, carries every legal question as an explicit `PENDING_LEGAL_REVIEW` and clears nothing. Approval is a legal act this repository cannot perform, and **no legal review has occurred**.
 - **All 14 policies remain DRAFT.** Platform Owner review is required before the first non-local deployment. Nothing in this directory approves a policy on the Platform Owner's behalf, and no gate record does either.
+- **Consent acceptance is unreachable, not merely gated.** `POST /consent/acceptances` answers 503 for every caller, including in `local`: a valid grant must pin jurisdiction, active pack version, operating entity, and legal-document version, and no runtime write path exists for the jurisdiction assignment or the pack activation. Refusing is correct behaviour and a real limitation, carried to Phase 4.
 
 ## How the pieces relate
 
