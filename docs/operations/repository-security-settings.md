@@ -142,6 +142,32 @@ findings:
 This review is maintainer-directed agent review, not organizationally
 independent human assurance. Registered as EV-318.
 
+## Phase 3.5 close — security-suppression review (2026-08-16, EV-430)
+
+**Finding: PR #6 introduced no suppressions of any kind.** That is the result
+of the review, recorded as a result rather than left as silence — "nothing
+new" is only trustworthy when someone says they looked.
+
+- **Gitleaks**: `.gitleaksignore` is **byte-unchanged from Phase 3** — the
+  same 2 exact-fingerprint entries reviewed at the Phase 3 close as EV-318.
+  Both were re-read at their pinned commits and re-confirmed: documentation
+  prose, no secret material, commit+file+rule+line exact, so neither can
+  suppress a future finding. **No regex, path, directory, or rule-level
+  suppression exists anywhere**, and none was added this phase.
+- **Code scanning**: **0 open alerts**, and exactly **1 dismissed** —
+  `js/insufficient-password-hash` on `packages/platform/src/ratelimit/keys.ts`,
+  the pre-existing Phase 3 dismissal recorded below. Re-confirmed still
+  per-alert; the workflow still runs plain `codeql-action init`/`analyze`
+  with no query exclusions, path ignores, or configuration file.
+- **Both pre-existing suppressions re-confirmed still narrow and still
+  correct.** Neither was widened, and no new one was created.
+- CI and Security runs on head `5411b0d`: 12 checks green, the `secrets` and
+  `codeql` jobs among them
+  (https://github.com/MoayadAlobaidi/Karar-Flutter-version/actions/runs/31953306623).
+
+This review is maintainer-directed technical review, **not organizationally
+independent human assurance**. Registered as EV-430.
+
 ## Code-scanning dismissal record — CodeQL alert 1 (2026-08-16)
 
 CodeQL flagged `js/insufficient-password-hash` (high) on the rate-limit key

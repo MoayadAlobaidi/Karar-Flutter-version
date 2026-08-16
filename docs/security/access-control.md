@@ -95,6 +95,34 @@ See [`sealed-access.md`](sealed-access.md).
 | **PostgreSQL RLS** | Tenant isolation — the actual boundary |
 | `SealedRecordStore` | Grant, at the type level |
 
+### Phase 3.5 additions
+
+Six enforcement points arrived with jurisdiction, capability, and tenant
+binding. Each is listed by the artifact that does the enforcing, in the order a
+request meets them.
+
+| Point | Enforces |
+|---|---|
+| Session tenant binding | Which tenant a session may act as. Set from a **server-side membership read, never from the request**; null → value only, and a change of tenant is a switch that revokes the old session and its refresh family |
+| Capability resolver, gate 1 | Whether the code exists at all. Reads the compile-time descriptor only — **no configuration row, pack, or entitlement is consulted first**, so unbuilt code cannot be made available |
+| PolicyPack ceiling | The **maximum** capability set for a jurisdiction. A ceiling, not a grant: clearing a capability permits the later gates to run, it never skips them |
+| `jurisdiction_settings` | Restriction only. The table has **no column that can express an enablement**, and the merge is subtractive — an absent row restricts nothing |
+| Tenant capability entitlement | Per-tenant availability, RLS-scoped and **validated temporally at read time**, so a lapsed window denies regardless of the stored status |
+| Client-safe view | What a client is told. A separate projection: `HIDDEN` capabilities are **omitted in every state**, and legal, jurisdictional, entity, and licence denial reasons never appear |
+
+Two rules hold across all six. **Every gate denies by default** — an absent
+row, an unresolved question, or a store outage is a denial, never a permission.
+And **nothing downstream can widen what an upstream gate allowed**: the merge
+across registry, pack, settings, availability, and entitlement is restrict-only,
+asserted as a property over randomized inputs in
+`modules/capability/__tests__/restrict-only.property.test.ts`.
+
+Records with legal consequence pin the policy that produced them at creation
+(data-model.md §5): jurisdiction, operating entity, PolicyPack version, and —
+where the capability has elective options — the subject-selection version. The
+pins are schema-enforced and immutable by trigger, and architecture test 21
+refuses a merge that leaves one unpinned or a null unexplained.
+
 ## 7. Sessions
 
 | Rule | Why |

@@ -310,11 +310,16 @@ export async function seedTenantData(database: string): Promise<void> {
   for (const [id, userId, tenantId] of grants) {
     await asApp(database, { tenantId, userId }, (tx) =>
       tx.query(
+        // The pinning block (migration 0086) is not optional for a row created
+        // from Phase 3.5 on: the seed pins a synthetic pack version and states
+        // the no-elective-options case explicitly.
         `INSERT INTO public.consent_grants
            (id, user_id, tenant_id, operating_entity_id, jurisdiction_ref, purpose_ref,
-            consent_version, legal_document_version_id, granted_at, status, evidence_reference)
+            consent_version, legal_document_version_id, granted_at, status, evidence_reference,
+            policy_pack_version, policy_pack_pin_state, subject_policy_selection_pin_state)
          VALUES ($1, $2, $3, $4, 'jurisdiction:synthetic', 'purpose:security-suite',
-                 '1.0.0', $5, now(), 'ACTIVE', 'request:security-suite-seed')`,
+                 '1.0.0', $5, now(), 'ACTIVE', 'request:security-suite-seed',
+                 'zz-security/v1', 'PINNED', 'NOT_APPLICABLE')`,
         [id, userId, tenantId, ENTITY_ID, DOCUMENT_VERSION_ID],
       ),
     );

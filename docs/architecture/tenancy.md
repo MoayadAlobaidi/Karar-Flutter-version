@@ -1,6 +1,6 @@
 # Multi-Tenancy and Isolation
 
-**ADRs:** 0008, 0022 · **Phase:** 3 (not 11) — implemented in Phase 3; implemented-state notes are marked per section
+**ADRs:** 0008, 0022 · **Phase:** 3 (not 11) — isolation implemented in Phase 3, session tenant binding in Phase 3.5; implemented-state notes are marked per section
 
 ---
 
@@ -113,7 +113,7 @@ The guard detects **three** failure shapes:
 
 A new table shipping with no RLS **fails the build**. The allow-list is the only escape, and it requires a written reason and a reviewer.
 
-**Implemented in Phase 3** — test 22 is active. The allow-list is [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json): one entry per table with the reason and its compensating controls, and the guard fails on any table that is neither ENABLE+FORCE nor listed. Current coverage (CODE): 37 tables across the `public`, `platform`, and `audit` schemas — 17 RLS-enabled **and** FORCEd, 27 allow-listed, 7 deliberately both. The 7 are identity's bootstrap-armed tables (accounts, credentials, verification/reset codes, refresh-token lineage, the security ledger): authentication begins before a principal exists, so their policies carry an explicit no-principal arm — recorded in the allow-list with justification — while any transaction that *has* a user context stays confined to its own rows. Sessions and MFA tables carry no bootstrap arm at all.
+**Implemented in Phase 3** — test 22 is active. The allow-list is [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json): one entry per table with the reason and its compensating controls, and the guard fails on any table that is neither ENABLE+FORCE nor listed. Current coverage after Phase 3.5 (CODE): 48 tables across the `public`, `platform`, and `audit` schemas — 22 RLS-enabled **and** FORCEd, 33 allow-listed, 7 deliberately both. The 7 are identity's bootstrap-armed tables (accounts, credentials, verification/reset codes, refresh-token lineage, the security ledger): authentication begins before a principal exists, so their policies carry an explicit no-principal arm — recorded in the allow-list with justification — while any transaction that *has* a user context stays confined to its own rows. Sessions and MFA tables carry no bootstrap arm at all.
 
 ## 5. Tenant kinds
 
@@ -125,11 +125,69 @@ A new table shipping with no RLS **fails the build**. The allow-list is the only
 
 The controller/processor inversion is the central legal fact of a white-label deal, and it is **configuration, not code**. See [`operating-entity.md`](operating-entity.md).
 
-## 6. Tenant resolution
+## 6. Tenant resolution and session binding
 
 Resolved at the infrastructure edge, before any use case runs, from — in order — the authenticated principal's tenant binding, the API client's tenant binding, or the request host for branded domains.
 
 **Never from a client-supplied header or body field.** A `?tenantId=` parameter is not accepted anywhere, and its absence is asserted by test.
+
+### How a session acquires a tenant
+
+**Implemented in Phase 3.5.** Phase 3 issued every session with `tenant_binding = null` and shipped no mechanism to set it, so the ten tenant-bound endpoints answered 401 for every caller — fail-closed, but dormant (risk KAR-RSK-021). Phase 3.5 supplies the mechanism, and the design constraint that shaped it is worth stating: `sessions.tenant_binding` is the **only** tenant source the fail-closed RLS design permits at the edge, because every tenant table needs `app.tenant_id` bound before it can be read, so membership cannot be discovered from a bare user id. Selecting a tenant therefore needs its own narrow, server-side read path — migration `0080` gives a principal a self-listing arm on `tenant_members`, and `0081` gives it a member arm on `tenants`, so tenant *selection* becomes possible before binding without widening anything else.
+
+`ResolveTenantContext` (`modules/tenancy`) turns the caller's own active memberships into exactly one of three outcomes:
+
+| Usable memberships | Outcome |
+|---|---|
+| 0 | `UNBOUND` |
+| exactly 1 | `AUTO_BIND(tenant)` |
+| more than 1 | `TENANT_SELECTION_REQUIRED(choices)` |
+
+A membership is **usable** only when the membership row is active **and** its tenant resolves through the `0081` member arm **and** that tenant's status is `ACTIVE`. A suspended or closed tenant is not a choice, so a principal whose only tenant was disabled resolves `UNBOUND` rather than half-bound. Choices carry safe fields only — tenant id, name, and a role hint — never status internals, operating-entity references, or membership plumbing. Nothing is ever fabricated: the rows are the only source.
+
+```mermaid
+graph TB
+    S[Authenticated session] --> Q{tenant_binding set?}
+    Q -->|no| R[ResolveTenantContext<br/>own active memberships]
+    R -->|0| U[UNBOUND]
+    R -->|1| AB[Auto-bind · no token rotation]
+    R -->|many| SEL[TENANT_SELECTION_REQUIRED]
+    SEL -->|client chooses| FB[First bind · no token rotation]
+    AB --> V{still a member?}
+    FB --> V
+    V -->|yes| B[BOUND]
+    V -->|no| REV[Session revoked · sign in again]
+    Q -->|yes| SW{switch requested?}
+    SW -->|no| B
+    SW -->|yes| RB[Full rebind: revoke session +<br/>refresh families · issue NEW session]
+    RB --> B
+    style REV fill:#ffe8e8,color:#111
+    style B fill:#e8f4e8,color:#111
+```
+
+### First bind and switch are different doors
+
+**First bind** (`BindSessionTenant`, `null → tenant`) sets the binding on the caller's own live session row with **no token rotation**. There is nothing to invalidate: the session gains context it never had, existing tokens keep working, and per-request server-side re-reads pick the binding up on the next request. Only a `null → value` transition succeeds; a bound session is refused and takes the other door.
+
+**Switch** (`RebindSessionTenant`, `A → B`) is the dangerous operation and rotates everything. One transaction atomically revokes the current session **and** its refresh-token families, then issues a brand-new session with a new session id and a new refresh family carrying the new binding. Old access tokens die with the revoked sid at their next per-request re-validation; old refresh tokens die with the family. The response carries the new tokens, and no interleaving can observe a principal holding two live sessions or one session with a half-switched binding.
+
+> **A switch must not leave a usable token pointing at the previous tenant.** That is why the switch path rebuilds the session instead of updating a column.
+
+`SwitchTenant` verifies server-side before and after: the target must be the caller's own active membership in an active tenant; the identity seam performs the rebind; then membership is verified **again**, and if it vanished in the race window the replacement session is revoked and the denial is audited. Membership denials are uniform — an unknown tenant, a revoked membership, an expired membership, a disabled tenant, and a malformed id all answer identically, so the endpoint is not a membership oracle.
+
+`GrantFirstPartyMembership` exists as its own explicit, audited use case rather than as a hidden insert inside registration. Creating a membership is a tenancy decision; burying it in another module's flow would put a grant where nobody reviews it.
+
+### Binding is routing; per-request checks stay authoritative
+
+> **The binding selects context. It does not confer authority.**
+
+A bound session says *which* tenant's data the request is about. Whether the caller may perform the operation is still decided per request by membership verification and the `PolicyService`, and which rows they can touch is still decided by RLS under `withPrincipalContext` (§3). The verify-act-re-verify-compensate sequence narrows the race window; it does not replace the guarantee beneath it, and it is not asked to. The residual window between a re-verification and a later revocation is covered by exactly that standing rule.
+
+The same principle makes stale bindings safe to report rather than dangerous to hold: a session bound to a tenant that has since been disabled, or whose membership was revoked, resolves as `UNBOUND` or `TENANT_SELECTION_REQUIRED` — the reported state reflects binding **validity**, never a tenant that would not work.
+
+### The first-party tenant comes from configuration
+
+The first-party tenant id is typed configuration (`KARAR_FIRST_PARTY_TENANT_ID`), **required outside `local`** so a non-local boot without one fails clearly at startup. Local development defaults to a documented synthetic UUID that `scripts/db/seed-local-first-party.mjs` creates. **No magic UUID appears in domain code**: the value reaches use cases through the typed config and nowhere else. Tenant provisioning itself has no runtime path this phase — migration `0041` grants `karar_app` `SELECT` only on `public.tenants` — so the seed writes as the bootstrap superuser, exactly as the tenancy test fixtures do, and real environments provision through the control plane.
 
 ## 7. Cross-tenant operations
 
@@ -170,4 +228,24 @@ The legacy's finding, quoted because it is the clearest statement of the problem
 | Give a tenant admin access to consumer financial detail | Per-entitlement only, audited, never `SEALED` |
 | Allow a tenant to enable a capability | Availability is platform-controlled and restrict-only |
 | Allow a client to assert its own tenant | Resolved from the principal, at the edge |
+| Let a session bind to a tenant the caller does not belong to | The target is verified server-side against the caller's own memberships, twice (§6) |
 | Make RLS optional in development | The same policies run locally. A control tested only in production is a control tested in production |
+
+## 11. The client bootstrap surface
+
+**Implemented in Phase 3.5** ([`modules/bootstrap`](../../modules/bootstrap/MODULE.md)). Two routes, authored OpenAPI-first in `packages/api-contracts/openapi/paths/platform.yaml`, both session-scoped self-service — the caller reads and mutates only their own session's context, and tenant selection is authorized by **membership**, not by a permission:
+
+| Route | Does |
+|---|---|
+| `GET /platform/bootstrap` | Returns who the caller is, their binding state, and the client-safe jurisdiction / operating-entity / PolicyPack / capability view |
+| `POST /platform/tenant-binding` | First bind (no rotation) or switch (full rotation, new tokens in the response) |
+
+The GET carries **one documented side effect**: an unbound session with exactly one usable membership is auto-bound to it, without token rotation, verified again afterwards, and compensated by revoking the session if the membership vanished in the race window. Both outcomes are audited, and the side effect is declared in the OpenAPI contract rather than discovered.
+
+This module owns **no persistent data**. It composes views over state owned by identity, tenancy, and the Phase 3.5 jurisdiction and capability modules, and every read its use cases trigger runs through those modules' repositories under `withPrincipalContext` — RLS stays the boundary beneath the surface.
+
+### What it must never return
+
+The response serializer emits a **closed field set**: each field is picked by name, so anything extra an upstream port attaches is dropped at the edge rather than shipped. Hidden capabilities, unimplemented or pending-legal capabilities, Amanat's existence, internal licence detail, full PolicyPack content (version and status only), raw consent evidence, and internal audit or configuration data are all outside that set. Capability output passes through the capability module's **client-safe** resolver unenriched — bootstrap never re-filters ids, so the filter cannot drift into two implementations ([`capability-registry.md` §5](capability-registry.md)). A leak-regression suite drives fakes that try to leak through every port and asserts the serialized output carries exactly the declared fields.
+
+Enrichment ports may legitimately return null while a dimension is unresolved; the response carries explicit nulls rather than fabricated defaults, and the jurisdiction state is the typed three-arm value whose `NONE` arm is the fail-closed case.

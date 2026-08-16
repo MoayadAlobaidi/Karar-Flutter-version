@@ -1,0 +1,28 @@
+{
+  "name": "@karar/capability",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deny-by-default capability availability resolution: the eight-gate restrict-only merge over descriptor, environment, jurisdiction/pack ceiling, availability rows, tenant entitlements, consent, licences, and providers — with client-safe hidden filtering in one place (capability-registry.md).",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/audit": "workspace:*",
+    "@karar/capability-registry": "workspace:*",
+    "@karar/consent": "workspace:*",
+    "@karar/operating-entity": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@karar/jurisdiction-policy": "workspace:*",
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}

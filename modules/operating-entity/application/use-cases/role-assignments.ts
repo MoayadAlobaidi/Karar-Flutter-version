@@ -49,6 +49,13 @@ export interface CreateRoleAssignmentInput {
   readonly role: DataProtectionRole;
   readonly effectiveFrom: Date;
   readonly contractReference?: string | null;
+  /**
+   * The PolicyPack version in force, to pin on the decision (data-model.md
+   * §5). Supplied by the caller from the policy it already resolved: this
+   * module resolves no policy, so a version it was not given is one it will
+   * not invent — and the schema refuses an unpinned row outright.
+   */
+  readonly policyPackVersion: string;
   readonly now: Date;
 }
 
@@ -98,6 +105,8 @@ export class CreateRoleAssignment {
       contractReference: input.contractReference ?? null,
       createdBy: requireNonEmpty('principalRef', input.principal.principalRef),
       createdAt: input.now,
+      policyPackVersion: requireNonEmpty('policyPackVersion', input.policyPackVersion),
+      policyPackPinState: 'PINNED' as const,
     });
     try {
       await this.assignments.insert(assignment);
@@ -116,6 +125,7 @@ export class CreateRoleAssignment {
         purposeRef: assignment.purposeRef,
         jurisdictionRef: assignment.jurisdictionRef,
         role: assignment.role,
+        policyPackVersion: assignment.policyPackVersion,
       },
     });
     return audited.ok ? Result.ok(assignment) : audited;

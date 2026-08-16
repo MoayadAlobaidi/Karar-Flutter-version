@@ -1,6 +1,8 @@
 # Asset Inventory
 
-**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** every phase gate
+**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.3 · **Date:** 2026-08-16 · **Review:** every phase gate
+
+**v0.3 (2026-08-16, Phase 3.5):** the `kararfinance.com` domain registration added as a current asset (confirmed facts only, hardening TO_VERIFY — [domain runbook](../operations/domain-and-dns-runbook.md)); the platform database-objects row brought to the Phase 3.5 reality (48 tables); the planned-assets domain row narrowed to what remains planned. All other rows re-checked, unchanged.
 
 **v0.2 (2026-08-15, Phase 2):** platform database objects added (the Phase 2 schemas and tables); all other rows re-checked, unchanged.
 
@@ -18,11 +20,12 @@ Current, real assets only — a Phase-1 project has few, and listing imagined on
 | GitHub organization/account (repo admin, settings, Actions) | Account | Security Owner | SECRET (credentials) | GitHub | MFA + settings verification pending (EV-007) |
 | Developer workstation (one, held by the person carrying all roles) | Hardware | Operations Owner | Up to SECRET (local `.env`, session credentials) | Off-premises (remote work) | Controls per acceptable-use-policy: FDE, screen lock, updates. No personal data on it by rule |
 | Local development environment (Compose: PostgreSQL, Redis, MinIO, OpenTelemetry collector) | Tooling | Engineering Owner | INTERNAL | Developer workstation | Synthetic data only (KAR-CTL-038) |
-| Platform database objects (Phase 2): schemas `platform` and `audit`; tables `platform.schema_migrations` (INTERNAL), `audit.audit_events` (CONFIDENTIAL), `platform.outbox_events` (CONFIDENTIAL ceiling), `platform.event_consumer_receipts` (INTERNAL), `platform.jobs` (CONFIDENTIAL ceiling) | Information / schema | Engineering Owner | CONFIDENTIAL (declared ceiling; contents synthetic today) | **Local only** — instantiated from migrations in the Compose PostgreSQL on the developer workstation and in ephemeral CI databases; deployed nowhere | Definition lives in-repo (`packages/platform/db/migrations`, rebuildable from zero — KAR-CTL-054); per-table classification, retention, and erasure declared in `packages/platform/db/DATA_LIFECYCLE.md` and `modules/audit/MODULE.md`. Classification is the declared ceiling: only synthetic/test data exists in any instance (KAR-CTL-038). Access split `karar_migrator`/`karar_app` (KAR-CTL-053); audit table append-only (KAR-CTL-056) |
+| Platform database objects (Phases 2–3.5): schemas `platform`, `audit`, and `public`; **48 tables** as of Phase 3.5 — 22 RLS ENABLE+FORCE, 33 allow-listed with written reasons, 7 deliberately both. Highest declared class among them is CONFIDENTIAL (e.g. `audit.audit_events`, `public.subject_policy_selections`, `public.consent_grants`) | Information / schema | Engineering Owner | CONFIDENTIAL (declared ceiling; contents synthetic today) | **Local only** — instantiated from migrations in the Compose PostgreSQL on the developer workstation and in ephemeral CI databases; deployed nowhere | Definition lives in-repo (`packages/platform/db/migrations`, rebuildable from zero — KAR-CTL-054); per-table classification, retention, and erasure declared in `packages/platform/db/DATA_LIFECYCLE.md` and the per-module `MODULE.md` files. Classification is the declared ceiling: only synthetic/test data exists in any instance (KAR-CTL-038). Access split `karar_migrator`/`karar_app` (KAR-CTL-053); append-only tables hold against the owner too (KAR-CTL-056, 082). Allow-list reasons: `packages/platform/db/rls-allow-list.json` (KAR-CTL-011) |
+| Domain name `kararfinance.com` — registered, **nothing configured on it** | Information / account-held name | Operations Owner | INTERNAL (the name itself is public; registrar account access is SECRET and is not held here) | Cloudflare Registrar (registrar) and Cloudflare (authoritative DNS) | Purpose: the global Karar master domain. Registration status **USER_CONFIRMED** — the Platform Owner states it is registered and held; the repository verifies nothing about it. Hosting, application traffic, API, email, and Cloudflare proxy/CDN/WAF are all **NOT_CONFIGURED**, and **no DNS record is configured**. MFA, DNSSEC, auto-renew, registrar lock, recovery methods, role separation, and renewal notifications are all **TO_VERIFY** — no repository-verifiable evidence of any of them exists (EV-427, PENDING). Ownership, renewal cadence, hardening checklist, and the one-change-at-a-time DNS rule: [`docs/operations/domain-and-dns-runbook.md`](../operations/domain-and-dns-runbook.md). No account identifiers, credentials, or billing data are recorded anywhere in this repository |
 | Package-registry accounts (npm, pub.dev — consumption only) | Account | Engineering Owner | SECRET (credentials, if/when publishing tokens exist) | Vendor | Read/consume today; no packages published |
 | Compliance evidence (register + interim artifacts) | Information | Compliance Owner | INTERNAL | In-repo register; interim store per evidence-handling.md | Never contains customer data, credentials, or raw logs |
 
-There are no servers, databases with real data, cloud accounts, domains in production use, mobile store listings, or customer records. **That absence is the current security posture's main fact.**
+There are no servers, databases with real data, cloud accounts, mobile store listings, or customer records. One domain name is held (`kararfinance.com`) and **nothing is configured on it** — no hosting, no DNS record, no proxy, no mail — so it carries no traffic and no data. **That absence is the current security posture's main fact.**
 
 ## Planned assets
 
@@ -39,7 +42,8 @@ There are no servers, databases with real data, cloud accounts, domains in produ
 | Production environment | 20–21 | Operations Owner | Behind all Phase 20 gates |
 | Mobile store accounts (App Store / Play) | 4+ (release phases) | Platform Owner | |
 | Billing provider account (`SubscriptionBillingProvider`) | 10 | Platform Owner | Settlement executor external to Karar (AC-011) |
-| Domain names, TLS certificates, email/push providers | 17+ | Operations Owner | |
+| DNS records, TLS certificates, proxy/CDN/WAF configuration, and email/push providers on `kararfinance.com` (the name itself is already held — see current assets) | 17+ | Operations Owner | Each is a separate reviewed change under the [domain runbook](../operations/domain-and-dns-runbook.md) §4; none exists today |
+| Additional domain names (per-market or per-brand, if any) | 17+ | Operations Owner | None decided; recorded so a second registration is a decision, not a drift |
 
 ## Rules
 

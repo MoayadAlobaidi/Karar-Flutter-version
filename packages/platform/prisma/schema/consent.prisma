@@ -69,6 +69,14 @@ model ConsentGrant {
   evidenceReference      String    @map("evidence_reference")
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  // Pinning block, migration 0086 (data-model.md §5). The value columns are
+  // nullable and the *_pin_state columns say why, per row; the CHECK pairs
+  // and the cutoff constraint live in the migration, not here.
+  policyPackVersion              String? @map("policy_pack_version")
+  policyPackPinState             String  @map("policy_pack_pin_state")
+  subjectPolicySelectionVersion  String? @map("subject_policy_selection_version")
+  subjectPolicySelectionPinState String  @map("subject_policy_selection_pin_state")
+
   legalDocumentVersion LegalDocumentVersion @relation(fields: [legalDocumentVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([userId, tenantId, operatingEntityId, purposeRef, jurisdictionRef, grantedAt], map: "consent_grants_resolution_idx")

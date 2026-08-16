@@ -17,10 +17,10 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **3 — COMPLETE** ([phase report](docs/phases/phase-03.md)); Phase 3.5 not started |
+| Current phase | **3.5 — COMPLETE** ([phase report](docs/phases/phase-03-5.md)); Phase 4 not started |
 | Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
-| Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
-| Application implementation | Platform foundation plus identity, tenancy, and access control — no consumer product capabilities are implemented |
+| Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
+| Application implementation | Platform foundation, identity/tenancy/access control, and the jurisdiction and capability foundation — **no consumer product capability is implemented or reachable** |
 | Cloud | None provisioned; local development is cloud-free |
 | Compliance | Readiness framework in place; **no certification is claimed** |
 
@@ -87,8 +87,8 @@ graph TB
 | `apps/api` | NestJS modular monolith — the only public API surface |
 | `apps/worker` | Second entrypoint over the same modules: outbox relay, projections, scheduled jobs |
 | `apps/admin` | Super Admin SPA; talks to the control plane only, carries no database driver |
-| `packages/` | Six shared packages; four are framework-free pure. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation (including the Prisma runtime and the RLS principal context), errors, observability, events/outbox/jobs |
-| `modules/` | 21 bounded contexts, each behind a `public-api.ts` |
+| `packages/` | Seven shared packages; five are framework-free pure. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation (including the Prisma runtime and the RLS principal context), errors, observability, events/outbox/jobs |
+| `modules/` | 24 module directories, each behind a `public-api.ts`; 12 have code, the rest are skeletons awaiting their phase |
 | PostgreSQL | The one authoritative store — RLS-enforced tenant isolation |
 | Local infra | Docker Compose ([`docker-compose.yml`](docker-compose.yml)): `postgres`, `redis`, `minio`, `otel-collector` — zero cloud dependency |
 | Provider adapters | Every external dependency (AI, storage, keys, messaging, identity, billing) behind a port in `infrastructure/` |
@@ -125,14 +125,14 @@ domain/          entities, rules, no I/O          → may use shared-kernel only
 infrastructure/  adapters, persistence, providers → implements application/ ports
 ```
 
-Cross-module imports resolve to the target module's `public-api.ts` and nothing else. Four packages (`shared-kernel`, `financial-engine`, `jurisdiction-policy`, `state-machine`) are pure — no framework, no I/O. Forbidden imports fail the architecture tests in CI, not a code review's memory. See [`clean-architecture.md`](docs/architecture/clean-architecture.md) and [`architecture-tests.md`](docs/testing/architecture-tests.md).
+Cross-module imports resolve to the target module's `public-api.ts` and nothing else. Five packages (`shared-kernel`, `financial-engine`, `jurisdiction-policy`, `capability-registry`, `state-machine`) are pure — no framework, no I/O. Forbidden imports fail the architecture tests in CI, not a code review's memory. See [`clean-architecture.md`](docs/architecture/clean-architecture.md) and [`architecture-tests.md`](docs/testing/architecture-tests.md).
 
 ## Repository structure
 
 ```
 apps/        mobile · api · worker · admin — entrypoints, no business logic
-packages/    shared-kernel · financial-engine · jurisdiction-policy · state-machine · api-contracts · platform
-modules/     21 bounded contexts, each with public-api.ts and MODULE.md
+packages/    shared-kernel · financial-engine · jurisdiction-policy · capability-registry · state-machine · api-contracts · platform
+modules/     24 module directories, each with public-api.ts and MODULE.md; 12 have code
 infra/       Terraform — contracts · providers · per-deployment compositions
 docs/        architecture · adr · security · compliance · phases · legacy · onboarding
 scripts/     verification, checks, helpers
@@ -154,15 +154,18 @@ Full detail, including availability, gates, and external providers: [`capability
 | `insights` | Derived financial insight from engine facts |
 | `zakat` | Deterministic Zakat calculation and tracking — never payment, never a fatwa |
 | `ai` | AI orchestration over verified facts |
-| `amanat` | Sealed after-death information handover — gated `PENDING_LEGAL_REVIEW` |
-| `identity` | Authentication, sessions, MFA |
+| `amanat` | Sealed after-death information handover — declares no jurisdiction, hidden from clients |
+| `identity` | Authentication, sessions, MFA, session tenant binding |
 | `users` | Profile and preferences |
-| `tenancy` | Tenant model and isolation |
+| `tenancy` | Tenant model, isolation, membership resolution and tenant switching |
 | `authorization` | Deny-by-default RBAC — permission catalogue, roles, the central `PolicyService` |
 | `operating-entity` | Legal person, controller/processor roles, entity migration |
 | `consent` | Consent triple, legal documents, re-consent |
 | `audit` | Append-only audit records |
-| `capability-registry` | Descriptors, availability, deny-by-default |
+| `jurisdiction` | Country and jurisdiction registers, assignments, restrict-only settings, the pack-activation ledger |
+| `capability` | Availability resolution over eight gates, availability rows, tenant entitlements, the client-safe view |
+| `subject-policy` | `SubjectPolicySelection` — immutable, version-pinned subject elections |
+| `bootstrap` | The authenticated client bootstrap surface and tenant binding |
 | `documents` | Evidence files behind the object-storage port |
 | `sealed-vault` | Grant-gated `SEALED` storage |
 | `notifications` | Delivery behind channel ports |
@@ -173,8 +176,8 @@ Full detail, including availability, gates, and external providers: [`capability
 
 Seven separated dimensions, deliberately never conflated:
 
-- **Country** — geography (ISO 3166-1); keys currency defaults, languages, formatting. An attribute, not the policy key.
-- **Jurisdiction** — the legal regime governing a person or record. The policy key.
+- **Country** — geography (ISO 3166-1); keys currency defaults, languages, formatting. An attribute, not the policy key, and carrying no business rule.
+- **Jurisdiction** — the legal regime governing a person or record. The policy key. Not assumed one per country: a financial free zone is a distinct regime inside its country's borders.
 - **OperatingEntity** — the legal person providing the service and bearing responsibility; determines controller/processor roles.
 - **SubjectPolicySelection** — the elective option-set a subject chose, versioned and pinned, within what the jurisdiction permits.
 - **DeploymentProfile** — where and on what infrastructure a deployment runs; an infrastructure concept, never a business one.
@@ -236,15 +239,19 @@ make verify           # run the full local check suite
 
 `make help` lists the remaining targets (`prisma-drift` verifies the Prisma mapping against the live database). `make dev` starts the Compose services and tells you how to run the API, worker, admin, and mobile entrypoints; the API always serves the health endpoints (`/readyz` answers 503 until the database is created and migrated — a real check, not a constant). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` in `.env` first. A clean-machine walkthrough of these commands is part of phase verification.
 
+Tenant-scoped endpoints additionally need a tenant to bind a session to. `node scripts/db/seed-local-first-party.mjs` creates the local first-party tenant that `KARAR_FIRST_PARTY_TENANT_ID` names — required outside `local`, defaulted to a documented synthetic id locally ([onboarding Q59](docs/onboarding/developer.md)).
+
 No cloud account, API key, or shared database is required for any of it — that is a design rule, not a convenience ([`environments.md` §3](docs/architecture/environments.md)).
 
 ## Testing and CI
 
-- **Unit tests** for `domain/` and the pure packages — no mocks, no container.
+- **Unit tests** for `domain/` and the pure packages — no mocks, no container. `jurisdiction-policy` and `capability-registry` need nothing running at all.
 - **Integration tests** against real PostgreSQL in Docker — since Phase 2 the workspace suite includes live-PostgreSQL runs of the migration, audit-immutability, outbox, and jobs suites, with concurrency proofs (two relays over 200 events; two workers over 100 jobs). `make dev` first; see the quick-start port note for machines with a host PostgreSQL.
 - **Adversarial security tests** — since Phase 3, per-module isolation suites plus the cross-cutting [`tests/security/`](tests/security) suite: two tenants seeded with real rows, own-tenant data proven non-empty first, then cross-tenant SELECT/INSERT/UPDATE/DELETE denial, pooled-connection context hygiene, and privilege-escalation probes ([`tenancy.md`](docs/architecture/tenancy.md)).
+- **Property tests** — since Phase 3.5, the capability resolver's restrict-only invariant is proven rather than asserted: the ceiling core is exercised exhaustively over generated configurations, then swept with randomized grant-like inputs, asserting that no entitlement, consent, licence, or provider status can widen what code and policy have not permitted ([`capability-registry.md` §4](docs/architecture/capability-registry.md)).
+- **Leak-regression tests** — since Phase 3.5, suites that drive fakes trying to leak through every port and assert the serialized output carries exactly the declared fields: the bootstrap surface's closed field set, and the subject-policy audit trail's reference-only metadata.
 - **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today, module repository ports since Phase 3; cloud provider legs are future.
-- **Architecture tests** — 26 CI-blocking structural tests, kept in a registry with per-test activation phases; a test activates when the structure it guards exists.
+- **Architecture tests** — 26 CI-blocking structural tests plus a canary-purity check, kept in a registry with per-test activation phases; a test activates when the structure it guards exists, and the registry fails the run if an activation phase arrives without an implementation.
 - **Security scans and SBOM** — dependency and secret scanning, software bill of materials, supply-chain checks.
 
 Required PR checks must pass before merge — CI blocks the merge, not merely the workflow run. The workflows are [`ci.yml`](.github/workflows/ci.yml) (lint, type-check, build, tests, architecture tests) and [`security.yml`](.github/workflows/security.yml) (scans, SBOM). See [`architecture-tests.md`](docs/testing/architecture-tests.md).
@@ -253,7 +260,7 @@ Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never
 
 ## Roadmap and phase discipline
 
-Completed: 0, 0.5, 1, 2, and 3 — the last delivering identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests. Next: 3.5 (jurisdiction and capability foundation — PolicyPacks, capability availability, `SubjectPolicySelection` resolution, session tenant binding), not started.
+Completed: 0, 0.5, 1, 2, 3, and 3.5 — Phase 3 delivered identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests; Phase 3.5 added Country and Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface. Next: 4 (Flutter foundation — app architecture, authentication and session UX, tenant selection, capability-aware navigation, Arabic RTL, accessibility, mobile security), not started.
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 

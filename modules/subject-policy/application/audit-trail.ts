@@ -1,0 +1,61 @@
+/**
+ * Every state change in this module lands in the audit trail through
+ * `@karar/audit`'s RecordAuditEvent. A failed append returns
+ * `AUDIT_APPEND_FAILED`, loudly — the mutation persisted, its trail did
+ * not, and the caller must see that (legacy AZ5).
+ *
+ * REFERENCE-ONLY metadata (jurisdiction-policy.md §7 rule 5): audit entries
+ * for selections carry the selection id, capability id, jurisdiction and
+ * version pins, and lifecycle facts — NEVER the profile reference, the
+ * snapshot hash, or any option value. What a subject elected is
+ * CONFIDENTIAL and purpose-limited to the owning capability; the audit
+ * trail answers who/what/when, not which methodology. The leak-regression
+ * suite asserts this against real recorded entries.
+ */
+
+import { Result } from '@karar/shared-kernel';
+import type { AuditMetadataInput, RecordAuditEvent } from '@karar/audit';
+
+import type { AuditAppendFailed } from './errors.js';
+
+export interface AuditEntry {
+  readonly occurredAt: Date;
+  readonly actorRef: string;
+  readonly tenantRef?: string | null;
+  readonly action: string;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly reason?: string | null;
+  readonly beforeMetadata?: AuditMetadataInput | null;
+  readonly afterMetadata?: AuditMetadataInput | null;
+}
+
+export class SubjectPolicyAuditTrail {
+  constructor(
+    private readonly recordAuditEvent: RecordAuditEvent,
+    private readonly environment: string,
+  ) {}
+
+  async record(entry: AuditEntry): Promise<Result<void, AuditAppendFailed>> {
+    const written = await this.recordAuditEvent.execute({
+      occurredAt: entry.occurredAt,
+      environment: this.environment,
+      actorRef: entry.actorRef,
+      tenantRef: entry.tenantRef ?? null,
+      action: entry.action,
+      resourceType: entry.resourceType,
+      resourceId: entry.resourceId,
+      reason: entry.reason ?? null,
+      beforeMetadata: entry.beforeMetadata ?? null,
+      afterMetadata: entry.afterMetadata ?? null,
+      outcome: 'SUCCESS',
+    });
+    if (!written.ok) {
+      return Result.err({
+        kind: 'AUDIT_APPEND_FAILED',
+        message: `state change persisted but its audit record did not: ${written.error.message}`,
+      });
+    }
+    return Result.ok(undefined);
+  }
+}

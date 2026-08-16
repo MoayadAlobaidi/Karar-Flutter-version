@@ -83,6 +83,13 @@ model DataProtectionRoleAssignment {
   createdBy         String    @map("created_by")
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  // Pinning block, migration 0086 (data-model.md §5). The subject-selection
+  // dimension is CHECK-bound to NOT_APPLICABLE there: a decision between legal
+  // persons carries no subject election, so no version column exists.
+  policyPackVersion              String? @map("policy_pack_version")
+  policyPackPinState             String  @map("policy_pack_pin_state")
+  subjectPolicySelectionPinState String  @default("NOT_APPLICABLE") @map("subject_policy_selection_pin_state")
+
   entity OperatingEntity @relation(fields: [operatingEntityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([operatingEntityId, jurisdictionRef, purposeRef, effectiveFrom], map: "data_protection_role_assignments_resolution_idx")

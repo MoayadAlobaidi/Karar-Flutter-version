@@ -1,7 +1,7 @@
 import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { ConfigurationError } from './configuration-error.js';
-import { loadConfig } from './config.js';
+import { LOCAL_FIRST_PARTY_TENANT_ID, loadConfig } from './config.js';
 import { InvalidRefError, isRef, parseDatabaseProfileRef, parseSecretRef, refId } from './refs.js';
 import { SecretValue } from './secret-value.js';
 
@@ -29,7 +29,7 @@ describe('loadConfig', () => {
     expect(config.database.password).toBeInstanceOf(SecretValue);
     expect(config.telemetry).toEqual({ otlpEndpoint: 'http://127.0.0.1:4318', enabled: true });
     expect(config.log.level).toBe('info');
-    expect(config.business).toEqual({});
+    expect(config.business).toEqual({ firstPartyTenantId: LOCAL_FIRST_PARTY_TENANT_ID });
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.service)).toBe(true);
   });
@@ -123,6 +123,46 @@ describe('loadConfig', () => {
     const issue = error.issues.find((entry) => entry.field === 'service.port');
     expect(issue?.reason).toBe('must be an integer');
     expect(error.message).not.toContain('30o0');
+  });
+
+  describe('first-party tenant (KARAR_FIRST_PARTY_TENANT_ID)', () => {
+    it('defaults to the documented synthetic tenant in local only', () => {
+      const config = loadConfig(LOCAL_ENV);
+      expect(config.business.firstPartyTenantId).toBe(LOCAL_FIRST_PARTY_TENANT_ID);
+      expect(Object.isFrozen(config.business)).toBe(true);
+    });
+
+    it('honours an explicit value over the local default', () => {
+      const config = loadConfig({
+        ...LOCAL_ENV,
+        KARAR_FIRST_PARTY_TENANT_ID: 'aaaaaaaa-0000-4000-8000-00000000000a',
+      });
+      expect(config.business.firstPartyTenantId).toBe('aaaaaaaa-0000-4000-8000-00000000000a');
+    });
+
+    it('is REQUIRED outside local: a non-local boot without it fails clearly', () => {
+      const error = loadFailure({
+        KARAR_ENV: 'production',
+        POSTGRES_HOST: 'db.internal.example',
+        POSTGRES_PORT: '5432',
+        POSTGRES_DB: 'karar',
+        POSTGRES_USER: 'karar_app',
+        POSTGRES_PASSWORD: 'a-very-secret-password-value',
+      });
+      const issue = error.issues.find((entry) => entry.field === 'business.firstPartyTenantId');
+      expect(issue?.envVar).toBe('KARAR_FIRST_PARTY_TENANT_ID');
+      expect(issue?.reason).toBe('required but unset');
+    });
+
+    it('rejects a non-UUID value without echoing it', () => {
+      const error = loadFailure({
+        ...LOCAL_ENV,
+        KARAR_FIRST_PARTY_TENANT_ID: 'first-party-not-a-uuid',
+      });
+      const issue = error.issues.find((entry) => entry.field === 'business.firstPartyTenantId');
+      expect(issue?.reason).toBe('must be a UUID');
+      expect(error.message).not.toContain('first-party-not-a-uuid');
+    });
   });
 });
 

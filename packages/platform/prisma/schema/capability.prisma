@@ -1,0 +1,93 @@
+// Prisma mapping for the capability module's tables (migrations 0076-0077).
+// The SQL migrations remain authoritative; this file maps them exactly so
+// `make prisma-drift` stays meaningful (base.prisma header).
+//
+// Deliberately NOT expressed here, enforced by the migrations and their
+// tests instead: the closed capability_id and state CHECK constraints, the
+// version-increment guard triggers, the SECURITY DEFINER history-append
+// triggers, the append-only immutability triggers on both history ledgers,
+// RLS enable/force and the tenant policies on the entitlement tables, and
+// grants. The entitlement repository runs every statement inside a
+// principal-context transaction (SET LOCAL app.tenant_id / app.user_id) or
+// the policy returns nothing — failing closed.
+//
+// Cross-module references (tenant_id) are plain scalars by design
+// (data-model.md §2): no relation crosses a module boundary. The
+// same-module history relations are mapped so the FKs stay drift-exact.
+
+model CapabilityAvailability {
+  id              String   @id @db.Uuid
+  environment     String
+  jurisdictionRef String?  @map("jurisdiction_ref")
+  capabilityId    String   @map("capability_id")
+  state           String
+  reason          String
+  actorRef        String   @map("actor_ref")
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @map("updated_at") @db.Timestamptz(6)
+
+  history CapabilityAvailabilityHistory[]
+
+  @@unique([environment, jurisdictionRef, capabilityId], map: "capability_availability_scope_key")
+  @@index([capabilityId, environment], map: "capability_availability_lookup_idx")
+  @@map("capability_availability")
+}
+
+model CapabilityAvailabilityHistory {
+  id             String   @id @db.Uuid
+  availabilityId String   @map("availability_id") @db.Uuid
+  environment    String
+  jurisdictionRef String? @map("jurisdiction_ref")
+  capabilityId   String   @map("capability_id")
+  state          String
+  reason         String
+  actorRef       String   @map("actor_ref")
+  version        Int
+  recordedAt     DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  availability CapabilityAvailability @relation(fields: [availabilityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([availabilityId, version], map: "capability_availability_history_row_version_key")
+  @@map("capability_availability_history")
+}
+
+model TenantCapabilityEntitlement {
+  id            String    @id @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  capabilityId  String    @map("capability_id")
+  status        String
+  sourceRef     String    @map("source_ref")
+  reason        String
+  actorRef      String    @map("actor_ref")
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz(6)
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @map("updated_at") @db.Timestamptz(6)
+
+  history TenantCapabilityEntitlementHistory[]
+
+  @@unique([tenantId, capabilityId], map: "tenant_capability_entitlements_tenant_capability_key")
+  @@map("tenant_capability_entitlements")
+}
+
+model TenantCapabilityEntitlementHistory {
+  id            String    @id @db.Uuid
+  entitlementId String    @map("entitlement_id") @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  capabilityId  String    @map("capability_id")
+  status        String
+  sourceRef     String    @map("source_ref")
+  reason        String
+  actorRef      String    @map("actor_ref")
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz(6)
+  version       Int
+  recordedAt    DateTime  @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  entitlement TenantCapabilityEntitlement @relation(fields: [entitlementId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([entitlementId, version], map: "tenant_capability_entitlement_history_row_version_key")
+  @@map("tenant_capability_entitlement_history")
+}

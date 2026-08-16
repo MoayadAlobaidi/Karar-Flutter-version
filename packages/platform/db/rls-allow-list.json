@@ -187,5 +187,47 @@
     "owner": "platform package (packages/platform/db/DATA_LIFECYCLE.md; packages/platform/src/jobs)",
     "compensatingGrants": "karar_app holds SELECT, INSERT, UPDATE only — no DELETE (purge belongs to the retention job); classification CHECK-constrained with the same six classes; lease-shape CHECK ties lease columns to the leased status; idempotent enqueue via the partial unique index on (job_type, idempotency_key); attempts >= max_attempts dead-letters terminally.",
     "reviewPhase": "3.5 (PolicyPack-owned retention windows; purge machinery lands with the retention job)"
+  },
+  {
+    "table": "public.capability_availability",
+    "reason": "Per-(environment, jurisdiction?, capability) exposure state consulted while resolving EVERY tenant's availability — deployment-wide configuration with no tenant or subject column by design (migration 0076); the per-tenant dimension is tenant_capability_entitlements, which IS RLS-FORCEd. A tenant predicate here would fabricate a relationship and break resolution for all tenants at once. Deny-by-default reads: a MISSING row is DISABLED, and a readable row can never widen access beyond the compile-time descriptor + policy-pack ceiling (restrict-only merge, property-harness-asserted).",
+    "owner": "capability module (modules/capability/MODULE.md)",
+    "compensatingGrants": "Writes reachable only through the permission-gated operator use case (capability.availability.manage via PolicyService — declared-but-unseeded this phase, so absence denies) with ABOVE_CEILING refusals audited as DENIED; karar_app holds SELECT/INSERT/UPDATE only (no DELETE — withdrawal is state DISABLED); closed capability_id and state CHECKs; every UPDATE must increment version by exactly one and auto-appends the history ledger (triggers); every change audited via @karar/audit.",
+    "reviewPhase": "3.5 (bootstrap resolution) and 8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.capability_availability_history",
+    "reason": "Append-only availability state ledger — accountability rows about configuration, not subjects; carries no tenant or subject column and is the referent of the resolver's TOCTOU provenance pins, reviewable across the platform (migration 0076).",
+    "owner": "capability module (modules/capability/MODULE.md)",
+    "compensatingGrants": "Append-only by BOTH mechanisms (data-model.md §10): karar_app holds SELECT only (no INSERT/UPDATE/DELETE) and the immutability trigger raises on UPDATE/DELETE/TRUNCATE even for the table owner; rows are written solely by the capability_availability AFTER INSERT OR UPDATE SECURITY DEFINER trigger, and UNIQUE (availability_id, version) forbids skipped or forked history.",
+    "reviewPhase": "8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.countries",
+    "reason": "ISO 3166-1 country REFERENCE data (jurisdiction-policy.md §1): display keys, default-currency formatting references, code lifecycle — data, never policy, mirroring packages/jurisdiction-policy/src/country.ts. No tenant or subject column exists to scope on, and display/formatting resolution for every principal (and pre-principal bootstrap composition) reads the same rows; a tenant predicate would fabricate a relationship reference data cannot have (migration 0070).",
+    "owner": "jurisdiction module (modules/jurisdiction/MODULE.md)",
+    "compensatingGrants": "karar_app is SELECT-ONLY — no INSERT/UPDATE/DELETE grant exists; the reference set changes exclusively by reviewed migration (the permissions-catalogue discipline, 0050). No runtime write path, no operator use case, and removal of a country is a status change (RETIRED), never a vanished row.",
+    "reviewPhase": "8 (control-plane reference-data surface, if one ever exists)"
+  },
+  {
+    "table": "public.jurisdictions",
+    "reason": "The legal-regime register — the policy key, distinct from country (jurisdiction-policy.md §1; migration 0071). Platform-global reference the assignment tables, settings, and activation ledger FK to; jurisdiction resolution runs for every principal regardless of tenant context, and no tenant or subject column exists. Rows are declarations with an explicit review lifecycle (no seeded row is APPROVED) and assert no legal fact.",
+    "owner": "jurisdiction module (modules/jurisdiction/MODULE.md)",
+    "compensatingGrants": "karar_app is SELECT-ONLY — the register changes by reviewed migration only this phase; no use case edits it, by design (the module's use cases are assignment- and activation-side). Vocabulary and effective-window CHECKs constrain every row; provenance is NOT NULL so no declaration is unattributed.",
+    "reviewPhase": "3.5 (pack activation FKs) and 8 (control-plane register surface)"
+  },
+  {
+    "table": "public.jurisdiction_settings",
+    "reason": "RESTRICT-ONLY runtime settings per jurisdiction (jurisdiction-policy.md §2; migration 0074): the audited database half of the typed/configured split. Keyed by jurisdiction with no tenant or subject column — policy resolution for ANY principal in a jurisdiction must read the same row. The SHAPE is the control: every column narrows what the code PolicyPack permits (disable list, AI suspension); no column can express an enablement, an absent row restricts nothing, and the resolver's merge is subtractive (restrict-only property tests in packages/jurisdiction-policy).",
+    "owner": "jurisdiction module (modules/jurisdiction/MODULE.md)",
+    "compensatingGrants": "karar_app is SELECT-ONLY this phase — no operator surface exists yet, so writes are migration-only until the Phase 8 control plane arrives behind its own PolicyService authorization; version is CHECK-bound positive for the future write path's optimistic concurrency, and reason/updated_by are NOT NULL so no restriction is unattributed.",
+    "reviewPhase": "8 (control-plane operator surface owns the write path)"
+  },
+  {
+    "table": "public.policy_pack_activations",
+    "reason": "Append-only pack activation ledger (jurisdiction-policy.md §2; migration 0075): which code-resident PolicyPack VERSION is operative per (jurisdiction, environment) — metadata only, never pack content, so no database write can alter what a pack says. Deployment-wide configuration with no tenant or subject column; resolving the active pack for any principal reads the same ledger, and history must remain reviewable across the platform.",
+    "owner": "jurisdiction module (modules/jurisdiction/MODULE.md)",
+    "compensatingGrants": "Append-only by BOTH mechanisms (data-model.md §10): karar_app holds SELECT+INSERT only, and the immutability trigger raises on UPDATE/DELETE/TRUNCATE even for the table owner (FOR EACH STATEMENT, so zero-row updates raise too). Writes are reachable only through the ActivatePackVersion/RetirePackVersion use cases, which authorize jurisdiction.pack.activate via PolicyService (declared-but-unseeded this phase — absence denies), enforce the pure canActivate predicate (DRAFT and unapproved packs never activate outside local), refuse structurally invalid packs, and audit every event via @karar/audit.",
+    "reviewPhase": "3.5 (activation gates) and 8 (control-plane admin surface)"
   }
 ]

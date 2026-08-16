@@ -47,6 +47,15 @@ importers:
       '@karar/authorization':
         specifier: workspace:*
         version: link:../../modules/authorization
+      '@karar/bootstrap':
+        specifier: workspace:*
+        version: link:../../modules/bootstrap
+      '@karar/capability':
+        specifier: workspace:*
+        version: link:../../modules/capability
+      '@karar/capability-registry':
+        specifier: workspace:*
+        version: link:../../packages/capability-registry
       '@karar/consent':
         specifier: workspace:*
         version: link:../../modules/consent
@@ -56,6 +65,12 @@ importers:
       '@karar/identity':
         specifier: workspace:*
         version: link:../../modules/identity
+      '@karar/jurisdiction':
+        specifier: workspace:*
+        version: link:../../modules/jurisdiction
+      '@karar/jurisdiction-policy':
+        specifier: workspace:*
+        version: link:../../packages/jurisdiction-policy
       '@karar/operating-entity':
         specifier: workspace:*
         version: link:../../modules/operating-entity
@@ -232,6 +247,86 @@ importers:
         specifier: ^8.16.0
         version: 8.23.0
 
+  modules/bootstrap:
+    dependencies:
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+      '@nestjs/common':
+        specifier: ^11.2.0
+        version: 11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+    devDependencies:
+      '@karar/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@karar/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@karar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@karar/tenancy':
+        specifier: workspace:*
+        version: link:../tenancy
+      '@nestjs/core':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@nestjs/testing':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.21.0
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.0
+
+  modules/capability:
+    dependencies:
+      '@karar/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@karar/capability-registry':
+        specifier: workspace:*
+        version: link:../../packages/capability-registry
+      '@karar/consent':
+        specifier: workspace:*
+        version: link:../consent
+      '@karar/operating-entity':
+        specifier: workspace:*
+        version: link:../operating-entity
+      '@karar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+    devDependencies:
+      '@karar/jurisdiction-policy':
+        specifier: workspace:*
+        version: link:../../packages/jurisdiction-policy
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.21.0
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.0
+
   modules/consent:
     dependencies:
       '@karar/audit':
@@ -349,11 +444,61 @@ importers:
         specifier: ^8.16.0
         version: 8.23.0
 
+  modules/jurisdiction:
+    dependencies:
+      '@karar/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@karar/jurisdiction-policy':
+        specifier: workspace:*
+        version: link:../../packages/jurisdiction-policy
+      '@karar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.21.0
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.0
+
   modules/operating-entity:
     dependencies:
       '@karar/audit':
         specifier: workspace:*
         version: link:../audit
+      '@karar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.21.0
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.0
+
+  modules/subject-policy:
+    dependencies:
+      '@karar/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@karar/capability-registry':
+        specifier: workspace:*
+        version: link:../../packages/capability-registry
       '@karar/platform':
         specifier: workspace:*
         version: link:../../packages/platform
@@ -457,13 +602,27 @@ importers:
         specifier: ^25.9.5
         version: 25.9.5
 
+  packages/capability-registry:
+    dependencies:
+      '@karar/jurisdiction-policy':
+        specifier: workspace:*
+        version: link:../jurisdiction-policy
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+
   packages/financial-engine:
     dependencies:
       '@karar/shared-kernel':
         specifier: workspace:*
         version: link:../shared-kernel
 
-  packages/jurisdiction-policy: {}
+  packages/jurisdiction-policy:
+    dependencies:
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../shared-kernel
 
   packages/platform:
     dependencies:
@@ -508,6 +667,9 @@ importers:
 
   tests/security:
     dependencies:
+      '@karar/capability-registry':
+        specifier: workspace:*
+        version: link:../../packages/capability-registry
       '@karar/platform':
         specifier: workspace:*
         version: link:../../packages/platform

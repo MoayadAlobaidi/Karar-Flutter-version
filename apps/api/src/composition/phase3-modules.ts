@@ -24,6 +24,7 @@
 import type { DynamicModule } from '@nestjs/common';
 import type { Clock, UserId } from '@karar/shared-kernel';
 import type { AppConfig } from '@karar/platform/dist/config/index.js';
+import type { PlatformLogger } from '@karar/platform/dist/observability/index.js';
 import { redisEndpointFromEnv } from '@karar/platform/dist/config/index.js';
 import {
   LocalPostgresConnectionProfile,
@@ -73,7 +74,9 @@ import {
   PrismaTenantRepository,
   RecordAuditEventAuditTrail as TenancyAuditTrail,
   RedeemInvitation,
+  ResolveTenantContext,
   RevokeInvitation,
+  SwitchTenant,
   Sha256InvitationTokenSource,
   TenancyApiModule,
 } from '@karar/tenancy';
@@ -90,7 +93,12 @@ import { PrismaLegalDocumentRepository } from '@karar/consent/dist/infrastructur
 import { Uuidv7IdSource } from '@karar/consent/dist/infrastructure/persistence/uuidv7-id-source.js';
 import { OperatingEntityDirectoryAdapter } from '@karar/consent/dist/infrastructure/operating-entity/operating-entity-directory-adapter.js';
 import { ResolveEffectiveOperatingEntity } from '@karar/operating-entity';
-import { PrismaEntityAssignmentRepository } from '@karar/operating-entity/dist/infrastructure/persistence/prisma-repositories.js';
+import {
+  PrismaEntityAssignmentRepository,
+  PrismaEntityLicenceRepository,
+  PrismaOperatingEntityRepository,
+} from '@karar/operating-entity/dist/infrastructure/persistence/prisma-repositories.js';
+import { IdentityEdgeContext } from '@karar/identity/dist/presentation/http/identity-di.js';
 import {
   AuthorizationModule,
   PrismaRoleAssignmentRepository,
@@ -104,6 +112,8 @@ import {
   tenantBoundPrincipalFrom,
 } from '../auth/principal-adapters.js';
 import { PrincipalEnrichmentGuard } from '../auth/request-principal.js';
+import { JurisdictionConsentPinSource } from './consent-pin-source.js';
+import { composePhase35Modules } from './phase35-modules.js';
 
 export interface ShutdownResource {
   readonly name: string;
@@ -122,10 +132,12 @@ export interface Phase3CompositionInput {
   readonly env: Readonly<Record<string, string | undefined>>;
   /** main's app-role adapter; the audit writer shares its pool. */
   readonly dbAdapter: PostgresPersistenceAdapter;
+  /** The platform logger, for composition-level failures that must not be silent. */
+  readonly logger: PlatformLogger;
 }
 
 export function composePhase3Modules(input: Phase3CompositionInput): Phase3Composition {
-  const { config, env, dbAdapter } = input;
+  const { config, env, dbAdapter, logger } = input;
   const clock: Clock = { now: () => new Date() };
 
   const prisma = createPrismaClient(LocalPostgresConnectionProfile.fromEnv('app', { env }));
@@ -206,13 +218,27 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
     ),
   };
 
+  // Tenancy, Phase 3.5: membership resolution and tenant binding. The
+  // identity module owns the session mechanics; tenancy verifies membership
+  // server-side and drives them through the ports it declared.
+  const resolveTenantContext = new ResolveTenantContext(memberships, tenants, clock);
+  const switchTenant = new SwitchTenant(
+    memberships,
+    tenants,
+    identityRuntime.useCases.rebindSessionTenant,
+    identityRuntime.useCases.revokeSession,
+    tenancyAudit,
+    clock,
+  );
+
   // Consent — consumer endpoints only; publication/classification have no
   // HTTP surface this phase.
   const documents = new PrismaLegalDocumentRepository(prisma.client);
   const grants = new PrismaConsentGrantRepository(prisma);
-  const entityDirectory = new OperatingEntityDirectoryAdapter(
-    new ResolveEffectiveOperatingEntity(new PrismaEntityAssignmentRepository(prisma.client)),
+  const resolveEntity = new ResolveEffectiveOperatingEntity(
+    new PrismaEntityAssignmentRepository(prisma.client),
   );
+  const entityDirectory = new OperatingEntityDirectoryAdapter(resolveEntity);
   const consentAudit = new ConsentAuditTrail(recordAudit, config.env);
   const consentIds = new Uuidv7IdSource();
   const consentUseCases = {
@@ -226,6 +252,10 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
     ),
     withdrawOwnConsent: new WithdrawOwnConsent(grants, consentAudit),
     getOwnConsentStatus: new GetOwnConsentStatus(grants, documents, entityDirectory),
+    // Migration 0086: a grant written from Phase 3.5 on must pin the policy
+    // provenance it was accepted under. The resolver lives at this edge; the
+    // consent module only records what it decided.
+    policyPinSource: new JurisdictionConsentPinSource(prisma, config.env, clock),
   };
 
   const enrichmentGuard = new PrincipalEnrichmentGuard(
@@ -253,6 +283,22 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       principalSource: { fromRequest: policyActorFrom },
     }),
     ControlPlaneModule.register({ killSwitchPort: killSwitches }),
+    ...composePhase35Modules({
+      environment: config.env,
+      prisma,
+      recordAudit,
+      clock,
+      logger,
+      resolveTenantContext,
+      switchTenant,
+      bindSession: identityRuntime.useCases.bindSessionTenant,
+      revokeSession: identityRuntime.useCases.revokeSession,
+      consentStatus: consentUseCases.getOwnConsentStatus,
+      resolveEntity,
+      entities: new PrismaOperatingEntityRepository(prisma.client),
+      licences: new PrismaEntityLicenceRepository(prisma.client),
+      edgeContext: new IdentityEdgeContext(trustedProxies, identityRuntime.deps.digester),
+    }),
   ];
 
   return {

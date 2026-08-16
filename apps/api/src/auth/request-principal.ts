@@ -26,6 +26,8 @@ export interface KararRequestPrincipal {
   readonly userId: UserId;
   readonly tenantId: TenantId | null;
   readonly sessionId: string;
+  /** From the same authenticated read; the bootstrap surface reports it. */
+  readonly emailVerified: boolean;
 }
 
 /** Request keys this guard owns. `principal` is the consent module's contract. */
@@ -82,6 +84,7 @@ export class PrincipalEnrichmentGuard implements CanActivate {
       userId: userId.value,
       tenantId,
       sessionId: outcome.value.sessionId,
+      emailVerified: outcome.value.emailVerified,
     };
     if (tenantId !== null) {
       request.principal = {

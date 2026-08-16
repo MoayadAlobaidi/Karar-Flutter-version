@@ -423,8 +423,89 @@ function splitTopLevel(body) {
 }
 
 /**
+ * Splits SQL into top-level statements, respecting string literals and
+ * dollar-quoted bodies (a `;` inside a trigger function is not a statement
+ * boundary). Input is expected to have passed through stripSqlComments.
+ */
+function splitStatements(sql) {
+  const out = [];
+  let current = '';
+  let mode = 'code'; // code | string | dollar
+  for (let i = 0; i < sql.length; i += 1) {
+    const c = sql[i];
+    const next = sql[i + 1];
+    if (mode === 'code') {
+      if (c === ';') {
+        if (current.trim() !== '') out.push(current);
+        current = '';
+        continue;
+      }
+      if (c === "'") mode = 'string';
+      else if (c === '$' && next === '$') {
+        mode = 'dollar';
+        current += '$$';
+        i += 1;
+        continue;
+      }
+    } else if (mode === 'string') {
+      if (c === "'" && next === "'") {
+        current += "''";
+        i += 1;
+        continue;
+      }
+      if (c === "'") mode = 'code';
+    } else if (c === '$' && next === '$') {
+      mode = 'code';
+      current += '$$';
+      i += 1;
+      continue;
+    }
+    current += c;
+  }
+  if (current.trim() !== '') out.push(current);
+  return out;
+}
+
+/** Whitespace-collapsed, lowercased SQL — the form constraint patterns match. */
+function normalizeSql(text) {
+  return text.replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** The parenthesised body of every CHECK clause in `text`, normalized. */
+function checkClauses(text) {
+  const clauses = [];
+  for (const m of text.matchAll(/\bCHECK\s*\(/gi)) {
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let end = start;
+    while (end < text.length && depth > 0) {
+      if (text[end] === '(') depth += 1;
+      else if (text[end] === ')') depth -= 1;
+      end += 1;
+    }
+    clauses.push(normalizeSql(text.slice(start, end - 1)));
+  }
+  return clauses;
+}
+
+/** Records one column fragment (from a CREATE TABLE body or an ADD COLUMN). */
+function recordColumn(columns, fragment) {
+  const trimmed = fragment.trim();
+  if (trimmed === '' || COLUMN_LINE_SKIP.test(trimmed)) return;
+  const colMatch = trimmed.match(/^"?([a-z_][\w$]*)"?\s/i);
+  if (!colMatch) return;
+  columns.set(colMatch[1].toLowerCase(), { notNull: /\bNOT\s+NULL\b/i.test(fragment) });
+}
+
+/**
  * Parses every canonical migration: created tables (with columns and their
- * NOT NULL state), RLS ENABLE/FORCE statements, and CREATE POLICY targets.
+ * NOT NULL state), later ALTER TABLE additions to those tables, RLS
+ * ENABLE/FORCE statements, and CREATE POLICY targets.
+ *
+ * ALTER TABLE is parsed because the schema of record is the WHOLE migration
+ * history, not the CREATE statement alone: a column or constraint added by a
+ * later migration is as real as one declared at creation, and a checker that
+ * read only CREATE bodies would report a pin as missing while it exists.
  */
 function parseCanonicalMigrations(root) {
   const dir = path.join(root, MIGRATIONS_REL);
@@ -447,25 +528,52 @@ function parseCanonicalMigrations(root) {
         else if (sql[end] === ')') depth -= 1;
         end += 1;
       }
+      const body = sql.slice(start, end - 1);
       const columns = new Map();
-      for (const fragment of splitTopLevel(sql.slice(start, end - 1))) {
-        const trimmed = fragment.trim();
-        if (trimmed === '' || COLUMN_LINE_SKIP.test(trimmed)) continue;
-        const colMatch = trimmed.match(/^"?([a-z_][\w$]*)"?\s/i);
-        if (!colMatch) continue;
-        columns.set(colMatch[1].toLowerCase(), {
-          notNull: /\bNOT\s+NULL\b/i.test(fragment),
-        });
-      }
+      for (const fragment of splitTopLevel(body)) recordColumn(columns, fragment);
       tables.set(name, {
         name,
         file: relFile,
         line: lineOf(sql, m.index),
         columns,
+        // Every piece of DDL text that constrains the table, in apply order:
+        // the CREATE body plus each later ALTER. Constraint-shape checks read
+        // this, so a CHECK added by a later migration counts.
+        ddl: [body],
         rlsEnabled: false,
         rlsForced: false,
         policies: [],
       });
+    }
+
+    // ALTER TABLE: ADD/DROP COLUMN, SET/DROP NOT NULL, and added constraints.
+    for (const statement of splitStatements(sql)) {
+      const head = statement.match(/^\s*ALTER\s+TABLE\s+(?:ONLY\s+)?([A-Za-z_."][\w."]*)\s+/i);
+      if (!head) continue;
+      const table = tables.get(normalizeTableName(head[1]));
+      if (!table) continue;
+      const rest = statement.slice(head[0].length);
+      table.ddl.push(rest);
+      for (const clause of splitTopLevel(rest)) {
+        const trimmed = clause.trim();
+        const add = trimmed.match(/^ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([\s\S]+)$/i);
+        if (add) {
+          recordColumn(table.columns, add[1]);
+          continue;
+        }
+        const drop = trimmed.match(/^DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?"?([a-z_][\w$]*)"?/i);
+        if (drop) {
+          table.columns.delete(drop[1].toLowerCase());
+          continue;
+        }
+        const nullability = trimmed.match(
+          /^ALTER\s+(?:COLUMN\s+)?"?([a-z_][\w$]*)"?\s+(SET|DROP)\s+NOT\s+NULL/i,
+        );
+        if (nullability) {
+          const column = table.columns.get(nullability[1].toLowerCase());
+          if (column) column.notNull = nullability[2].toUpperCase() === 'SET';
+        }
+      }
     }
 
     for (const m of sql.matchAll(
@@ -498,6 +606,20 @@ const ALLOW_LIST_REQUIRED_FIELDS = [
   'reviewPhase',
 ];
 
+// An allow-list hole is a decision to leave a table outside the tenant
+// boundary, so the entry must carry the reasoning that decision needs. Field
+// presence alone admits "platform configuration" as a justification, which is
+// a category, not a reason. Three mechanical requirements, all satisfiable
+// only by writing the actual argument:
+//   * a stated reason why the table cannot be tenant- or subject-scoped;
+//   * compensating controls described concretely, not labelled;
+//   * enough text to be an argument at all.
+const ALLOW_LIST_MIN_REASON = 120;
+const ALLOW_LIST_MIN_GRANTS = 60;
+const ALLOW_LIST_SCOPE_CLAUSE =
+  /\b(no|not|never|without|carries no|has no)\b[^.]{0,120}\b(tenant|subject|principal|user)\b|\b(pre-auth|before (any|a) [\w -]{0,24}(principal|tenant|context|session)|across (all |every )?tenants?|regardless of (any |which )?(principal|tenant)|platform-global|platform-wide|deployment-wide)\b/i;
+const ALLOW_LIST_BOILERPLATE = /^(none|n\/?a|tbd|todo|unknown|—|-|see above|standard)\.?$/i;
+
 /** Loads and field-validates the RLS allow-list; shape errors become violations. */
 function loadRlsAllowList(root, violations) {
   const listPath = path.join(root, ALLOW_LIST_REL);
@@ -525,6 +647,31 @@ function loadRlsAllowList(root, violations) {
         violations.push({
           file: relPath,
           detail: `${where}: '${field}' is missing or empty — an allow-list hole needs a stated reason, owner, compensating grants, and review phase`,
+        });
+      }
+    }
+    const reason = typeof entry?.reason === 'string' ? entry.reason.trim() : '';
+    const grants =
+      typeof entry?.compensatingGrants === 'string' ? entry.compensatingGrants.trim() : '';
+    if (reason !== '') {
+      if (reason.length < ALLOW_LIST_MIN_REASON) {
+        violations.push({
+          file: relPath,
+          detail: `${where}: 'reason' is ${reason.length} characters — an allow-list hole needs the argument for leaving the table outside the tenant boundary, not a label (minimum ${ALLOW_LIST_MIN_REASON})`,
+        });
+      }
+      if (!ALLOW_LIST_SCOPE_CLAUSE.test(reason)) {
+        violations.push({
+          file: relPath,
+          detail: `${where}: 'reason' never states why the table cannot be tenant- or subject-scoped — "platform configuration" is a category, and the question the exemption turns on is what the table is and why no principal predicate fits it`,
+        });
+      }
+    }
+    if (grants !== '') {
+      if (ALLOW_LIST_BOILERPLATE.test(grants) || grants.length < ALLOW_LIST_MIN_GRANTS) {
+        violations.push({
+          file: relPath,
+          detail: `${where}: 'compensatingGrants' is '${grants.slice(0, 40)}' — a table outside RLS is protected by named grants, triggers, and gated write paths, or it is not protected (minimum ${ALLOW_LIST_MIN_GRANTS} characters, describing the actual controls)`,
         });
       }
     }
@@ -735,16 +882,36 @@ export function checkTenantScoping(ctx) {
 // Test 21 — Pinning (records with legal consequence pin their provenance)
 // ---------------------------------------------------------------------------
 // The declared set of legal-consequence tables, checked against the REAL
-// schema (data-model.md §5). Each canonical pinning dimension maps to the
-// actual column that carries it, or declares a deferral to the phase whose
-// machinery introduces the value — and a deferral whose phase has arrived
-// FAILS the run (the registry's own activation-gate discipline; a pin backed
-// by fabricated values would be worse than an honest deferral). Phase 3
-// reality, recorded in migration 0063: consent_grants pins the operating
-// entity and jurisdiction per acceptance (plus the exact document version);
-// data_protection_role_assignments carries the same per-row entity +
-// jurisdiction pins. PolicyPack versions and SubjectPolicySelection do not
-// exist until Phase 3.5, so those two dimensions are deferred to 3.5 below.
+// schema (data-model.md §5). All four canonical dimensions are enforced; NO
+// dimension is deferred any more. Phase 3 pinned jurisdiction and operating
+// entity and deferred the other two behind a gate that fired the moment Phase
+// 3.5 arrived; migration 0086 resolved it, so the deferral machinery is gone
+// rather than left as a branch nothing can exercise.
+//
+// Two pin shapes are recognised, and both are verified against the schema —
+// never against prose in this file:
+//
+//   { column }                    the classic pin: the column exists and is
+//                                 NOT NULL. Absence of a value is impossible.
+//
+//   { column, stateColumn, … }    a value that is legitimately absent for some
+//                                 rows. The value column may be nullable ONLY
+//                                 because a NOT NULL state column says, per
+//                                 row, why — and the schema must carry the
+//                                 CHECKs that make the pair honest: a
+//                                 vocabulary CHECK on the state, a CHECK tying
+//                                 the PINNED state to a non-null value, and a
+//                                 CHECK requiring the pin for rows created
+//                                 from the cutoff on. A justified NULL is one
+//                                 the DATABASE justifies; a blanket "nullable
+//                                 by design" in a declaration is not evidence.
+//
+//   { declaredNotApplicable }     the dimension cannot apply to this table at
+//                                 all. The table carries a NOT NULL state
+//                                 column CHECK-bound to exactly that single
+//                                 value, so no row can ever claim otherwise
+//                                 and introducing the dimension later is a
+//                                 reviewed migration rather than a silent NULL.
 const LEGAL_CONSEQUENCE_TABLES = [
   {
     table: 'public.consent_grants',
@@ -752,13 +919,14 @@ const LEGAL_CONSEQUENCE_TABLES = [
       jurisdictionAtCreation: { column: 'jurisdiction_ref' },
       operatingEntityAtCreation: { column: 'operating_entity_id' },
       policyPackVersionAtCreation: {
-        deferredUntilPhase: 3.5,
-        reason: 'PolicyPack machinery arrives in Phase 3.5; no pack version exists to pin yet',
+        column: 'policy_pack_version',
+        stateColumn: 'policy_pack_pin_state',
+        pinnedState: 'PINNED',
       },
       subjectPolicySelectionVersion: {
-        deferredUntilPhase: 3.5,
-        reason:
-          'SubjectPolicySelection arrives in Phase 3.5; the column is nullable-by-design where no elective options exist (data-model.md §5)',
+        column: 'subject_policy_selection_version',
+        stateColumn: 'subject_policy_selection_pin_state',
+        pinnedState: 'PINNED',
       },
     },
   },
@@ -768,31 +936,45 @@ const LEGAL_CONSEQUENCE_TABLES = [
       jurisdictionAtCreation: { column: 'jurisdiction_ref' },
       operatingEntityAtCreation: { column: 'operating_entity_id' },
       policyPackVersionAtCreation: {
-        deferredUntilPhase: 3.5,
-        reason: 'PolicyPack machinery arrives in Phase 3.5; no pack version exists to pin yet',
+        column: 'policy_pack_version',
+        stateColumn: 'policy_pack_pin_state',
+        pinnedState: 'PINNED',
       },
       subjectPolicySelectionVersion: {
-        deferredUntilPhase: 3.5,
-        reason:
-          'stored legal decisions carry no subject election; re-reviewed when SubjectPolicySelection lands (Phase 3.5)',
+        declaredNotApplicable: {
+          column: 'subject_policy_selection_pin_state',
+          value: 'NOT_APPLICABLE',
+        },
       },
     },
   },
+  {
+    // The election record itself (migration 0083). It pins the regime, the
+    // pack that permitted the option set, and its own version — profile_version
+    // IS the selection version other records pin. It carries no
+    // operating_entity_id column, so no dimension maps to one here; whether an
+    // election survives an entity migration is a question for the module that
+    // owns the table, recorded as a finding rather than answered in a checker.
+    table: 'public.subject_policy_selections',
+    pins: {
+      jurisdictionAtCreation: { column: 'jurisdiction_ref' },
+      policyPackVersionAtCreation: { column: 'policy_pack_version' },
+      subjectPolicySelectionVersion: { column: 'profile_version' },
+    },
+  },
+];
+
+/** Columns whose presence means a table carries legal consequence. */
+const PINNING_SIGNATURE_COLUMNS = [
+  'operating_entity_id',
+  'policy_pack_version',
+  'subject_policy_selection_version',
 ];
 
 export function checkPinning(ctx) {
   const { root } = ctx;
   const violations = [];
   const { tables } = parseCanonicalMigrations(root);
-
-  let currentPhase = null;
-  try {
-    const registry = readJson(path.join(root, REGISTRY_REL));
-    if (typeof registry.currentPhase === 'number') currentPhase = registry.currentPhase;
-  } catch {
-    // loadRegistry reports unreadable registries; deferral gates cannot
-    // evaluate without a phase, which is itself a violation below.
-  }
 
   const declared = new Set();
   for (const { table, pins } of LEGAL_CONSEQUENCE_TABLES) {
@@ -806,51 +988,125 @@ export function checkPinning(ctx) {
       });
       continue;
     }
+    const clauses = record.ddl.flatMap((text) => checkClauses(text));
+    const fail = (detail) => violations.push({ file: record.file, line: record.line, detail });
+
+    // Anti-dodge: a declared table cannot leave one of its own pinning-signature
+    // columns unmapped. Declaring a table and then omitting the dimension its
+    // schema visibly carries would turn the declaration into a shorter list of
+    // things to check.
+    const mapped = new Set(
+      Object.values(pins).flatMap((pin) =>
+        [pin.column, pin.stateColumn, pin.declaredNotApplicable?.column]
+          .filter((c) => typeof c === 'string')
+          .map((c) => c.toLowerCase()),
+      ),
+    );
+    for (const col of record.columns.keys()) {
+      const isSignature = col.endsWith('_at_creation') || PINNING_SIGNATURE_COLUMNS.includes(col);
+      if (isSignature && !mapped.has(col)) {
+        fail(
+          `${name} carries pinning-signature column '${col}' that no declared dimension maps to — a declaration that skips a pin the schema already carries checks less than the schema says`,
+        );
+      }
+    }
+
     for (const [dimension, pin] of Object.entries(pins)) {
-      if (pin.column !== undefined) {
-        const column = record.columns.get(pin.column.toLowerCase());
-        if (!column) {
-          violations.push({
-            file: record.file,
-            line: record.line,
-            detail: `${name}: pinning dimension '${dimension}' maps to column '${pin.column}', which does not exist`,
-          });
-        } else if (!column.notNull && pin.nullable !== true) {
-          violations.push({
-            file: record.file,
-            line: record.line,
-            detail: `${name}: pinning column '${pin.column}' (${dimension}) is nullable — a legal-consequence record pins its provenance at creation, always`,
-          });
+      if (pin.declaredNotApplicable !== undefined) {
+        const { column: stateColumn, value } = pin.declaredNotApplicable;
+        const state = record.columns.get(stateColumn.toLowerCase());
+        if (!state) {
+          fail(
+            `${name}: dimension '${dimension}' is declared not applicable, but the declaring column '${stateColumn}' does not exist — non-applicability is stated in the schema, not only in the checker`,
+          );
+          continue;
+        }
+        if (!state.notNull) {
+          fail(
+            `${name}: '${stateColumn}' declares dimension '${dimension}' not applicable but is nullable — a declaration a row may omit declares nothing`,
+          );
+        }
+        const bound = new RegExp(`^${stateColumn.toLowerCase()}\\s*=\\s*'${value.toLowerCase()}'$`);
+        if (!clauses.some((clause) => bound.test(clause))) {
+          fail(
+            `${name}: no CHECK binds '${stateColumn}' to exactly '${value}' — without it the "not applicable" declaration is a default a row can walk away from`,
+          );
         }
         continue;
       }
-      if (typeof pin.deferredUntilPhase === 'number') {
-        if (currentPhase === null) {
-          violations.push({
-            file: REGISTRY_REL.split(path.sep).join('/'),
-            detail: `cannot evaluate the '${dimension}' deferral for ${name}: registry currentPhase is unreadable`,
-          });
-        } else if (currentPhase >= pin.deferredUntilPhase) {
-          violations.push({
-            file: record.file,
-            detail: `${name}: pinning dimension '${dimension}' was deferred until phase ${pin.deferredUntilPhase} and phase ${currentPhase} has arrived without the column — the deferral gate works like the registry's activation gate`,
-          });
+
+      if (pin.column === undefined) {
+        violations.push({
+          file: 'scripts/checks/architecture.mjs',
+          detail: `${name}: pinning dimension '${dimension}' declares neither a column nor an explicit non-applicability`,
+        });
+        continue;
+      }
+
+      const col = pin.column.toLowerCase();
+      const column = record.columns.get(col);
+      if (!column) {
+        fail(
+          `${name}: pinning dimension '${dimension}' maps to column '${pin.column}', which does not exist`,
+        );
+        continue;
+      }
+
+      if (pin.stateColumn === undefined) {
+        if (!column.notNull) {
+          fail(
+            `${name}: pinning column '${pin.column}' (${dimension}) is nullable — a legal-consequence record pins its provenance at creation, always`,
+          );
         }
         continue;
       }
-      violations.push({
-        file: 'scripts/checks/architecture.mjs',
-        detail: `${name}: pinning dimension '${dimension}' declares neither a column nor a numeric deferredUntilPhase`,
-      });
+
+      // State-paired pin: the nullability of the value column is bought with
+      // a per-row explanation the database enforces.
+      const stateName = pin.stateColumn.toLowerCase();
+      const pinned = pin.pinnedState.toLowerCase();
+      const state = record.columns.get(stateName);
+      if (!state) {
+        fail(
+          `${name}: pinning dimension '${dimension}' allows a null '${pin.column}' only alongside state column '${pin.stateColumn}', which does not exist`,
+        );
+        continue;
+      }
+      if (!state.notNull) {
+        fail(
+          `${name}: state column '${pin.stateColumn}' (${dimension}) is nullable — the column that explains a missing pin cannot itself be missing`,
+        );
+      }
+      const vocabulary = new RegExp(`\\b${stateName}\\s+in\\s*\\(`);
+      if (!clauses.some((clause) => vocabulary.test(clause) && clause.includes(`'${pinned}'`))) {
+        fail(
+          `${name}: no CHECK constrains '${pin.stateColumn}' to a closed vocabulary including '${pin.pinnedState}' — a free-text state explains nothing`,
+        );
+      }
+      const forward = new RegExp(
+        `\\(\\s*${stateName}\\s*=\\s*'${pinned}'\\s*\\)\\s*=\\s*\\(\\s*${col}\\s*is not null\\s*\\)`,
+      );
+      const reverse = new RegExp(
+        `\\(\\s*${col}\\s*is not null\\s*\\)\\s*=\\s*\\(\\s*${stateName}\\s*=\\s*'${pinned}'\\s*\\)`,
+      );
+      if (!clauses.some((clause) => forward.test(clause) || reverse.test(clause))) {
+        fail(
+          `${name}: no CHECK ties '${pin.stateColumn}' = '${pin.pinnedState}' to '${pin.column}' IS NOT NULL — without it a row can claim to be pinned while carrying no version, or carry one while claiming not to be`,
+        );
+      }
+      if (!clauses.some((clause) => /created_at\s*</.test(clause) && clause.includes(stateName))) {
+        fail(
+          `${name}: no CHECK requires dimension '${dimension}' for rows created from a cutoff (a clause over created_at naming '${pin.stateColumn}') — otherwise the historical state is a permanent exemption every new row can claim`,
+        );
+      }
     }
   }
 
-  // A table that carries the pinning signature must be declared: canonical
-  // *_at_creation columns, or a per-row operating_entity_id pin.
+  // A table that carries the pinning signature must be declared.
   for (const table of tables.values()) {
     if (declared.has(table.name)) continue;
     const pinColumns = [...table.columns.keys()].filter(
-      (col) => col.endsWith('_at_creation') || col === 'operating_entity_id',
+      (col) => col.endsWith('_at_creation') || PINNING_SIGNATURE_COLUMNS.includes(col),
     );
     if (pinColumns.length > 0) {
       violations.push({
@@ -861,10 +1117,337 @@ export function checkPinning(ctx) {
     }
   }
 
+  const dimensions = LEGAL_CONSEQUENCE_TABLES.reduce((n, t) => n + Object.keys(t.pins).length, 0);
   return violationsResult(
     violations,
     tables.size,
-    `declared legal-consequence tables: ${LEGAL_CONSEQUENCE_TABLES.length}; deferred dimensions gate at phase 3.5 (currentPhase ${currentPhase ?? 'unreadable'})`,
+    `declared legal-consequence tables: ${LEGAL_CONSEQUENCE_TABLES.length}; pinning dimensions enforced: ${dimensions}; none deferred`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 19 — Approval policy
+// ---------------------------------------------------------------------------
+// A PolicyPack that CLEARS a disclosure-bearing capability without a DECIDED
+// ApprovalPolicy fails (jurisdiction-policy.md §8): no capability that
+// discharges data to anyone exists without a named approval workflow.
+//
+// This is a repository-level STATIC check and it reads real source, not a
+// runtime. Three things are verified, because each alone can be true while the
+// rule is dead:
+//
+//   1. Every pack literal in non-test source is inspected directly. A pack is
+//      recognised by its `clearedCapabilities` slot wherever it is declared —
+//      including a pack declared outside the policy package, which would
+//      otherwise escape review entirely.
+//   2. The validator still carries the rule. Deleting the finding from
+//      packages/jurisdiction-policy would make every future pack pass.
+//   3. Every non-test caller of validatePack/validatePackSet supplies
+//      `disclosureBearingCapabilityIds`. The rule only fires for ids the
+//      caller passes, so a call site that omits them disarms it silently —
+//      the failure mode a "the validator has a test for it" argument misses.
+//
+// Disclosure-bearing ids are read from the capability registry's source, which
+// means the registry must stay statically classifiable: `disclosureBearing`
+// must be a boolean literal or an expression naming the ids it applies to.
+const CAPABILITY_REGISTRY_SRC_REL = path.join('packages', 'capability-registry', 'src');
+const JURISDICTION_POLICY_DIR_REL = path.join('packages', 'jurisdiction-policy');
+
+/** Index of the bracket matching the one at `open`, or -1. */
+function matchBracket(src, open) {
+  const openers = '([{';
+  const closers = ')]}';
+  if (!openers.includes(src[open])) return -1;
+  let depth = 0;
+  for (let i = open; i < src.length; i += 1) {
+    if (openers.includes(src[i])) depth += 1;
+    else if (closers.includes(src[i])) {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** Index of the `{` opening the object literal enclosing `index`, or -1. */
+function enclosingObjectStart(src, index) {
+  let depth = 0;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const c = src[i];
+    if (')]}'.includes(c)) depth += 1;
+    else if ('([{'.includes(c)) {
+      if (depth === 0) return c === '{' ? i : -1;
+      depth -= 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The literal body that follows `start`, skipping one call wrapper such as
+ * `Object.freeze(`. Returns the text between the brackets, or null.
+ */
+function literalAfter(src, start, opener) {
+  let i = start;
+  while (i < src.length && /\s/.test(src[i])) i += 1;
+  const wrapper = src.slice(i, i + 80).match(/^[A-Za-z_$][\w$.]*\s*\(\s*/);
+  if (wrapper) i += wrapper[0].length;
+  if (src[i] !== opener) return null;
+  const end = matchBracket(src, i);
+  return end === -1 ? null : src.slice(i + 1, end);
+}
+
+/** Splits a JS literal body on top-level commas (brackets and quotes tracked). */
+function splitTopLevelJs(body) {
+  const parts = [];
+  let current = '';
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < body.length; i += 1) {
+    const c = body[i];
+    if (quote !== null) {
+      if (c === '\\') {
+        current += c + (body[i + 1] ?? '');
+        i += 1;
+        continue;
+      }
+      if (c === quote) quote = null;
+    } else if (c === "'" || c === '"' || c === '`') quote = c;
+    else if ('([{'.includes(c)) depth += 1;
+    else if (')]}'.includes(c)) depth -= 1;
+    else if (c === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += c;
+  }
+  if (current.trim() !== '') parts.push(current);
+  return parts;
+}
+
+/** Top-level `key: value` pairs of an object-literal body. */
+function objectEntries(body) {
+  const out = [];
+  for (const part of splitTopLevelJs(body)) {
+    const m = part.match(
+      /^\s*(?:'([^']+)'|"([^"]+)"|\[\s*([\w$.]+)\s*\]|([A-Za-z_$][\w$]*))\s*:\s*([\s\S]*)$/,
+    );
+    if (!m) continue;
+    out.push({ key: m[1] ?? m[2] ?? m[3] ?? m[4], value: m[5].trim() });
+  }
+  return out;
+}
+
+/**
+ * True for a TypeScript member declaration rather than a value: `readonly x:
+ * boolean;`. Type declarations name the same slots packs fill, and inspecting
+ * an interface as if it were a pack reports nonsense.
+ */
+function isTypePosition(src, keyIndex, expression) {
+  const before = src.slice(Math.max(0, keyIndex - 12), keyIndex);
+  if (/\breadonly\s+$/.test(before)) return true;
+  return /^[\w.<>[\]\s|&]*;/.test(expression) && !/['"]/.test(expression);
+}
+
+/** The value expression following a `key:` at `start`, to the next boundary. */
+function valueExpression(src, start) {
+  return (splitTopLevelJs(src.slice(start, start + 400))[0] ?? '').split('\n')[0].trim();
+}
+
+const STRING_LITERAL = /'([^'\\]*)'|"([^"\\]*)"/g;
+
+function stringLiterals(text) {
+  return [...text.matchAll(STRING_LITERAL)].map((m) => m[1] ?? m[2]).filter((s) => s !== '');
+}
+
+/** Capability ids the registry source declares disclosure-bearing. */
+function collectDisclosureBearingIds(root, violations) {
+  const ids = new Set();
+  for (const file of codeFiles([path.join(root, CAPABILITY_REGISTRY_SRC_REL)])) {
+    const src = loadStripped(file);
+    for (const m of src.matchAll(/\bdisclosureBearing\s*:\s*/g)) {
+      const expression = valueExpression(src, m.index + m[0].length)
+        .split('}')[0]
+        .trim();
+      if (isTypePosition(src, m.index, expression)) continue;
+      if (/^false\b/.test(expression)) continue;
+      if (/^true\b/.test(expression)) {
+        const objectStart = enclosingObjectStart(src, m.index);
+        const objectEnd = objectStart === -1 ? -1 : matchBracket(src, objectStart);
+        const owner =
+          objectEnd === -1
+            ? null
+            : (src.slice(objectStart, objectEnd).match(/\bid\s*:\s*['"]([\w$]+)['"]/)?.[1] ?? null);
+        if (owner === null) {
+          violations.push({
+            file: rel(root, file),
+            line: lineOf(src, m.index),
+            detail: `'disclosureBearing: true' on an object literal with no literal 'id' — test 19 reads the disclosure-bearing set from this source and cannot attribute the flag`,
+          });
+          continue;
+        }
+        ids.add(owner);
+        continue;
+      }
+      const named = stringLiterals(expression);
+      if (named.length === 0) {
+        violations.push({
+          file: rel(root, file),
+          line: lineOf(src, m.index),
+          detail: `'disclosureBearing' is computed as '${expression}', which names no capability id — test 19 reads this set statically, so the declaration must stay classifiable (a boolean literal, or an expression naming its ids)`,
+        });
+        continue;
+      }
+      for (const id of named) ids.add(id);
+    }
+  }
+  return ids;
+}
+
+/** Every PolicyPack literal declared in non-test source. */
+function collectPackDeclarations(root, violations) {
+  const packs = [];
+  const files = codeFiles([
+    ...packagesSrcDirs(root),
+    path.join(root, 'modules'),
+    ...appsSrcDirs(root),
+  ]);
+  for (const file of files) {
+    const src = loadStripped(file);
+    for (const m of src.matchAll(/\bclearedCapabilities\s*:\s*/g)) {
+      const relFile = rel(root, file);
+      const line = lineOf(src, m.index);
+      if (isTypePosition(src, m.index, valueExpression(src, m.index + m[0].length))) continue;
+      const objectStart = enclosingObjectStart(src, m.index);
+      const objectEnd = objectStart === -1 ? -1 : matchBracket(src, objectStart);
+      if (objectEnd === -1) {
+        violations.push({
+          file: relFile,
+          line,
+          detail: `a 'clearedCapabilities' slot whose enclosing pack literal does not parse — test 19 must read every pack, so an unparseable one is a failure, not a skip`,
+        });
+        continue;
+      }
+      const body = src.slice(objectStart + 1, objectEnd);
+      const clearedAt = body.search(/\bclearedCapabilities\s*:/);
+      const clearedBody = literalAfter(
+        body,
+        clearedAt + body.slice(clearedAt).indexOf(':') + 1,
+        '[',
+      );
+      if (clearedBody === null) {
+        violations.push({
+          file: relFile,
+          line,
+          detail: `'clearedCapabilities' is not a literal array — the cleared ceiling is reviewed source, so it must be readable as such`,
+        });
+        continue;
+      }
+      const approvals = new Map();
+      const approvalsAt = body.search(/\bapprovalPolicies\s*:/);
+      if (approvalsAt !== -1) {
+        const approvalsBody = literalAfter(
+          body,
+          approvalsAt + body.slice(approvalsAt).indexOf(':') + 1,
+          '{',
+        );
+        if (approvalsBody !== null) {
+          for (const { key, value } of objectEntries(approvalsBody)) {
+            approvals.set(key, {
+              decided: /\bdecided\s*\(/.test(value) || /\bstate\s*:\s*['"]DECIDED['"]/.test(value),
+            });
+          }
+        }
+      }
+      packs.push({
+        file: relFile,
+        line,
+        version: body.match(/\bversion\s*:\s*['"]([^'"]+)['"]/)?.[1] ?? '(unnamed pack)',
+        cleared: stringLiterals(clearedBody),
+        approvals,
+      });
+    }
+  }
+  return packs;
+}
+
+export function checkApprovalPolicy(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const disclosureBearing = collectDisclosureBearingIds(root, violations);
+  const packs = collectPackDeclarations(root, violations);
+
+  for (const pack of packs) {
+    for (const capabilityId of pack.cleared) {
+      if (!disclosureBearing.has(capabilityId)) continue;
+      const approval = pack.approvals.get(capabilityId);
+      if (approval === undefined) {
+        violations.push({
+          file: pack.file,
+          line: pack.line,
+          detail: `pack '${pack.version}' clears disclosure-bearing capability '${capabilityId}' with no approvalPolicies entry — a capability that discharges data has an approval workflow or it is not cleared`,
+        });
+      } else if (!approval.decided) {
+        violations.push({
+          file: pack.file,
+          line: pack.line,
+          detail: `pack '${pack.version}' clears disclosure-bearing capability '${capabilityId}' with an approval policy that is not DECIDED — an undecided workflow is a denial, and clearing on top of it is the contradiction`,
+        });
+      }
+    }
+  }
+
+  // The validator's own rule, so deleting it cannot quietly pass every pack.
+  const validationRel = path.join(JURISDICTION_POLICY_DIR_REL, 'src', 'validation.ts');
+  const validationPath = path.join(root, validationRel);
+  if (!fs.existsSync(validationPath)) {
+    violations.push({
+      file: validationRel.split(path.sep).join('/'),
+      detail: 'pack validation source is missing — the approval-policy rule has no home',
+    });
+  } else {
+    const src = readText(validationPath);
+    for (const token of ['MISSING_APPROVAL_POLICY', 'approvalPolicies', 'disclosureBearing']) {
+      if (!src.includes(token)) {
+        violations.push({
+          file: validationRel.split(path.sep).join('/'),
+          detail: `pack validation no longer references '${token}' — the approval-policy rule must stay in the validator, not only in this checker`,
+        });
+      }
+    }
+  }
+
+  // Call sites: the rule fires only for the ids a caller supplies.
+  const callerFiles = codeFiles([
+    ...packagesSrcDirs(root),
+    path.join(root, 'modules'),
+    ...appsSrcDirs(root),
+  ]).filter((file) => !isWithin(path.join(root, JURISDICTION_POLICY_DIR_REL), file));
+  for (const file of callerFiles) {
+    const src = loadStripped(file);
+    for (const m of src.matchAll(/\bvalidatePack(?:Set)?\s*\(/g)) {
+      // A declaration is not a call site; its parameter list names no ids.
+      if (/\bfunction\s+$/.test(src.slice(Math.max(0, m.index - 20), m.index))) continue;
+      const open = m.index + m[0].length - 1;
+      const end = matchBracket(src, open);
+      const args = end === -1 ? '' : src.slice(open + 1, end);
+      if (!args.includes('disclosureBearingCapabilityIds')) {
+        violations.push({
+          file: rel(root, file),
+          line: lineOf(src, m.index),
+          detail: `calls ${m[0].slice(0, -1)} without 'disclosureBearingCapabilityIds' — the approval-policy rule only fires for ids the caller passes, so this call site validates packs with the rule switched off`,
+        });
+      }
+    }
+  }
+
+  return violationsResult(
+    violations,
+    packs.length,
+    `packs inspected: ${packs.length}; disclosure-bearing capabilities: ${
+      disclosureBearing.size === 0 ? 'none declared' : [...disclosureBearing].sort().join(', ')
+    }`,
   );
 }
 
@@ -1194,11 +1777,39 @@ export function checkModuleDocs(ctx) {
 // ---------------------------------------------------------------------------
 // Test 17 — Pure packages (no runtime dependencies)
 // ---------------------------------------------------------------------------
+// Two tiers, both checked at the manifest AND in the source. The manifest
+// alone is not sufficient: `node:fs`, `node:http`, and `node:child_process`
+// are builtins, so a package can reach the filesystem or the network without
+// declaring a single dependency.
+//
+//   PURE_PACKAGES              only @karar/shared-kernel (and shared-kernel
+//                              itself, nothing at all).
+//   PURITY_CONSTRAINED         packages that legitimately build on another
+//                              pure package. capability-registry declares
+//                              @karar/jurisdiction-policy for JurisdictionId;
+//                              everything else — framework, ORM, HTTP client,
+//                              filesystem, cloud SDK — stays out, so the
+//                              registry can be imported by any layer without
+//                              dragging infrastructure behind it.
+const PURITY_CONSTRAINED_PACKAGES = [
+  { name: 'capability-registry', allowed: ['@karar/shared-kernel', '@karar/jurisdiction-policy'] },
+];
+
 export function checkPurePackages(ctx) {
   const { root } = ctx;
   const violations = [];
-  for (const pkg of PURE_PACKAGES) {
-    const pkgJsonPath = path.join(root, 'packages', pkg, 'package.json');
+  const tiers = [
+    ...PURE_PACKAGES.map((name) => ({
+      name,
+      allowed: name === 'shared-kernel' ? [] : ['@karar/shared-kernel'],
+      scanSource: false,
+    })),
+    ...PURITY_CONSTRAINED_PACKAGES.map((p) => ({ ...p, scanSource: true })),
+  ];
+
+  for (const { name, allowed, scanSource } of tiers) {
+    const pkgDir = path.join(root, 'packages', name);
+    const pkgJsonPath = path.join(pkgDir, 'package.json');
     const relPath = rel(root, pkgJsonPath);
     if (!fs.existsSync(pkgJsonPath)) {
       violations.push({ file: relPath, detail: 'package.json missing' });
@@ -1211,21 +1822,38 @@ export function checkPurePackages(ctx) {
       violations.push({ file: relPath, detail: `does not parse: ${err.message}` });
       continue;
     }
-    const deps = Object.keys(json.dependencies ?? {});
-    for (const dep of deps) {
-      const allowed = pkg !== 'shared-kernel' && dep === '@karar/shared-kernel';
-      if (!allowed) {
+    const permitted = allowed.join(', ') || 'nothing';
+    for (const dep of Object.keys(json.dependencies ?? {})) {
+      if (allowed.includes(dep)) continue;
+      violations.push({
+        file: relPath,
+        detail:
+          allowed.length === 0
+            ? `${name} declares runtime dependency '${dep}' — it must have none`
+            : `${name} declares runtime dependency '${dep}' — only ${permitted} is allowed (no framework, ORM, HTTP, filesystem, or cloud dependency)`,
+      });
+    }
+
+    // Source imports for the constrained tier. The pure tier's imports are
+    // test 1's subject, which enforces the same shape one layer deeper.
+    if (!scanSource) continue;
+    for (const file of codeFiles([path.join(pkgDir, 'src')])) {
+      const src = loadStripped(file);
+      for (const { specifier, line } of extractImports(src)) {
+        if (specifier.startsWith('.') || allowed.includes(specifier)) continue;
         violations.push({
-          file: relPath,
-          detail:
-            pkg === 'shared-kernel'
-              ? `shared-kernel declares runtime dependency '${dep}' — it must have none`
-              : `pure package declares runtime dependency '${dep}' — only @karar/shared-kernel is allowed`,
+          file: rel(root, file),
+          line,
+          detail: `${name} imports '${specifier}' — only ./relative and ${permitted} are allowed; a builtin or third-party import here (filesystem, HTTP, framework, ORM, cloud) is exactly what this tier exists to keep out`,
         });
       }
     }
   }
-  return violationsResult(violations, PURE_PACKAGES.length);
+  return violationsResult(
+    violations,
+    tiers.length,
+    `pure: ${PURE_PACKAGES.join(', ')}; purity-constrained (manifest + source): ${PURITY_CONSTRAINED_PACKAGES.map((p) => p.name).join(', ')}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1819,6 +2447,31 @@ export function checkAssuranceClaims(ctx) {
         });
       }
     }
+    // A pointer that does not point is not evidence: backticked repo paths
+    // must resolve, and evidence ids must be well formed. Whether the evidence
+    // SUPPORTS the claim stays a human review (§1 of the registry) — this only
+    // asserts the reference is real.
+    const rawEvidence = cells[cols.evidence] ?? '';
+    for (const m of rawEvidence.matchAll(/`([^`]+)`/g)) {
+      const target = m[1].trim();
+      if (!/^[\w.@/-]+$/.test(target) || !target.includes('/')) continue;
+      if (!fs.existsSync(path.join(root, target))) {
+        violations.push({
+          file: relPath,
+          line,
+          detail: `${id}: evidence names '${target}', which does not exist in the repository`,
+        });
+      }
+    }
+    for (const m of rawEvidence.matchAll(/\bEV-[\w-]+/g)) {
+      if (!/^EV-\d{3}$/.test(m[0])) {
+        violations.push({
+          file: relPath,
+          line,
+          detail: `${id}: evidence id '${m[0]}' is malformed — evidence ids are EV-### and are defined once in docs/compliance/evidence-register.md`,
+        });
+      }
+    }
   }
 
   return violationsResult(violations, rows.length, `AC rows parsed: ${rows.length}`);
@@ -1875,6 +2528,7 @@ const CHECKS = {
   checkPurePackages,
   checkStorageBoundary,
   checkKernelSurface,
+  checkApprovalPolicy,
   checkPinning,
   checkRlsCoverage,
   checkGuardCallSites,
@@ -1995,6 +2649,75 @@ function buildSelfTestFixture() {
     JSON.stringify({ name: '@karar/jurisdiction-policy' }),
   );
   write('packages/jurisdiction-policy/src/index.ts', 'export {};\n');
+  // Test 19 seeds. The registry declares one disclosure-bearing capability in
+  // each recognised shape (a boolean literal, and an expression naming the id).
+  write(
+    'packages/capability-registry/package.json',
+    JSON.stringify({
+      name: '@karar/capability-registry',
+      dependencies: { '@karar/jurisdiction-policy': 'workspace:*', express: '^4.0.0' },
+    }),
+  );
+  write(
+    'packages/capability-registry/src/index.ts',
+    [
+      `import { readFileSync } from 'node:fs';`,
+      `export const FIXTURE_REGISTRY = {`,
+      `  FIXTURE_PLAIN: { id: 'FIXTURE_PLAIN', disclosureBearing: false },`,
+      `  FIXTURE_DISCLOSING: { id: 'FIXTURE_DISCLOSING', disclosureBearing: true },`,
+      `  FIXTURE_COMPUTED: { id: 'FIXTURE_COMPUTED', disclosureBearing: name === 'FIXTURE_COMPUTED' },`,
+      `};`,
+      `export const loaded = readFileSync;`,
+      '',
+    ].join('\n'),
+  );
+  // …and packs that clear them: one with no entry at all, one with an
+  // undecided entry, one correct (the negative case).
+  write(
+    'packages/jurisdiction-policy/src/packs/fixture-packs.ts',
+    [
+      `const decided = (value: object, basis: string) => ({ state: 'DECIDED', value, basis });`,
+      `export const NO_ENTRY_PACK = Object.freeze({`,
+      `  version: 'fx/no-entry',`,
+      `  clearedCapabilities: Object.freeze(['FIXTURE_PLAIN', 'FIXTURE_DISCLOSING']),`,
+      `  approvalPolicies: Object.freeze({ FIXTURE_PLAIN: decided({}, 'basis:fixture') }),`,
+      `});`,
+      `export const UNDECIDED_PACK = Object.freeze({`,
+      `  version: 'fx/undecided',`,
+      `  clearedCapabilities: Object.freeze(['FIXTURE_COMPUTED']),`,
+      `  approvalPolicies: Object.freeze({`,
+      `    FIXTURE_COMPUTED: { state: 'PENDING_LEGAL_REVIEW', reason: 'undecided' },`,
+      `  }),`,
+      `});`,
+      `export const CORRECT_PACK = Object.freeze({`,
+      `  version: 'fx/correct',`,
+      `  clearedCapabilities: Object.freeze(['FIXTURE_DISCLOSING']),`,
+      `  approvalPolicies: Object.freeze({`,
+      `    FIXTURE_DISCLOSING: decided({ workflow: 'w', approverRole: 'r' }, 'basis:fixture'),`,
+      `  }),`,
+      `});`,
+      '',
+    ].join('\n'),
+  );
+  // A call site with the rule switched off, and one with it armed.
+  write(
+    'modules/alpha/application/unarmed-activation.ts',
+    [
+      'declare function validatePack(pack: object, context?: object): unknown[];',
+      'export const unarmed = (pack: object) => validatePack(pack, {});',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'modules/alpha/application/armed-activation.ts',
+    [
+      'declare function validatePackSet(packs: object[], context?: object): unknown[];',
+      'export const armed = (packs: object[], ids: readonly string[]) =>',
+      '  validatePackSet(packs, { disclosureBearingCapabilityIds: ids });',
+      '',
+    ].join('\n'),
+  );
+
   write(
     'packages/state-machine/package.json',
     JSON.stringify({ name: '@karar/state-machine', dependencies: { rxjs: '^7.0.0' } }),
@@ -2092,16 +2815,61 @@ function buildSelfTestFixture() {
       'ALTER TABLE public.fixture_scoped FORCE ROW LEVEL SECURITY;',
       'CREATE POLICY fixture_scoped_tenant ON public.fixture_scoped FOR SELECT',
       "  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);",
-      '-- fixture: a declared legal-consequence table MISSING its jurisdiction pin (test 21)',
-      'CREATE TABLE public.consent_grants (id uuid PRIMARY KEY, operating_entity_id uuid NOT NULL);',
+      '-- fixture: a declared legal-consequence table whose pinning block is',
+      '-- broken every way test 21 recognises — the classic pin absent, a',
+      '-- signature column no dimension maps to, a nullable state column with',
+      '-- none of its three CHECKs, and a nullable version with no state at all.',
+      'CREATE TABLE public.consent_grants (',
+      '  id uuid PRIMARY KEY,',
+      '  operating_entity_id uuid NOT NULL,',
+      '  jurisdiction_at_creation text NOT NULL,',
+      '  policy_pack_version text NULL,',
+      '  policy_pack_pin_state text NULL,',
+      '  subject_policy_selection_version text NULL,',
+      '  created_at timestamptz NOT NULL DEFAULT now()',
+      ');',
       'ALTER TABLE public.consent_grants ENABLE ROW LEVEL SECURITY;',
       'ALTER TABLE public.consent_grants FORCE ROW LEVEL SECURITY;',
       'CREATE POLICY consent_grants_subject ON public.consent_grants FOR SELECT USING (true);',
+      '-- fixture: the state-paired pack pin done CORRECTLY (the negative case:',
+      '-- a compliant shape must not be flagged), with the declared-not-',
+      '-- applicable dimension left unbound by any CHECK (the positive case).',
+      'CREATE TABLE public.data_protection_role_assignments (',
+      '  id uuid PRIMARY KEY,',
+      '  operating_entity_id uuid NOT NULL,',
+      '  jurisdiction_ref text NOT NULL,',
+      '  policy_pack_version text NULL,',
+      "  policy_pack_pin_state text NOT NULL CHECK (policy_pack_pin_state IN ('PINNED', 'PRE_POLICY_PACK')),",
+      '  subject_policy_selection_pin_state text NOT NULL,',
+      '  created_at timestamptz NOT NULL DEFAULT now(),',
+      "  CHECK ((policy_pack_pin_state = 'PINNED') = (policy_pack_version IS NOT NULL)),",
+      "  CHECK (created_at < TIMESTAMPTZ '2026-08-16 00:00:00+00' OR policy_pack_pin_state = 'PINNED')",
+      ');',
+      'ALTER TABLE public.data_protection_role_assignments ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.data_protection_role_assignments FORCE ROW LEVEL SECURITY;',
+      'CREATE POLICY dpra_policy ON public.data_protection_role_assignments FOR SELECT USING (true);',
+      '-- fixture: plain pins, all present and NOT NULL — the second negative case.',
+      'CREATE TABLE public.subject_policy_selections (',
+      '  id uuid PRIMARY KEY,',
+      '  jurisdiction_ref text NOT NULL,',
+      '  policy_pack_version text NOT NULL,',
+      '  profile_version text NOT NULL',
+      ');',
+      'ALTER TABLE public.subject_policy_selections ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.subject_policy_selections FORCE ROW LEVEL SECURITY;',
+      'CREATE POLICY sps_policy ON public.subject_policy_selections FOR SELECT USING (true);',
       '-- fixture: pinning-signature columns on an UNDECLARED table (test 21)',
       'CREATE TABLE public.fixture_rulings (id uuid PRIMARY KEY, jurisdiction_at_creation text NOT NULL);',
       'ALTER TABLE public.fixture_rulings ENABLE ROW LEVEL SECURITY;',
       'ALTER TABLE public.fixture_rulings FORCE ROW LEVEL SECURITY;',
       'CREATE POLICY fixture_rulings_policy ON public.fixture_rulings FOR SELECT USING (true);',
+      '-- fixture: a column added by a LATER migration is as real as one at',
+      '-- creation — the ALTER pass must see it (test 21 reads the whole history).',
+      'CREATE TABLE public.fixture_altered (id uuid PRIMARY KEY);',
+      'ALTER TABLE public.fixture_altered ADD COLUMN operating_entity_id uuid NOT NULL;',
+      'ALTER TABLE public.fixture_altered ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.fixture_altered FORCE ROW LEVEL SECURITY;',
+      'CREATE POLICY fixture_altered_policy ON public.fixture_altered FOR SELECT USING (true);',
       '',
     ].join('\n'),
   );
@@ -2210,6 +2978,8 @@ function buildSelfTestFixture() {
       '|---|---|---|---|---|---|---|',
       '| AC-001 | claim with no evidence | TECHNICAL | platform |  | Platform | PENDING |',
       '| AC-002 | claim citing a ghost test | TECHNICAL | platform | test 99 | Platform | MAYBE |',
+      '| AC-003 | claim citing a file that is not there | TECHNICAL | platform | `modules/ghost/GONE.md` | Platform | PENDING |',
+      '| AC-004 | claim citing a malformed evidence id | TECHNICAL | platform | EV-4 | Platform | PENDING |',
       '',
     ].join('\n'),
   );
@@ -2235,8 +3005,25 @@ const SELF_TEST_CASES = [
   },
   // …an undeclared table carrying the pinning signature…
   { fn: 'checkPinning', expect: /fixture_rulings/ },
-  // …and a deferral whose phase has arrived (fixture currentPhase 4 > 3.5).
-  { fn: 'checkPinning', expect: /policyPackVersionAtCreation/ },
+  // …the same, on a column added by a LATER migration (ALTER TABLE parsing)…
+  { fn: 'checkPinning', expect: /fixture_altered/ },
+  // …a signature column on a declared table that no dimension maps to…
+  { fn: 'checkPinning', expect: /jurisdiction_at_creation' that no declared dimension maps to/ },
+  // …a nullable state column (the explanation a row may omit)…
+  { fn: 'checkPinning', expect: /state column 'policy_pack_pin_state'.*is nullable/ },
+  // …a state with no closed vocabulary…
+  { fn: 'checkPinning', expect: /no CHECK constrains 'policy_pack_pin_state'/ },
+  // …a state not tied to the presence of the value it explains…
+  { fn: 'checkPinning', expect: /no CHECK ties 'policy_pack_pin_state'/ },
+  // …a historical state with no creation cutoff (a permanent exemption)…
+  { fn: 'checkPinning', expect: /no CHECK requires dimension 'policyPackVersionAtCreation'/ },
+  // …a nullable pin with no state column to justify the null…
+  {
+    fn: 'checkPinning',
+    expect: /subject_policy_selection_pin_state', which does not exist/,
+  },
+  // …and a "not applicable" declaration no CHECK binds to that one value.
+  { fn: 'checkPinning', expect: /binds 'subject_policy_selection_pin_state' to exactly/ },
   // Test 22, all three shapes plus allow-list integrity.
   { fn: 'checkRlsCoverage', expect: /fixture_naked/ },
   {
@@ -2246,6 +3033,13 @@ const SELF_TEST_CASES = [
   { fn: 'checkRlsCoverage', expect: /fixture_forced_not_enabled/ },
   { fn: 'checkRlsCoverage', expect: /fixture_ghost/ },
   { fn: 'checkRlsCoverage', expect: /'reason' is missing or empty/ },
+  // …a reason that never says why no principal predicate fits…
+  {
+    fn: 'checkRlsCoverage',
+    expect: /never states why the table cannot be tenant- or subject-scoped/,
+  },
+  // …and compensating controls that are a label rather than controls.
+  { fn: 'checkRlsCoverage', expect: /'compensatingGrants' is 'none'/ },
   // Test 5: an adapter-suffixed infrastructure class with no port interface.
   { fn: 'checkPortsDeclaredInward', expect: /OrphanRepository/ },
   // Test 6: a controller importing a module's domain, over the route budget.
@@ -2258,8 +3052,20 @@ const SELF_TEST_CASES = [
   { fn: 'checkJurisdictionBranching', expect: /jurisdiction|country/i },
   { fn: 'checkModuleDocs', expect: /beta/ },
   { fn: 'checkPurePackages', expect: /lodash|rxjs/ },
+  // Test 17, constrained tier: a framework dependency in the manifest…
+  { fn: 'checkPurePackages', expect: /capability-registry declares runtime dependency 'express'/ },
+  // …and a filesystem import no manifest would ever show.
+  { fn: 'checkPurePackages', expect: /capability-registry imports 'node:fs'/ },
   { fn: 'checkStorageBoundary', expect: /client-s3/ },
   { fn: 'checkKernelSurface', expect: /ExtraTenthExport/ },
+  // Test 19: a pack clearing a disclosure-bearing capability with no entry…
+  { fn: 'checkApprovalPolicy', expect: /fx\/no-entry.*FIXTURE_DISCLOSING/ },
+  // …one whose entry is not DECIDED…
+  { fn: 'checkApprovalPolicy', expect: /fx\/undecided.*not DECIDED/ },
+  // …a validator that no longer carries the rule…
+  { fn: 'checkApprovalPolicy', expect: /MISSING_APPROVAL_POLICY|validation source is missing/ },
+  // …and a call site that validates packs with the rule switched off.
+  { fn: 'checkApprovalPolicy', expect: /unarmed-activation.*disclosureBearingCapabilityIds/ },
   // Test 23: a declared FooGuard nothing references.
   { fn: 'checkGuardCallSites', expect: /FooGuard/ },
   { fn: 'checkLifecycleDeclarations', expect: /DELETE_LATER/ },
@@ -2268,6 +3074,10 @@ const SELF_TEST_CASES = [
   // …and a DATA_LIFECYCLE.md row carrying a forbidden placeholder.
   { fn: 'checkLifecycleDeclarations', expect: /placeholder/ },
   { fn: 'checkAssuranceClaims', expect: /AC-00[12]/ },
+  // …an evidence pointer naming a file that does not exist…
+  { fn: 'checkAssuranceClaims', expect: /AC-003: evidence names 'modules\/ghost\/GONE\.md'/ },
+  // …and a malformed evidence id.
+  { fn: 'checkAssuranceClaims', expect: /AC-004: evidence id 'EV-4' is malformed/ },
   { fn: 'checkAdminNoDbDriver', expect: /'pg'/ },
 ];
 
@@ -2278,6 +3088,19 @@ const NEGATIVE_SELF_TEST_CASES = [
   { fn: 'checkOrmLeakage', forbid: /packages[\\/]platform[\\/]src[\\/]db[\\/]prisma/ },
   // Test 9: the identity-scope pattern (transaction-local set_config) passes.
   { fn: 'checkTenantScoping', forbid: /scoped-binder/ },
+  // Test 21: a correctly built state-paired pin raises none of the three
+  // state-paired complaints — the allowance is real, not a checker that always
+  // fails.
+  {
+    fn: 'checkPinning',
+    forbid: /data_protection_role_assignments: (no CHECK (ties|constrains)|state column)/,
+  },
+  // Test 21: plain NOT NULL pins on a declared table are not flagged either.
+  { fn: 'checkPinning', forbid: /subject_policy_selections/ },
+  // Test 19: a correctly approved clearance passes, and so does a call site
+  // that arms the rule — the check is not "every pack fails".
+  { fn: 'checkApprovalPolicy', forbid: /fx\/correct/ },
+  { fn: 'checkApprovalPolicy', forbid: /[/\\]armed-activation/ },
 ];
 
 function runSelfTest() {

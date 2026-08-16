@@ -1,5 +1,5 @@
 /**
- * Principals for tenancy operations. Two shapes on purpose:
+ * Principals for tenancy operations. Three shapes on purpose:
  *
  * - `PrincipalActor` — authenticated AND tenant-bound. Tenant identity comes
  *   ONLY from server-side session/membership state resolved at the edge
@@ -8,8 +8,13 @@
  *   redeemer is logged in but not yet a member of the inviting tenant; the
  *   tenant they join comes from the INVITATION ROW (a server-side record),
  *   never from the client.
+ * - `AuthenticatedActor` — authenticated, tenant DELIBERATELY absent
+ *   (Phase 3.5 tenant selection/binding): the caller exists before any
+ *   binding does, and the operations scoped to it (list own memberships,
+ *   resolve tenant context, switch) read only through the 0080/0081
+ *   self-arms keyed on app.user_id.
  *
- * Both are re-validated at runtime (fail closed) even though the types
+ * All are re-validated at runtime (fail closed) even though the types
  * already promise the shape — HTTP is not the only caller, and a cast is not
  * an authentication.
  */
@@ -52,6 +57,50 @@ export function requirePrincipal(
     });
   }
   return Result.ok(actor);
+}
+
+/** Authenticated, deliberately tenantless (tenant selection precedes binding). */
+export interface AuthenticatedActor {
+  readonly userId: UserId;
+  readonly sessionId?: string;
+  readonly requestId?: string;
+}
+
+export function requireAuthenticated(
+  actor: AuthenticatedActor | null | undefined,
+): Result<AuthenticatedActor, MissingPrincipalContext> {
+  if (
+    actor === null ||
+    actor === undefined ||
+    typeof actor.userId !== 'string' ||
+    !UserId.parse(actor.userId).ok
+  ) {
+    return Result.err({
+      kind: 'missing_principal_context',
+      message:
+        'operation requires an authenticated principal — denied (fail closed, no default principal exists)',
+    });
+  }
+  return Result.ok(actor);
+}
+
+/** Binding operations act on the caller's own session row: sessionId required. */
+export function requireSessionActor(
+  actor: AuthenticatedActor | null | undefined,
+): Result<AuthenticatedActor & { readonly sessionId: string }, MissingPrincipalContext> {
+  const authenticated = requireAuthenticated(actor);
+  if (!authenticated.ok) {
+    return authenticated;
+  }
+  const { sessionId } = authenticated.value;
+  if (typeof sessionId !== 'string' || sessionId.length === 0) {
+    return Result.err({
+      kind: 'missing_principal_context',
+      message:
+        'session-binding operations require the authenticated session identity — denied (fail closed)',
+    });
+  }
+  return Result.ok({ ...authenticated.value, sessionId });
 }
 
 export function requireRedeemer(

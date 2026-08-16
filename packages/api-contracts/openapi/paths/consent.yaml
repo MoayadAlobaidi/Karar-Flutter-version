@@ -140,6 +140,18 @@
       '401': { description: Not authenticated. }
       '404': { description: Unknown document version. }
       '409': { description: No operating entity is bound for the caller — consent fails closed. }
+      '503':
+        description: >-
+          Policy provenance is unresolved, so the grant is not recorded
+          (code DEPENDENCY_UNAVAILABLE). From Phase 3.5 a grant must pin the
+          PolicyPack version it was accepted under (migration 0086), and the
+          schema refuses an unpinned row independently. This is returned
+          whenever the caller has no effective jurisdiction assignment or no
+          pack is active for it — which, in Phase 3.5, is every caller:
+          neither record has a runtime write path yet, so consent acceptance
+          is unreachable until one exists. Refusing is the intended
+          behaviour; recording a grant whose provenance nobody resolved is
+          not.
 
 /consent/withdrawals:
   post:

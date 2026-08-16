@@ -71,14 +71,31 @@ export interface LogConfig {
 }
 
 /**
+ * The local-development first-party tenant id: a fixed, documented SYNTHETIC
+ * UUID (the trailing group spells "KARAR1" in ASCII hex) that
+ * `scripts/db/seed-local-first-party.mjs` creates and local suites rely on.
+ * It exists ONLY as the `local` default of `KARAR_FIRST_PARTY_TENANT_ID`;
+ * every other environment must configure the real tenant id explicitly, and
+ * domain code reaches the value exclusively through this typed config —
+ * never as a literal.
+ */
+export const LOCAL_FIRST_PARTY_TENANT_ID = '00000000-0000-4000-8000-4b4152415231';
+
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * Business configuration — product behaviour knobs (feature defaults, policy
- * selection inputs, …). Deliberately EMPTY in Phase 2; it exists so the
- * deployment/business split (environments.md §7) is structural from the first
- * commit rather than retrofitted. Business config never contains connection
- * strings, endpoints, or any deployment concern.
+ * selection inputs, …). First occupant (Phase 3.5): the first-party tenant
+ * reference the bootstrap/enrolment path binds against. Business config never
+ * contains connection strings, endpoints, or any deployment concern.
  */
 export interface BusinessConfig {
-  readonly [key: string]: never;
+  /**
+   * The tenant id of the platform's own (first-party) tenant. Required
+   * OUTSIDE local — a non-local boot without it refuses to start; local
+   * defaults to the documented synthetic id the seed script creates.
+   */
+  readonly firstPartyTenantId: string;
 }
 
 export interface AppConfig {
@@ -179,11 +196,36 @@ export function loadConfig(env: NodeJS.ProcessEnv, options: LoadConfigOptions = 
   );
   if (!logOutcome.ok) issues.push(...logOutcome.issues);
 
+  // Business configuration: required outside local (a non-local boot without
+  // a first-party tenant fails clearly); local defaults to the documented
+  // synthetic tenant the seed script creates.
+  const businessOutcome = parseSchema(
+    {
+      firstPartyTenantId: field(
+        'KARAR_FIRST_PARTY_TENANT_ID',
+        str({
+          ...(isLocal ? { default: LOCAL_FIRST_PARTY_TENANT_ID } : {}),
+          pattern: UUID_SHAPE,
+          patternHint: 'must be a UUID',
+        }),
+      ),
+    },
+    env,
+    'business.',
+  );
+  if (!businessOutcome.ok) issues.push(...businessOutcome.issues);
+
   if (issues.length > 0 || kararEnv === undefined) {
     throw new ConfigurationError(issues);
   }
   // The outcomes below are all ok — a failure would have thrown above.
-  if (!serviceOutcome.ok || !databaseOutcome.ok || !telemetryOutcome.ok || !logOutcome.ok) {
+  if (
+    !serviceOutcome.ok ||
+    !databaseOutcome.ok ||
+    !telemetryOutcome.ok ||
+    !logOutcome.ok ||
+    !businessOutcome.ok
+  ) {
     throw new ConfigurationError(issues);
   }
 
@@ -193,7 +235,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, options: LoadConfigOptions = 
     database: Object.freeze(databaseOutcome.value),
     telemetry: Object.freeze(telemetryOutcome.value),
     log: Object.freeze(logOutcome.value),
-    business: Object.freeze({}),
+    business: Object.freeze(businessOutcome.value),
   };
   return Object.freeze(config);
 }

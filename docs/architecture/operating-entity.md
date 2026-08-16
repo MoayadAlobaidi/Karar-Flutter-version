@@ -1,6 +1,6 @@
 # OperatingEntity — the legal person dimension
 
-**ADR:** 0024 · **Phase:** 3
+**ADR:** 0024 · **Phase:** 3 — the register and roles; the capability licence gate that consumes it landed in Phase 3.5 (§8)
 
 ---
 
@@ -37,7 +37,7 @@ OperatingEntity
 
 **`dataProtectionRole` is per relationship, not per entity.** The same entity can be controller for its own customers and processor for a partner's. Storing one role on the entity would force a second entity record to express a second relationship.
 
-**`licensesHeld` asserts nothing about any regulator.** It is a typed reference so the capability registry can require one (`requiredOperatingEntityLicenses`). Karar's documentation claims no licence, approval, or clearance anywhere.
+**`licensesHeld` asserts nothing about any regulator.** It is a typed reference the capability resolver reads when a PolicyPack requires that licence type (§8). Karar's documentation claims no licence, approval, or clearance anywhere.
 
 ## 4. Bindings — pinned, never updated
 
@@ -115,11 +115,17 @@ graph TB
 
 ## 8. Capability gating
 
-The capability resolver's third gate:
+The capability resolver's licence gate — gate 7 of eight in the landed order ([`capability-registry.md` §4](capability-registry.md)):
 
 > **Is the operating entity permitted in this jurisdiction, and does it hold the licences this capability requires?**
 
-A capability declaring `requiredOperatingEntityLicenses` is unavailable to an entity lacking them — regardless of PolicyPack clearance, availability rows, or tenant entitlement. Every gate is AND. See [`capability-registry.md`](capability-registry.md).
+Every gate is AND, and this one asks its question only where the **PolicyPack** declares licence types for the capability. The resolver never invents a requirement, and `qa/v1` declares none.
+
+Three properties, as landed in Phase 3.5:
+
+- **A claim is not evidence.** A `CLAIMED_UNVERIFIED` licence never satisfies a requirement; only an `EVIDENCED` licence, in-window at the instant of the question, does. A revoked licence reads as an absence (`LICENCE_MISSING`), a lapsed one as an expiry (`LICENCE_EXPIRED`).
+- **No effective entity denies.** An unresolvable entity, or an entity not permitted in the effective jurisdiction, denies the same way a missing licence does.
+- **The gate cannot widen anything.** It runs after the descriptor, environment, jurisdiction/pack, availability, entitlement, and consent gates, so a held licence satisfies its own condition and nothing else — an entity holding every licence in the world reaches a capability that has no code or no clearance exactly never.
 
 ## 9. White-label — the inversion in practice
 

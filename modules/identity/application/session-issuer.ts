@@ -27,10 +27,31 @@ export interface IssuedSession {
   readonly absoluteExpiresAt: Date;
 }
 
+/** A fully-minted (not yet persisted) session bundle plus its raw token. */
+export interface MintedSessionBundle {
+  readonly session: Session;
+  readonly family: RefreshTokenFamily;
+  readonly firstToken: RefreshTokenRecord;
+  /** The RAW refresh token backing firstToken.tokenHash — returned once. */
+  readonly rawRefreshToken: string;
+}
+
 export class SessionIssuer {
   constructor(private readonly deps: IdentityDependencies) {}
 
-  async issue(account: IdentityAccount, client: ClientContext): Promise<IssuedSession> {
+  /**
+   * Mint (without persisting) a complete session/family/token bundle. The
+   * ONE construction path for session state: `issue` persists it via
+   * createSession; the tenant-switch rebind persists it atomically with the
+   * old session's revocation. `tenantBinding` defaults to null — the Phase 3
+   * issuance state; a non-null value is only ever a server-resolved tenant
+   * (tenancy owns the semantics; this module transports it opaquely).
+   */
+  mint(
+    account: IdentityAccount,
+    client: ClientContext,
+    tenantBinding: string | null = null,
+  ): MintedSessionBundle {
     const deps = this.deps;
     const now = deps.clock.now();
     const sessionId = deps.secretSource.id() as SessionId;
@@ -51,7 +72,7 @@ export class SessionIssuer {
       revokedReason: null,
       ipDigest: client.ipDigest,
       userAgentSummary: client.userAgentSummary,
-      tenantBinding: null,
+      tenantBinding,
     };
     const family: RefreshTokenFamily = {
       id: deps.secretSource.id() as RefreshTokenFamilyId,
@@ -71,22 +92,40 @@ export class SessionIssuer {
       usedAt: null,
       supersededBy: null,
     };
+    return { session, family, firstToken, rawRefreshToken };
+  }
 
-    await deps.sessions.createSession({ session, family, firstToken });
-
-    const access = await deps.tokenSigner.signAccessToken(
-      { accountId: account.id, sessionId, tokenVersion: account.tokenVersion },
-      now,
+  /** Sign the access token for a minted bundle and assemble the issue result. */
+  async issuedFrom(
+    minted: MintedSessionBundle,
+    tokenVersion: number,
+  ): Promise<IssuedSession> {
+    const access = await this.deps.tokenSigner.signAccessToken(
+      {
+        accountId: minted.session.accountId,
+        sessionId: minted.session.id,
+        tokenVersion,
+      },
+      this.deps.clock.now(),
     );
-
     return {
-      sessionId,
+      sessionId: minted.session.id,
       accessToken: access.token,
       accessTokenExpiresAt: access.expiresAt,
-      refreshToken: rawRefreshToken,
-      refreshTokenExpiresAt: firstToken.expiresAt,
-      absoluteExpiresAt,
+      refreshToken: minted.rawRefreshToken,
+      refreshTokenExpiresAt: minted.firstToken.expiresAt,
+      absoluteExpiresAt: minted.session.absoluteExpiresAt,
     };
+  }
+
+  async issue(account: IdentityAccount, client: ClientContext): Promise<IssuedSession> {
+    const minted = this.mint(account, client);
+    await this.deps.sessions.createSession({
+      session: minted.session,
+      family: minted.family,
+      firstToken: minted.firstToken,
+    });
+    return this.issuedFrom(minted, account.tokenVersion);
   }
 
   /** A refresh token never outlives its session's absolute ceiling. */

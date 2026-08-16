@@ -130,12 +130,20 @@ gate REQUIRED so the routes cannot mount unguarded
 
 ## Notes and known limitations
 
-**Sessions are issued with `tenant_binding = null` and nothing sets it in Phase 3.** The column
-(0031) is the only tenant source the fail-closed RLS design permits at the edge; this module
-transports it opaquely on `AuthenticatedPrincipal.tenantBinding` — tenancy owns the semantics,
-and the binding mechanism (bind-at-login or explicit tenant selection) is the entry work of the
-first phase that needs the tenant-bound surface live. Until then every tenant-bound endpoint in
-the composed api answers 401 (phase-03 Known limitations; KAR-RSK-021).
+**Sessions are issued with `tenant_binding = null`; binding it is an explicit post-issuance
+step (Phase 3.5, closes KAR-RSK-021).** The column (0031) is the only tenant source the
+fail-closed RLS design permits at the edge; this module transports it opaquely on
+`AuthenticatedPrincipal.tenantBinding` — tenancy owns the semantics and verifies membership
+BEFORE calling. The mechanics live in `application/use-cases/session-tenant-binding.ts`:
+`BindSessionTenant` (first bind, null → tenant, NO token rotation — per-request re-reads pick
+the binding up; guarded null → value only) and `RebindSessionTenant` (switch, A → B or A → null:
+atomically revokes the old session and its refresh-token families, then issues a brand-new
+session carrying the new binding — old access tokens die with the revoked sid, old refresh
+tokens with the family). Both write the security ledger (`session_tenant_bound` /
+`session_tenant_rebound`) and the audit trail. Consumed by tenancy/bootstrap through ports THEY
+declare; exported via public-api for the composition root only. Login still issues unbound
+sessions — bind-at-login is deliberately absent (tenant resolution is tenancy's, not this
+module's).
 
 **`AuthenticateRequest` slides the session idle window on every successful call** — one
 `touchSession` UPDATE per bearer-carrying request, from both `AccessTokenGuard` and the

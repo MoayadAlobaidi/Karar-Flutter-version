@@ -46,6 +46,20 @@ export {
 // Contract types consumers may need.
 export type { AuthenticatedPrincipal } from './application/use-cases/authenticate-request.js';
 export type { IssuedSession } from './application/session-issuer.js';
+
+// Session-tenant binding (Phase 3.5, KAR-RSK-021): the composition root binds
+// these use cases to the ports tenancy/bootstrap declare (structural — no
+// module depends on identity beyond this surface).
+export {
+  BindSessionTenant,
+  RebindSessionTenant,
+  type BindSessionTenantError,
+  type BindSessionTenantInput,
+  type RebindSessionTenantError,
+  type RebindSessionTenantInput,
+  type SessionTenantBound,
+  type SessionTenantRebound,
+} from './application/use-cases/session-tenant-binding.js';
 export type { ClientContext } from './application/identity-deps.js';
 export type { TokenKeyProvider } from './application/ports/crypto-ports.js';
 export { DEFAULT_IDENTITY_POLICY, type IdentityPolicy } from './domain/identity-policy.js';

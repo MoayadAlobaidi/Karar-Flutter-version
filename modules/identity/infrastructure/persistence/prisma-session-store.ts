@@ -168,6 +168,82 @@ export class PrismaSessionStore implements SessionRepository {
     });
   }
 
+  async setTenantBinding(input: {
+    readonly accountId: UserId;
+    readonly sessionId: SessionId;
+    readonly tenantBinding: string;
+    readonly now: Date;
+  }): Promise<'bound' | 'not_bindable'> {
+    return this.scope.withAccount(input.accountId, async (tx) => {
+      // Atomic first-bind claim: only a LIVE, still-unbound row matches — of
+      // two concurrent binds exactly one sees a row; a bound or revoked
+      // session matches zero (switch is the other path).
+      const claimed = await tx.session.updateMany({
+        where: {
+          id: input.sessionId,
+          accountId: input.accountId,
+          revokedAt: null,
+          tenantBinding: null,
+        },
+        data: { tenantBinding: input.tenantBinding },
+      });
+      return claimed.count === 1 ? 'bound' : 'not_bindable';
+    });
+  }
+
+  async rebindSession(input: {
+    readonly accountId: UserId;
+    readonly oldSessionId: SessionId;
+    readonly reason: RevocationReason;
+    readonly bundle: NewSessionBundle;
+    readonly now: Date;
+  }): Promise<'rebound' | 'stale_session'> {
+    const { session, family, firstToken } = input.bundle;
+    return this.scope.withAccount(input.accountId, async (tx) => {
+      // ONE transaction: revoke the old session (guarded — a concurrently
+      // revoked session writes nothing at all), revoke its families, insert
+      // the replacement bundle. No interleaving observes two live sessions
+      // or a live session with a half-switched binding.
+      const revoked = await tx.session.updateMany({
+        where: { id: input.oldSessionId, accountId: input.accountId, revokedAt: null },
+        data: { revokedAt: input.now, revokedReason: input.reason },
+      });
+      if (revoked.count === 0) return 'stale_session';
+      await this.revokeFamiliesOfSessions(tx, [input.oldSessionId], input.reason, input.now);
+      await tx.session.create({
+        data: {
+          id: session.id,
+          accountId: session.accountId,
+          createdAt: session.createdAt,
+          lastSeenAt: session.lastSeenAt,
+          absoluteExpiresAt: session.absoluteExpiresAt,
+          idleExpiresAt: session.idleExpiresAt,
+          ipDigest: session.ipDigest,
+          userAgentSummary: session.userAgentSummary,
+          tenantBinding: session.tenantBinding,
+        },
+      });
+      await tx.refreshTokenFamily.create({
+        data: {
+          id: family.id,
+          sessionId: family.sessionId,
+          accountId: family.accountId,
+          createdAt: family.createdAt,
+        },
+      });
+      await tx.refreshToken.create({
+        data: {
+          id: firstToken.id,
+          familyId: firstToken.familyId,
+          tokenHash: firstToken.tokenHash,
+          createdAt: firstToken.createdAt,
+          expiresAt: firstToken.expiresAt,
+        },
+      });
+      return 'rebound';
+    });
+  }
+
   async findByTokenHash(tokenHash: string): Promise<PresentedRefreshToken | null> {
     // Bootstrap read: token and family carry pre-auth SELECT arms; the
     // session does NOT, so it is read afterwards inside the account scope

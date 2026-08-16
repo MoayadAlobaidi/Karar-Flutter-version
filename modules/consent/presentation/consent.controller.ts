@@ -26,6 +26,7 @@ import {
   Req,
   Body,
   HttpCode,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 
 import type {
@@ -35,6 +36,7 @@ import type {
   RecordOwnAcceptance,
   WithdrawOwnConsent,
 } from '../application/use-cases/consent.js';
+import type { ConsentPolicyPinSource } from '../application/ports/policy-pin-source.js';
 import { requirePrincipal, type RequestPrincipal } from './principal.js';
 
 /** The wired use cases the composition root provides to ConsentApiModule. */
@@ -43,6 +45,9 @@ export interface ConsentEndpointUseCases {
   readonly recordOwnAcceptance: RecordOwnAcceptance;
   readonly withdrawOwnConsent: WithdrawOwnConsent;
   readonly getOwnConsentStatus: GetOwnConsentStatus;
+  /** Optional only until the composition root binds it; while it is absent
+   * the acceptance route refuses rather than recording an unpinned grant. */
+  readonly policyPinSource?: ConsentPolicyPinSource;
 }
 
 export const CONSENT_ENDPOINT_USE_CASES = Symbol('CONSENT_ENDPOINT_USE_CASES');
@@ -150,13 +155,22 @@ export class ConsentController {
     @Body() body: RecordAcceptanceBody,
   ): Promise<unknown> {
     const principal = requirePrincipal(request);
+    const purposeRef = requireField('purposeRef', body.purposeRef);
+    const now = new Date();
+    // Provenance comes from the resolver, never from the request body: a
+    // client-supplied pack version would be a forged pin.
+    const pin = await this.useCases.policyPinSource?.resolvePin({ principal, purposeRef, at: now });
+    if (pin === undefined || pin === null) {
+      throw new ServiceUnavailableException('policy provenance is unresolved; not recorded unpinned');
+    }
     const result = await this.useCases.recordOwnAcceptance.execute({
       principal,
       legalDocumentVersionId: requireField('legalDocumentVersionId', body.legalDocumentVersionId),
-      purposeRef: requireField('purposeRef', body.purposeRef),
+      purposeRef,
       // Evidence of the acceptance act: the request identity, never client input.
       evidenceReference: `request:${request.id ?? 'unidentified'}`,
-      now: new Date(),
+      policyPin: pin,
+      now,
     });
     if (!result.ok) {
       throw toHttpError(result.error);

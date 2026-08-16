@@ -1,0 +1,125 @@
+// Prisma mapping for the jurisdiction module's tables (migrations 0070-0075).
+// The SQL migrations remain authoritative; this file maps them exactly so
+// `make prisma-drift` stays meaningful (base.prisma header).
+//
+// Deliberately NOT expressed here, enforced by the migrations and their
+// tests instead: CHECK constraints (vocabularies, effective-window pairing,
+// the USER_DECLARED->UNVERIFIED and PROVIDER_VERIFIED->VERIFIED bindings),
+// the end-only assignment guards, the activation ledger's append-only
+// trigger, RLS enable/force with the principal policies on both assignment
+// tables, and grants (reference/settings tables are SELECT-only for
+// karar_app; the ledger is SELECT+INSERT).
+//
+// The assignment repositories run every statement inside a principal-context
+// transaction (SET LOCAL app.tenant_id / app.user_id) or the policies return
+// nothing — failing closed. Cross-module references (user_id, tenant_id) are
+// plain scalars by design (data-model.md §2); FKs inside this module's own
+// tables (jurisdiction_code -> jurisdictions -> countries) are real FKs.
+
+model Country {
+  code            String   @id
+  displayNameKey  String   @map("display_name_key")
+  defaultCurrency String   @map("default_currency")
+  status          String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @map("updated_at") @db.Timestamptz(6)
+
+  jurisdictions Jurisdiction[]
+
+  @@map("countries")
+}
+
+model Jurisdiction {
+  code          String    @id
+  countryCode   String    @map("country_code")
+  type          String
+  status        String
+  reviewStatus  String    @map("review_status")
+  effectiveFrom DateTime? @map("effective_from") @db.Timestamptz(6)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz(6)
+  provenance    String
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @map("updated_at") @db.Timestamptz(6)
+
+  country           Country                       @relation(fields: [countryCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  userAssignments   UserJurisdictionAssignment[]
+  tenantAssignments TenantJurisdictionAssignment[]
+  settings          JurisdictionSetting?
+  activations       PolicyPackActivation[]
+
+  @@index([countryCode], map: "jurisdictions_country_idx")
+  @@map("jurisdictions")
+}
+
+model UserJurisdictionAssignment {
+  id                 String    @id @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  jurisdictionCode   String    @map("jurisdiction_code")
+  source             String
+  verificationStatus String    @map("verification_status")
+  effectiveFrom      DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo        DateTime? @map("effective_to") @db.Timestamptz(6)
+  reason             String
+  assignedBy         String    @map("assigned_by")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  jurisdiction Jurisdiction @relation(fields: [jurisdictionCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, tenantId, effectiveFrom], map: "user_jurisdiction_assignments_principal_idx")
+  @@index([jurisdictionCode], map: "user_jurisdiction_assignments_jurisdiction_idx")
+  @@map("user_jurisdiction_assignments")
+}
+
+model TenantJurisdictionAssignment {
+  id                 String    @id @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  jurisdictionCode   String    @map("jurisdiction_code")
+  source             String
+  verificationStatus String    @map("verification_status")
+  effectiveFrom      DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo        DateTime? @map("effective_to") @db.Timestamptz(6)
+  reason             String
+  assignedBy         String    @map("assigned_by")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  jurisdiction Jurisdiction @relation(fields: [jurisdictionCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, effectiveFrom], map: "tenant_jurisdiction_assignments_tenant_idx")
+  @@index([jurisdictionCode], map: "tenant_jurisdiction_assignments_jurisdiction_idx")
+  @@map("tenant_jurisdiction_assignments")
+}
+
+model JurisdictionSetting {
+  jurisdictionCode      String   @id @map("jurisdiction_code")
+  disabledCapabilityIds String[] @map("disabled_capability_ids")
+  aiProcessingSuspended Boolean  @default(false) @map("ai_processing_suspended")
+  version               Int
+  reason                String
+  updatedBy             String   @map("updated_by")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @map("updated_at") @db.Timestamptz(6)
+
+  jurisdiction Jurisdiction @relation(fields: [jurisdictionCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("jurisdiction_settings")
+}
+
+model PolicyPackActivation {
+  id                        String   @id @db.Uuid
+  jurisdictionCode          String   @map("jurisdiction_code")
+  packVersion               String   @map("pack_version")
+  packLifecycleAtActivation String   @map("pack_lifecycle_at_activation")
+  environment               String
+  action                    String
+  occurredAt                DateTime @map("occurred_at") @db.Timestamptz(6)
+  actor                     String
+  reason                    String
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  jurisdiction Jurisdiction @relation(fields: [jurisdictionCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([jurisdictionCode, environment, occurredAt], map: "policy_pack_activations_instant_key")
+  @@index([jurisdictionCode, environment, occurredAt], map: "policy_pack_activations_lookup_idx")
+  @@map("policy_pack_activations")
+}
