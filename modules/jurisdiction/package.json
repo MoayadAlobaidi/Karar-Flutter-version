@@ -1,0 +1,25 @@
+{
+  "name": "@karar/jurisdiction",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runtime jurisdiction persistence: user and tenant jurisdiction assignments (audited, effective-dated, verification-aware), restrict-only jurisdiction settings reads, and the append-only PolicyPack activation ledger over the pure @karar/jurisdiction-policy predicates.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/audit": "workspace:*",
+    "@karar/jurisdiction-policy": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}
