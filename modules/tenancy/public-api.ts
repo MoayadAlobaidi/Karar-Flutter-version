@@ -150,9 +150,12 @@ export { RecordAuditEventAuditTrail } from './infrastructure/audit/record-audit-
 // presentation — the NestJS surface
 export {
   TENANCY_PRINCIPAL_SOURCE,
+  TENANCY_SELF_PRINCIPAL_SOURCE,
   type AuthenticatedPrincipal,
   type AuthenticatedRedeemer,
+  type AuthenticatedSelf,
   type TenancyPrincipalSource,
+  type TenancySelfPrincipalSource,
 } from './presentation/http/principal-source.js';
 export {
   TENANCY_USE_CASES,
@@ -160,6 +163,15 @@ export {
   type TenancyUseCases,
 } from './presentation/http/tenancy.controller.js';
 export {
+  TENANCY_SELF_USE_CASES,
+  OwnMembershipsController,
+  type TenancySelfUseCases,
+} from './presentation/http/own-memberships.controller.js';
+export {
   TenancyApiModule,
   type TenancyApiModuleOptions,
 } from './presentation/tenancy-api.module.js';
+export {
+  TenancySelfApiModule,
+  type TenancySelfApiModuleOptions,
+} from './presentation/tenancy-self-api.module.js';

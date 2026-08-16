@@ -1,12 +1,20 @@
 /**
- * Phase 3.5 composition — jurisdiction, capability availability, and the
- * client bootstrap surface, built on the primitives the Phase 3 composition
- * already constructed (one Prisma handle, one audit use case, one clock).
+ * Phase 3.5 composition — jurisdiction, capability availability, the client
+ * bootstrap surface, and the Phase 4 client-contract reads, built on the
+ * primitives the Phase 3 composition already constructed (one Prisma handle,
+ * one audit use case, one clock).
  *
- * Only bootstrap mounts HTTP. Jurisdiction and capability are composed
- * because bootstrap's ports need real implementations behind them;
- * subject-policy composes nothing this phase — its selection reader exists
- * for capability-owned resolvers, and no capability is implemented.
+ * Capability is composed because bootstrap's ports need real implementations
+ * behind them; subject-policy composes nothing this phase — its selection
+ * reader exists for capability-owned resolvers, and no capability is
+ * implemented.
+ *
+ * The Phase 4 additions are READS the client already had code for and no
+ * contract to call: the caller's own memberships (so a bound session can
+ * offer a switch target), the declarable jurisdiction references (so the
+ * declaration screen can offer a chooser instead of a free-text field), and
+ * the legal-document content path (so consent text is server-supplied rather
+ * than an internal locator the client cannot fetch). None of them writes.
  *
  * Every port is bound to a real implementation or to a deliberately denying
  * one. Nothing is stubbed to succeed: an unfinished seam reports absence or
@@ -24,6 +32,7 @@ import {
   GetActivePackVersion,
   JurisdictionApiModule,
   JurisdictionAuditTrail,
+  ListDeclarableJurisdictions,
 } from '@karar/jurisdiction';
 import type { JurisdictionPrincipal } from '@karar/jurisdiction';
 import { PrismaUserJurisdictionAssignmentRepository } from '@karar/jurisdiction/dist/infrastructure/persistence/prisma-assignment-repositories.js';
@@ -45,6 +54,15 @@ import { ConsentGateAdapter } from '@karar/capability/dist/infrastructure/consen
 import { LicenceDirectoryAdapter } from '@karar/capability/dist/infrastructure/operating-entity/licence-directory-adapter.js';
 import { PrismaCapabilityAvailabilityRepository } from '@karar/capability/dist/infrastructure/persistence/prisma-availability-repository.js';
 import { PrismaTenantCapabilityEntitlementRepository } from '@karar/capability/dist/infrastructure/persistence/prisma-entitlement-repository.js';
+
+import { ListOwnMemberships, TenancySelfApiModule } from '@karar/tenancy';
+import { PrismaMembershipRepository } from '@karar/tenancy';
+
+import { ConsentDocumentContentApiModule, GetLegalDocumentContent } from '@karar/consent';
+import { PrismaLegalDocumentRepository } from '@karar/consent/dist/infrastructure/persistence/prisma-legal-document-repository.js';
+import { OperatingEntityDirectoryAdapter } from '@karar/consent/dist/infrastructure/operating-entity/operating-entity-directory-adapter.js';
+import { NoContentSourceConfigured } from '@karar/consent/dist/infrastructure/content/no-content-source-configured.js';
+import { Sha256ContentDigest } from '@karar/consent/dist/infrastructure/providers/sha256-content-digest.js';
 
 import { BootstrapApiModule, GetBootstrap, SetTenantBinding } from '@karar/bootstrap';
 import type {
@@ -122,6 +140,33 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
     jurisdictionDirectory,
     new JurisdictionIdSource(),
     new JurisdictionAuditTrail(recordAudit, environment),
+  );
+  // The READ side of the same narrow surface: which register entries the
+  // declaration above would accept, projected client-safe. It reads the same
+  // SELECT-only directory and writes nothing; the declarability rule is one
+  // shared domain predicate, so the offered set cannot drift from the
+  // accepted one.
+  const listDeclarableJurisdictions = new ListDeclarableJurisdictions(jurisdictionDirectory);
+
+  // Tenancy, SELF scope: the caller's own memberships across tenants. Phase
+  // 3.5 built the use case and the 0080 self-arm it reads through; nothing
+  // mounted them, so a bound session could see no switch target. The
+  // repository is constructed on the SAME app-role Prisma handle as every
+  // other repository here — a second instance over one handle, not a second
+  // connection.
+  const listOwnMemberships = new ListOwnMemberships(new PrismaMembershipRepository(prisma), clock);
+
+  // Consent, document CONTENT: the text a subject must read before accepting,
+  // with its language. The source is the one this phase honestly has — there
+  // is no document store, so it retrieves nothing and the endpoint reports
+  // that absence rather than substituting prose. The digest holds any future
+  // source to the hash the published version pinned.
+  const legalDocuments = new PrismaLegalDocumentRepository(prisma.client);
+  const getLegalDocumentContent = new GetLegalDocumentContent(
+    legalDocuments,
+    new OperatingEntityDirectoryAdapter(input.resolveEntity),
+    new NoContentSourceConfigured(),
+    new Sha256ContentDigest(),
   );
 
   // Capability — its ceiling comes from the jurisdiction resolution above.
@@ -297,8 +342,25 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
         clientContextOf: (request: unknown) => clientContextOf(input.edgeContext, request),
       },
     }),
+    TenancySelfApiModule.register({
+      useCases: { listOwnMemberships },
+      principalSource: {
+        // The SAME server-side principal every other surface here reads. The
+        // tenant binding is deliberately dropped: this read must work before
+        // one exists, and must not be narrowed to one when it does — a bound
+        // session that could only see its current tenant would have no switch
+        // target, which is the gap this surface closes.
+        fromRequest: (request: unknown) => {
+          const principal = bootstrapPrincipalFrom(request);
+          return principal === null
+            ? null
+            : { userId: principal.userId, sessionId: principal.sessionId };
+        },
+      },
+    }),
+    ConsentDocumentContentApiModule.register({ getLegalDocumentContent }),
     JurisdictionApiModule.register({
-      useCases: { declareOwnJurisdiction },
+      useCases: { declareOwnJurisdiction, listDeclarableJurisdictions },
       principalSource: {
         // The SAME server-side principal the bootstrap surface reads — derived
         // from the session row, never from query, header, or body. An unbound

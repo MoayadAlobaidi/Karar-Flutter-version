@@ -12,13 +12,15 @@
  * nothing here branches on a jurisdiction identifier (architecture test 12).
  */
 
-import { Body, Controller, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Req, Res } from '@nestjs/common';
 
 import type { DeclareOwnJurisdiction } from '../../application/use-cases/self-declaration.js';
+import type { ListDeclarableJurisdictions } from '../../application/use-cases/declarable-jurisdictions.js';
 import {
   authenticationRequiredProblem,
   invalidDeclarationProblem,
   problemForDeclarationError,
+  referencesUnavailableProblem,
   tenantBindingRequiredProblem,
 } from './problems.js';
 import {
@@ -26,11 +28,13 @@ import {
   type JurisdictionPrincipalSource,
 } from './principal-source.js';
 import { toDeclarationResponse } from '../dto/declaration-response.js';
+import { toDeclarableReferencesResponse } from '../dto/declarable-jurisdictions-response.js';
 
 export const JURISDICTION_USE_CASES = 'karar.jurisdiction.use-cases';
 
 export interface JurisdictionUseCases {
   readonly declareOwnJurisdiction: DeclareOwnJurisdiction;
+  readonly listDeclarableJurisdictions: ListDeclarableJurisdictions;
 }
 
 interface ReplyLike {
@@ -50,6 +54,32 @@ export class JurisdictionController {
     private readonly principalSource: JurisdictionPrincipalSource,
     @Inject('karar.jurisdiction.clock') private readonly clock: { now(): Date },
   ) {}
+
+  /**
+   * The entries a caller may declare into. Authentication is required; a
+   * tenant binding deliberately is NOT — the register is reference data with
+   * no principal scope, and an onboarding client needs the chooser BEFORE it
+   * can bind. The write below keeps its own binding requirement, where the
+   * RLS context actually matters.
+   */
+  @Get('declarable-references')
+  async listDeclarableReferences(@Req() request: unknown, @Res() reply: ReplyLike): Promise<void> {
+    const principal = this.principalSource.fromRequest(request);
+    if (principal === null) {
+      const problem = authenticationRequiredProblem();
+      reply.status(problem.status).send(problem.body);
+      return;
+    }
+    const result = await this.useCases.listDeclarableJurisdictions.execute({
+      now: this.clock.now(),
+    });
+    if (!result.ok) {
+      const problem = referencesUnavailableProblem(principal.requestId);
+      reply.status(problem.status).send(problem.body);
+      return;
+    }
+    reply.status(200).send(toDeclarableReferencesResponse(result.value));
+  }
 
   @Post('self-declaration')
   async declare(

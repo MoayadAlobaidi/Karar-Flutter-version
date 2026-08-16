@@ -21,6 +21,7 @@ import {
   DeclareOwnJurisdiction,
   type DeclareOwnJurisdictionInput,
 } from '../application/use-cases/self-declaration.js';
+import { ListDeclarableJurisdictions } from '../application/use-cases/declarable-jurisdictions.js';
 import { JurisdictionAuditTrail, type AuditEntry } from '../application/audit-trail.js';
 import type { JurisdictionRecord } from '../domain/reference.js';
 import type { UserJurisdictionAssignment } from '../domain/assignment.js';
@@ -140,13 +141,15 @@ function useCaseWith(options: {
 }) {
   const assignments = new FakeAssignments(options.rows ?? []);
   const audit = options.audit ?? new RecordingAudit();
-  const useCase = new DeclareOwnJurisdiction(
-    assignments,
-    new FakeDirectory(options.known ?? { QA: record(), AE: record({ code: 'AE' as never, countryCode: 'AE' }) }),
-    ids,
-    audit,
+  const directory = new FakeDirectory(
+    options.known ?? { QA: record(), AE: record({ code: 'AE' as never, countryCode: 'AE' }) },
   );
-  return { useCase, assignments, audit };
+  const useCase = new DeclareOwnJurisdiction(assignments, directory, ids, audit);
+  // The read side of the same surface, over the SAME directory: the route
+  // that offers a chooser and the route that accepts a choice see one
+  // register, so the module registration below cannot diverge from reality.
+  const listDeclarable = new ListDeclarableJurisdictions(directory);
+  return { useCase, assignments, audit, listDeclarable };
 }
 
 const input: DeclareOwnJurisdictionInput = {
@@ -290,11 +293,14 @@ describe('DeclareOwnJurisdiction', () => {
 
 describe('POST /jurisdiction/self-declaration', () => {
   async function appWith(principal: JurisdictionPrincipal | null) {
-    const { useCase, assignments } = useCaseWith({});
+    const { useCase, assignments, listDeclarable } = useCaseWith({});
     const moduleRef = await Test.createTestingModule({
       imports: [
         JurisdictionApiModule.register({
-          useCases: { declareOwnJurisdiction: useCase },
+          useCases: {
+            declareOwnJurisdiction: useCase,
+            listDeclarableJurisdictions: listDeclarable,
+          },
           principalSource: { fromRequest: () => principal },
           clock: { now: () => NOW },
         }),

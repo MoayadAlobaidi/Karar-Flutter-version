@@ -39,10 +39,13 @@ export {
   type ActivePackState,
   type PackActivationRecord,
 } from './domain/pack-activation.js';
-export type {
-  CountryRecord,
-  JurisdictionRecord,
-  JurisdictionSettingsRecord,
+export {
+  approvalRecorded,
+  declarabilityRefusalAt,
+  type CountryRecord,
+  type DeclarabilityRefusal,
+  type JurisdictionRecord,
+  type JurisdictionSettingsRecord,
 } from './domain/reference.js';
 
 export {
@@ -115,9 +118,17 @@ export {
   type DeclareOwnJurisdictionInput,
   type DeclaredJurisdiction,
 } from './application/use-cases/self-declaration.js';
+export {
+  ListDeclarableJurisdictions,
+  type DeclarableJurisdiction,
+  type ListDeclarableJurisdictionsError,
+  type ListDeclarableJurisdictionsInput,
+} from './application/use-cases/declarable-jurisdictions.js';
 
-// presentation — the ONE subject-facing route (self-declaration). Operator
-// assignment, verification, and pack activation stay off the consumer API.
+// presentation — the subject-facing routes: the declarable-reference listing
+// a client needs to offer a chooser, and the self-declaration write itself.
+// Operator assignment, verification, and pack activation stay off the
+// consumer API.
 export {
   JURISDICTION_PRINCIPAL_SOURCE,
   type JurisdictionPrincipal,

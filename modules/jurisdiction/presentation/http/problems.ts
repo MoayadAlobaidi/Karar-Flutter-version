@@ -80,6 +80,27 @@ export function invalidDeclarationProblem(detail: string, requestId?: string): P
   };
 }
 
+/**
+ * The register could not be read. Static on purpose — store text and register
+ * internals never cross the edge — and reported as a failure rather than as an
+ * empty list, so a client cannot read an outage as "nothing is declarable".
+ */
+export function referencesUnavailableProblem(requestId?: string): ProblemResponse {
+  return {
+    status: 503,
+    body: withCorrelation(
+      {
+        type: 'about:blank',
+        title: 'Jurisdiction references unavailable',
+        status: 503,
+        code: 'JURISDICTION_REFERENCES_UNAVAILABLE',
+        retryable: true,
+      },
+      requestId,
+    ),
+  };
+}
+
 export function problemForDeclarationError(
   error: DeclareOwnJurisdictionError,
   requestId?: string,

@@ -95,9 +95,25 @@ _None._
 
 | Route | Audience | Capability required |
 |---|---|---|
+| `GET /jurisdiction/declarable-references` | authenticated caller (no binding required) | _none — reference data only_ |
 | `POST /jurisdiction/self-declaration` | authenticated subject (own record) | _none — this route grants no capability access_ |
 
-**Exactly one route, added in Phase 4.** A subject declares its own jurisdiction so that
+**The listing exists so the declaration is usable.** Without it a client could only offer a
+free-text field, inviting an identifier the register does not hold; the screen instead rendered
+an honest "selection unavailable" state. The listing and the declaration decide declarability
+through ONE shared domain predicate (`declarabilityRefusalAt`), so an entry offered is an entry
+accepted: retired entries, entries outside their reviewed effective window, and entries whose
+country does not resolve are omitted from both. It is a read — it writes nothing, activates no
+pack, and approves nothing.
+
+**Safe fields only.** The response carries the identifier, the register's code, the country code
+and its localisation key, the structural type, and one derived fact — `approvalRecorded`, false
+for every entry, stated rather than left silent so a chooser cannot read as an approved list.
+The register's governance record (provenance, lifecycle stage, review status, reviewed effective
+window) is INTERNAL and appears nowhere on the wire. No display NAME is emitted: the register
+holds none, and inventing one would be fabricating reference data.
+
+**One narrow write, added in Phase 4.** A subject declares its own jurisdiction so that
 onboarding can proceed: without an assignment there is no governing jurisdiction, no PolicyPack
 resolves, and consent acceptance can pin no provenance — and every other write path here is
 gated on `jurisdiction.assignment.manage`, deliberately unseeded, so no assignment could come

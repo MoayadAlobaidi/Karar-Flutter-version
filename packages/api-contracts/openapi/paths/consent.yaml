@@ -62,13 +62,18 @@
                       kind: { type: string }
                       effectiveVersion:
                         type: [object, 'null']
-                        required:
-                          [versionId, version, contentHash, storageRef, classification, effectiveAt]
+                        required: [versionId, version, contentHash, classification, effectiveAt]
+                        additionalProperties: false
                         properties:
                           versionId: { type: string, format: uuid }
                           version: { type: string }
-                          contentHash: { type: string }
-                          storageRef: { type: string }
+                          contentHash:
+                            type: string
+                            description: >-
+                              sha256 of the canonical document bytes. The
+                              content route serves only bytes that match it, so
+                              a client may re-check what it displayed against
+                              what it later accepts.
                           classification:
                             type: [string, 'null']
                             enum:
@@ -81,6 +86,117 @@
                           effectiveAt: { type: [string, 'null'], format: date-time }
       '401': { description: Not authenticated. }
       '409': { description: No operating entity is bound for the caller — consent fails closed. }
+
+/consent/documents/{documentId}/content:
+  get:
+    operationId: readConsentDocumentContent
+    summary: Read the text of the document version in force, with its language
+    description: >-
+      The legal text a subject must READ before accepting, supplied by the
+      platform. The client never composes, summarizes, translates, or
+      substitutes legal wording; when the platform has no content to serve this
+      route says so and the client shows its own unavailable state.
+
+      The caller names a DOCUMENT, never a version: the server chooses the
+      version in force, so no unpublished draft and no superseded version is
+      reachable. The document must be the one applicable to the caller (the
+      effective operating entity is resolved server-side); any other entity's
+      document answers 404, exactly as an unknown id does, so the route is not
+      an oracle for the wider catalogue.
+
+      WHAT IS SERVED IS WHAT WAS PUBLISHED. The bytes are hashed and compared
+      against the version's pinned `contentHash` before anything is returned; a
+      mismatch is refused (503) rather than displayed with a warning, because a
+      grant pins a version id and reading one text while accepting another is
+      the failure this check exists to prevent.
+
+      `language` describes the CONTENT and arrives with it. The catalogue
+      records no language, so the listing carries none — a language field there
+      could only be invented.
+    tags: [consent]
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      '200':
+        description: The version in force, its content, and the content's language.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                [
+                  documentId,
+                  versionId,
+                  version,
+                  contentHash,
+                  effectiveAt,
+                  language,
+                  format,
+                  content,
+                ]
+              additionalProperties: false
+              properties:
+                documentId: { type: string, format: uuid }
+                versionId:
+                  type: string
+                  format: uuid
+                  description: The exact version displayed — post this to /consent/acceptances.
+                version: { type: string }
+                contentHash:
+                  type: string
+                  description: sha256 the served bytes were verified against.
+                effectiveAt: { type: [string, 'null'], format: date-time }
+                language:
+                  type: string
+                  description: >-
+                    BCP-47 tag of the text, as the content source recorded it.
+                    Never inferred; content whose language cannot be stated is
+                    not served.
+                format:
+                  type: string
+                  enum: [text/plain, text/markdown]
+                content:
+                  type: string
+                  description: >-
+                    The document text, server-supplied. No internal storage
+                    locator appears anywhere in this response.
+      '401': { description: Not authenticated. }
+      '404':
+        description: >-
+          No legal document with that id applies to this caller (code
+          DOCUMENT_NOT_FOUND) — the same answer an unknown id and another
+          entity's document receive.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: >-
+          No operating entity is bound for the caller (code
+          NO_EFFECTIVE_ENTITY), or the document EXISTS and applies but the
+          platform has no displayable text for it (code
+          DOCUMENT_CONTENT_UNAVAILABLE, with `reason` NO_EFFECTIVE_VERSION |
+          NOT_RETRIEVABLE | LANGUAGE_NOT_STATED). Deliberately not a 404: the
+          document is still owed consent, and a client told it was gone would
+          stop asking.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        description: >-
+          The retrieved content did not match the published version (code
+          DOCUMENT_CONTENT_UNVERIFIABLE — nothing was served), or the catalogue
+          did not answer (code STORE_UNAVAILABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
 
 /consent/acceptances:
   post:
@@ -250,3 +366,33 @@
       '400': { description: Ambiguous jurisdiction — name one. }
       '401': { description: Not authenticated. }
       '409': { description: No operating entity is bound for the caller — consent fails closed. }
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging. Only the content route
+# references them today — the older §49 routes describe their failures in
+# prose, and normalizing those is a separate, contract-wide change.
+components:
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        type: integer
+      code:
+        type: string
+        description: >-
+          Machine-readable reason (DOCUMENT_NOT_FOUND, NO_EFFECTIVE_ENTITY,
+          DOCUMENT_CONTENT_UNAVAILABLE, DOCUMENT_CONTENT_UNVERIFIABLE,
+          STORE_UNAVAILABLE).
+      detail:
+        type: string
+      reason:
+        type: string
+        description: >-
+          Finer-grained reason where applicable — on
+          DOCUMENT_CONTENT_UNAVAILABLE it is NO_EFFECTIVE_VERSION,
+          NOT_RETRIEVABLE, or LANGUAGE_NOT_STATED.

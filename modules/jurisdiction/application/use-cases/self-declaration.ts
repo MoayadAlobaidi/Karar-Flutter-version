@@ -47,6 +47,7 @@ import {
   effectiveJurisdictionState,
   type UserJurisdictionAssignment,
 } from '../../domain/assignment.js';
+import { declarabilityRefusalAt } from '../../domain/reference.js';
 import {
   toStoreFailure,
   type AuditAppendFailed,
@@ -110,11 +111,14 @@ export class DeclareOwnJurisdiction {
       // stored as free text, never treated as "some jurisdiction".
       return Result.err({ kind: 'UNKNOWN_JURISDICTION', code: input.jurisdictionCode });
     }
-    if (register.status === 'RETIRED') {
+    // The ONE declarability rule, shared with ListDeclarableJurisdictions so
+    // the offered set and the accepted set cannot drift apart.
+    const refusal = declarabilityRefusalAt(register, input.now);
+    if (refusal !== null) {
       return Result.err({
         kind: 'DECLARATION_NOT_PERMITTED',
         reason: 'JURISDICTION_NOT_DECLARABLE',
-        message: `jurisdiction ${register.code} is retired; no new assignment may be made into it`,
+        message: refusal.message,
       });
     }
 

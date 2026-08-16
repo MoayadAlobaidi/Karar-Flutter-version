@@ -109,6 +109,17 @@ membership in (0081 member-arm). Both arms are fail-closed NULLIF predicates key
 (`__tests__/tenant-context.integration.test.ts`) proves the non-empty own case FIRST, then
 other-user invisibility.
 
+**Phase 4 — the self arm reaches HTTP.** `TenancySelfApiModule` mounts
+`GET /tenancy/memberships` over the existing `ListOwnMemberships`: a presentation addition, no
+new domain logic and no new persistence. It exists because the bootstrap surface reports the
+CURRENT binding only, so a bound session could see no switch target and the implemented,
+tested switch path was unreachable from the UI. It is mounted SEPARATELY from
+`TenancyApiModule` because its principal requirement differs — authenticated, tenant binding
+deliberately NOT required (selection precedes binding, and the answer must not be narrowed to
+the current binding when one exists). Its adversarial evidence is
+`__tests__/own-memberships.integration.test.ts`, in the AZ2 order: the caller's own non-empty
+list first, then another user's invisibility.
+
 Inherited defects, now guarded by tests rather than avoided by intent:
 
 - **AZ2** — *an empty roster is indistinguishable from correct isolation.* The adversarial

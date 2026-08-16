@@ -89,6 +89,29 @@ lifecycle administration (create/draft/classify/publish) ships as authorized use
 its HTTP surface is a Super Admin concern and follows the operating-entity module's
 control-plane deferral (ADR-0021).
 
+**Document CONTENT (Phase 4).** `ConsentDocumentContentApiModule` mounts
+`GET /consent/documents/{documentId}/content`, which returns the text of the version in force
+together with the LANGUAGE of that text. It exists because the listing previously returned
+`storage_ref` — an internal locator no client can fetch — which the listing no longer emits:
+a consent gate that cannot show its document fails closed into uselessness, so the subject
+needs the text itself, and the platform must be the one supplying it.
+
+Why a route rather than a field on the listing: the catalogue records no language, so a
+`language` field on the listing could only be invented, whereas content and its language are
+retrieved together and cannot disagree; the listing is a control-flow surface consulted far
+more often than the text is read; and the bytes are verified against the version's pinned
+`content_hash` before anything is served, a guarantee that belongs where the bytes are handled.
+The caller names a document, never a version — the server chooses the one in force — and a
+document outside the caller's effective entity answers exactly as an unknown id does.
+
+**The bytes do not exist yet, and the module says so.** `LegalDocumentContentSource` is
+declared inward; the only shipped implementation (`NoContentSourceConfigured`) retrieves
+nothing, because no document store exists this phase and no legal text has been drafted or
+reviewed to place in one. The endpoint reports that absence as a typed
+`DOCUMENT_CONTENT_UNAVAILABLE`; it never approximates, substitutes, or generates legal prose,
+and neither may a client. A real source arrives with the document store and a reviewed
+publication path that records content alongside the version it belongs to.
+
 ## Dependencies
 
 Cross-module dependencies resolve through `public-api.ts` only. Cross-module references

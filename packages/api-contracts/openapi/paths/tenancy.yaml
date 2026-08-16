@@ -8,8 +8,10 @@
 #   * Tenant identity comes ONLY from server-side membership/session state.
 #     No operation accepts a tenantId — not in query, header, or body; a
 #     request carrying one is answered as if it were absent (asserted by
-#     test). Redemption is the one flow whose caller may hold no tenant yet:
-#     the tenant is read from the invitation record, server-side.
+#     test). Two flows may be called by a caller who holds no tenant yet:
+#     redemption (the tenant is read from the invitation record, server-side)
+#     and the OWN-membership listing (the caller is asking which tenants they
+#     could bind to).
 #   * The invitation token is returned exactly once, in the creation
 #     response; only its sha256 is stored, and no read endpoint returns it.
 #   * Errors are RFC 7807 problem documents with a machine-readable `code`;
@@ -49,6 +51,47 @@
           application/problem+json:
             schema:
               $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/tenancy/memberships:
+  get:
+    operationId: listOwnTenantMemberships
+    summary: List the caller's OWN memberships, across tenants
+    description: >-
+      Every membership the AUTHENTICATED caller holds that is ACTIVE and inside
+      its effective window right now — the set of tenants they may bind to.
+      This is what makes tenant switching reachable from a bound session: the
+      bootstrap surface reports the CURRENT binding only, so without this read
+      a client has no switch target to offer.
+
+      Authentication is required; a tenant binding deliberately is NOT.
+      Selection precedes binding, so the read must work before a binding
+      exists — and it is never narrowed to the current one when it does.
+
+      OWN means own. There is no user or tenant parameter anywhere: the subject
+      is the session's subject, RLS bounds the rows to the caller's own, and a
+      `?userId=`, `?tenantId=`, or `x-tenant-id` is ignored by construction
+      (asserted by test). An empty array is a real answer — this caller holds
+      no usable membership anywhere; a read that could not be performed is 503.
+    tags: [tenancy]
+    security:
+      - sessionAuth: []
+    responses:
+      '200':
+        description: The caller's own active memberships, oldest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberships]
+              properties:
+                memberships:
+                  type: array
+                  items:
+                    $ref: '#/components/Membership'
+      '401':
+        $ref: '#/components/ProblemResponse'
       '503':
         $ref: '#/components/ProblemResponse'
 

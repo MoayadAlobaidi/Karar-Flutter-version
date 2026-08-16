@@ -4,7 +4,8 @@
 #   /jurisdiction/self-declaration:
 #     $ref: './paths/jurisdiction.yaml#/~1jurisdiction~1self-declaration'
 #
-# ONE route, and the contract rules that keep it narrow:
+# TWO routes — a reference READ and one narrow write — and the contract rules
+# that keep them narrow:
 #   * Subject and tenant identity come ONLY from the authenticated session's
 #     server-side binding. The single body field is the declared jurisdiction
 #     reference, which is DATA validated against the register — never an
@@ -25,6 +26,64 @@
 #   * Deliberately absent from this surface: operator assignment
 #     administration, verification writes, jurisdiction-settings writes, and
 #     PolicyPack activation. Those are control-plane surfaces (ADR-0021).
+
+/jurisdiction/declarable-references:
+  get:
+    operationId: listDeclarableJurisdictionReferences
+    summary: List the jurisdiction references the caller may declare
+    description: >-
+      The register entries `POST /jurisdiction/self-declaration` accepts, so a
+      client can offer a chooser instead of a free-text field that would invite
+      an identifier the register does not hold. It is a READ: it writes
+      nothing, activates no PolicyPack, and approves nothing.
+
+      The listing and the declaration decide declarability through the same
+      rule, so an entry offered here is an entry the declaration accepts.
+      Retired entries, entries outside their reviewed effective window, and
+      entries whose country does not resolve are omitted — fail closed.
+
+      SELECTABLE IS NOT APPROVED. `approvalRecorded` is stated on every entry
+      and is false for all of them: no jurisdiction in this register is legally
+      approved, and declaring one records an UNVERIFIED assignment that clears
+      no capability.
+
+      Authentication is required; a tenant binding is NOT — an onboarding
+      client needs the chooser before it can bind. The declaration itself keeps
+      its own binding requirement.
+
+      SAFE FIELDS ONLY. The register's governance record — the provenance of
+      each declaration, the lifecycle stage, the review status, the reviewed
+      effective window — is internal and appears nowhere in this response.
+    tags: [jurisdiction]
+    security:
+      - sessionAuth: []
+    responses:
+      '200':
+        description: >-
+          The declarable references. An empty array means the register holds
+          nothing declarable — a read that could not be performed is 503.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [references]
+              properties:
+                references:
+                  type: array
+                  items:
+                    $ref: '#/components/DeclarableJurisdictionReference'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        description: >-
+          The register could not be read (code
+          JURISDICTION_REFERENCES_UNAVAILABLE, retryable). Reported as a
+          failure rather than an empty list, so an outage cannot be read as
+          "nothing is declarable".
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
 
 /jurisdiction/self-declaration:
   post:
@@ -103,6 +162,46 @@
 # Local component shapes for this fragment; the lead may lift them into the
 # root document's components section when merging.
 components:
+  DeclarableJurisdictionReference:
+    type: object
+    required: [jurisdictionId, code, countryCode, countryDisplayNameKey, type, approvalRecorded]
+    additionalProperties: false
+    properties:
+      jurisdictionId:
+        type: string
+        pattern: '^[A-Za-z0-9-]{2,32}$'
+        description: >-
+          The identifier to post back to /jurisdiction/self-declaration.
+          Reference DATA: clients never branch on it — behaviour differences
+          resolve through policy packs (architecture test 12).
+      code:
+        type: string
+        description: The register's own reference token — the same value, mirroring the row.
+      countryCode:
+        type: string
+        pattern: '^[A-Z]{2}$'
+        description: >-
+          ISO 3166-1 alpha-2. A jurisdiction is NOT a country: one country may
+          carry several regimes (a national one and a financial free zone).
+      countryDisplayNameKey:
+        type: string
+        description: >-
+          Localisation key for the entry's country, from the country register.
+          Display names live in locale bundles, never in the register, and a
+          jurisdiction entry carries no name of its own — so none is invented
+          here. A client composes its label from this key, the type, and the
+          code.
+      type:
+        type: string
+        enum: [NATIONAL, FINANCIAL_FREE_ZONE, SPECIAL_REGIME]
+        description: Structural kind of the regime — what distinguishes AE from AE-DIFC.
+      approvalRecorded:
+        type: boolean
+        description: >-
+          Whether the platform's register records a COMPLETED legal approval
+          for this entry. False for every entry today. A selectable
+          jurisdiction is a declarable one; it is not an approved one, and a
+          declaration into it stays UNVERIFIED.
   DeclaredJurisdiction:
     type: object
     required: [state, jurisdictionId, source, effectiveFrom, recorded]
@@ -146,7 +245,8 @@ components:
         description: >-
           Machine-readable reason (AUTHENTICATION_REQUIRED,
           INVALID_JURISDICTION_DECLARATION, TENANT_BINDING_REQUIRED,
-          DECLARATION_NOT_PERMITTED, JURISDICTION_DECLARATION_UNAVAILABLE).
+          DECLARATION_NOT_PERMITTED, JURISDICTION_DECLARATION_UNAVAILABLE,
+          JURISDICTION_REFERENCES_UNAVAILABLE).
       detail:
         type: string
       retryable:
