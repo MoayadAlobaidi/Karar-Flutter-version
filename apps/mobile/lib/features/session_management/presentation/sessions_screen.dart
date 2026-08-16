@@ -14,10 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/errors/failure.dart';
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/controllers/authentication_controllers.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/widgets/identity_confirmation.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import '../../authentication/presentation/widgets/sensitive_screen.dart';
@@ -45,12 +45,12 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
     });
   }
 
-  Future<void> _confirmRevoke(UserSession session, IdentityStrings strings) async {
+  Future<void> _confirmRevoke(UserSession session, AppLocalizations l10n) async {
     final bool confirmed = await confirmIdentityAction(
       context: context,
-      title: strings.sessionsRevokeConfirmTitle,
-      message: strings.sessionsRevokeConfirmMessage,
-      confirmLabel: strings.sessionsRevokeAction,
+      title: l10n.sessionsRevokeConfirmTitle,
+      message: l10n.sessionsRevokeConfirmMessage,
+      confirmLabel: l10n.sessionsRevokeAction,
       cancelLabel: context.l10n.actionCancel,
     );
     if (confirmed) {
@@ -58,12 +58,12 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
     }
   }
 
-  Future<void> _confirmRevokeOthers(IdentityStrings strings) async {
+  Future<void> _confirmRevokeOthers(AppLocalizations l10n) async {
     final bool confirmed = await confirmIdentityAction(
       context: context,
-      title: strings.sessionsRevokeOthersConfirmTitle,
-      message: strings.sessionsRevokeOthersConfirmMessage,
-      confirmLabel: strings.sessionsRevokeOthersAction,
+      title: l10n.sessionsRevokeOthersConfirmTitle,
+      message: l10n.sessionsRevokeOthersConfirmMessage,
+      confirmLabel: l10n.sessionsRevokeOthersAction,
       cancelLabel: context.l10n.actionCancel,
     );
     if (confirmed) {
@@ -73,37 +73,37 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final SessionsViewState state = ref.watch(sessionsControllerProvider);
 
     return SensitiveScreen(
       child: IdentityScaffold(
-        title: strings.sessionsTitle,
+        title: l10n.sessionsTitle,
         onBack: () => context.pop(),
         children: <Widget>[
-          ..._notices(strings, state),
-          ..._content(context, strings, state),
+          ..._notices(l10n, state),
+          ..._content(context, l10n, state),
         ],
       ),
     );
   }
 
-  List<Widget> _notices(IdentityStrings strings, SessionsViewState state) {
+  List<Widget> _notices(AppLocalizations l10n, SessionsViewState state) {
     final Failure? revocationFailure = state.revocationFailure;
     final int? revokedOthers = state.revokedOthersCount;
     return <Widget>[
       if (revocationFailure != null)
         IdentityFailureNotice(
-          message: sessionRevocationFailureMessage(strings, revocationFailure),
+          message: sessionRevocationFailureMessage(l10n, revocationFailure),
         ),
       if (state.revokedOne)
         IdentityFailureNotice(
-          message: strings.sessionsRevokedNotice,
+          message: l10n.sessionsRevokedNotice,
           tone: KararStatusTone.success,
         ),
       if (revokedOthers != null)
         IdentityFailureNotice(
-          message: strings.revokedOthersNotice(context.formatter.integer(revokedOthers)),
+          message: l10n.sessionsRevokedOthersNotice(revokedOthers),
           tone: KararStatusTone.success,
         ),
     ];
@@ -111,11 +111,11 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
 
   List<Widget> _content(
     BuildContext context,
-    IdentityStrings strings,
+    AppLocalizations l10n,
     SessionsViewState state,
   ) {
     if (state.isLoading) {
-      return <Widget>[KararLoadingView(subject: strings.sessionsTitle)];
+      return <Widget>[KararLoadingView(subject: l10n.sessionsTitle)];
     }
     final Failure? failure = state.failure;
     if (failure != null) {
@@ -126,7 +126,7 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
           )
         else
           KararStateView.error(
-            message: identityFailureMessage(strings, failure),
+            message: identityFailureMessage(l10n, failure),
             detail: failure.correlationId == null
                 ? null
                 : context.l10n.stateErrorReference(failure.correlationId!),
@@ -137,41 +137,41 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
     }
     final SessionDirectory? directory = state.directory;
     if (directory == null) {
-      return <Widget>[KararLoadingView(subject: strings.sessionsTitle)];
+      return <Widget>[KararLoadingView(subject: l10n.sessionsTitle)];
     }
     if (directory.isEmpty) {
       return <Widget>[
         KararStateView.empty(
-          title: strings.sessionsEmptyTitle,
-          message: strings.sessionsEmptyMessage,
+          title: l10n.sessionsEmptyTitle,
+          message: l10n.sessionsEmptyMessage,
         ),
       ];
     }
     return <Widget>[
-      IdentityBody(strings.sessionsSubtitle),
+      IdentityBody(l10n.sessionsSubtitle),
       const IdentityGap.large(),
       for (final UserSession session in directory.sessions)
         Padding(
           padding: EdgeInsetsDirectional.only(bottom: context.spacing.md),
           child: _SessionCard(
             session: session,
-            strings: strings,
+            l10n: l10n,
             isBusy: state.busySessionId == session.sessionId,
-            onRevoke: state.isBusy ? null : () => _confirmRevoke(session, strings),
+            onRevoke: state.isBusy ? null : () => _confirmRevoke(session, l10n),
           ),
         ),
       if (directory.hasOthers) ...<Widget>[
         const IdentityGap(),
         KararButton(
-          label: strings.sessionsRevokeOthersAction,
+          label: l10n.sessionsRevokeOthersAction,
           variant: KararButtonVariant.destructive,
           isFullWidth: true,
           isLoading: state.isRevokingOthers,
-          onPressed: state.isBusy ? null : () => _confirmRevokeOthers(strings),
+          onPressed: state.isBusy ? null : () => _confirmRevokeOthers(l10n),
         ),
       ],
       const IdentityGap.large(),
-      _SignOutAction(strings: strings),
+      _SignOutAction(l10n: l10n),
     ];
   }
 }
@@ -180,13 +180,13 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
 class _SessionCard extends StatelessWidget {
   const _SessionCard({
     required this.session,
-    required this.strings,
+    required this.l10n,
     required this.isBusy,
     required this.onRevoke,
   });
 
   final UserSession session;
-  final IdentityStrings strings;
+  final AppLocalizations l10n;
   final bool isBusy;
   final VoidCallback? onRevoke;
 
@@ -208,14 +208,14 @@ class _SessionCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: <Widget>[
               KararBidiText(
-                session.userAgentSummary ?? strings.sessionsUnknownDevice,
+                session.userAgentSummary ?? l10n.sessionsUnknownDevice,
                 style: context.typography.labelLarge.copyWith(
                   color: context.colors.contentPrimary,
                 ),
               ),
               if (session.isCurrent)
                 KararStatusBadge(
-                  label: strings.sessionsCurrentBadge,
+                  label: l10n.sessionsCurrentBadge,
                   tone: KararStatusTone.success,
                   icon: KararIcons.check,
                 ),
@@ -223,21 +223,21 @@ class _SessionCard extends StatelessWidget {
           ),
           SizedBox(height: context.spacing.xs),
           Text(
-            strings.sessionStartedAt(formatter.dateTime(session.createdAt)),
+            l10n.sessionsStartedAt(formatter.dateTime(session.createdAt)),
             style: context.typography.bodySmall.copyWith(
               color: context.colors.contentSecondary,
             ),
           ),
           if (lastSeen != null)
             Text(
-              strings.sessionLastSeenAt(formatter.dateTime(lastSeen)),
+              l10n.sessionsLastSeenAt(formatter.dateTime(lastSeen)),
               style: context.typography.bodySmall.copyWith(
                 color: context.colors.contentSecondary,
               ),
             ),
           if (expiresAt != null)
             Text(
-              strings.sessionExpiresAt(formatter.dateTime(expiresAt)),
+              l10n.sessionsExpiresAt(formatter.dateTime(expiresAt)),
               style: context.typography.bodySmall.copyWith(
                 color: context.colors.contentTertiary,
               ),
@@ -245,15 +245,15 @@ class _SessionCard extends StatelessWidget {
           if (!session.isCurrent) ...<Widget>[
             SizedBox(height: context.spacing.sm),
             KararButton(
-              label: strings.sessionsRevokeAction,
+              label: l10n.sessionsRevokeAction,
               variant: KararButtonVariant.secondary,
               isLoading: isBusy,
               onPressed: onRevoke,
               // Several rows carry the same visible label, so each announces
               // which device it acts on.
               semanticLabel:
-                  '${strings.sessionsRevokeAction}. '
-                  '${session.userAgentSummary ?? strings.sessionsUnknownDevice}',
+                  '${l10n.sessionsRevokeAction}. '
+                  '${session.userAgentSummary ?? l10n.sessionsUnknownDevice}',
             ),
           ],
         ],
@@ -264,9 +264,9 @@ class _SessionCard extends StatelessWidget {
 
 /// Signs out of this device.
 class _SignOutAction extends ConsumerWidget {
-  const _SignOutAction({required this.strings});
+  const _SignOutAction({required this.l10n});
 
-  final IdentityStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -276,11 +276,11 @@ class _SignOutAction extends ConsumerWidget {
       children: <Widget>[
         if (state.incompleteFailure != null)
           IdentityFailureNotice(
-            message: strings.signOutIncompleteNotice,
+            message: l10n.signOutIncompleteNotice,
             tone: KararStatusTone.warning,
           ),
         KararButton(
-          label: strings.signOutAction,
+          label: l10n.signOutAction,
           variant: KararButtonVariant.destructive,
           isFullWidth: true,
           isLoading: state.isSubmitting,
@@ -289,9 +289,9 @@ class _SignOutAction extends ConsumerWidget {
               : () async {
                   final bool confirmed = await confirmIdentityAction(
                     context: context,
-                    title: strings.signOutConfirmTitle,
-                    message: strings.signOutConfirmMessage,
-                    confirmLabel: strings.signOutAction,
+                    title: l10n.signOutConfirmTitle,
+                    message: l10n.signOutConfirmMessage,
+                    confirmLabel: l10n.signOutAction,
                     cancelLabel: context.l10n.actionCancel,
                   );
                   if (confirmed) {

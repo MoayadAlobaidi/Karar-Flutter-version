@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/networking/http_method.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/widgets/sensitive_screen.dart';
 import 'package:karar_mobile/features/session_management/domain/user_session.dart';
 import 'package:karar_mobile/features/session_management/presentation/session_providers.dart';
@@ -163,18 +162,16 @@ void main() {
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.onGet('/auth/sessions', sessionListPayload());
 
       await pumpIdentity(tester, const SessionsScreen(),
           harness: harness, locale: locale, textScale: textScale);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.sessionsSubtitle), findsOneWidget);
+      expect(find.text(l10n.sessionsSubtitle), findsOneWidget);
       // Status is never colour alone: the current session is labelled.
-      expect(find.text(strings.sessionsCurrentBadge), findsOneWidget);
+      expect(find.text(l10n.sessionsCurrentBadge), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(SessionsScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -186,9 +183,7 @@ void main() {
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.failWith(
         HttpMethod.get,
         '/auth/sessions',
@@ -200,7 +195,7 @@ void main() {
           harness: harness, locale: locale, textScale: textScale);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.failureServiceUnavailable), findsOneWidget);
+      expect(find.text(l10n.failureServiceUnavailable), findsOneWidget);
       // The correlation id is opaque and non-sensitive; it is the support
       // reference and the only server value shown.
       expect(find.textContaining('corr-1'), findsOneWidget);
@@ -209,16 +204,14 @@ void main() {
       await tapIdentityButton(tester, _shared(tester).actionRetry);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.sessionsCurrentBadge), findsOneWidget);
+      expect(find.text(l10n.sessionsCurrentBadge), findsOneWidget);
     });
 
     testEveryDirectionAndScale('shows the empty state when only this device is live',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.onGet('/auth/sessions', <String, Object?>{
         'sessions': <Object?>[],
       });
@@ -227,14 +220,14 @@ void main() {
           harness: harness, locale: locale, textScale: textScale);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.sessionsEmptyMessage), findsOneWidget);
+      expect(find.text(l10n.sessionsEmptyMessage), findsOneWidget);
     });
 
     testWidgets('a revoke confirms first, then reloads from the server',
         (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
       harness.transport.onGet('/auth/sessions', sessionListPayload());
       harness.transport.onDelete(
         '/auth/sessions/9f1d0f6a-0000-4000-8000-000000000002',
@@ -244,11 +237,11 @@ void main() {
       await pumpIdentity(tester, const SessionsScreen(), harness: harness);
       await tester.pumpAndSettle();
 
-      await tapIdentityButton(tester, strings.sessionsRevokeAction);
+      await tapIdentityButton(tester, l10n.sessionsRevokeAction);
       await tester.pumpAndSettle();
-      expect(find.text(strings.sessionsRevokeConfirmMessage), findsOneWidget);
+      expect(find.text(l10n.sessionsRevokeConfirmMessage), findsOneWidget);
 
-      await tester.tap(find.text(strings.sessionsRevokeAction).last);
+      await tester.tap(find.text(l10n.sessionsRevokeAction).last);
       await tester.pumpAndSettle();
 
       expect(harness.transport.callsTo('/auth/sessions/9f1d0f6a-0000-4000-8000-000000000002'), 1);
@@ -260,12 +253,12 @@ void main() {
     testWidgets('a dismissed confirmation revokes nothing', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
       harness.transport.onGet('/auth/sessions', sessionListPayload());
 
       await pumpIdentity(tester, const SessionsScreen(), harness: harness);
       await tester.pumpAndSettle();
-      await tapIdentityButton(tester, strings.sessionsRevokeAction);
+      await tapIdentityButton(tester, l10n.sessionsRevokeAction);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text(_shared(tester).actionCancel));

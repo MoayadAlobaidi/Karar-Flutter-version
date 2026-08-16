@@ -14,15 +14,15 @@ import 'package:karar_mobile/features/profile/domain/user_profile.dart';
 import 'package:karar_mobile/features/profile/presentation/profile_providers.dart';
 import 'package:karar_mobile/features/settings/presentation/settings_providers.dart';
 import 'package:karar_mobile/features/settings/presentation/settings_screen.dart';
-import 'package:karar_mobile/features/settings/presentation/settings_strings.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'package:karar_mobile/shared/shared.dart';
 
 import '../platform_bootstrap/support/feature_harness.dart';
 import '../platform_bootstrap/support/fixtures.dart';
 import '../profile/profile_test.dart' show ScriptedProfileRepository;
 
-SettingsStrings mountedStrings(WidgetTester tester) =>
-    SettingsStrings.of(tester.element(find.byType(SettingsScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(SettingsScreen)));
 
 Future<InMemoryKeyValueStore> pumpSettings(
   WidgetTester tester, {
@@ -51,11 +51,11 @@ void main() {
     'renders every group and derives its direction from the locale',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpSettings(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.appearanceTitle), findsOneWidget);
-      expect(find.text(strings.yourAccountTitle), findsOneWidget);
-      expect(find.text(strings.dangerTitle), findsOneWidget);
+      expect(find.text(l10n.settingsAppearanceTitle), findsOneWidget);
+      expect(find.text(l10n.settingsYourAccountTitle), findsOneWidget);
+      expect(find.text(l10n.settingsDangerTitle), findsOneWidget);
       expect(
         directionUnder(tester, find.byType(SettingsScreen)),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -105,11 +105,11 @@ void main() {
     'the disable request is described as recording an intention',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpSettings(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.disableTitle), findsOneWidget);
-      expect(find.text(strings.disableDescription), findsOneWidget);
-      expect(find.text(strings.disableRecordedTitle), findsNothing);
+      expect(find.text(l10n.settingsDisableTitle), findsOneWidget);
+      expect(find.text(l10n.settingsDisableDescription), findsOneWidget);
+      expect(find.text(l10n.settingsDisableRecordedTitle), findsNothing);
     },
     textScales: featureTextScales,
   );
@@ -118,12 +118,12 @@ void main() {
       (WidgetTester tester) async {
     final profiles = ScriptedProfileRepository();
     await pumpSettings(tester, profiles: profiles);
-    final strings = mountedStrings(tester);
+    final l10n = mountedL10n(tester);
 
-    await tester.tap(find.text(strings.disableAction));
+    await tester.tap(find.text(l10n.settingsDisableAction));
     await tester.pumpAndSettle();
 
-    expect(find.text(strings.disableConfirmTitle), findsOneWidget);
+    expect(find.text(l10n.settingsDisableConfirmTitle), findsOneWidget);
     expect(profiles.disableRequests, 0);
 
     // The dialog's cancel control, named by the shared catalogue. This test
@@ -132,23 +132,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(profiles.disableRequests, 0, reason: 'the cancel control sends nothing');
-    expect(find.text(strings.disableConfirmTitle), findsNothing);
+    expect(find.text(l10n.settingsDisableConfirmTitle), findsNothing);
   });
 
   testWidgets('a confirmed disable request records an intention and says so',
       (WidgetTester tester) async {
     final profiles = ScriptedProfileRepository();
     await pumpSettings(tester, profiles: profiles);
-    final strings = mountedStrings(tester);
+    final l10n = mountedL10n(tester);
 
-    await tester.tap(find.text(strings.disableAction));
+    await tester.tap(find.text(l10n.settingsDisableAction));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(strings.disableAction).last);
+    await tester.tap(find.text(l10n.settingsDisableAction).last);
     await tester.pumpAndSettle();
 
     expect(profiles.disableRequests, 1);
-    expect(find.text(strings.disableRecordedTitle), findsOneWidget);
-    expect(find.text(strings.disableRecordedMessage), findsOneWidget);
+    expect(find.text(l10n.settingsDisableRecordedTitle), findsOneWidget);
+    expect(find.text(l10n.settingsDisableRecordedMessage), findsOneWidget);
   });
 
   testWidgets('an unrecorded audit entry is surfaced rather than hidden',
@@ -159,14 +159,14 @@ void main() {
       ),
     );
     await pumpSettings(tester, profiles: profiles);
-    final strings = mountedStrings(tester);
+    final l10n = mountedL10n(tester);
 
-    await tester.tap(find.text(strings.disableAction));
+    await tester.tap(find.text(l10n.settingsDisableAction));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(strings.disableAction).last);
+    await tester.tap(find.text(l10n.settingsDisableAction).last);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining(strings.disableAuditWarning), findsOneWidget);
+    expect(find.textContaining(l10n.settingsDisableAuditWarning), findsOneWidget);
   });
 
   testInBothDirections(

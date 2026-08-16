@@ -19,8 +19,8 @@
 // be. It does, on its own, keep the content out of the captured frame.
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/karar_localization.dart';
 import '../../../../shared/shared.dart';
-import '../localization/identity_strings.dart';
 
 /// Covers [child] whenever the application is not in the foreground.
 class SensitiveScreen extends StatefulWidget {
@@ -64,7 +64,7 @@ class _SensitiveScreenState extends State<SensitiveScreen> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     return Stack(
       children: <Widget>[
         // Kept in the tree rather than replaced, so scroll position, focus and
@@ -77,7 +77,7 @@ class _SensitiveScreenState extends State<SensitiveScreen> with WidgetsBindingOb
           Positioned.fill(
             key: SensitiveScreen.coverKey,
             child: Semantics(
-              label: strings.a11ySensitiveScreen,
+              label: l10n.a11ySensitiveScreen,
               child: ColoredBox(
                 color: context.colors.surface,
                 child: Center(

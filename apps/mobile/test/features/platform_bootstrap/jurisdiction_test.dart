@@ -16,7 +16,7 @@ import 'package:karar_mobile/features/platform_bootstrap/domain/jurisdiction_dec
 import 'package:karar_mobile/features/platform_bootstrap/domain/platform_context.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/jurisdiction_screen.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_providers.dart';
-import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_strings.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'package:karar_mobile/shared/shared.dart';
 
 import '../../core/support/fakes.dart';
@@ -70,8 +70,8 @@ JurisdictionDeclaration declaration({bool recorded = true}) => JurisdictionDecla
       effectiveFrom: DateTime.utc(2026),
     );
 
-PlatformStrings mountedStrings(WidgetTester tester) =>
-    PlatformStrings.of(tester.element(find.byType(JurisdictionScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(JurisdictionScreen)));
 
 void main() {
   group('the repository', () {
@@ -143,9 +143,9 @@ void main() {
             platformContextProvider.overrideWithValue(platformContext()),
           ],
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.jurisdictionVerified), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionVerified), findsOneWidget);
         expect(find.text('jurisdiction-a'), findsOneWidget);
         expect(
           directionUnder(tester, find.byType(JurisdictionScreen)),
@@ -173,9 +173,9 @@ void main() {
             ),
           ],
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.jurisdictionNone), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionNone), findsOneWidget);
       },
     );
 
@@ -191,10 +191,10 @@ void main() {
             platformContextProvider.overrideWithValue(platformContext()),
           ],
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.jurisdictionSelectionUnavailable), findsOneWidget);
-        expect(find.text(strings.jurisdictionDeclareAction), findsNothing);
+        expect(find.text(l10n.platformJurisdictionSelectionUnavailable), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionDeclareAction), findsNothing);
         expect(
           find.byType(TextField),
           findsNothing,
@@ -224,19 +224,19 @@ void main() {
             ),
           ],
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.jurisdictionRecorded), findsNothing);
+        expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
 
         await tester.tap(find.byType(KararCheckboxTile));
         await tester.pumpAndSettle();
-        await tester.tap(find.text(strings.jurisdictionDeclareAction));
+        await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
         await tester.pumpAndSettle();
 
         expect(repository.calls, 1);
         expect(repository.lastReference?.id, 'jurisdiction-a');
-        expect(find.text(strings.jurisdictionRecorded), findsOneWidget);
-        expect(find.text(strings.jurisdictionRemainsUnverified), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionRecorded), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionRemainsUnverified), findsOneWidget);
       },
     );
 
@@ -260,15 +260,15 @@ void main() {
             ),
           ],
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
         await tester.tap(find.byType(KararCheckboxTile));
         await tester.pumpAndSettle();
-        await tester.tap(find.text(strings.jurisdictionDeclareAction));
+        await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
         await tester.pumpAndSettle();
 
-        expect(find.text(strings.jurisdictionAlreadyInEffect), findsOneWidget);
-        expect(find.text(strings.jurisdictionRecorded), findsNothing);
+        expect(find.text(l10n.platformJurisdictionAlreadyInEffect), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
       },
     );
 
@@ -297,15 +297,15 @@ void main() {
             ),
           ],
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
         await tester.tap(find.byType(KararCheckboxTile));
         await tester.pumpAndSettle();
-        await tester.tap(find.text(strings.jurisdictionDeclareAction));
+        await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
         await tester.pumpAndSettle();
 
         expect(find.textContaining('req-77'), findsOneWidget);
-        expect(find.text(strings.jurisdictionRecorded), findsNothing);
+        expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
       },
     );
 

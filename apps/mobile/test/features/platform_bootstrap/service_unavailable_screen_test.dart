@@ -14,8 +14,8 @@ import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/logging/app_logger.dart';
 import 'package:karar_mobile/core/networking/problem_details.dart';
 import 'package:karar_mobile/core/security/session_manager.dart';
-import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_strings.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/service_unavailable_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../../core/support/fakes.dart';
 import 'support/feature_harness.dart';
@@ -29,8 +29,8 @@ BootstrapUnavailable unavailable({bool? retryable, String? reference}) =>
       ),
     );
 
-PlatformStrings mountedStrings(WidgetTester tester) =>
-    PlatformStrings.of(tester.element(find.byType(ServiceUnavailableScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(ServiceUnavailableScreen)));
 
 void main() {
   testInBothDirections(
@@ -42,12 +42,12 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.serviceUnavailableTitle), findsOneWidget);
-      expect(find.text(strings.serviceUnavailableDescription), findsOneWidget);
+      expect(find.text(l10n.platformServiceUnavailableTitle), findsOneWidget);
+      expect(find.text(l10n.platformServiceUnavailableDescription), findsOneWidget);
       expect(find.textContaining('req-9'), findsOneWidget);
-      expect(find.text(strings.noServicesTitle), findsNothing);
+      expect(find.text(l10n.platformNoServicesTitle), findsNothing);
     },
     textScales: featureTextScales,
   );
@@ -79,10 +79,10 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.actionStartOver), findsOneWidget);
-      expect(find.text(strings.serviceUnavailableFinalDescription), findsOneWidget);
+      expect(find.text(l10n.platformActionStartOver), findsOneWidget);
+      expect(find.text(l10n.platformServiceUnavailableFinalDescription), findsOneWidget);
     },
   );
 
@@ -95,10 +95,10 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.actionStartOver), findsNothing);
-      expect(find.text(strings.serviceUnavailableDescription), findsOneWidget);
+      expect(find.text(l10n.platformActionStartOver), findsNothing);
+      expect(find.text(l10n.platformServiceUnavailableDescription), findsOneWidget);
     },
   );
 

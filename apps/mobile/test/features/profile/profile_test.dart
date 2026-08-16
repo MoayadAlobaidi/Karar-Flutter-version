@@ -12,7 +12,7 @@ import 'package:karar_mobile/features/profile/data/api_profile_repository.dart';
 import 'package:karar_mobile/features/profile/domain/user_profile.dart';
 import 'package:karar_mobile/features/profile/presentation/profile_providers.dart';
 import 'package:karar_mobile/features/profile/presentation/profile_screen.dart';
-import 'package:karar_mobile/features/profile/presentation/profile_strings.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'package:karar_mobile/shared/shared.dart';
 
 import '../../core/support/fakes.dart';
@@ -69,8 +69,8 @@ final class ScriptedProfileRepository implements ProfileRepository {
   }
 }
 
-ProfileStrings mountedStrings(WidgetTester tester) =>
-    ProfileStrings.of(tester.element(find.byType(ProfileScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(ProfileScreen)));
 
 Future<void> pumpProfile(
   WidgetTester tester, {
@@ -186,9 +186,9 @@ void main() {
           locale: locale,
           textScale: scale,
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.statusActive), findsOneWidget);
+        expect(find.text(l10n.profileStatusActive), findsOneWidget);
         expect(find.text(testTenantId), findsOneWidget);
         expect(find.text(testUserId), findsOneWidget);
         expect(
@@ -210,16 +210,16 @@ void main() {
           locale: locale,
           textScale: scale,
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.saveConfirmation), findsNothing);
+        expect(find.text(l10n.profileSaveConfirmation), findsNothing);
 
         await tester.enterText(find.byType(TextField), 'Changed Name');
         await tester.tap(find.byType(KararButton).first);
         await tester.pumpAndSettle();
 
         expect(repository.updates.single.displayName, 'Changed Name');
-        expect(find.text(strings.saveConfirmation), findsOneWidget);
+        expect(find.text(l10n.profileSaveConfirmation), findsOneWidget);
       },
     );
 
@@ -236,14 +236,14 @@ void main() {
           locale: locale,
           textScale: scale,
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
         await tester.enterText(find.byType(TextField), 'Changed Name');
         await tester.tap(find.byType(KararButton).first);
         await tester.pumpAndSettle();
 
-        expect(find.text(strings.saveFailedTitle), findsOneWidget);
-        expect(find.text(strings.saveConfirmation), findsNothing);
+        expect(find.text(l10n.profileSaveFailedTitle), findsOneWidget);
+        expect(find.text(l10n.profileSaveConfirmation), findsNothing);
       },
     );
 
@@ -260,10 +260,10 @@ void main() {
           locale: locale,
           textScale: scale,
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.statusDisableRequested), findsOneWidget);
-        expect(find.text(strings.statusDisableRequestedNote), findsOneWidget);
+        expect(find.text(l10n.profileStatusDisableRequested), findsOneWidget);
+        expect(find.text(l10n.profileStatusDisableRequestedNote), findsOneWidget);
       },
     );
 
@@ -280,9 +280,9 @@ void main() {
           locale: locale,
           textScale: scale,
         );
-        final strings = mountedStrings(tester);
+        final l10n = mountedL10n(tester);
 
-        expect(find.text(strings.unavailableTitle), findsOneWidget);
+        expect(find.text(l10n.profileUnavailableTitle), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
       },
       textScales: featureTextScales,

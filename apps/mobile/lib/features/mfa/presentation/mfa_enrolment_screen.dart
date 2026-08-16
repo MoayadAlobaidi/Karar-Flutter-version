@@ -20,9 +20,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import '../../authentication/presentation/widgets/sensitive_screen.dart';
 import '../domain/mfa_entities.dart';
@@ -61,14 +61,14 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final MfaEnrolmentViewState state = ref.watch(mfaEnrolmentControllerProvider);
 
     return SensitiveScreen(
       child: IdentityScaffold(
         title: state.step == MfaEnrolmentStep.codesIssued
-            ? strings.mfaRecoveryCodesTitle
-            : strings.mfaEnrolTitle,
+            ? l10n.mfaRecoveryCodesTitle
+            : l10n.mfaEnrolTitle,
         // The back affordance is withheld while the codes are on screen and
         // unacknowledged: leaving destroys them, and the user cannot get them
         // back.
@@ -78,12 +78,12 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
         children: <Widget>[
           if (state.failure != null)
             IdentityFailureNotice(
-              message: mfaEnrolmentFailureMessage(strings, state.failure!),
+              message: mfaEnrolmentFailureMessage(l10n, state.failure!),
             ),
           ...switch (state.step) {
-            MfaEnrolmentStep.introduction => _introduction(context, strings, state),
-            MfaEnrolmentStep.keyIssued => _keyIssued(context, strings, state),
-            MfaEnrolmentStep.codesIssued => _codesIssued(context, strings, state),
+            MfaEnrolmentStep.introduction => _introduction(context, l10n, state),
+            MfaEnrolmentStep.keyIssued => _keyIssued(context, l10n, state),
+            MfaEnrolmentStep.codesIssued => _codesIssued(context, l10n, state),
           },
         ],
       ),
@@ -92,14 +92,14 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
 
   List<Widget> _introduction(
     BuildContext context,
-    IdentityStrings strings,
+    AppLocalizations l10n,
     MfaEnrolmentViewState state,
   ) =>
       <Widget>[
-        IdentityBody(strings.mfaEnrolIntro),
+        IdentityBody(l10n.mfaEnrolIntro),
         const IdentityGap.large(),
         KararButton(
-          label: strings.mfaEnrolStartAction,
+          label: l10n.mfaEnrolStartAction,
           isFullWidth: true,
           size: KararButtonSize.large,
           isLoading: state.isSubmitting,
@@ -111,42 +111,42 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
 
   List<Widget> _keyIssued(
     BuildContext context,
-    IdentityStrings strings,
+    AppLocalizations l10n,
     MfaEnrolmentViewState state,
   ) {
     final MfaEnrolment? enrolment = state.enrolment;
     if (enrolment == null) {
-      return <Widget>[KararStateView.error(message: strings.failureUnexpected)];
+      return <Widget>[KararStateView.error(message: l10n.failureUnexpected)];
     }
     return <Widget>[
-      IdentityHeading(strings.mfaEnrolSecretLabel),
+      IdentityHeading(l10n.mfaEnrolSecretLabel),
       const IdentityGap.small(),
-      IdentityBody(strings.mfaEnrolStepScan),
+      IdentityBody(l10n.mfaEnrolStepScan),
       const IdentityGap(),
-      _SecretBlock(secret: enrolment.sharedSecret, label: strings.mfaEnrolSecretLabel),
+      _SecretBlock(secret: enrolment.sharedSecret, label: l10n.mfaEnrolSecretLabel),
       const IdentityGap(),
       KararBanner(
-        message: strings.mfaEnrolSecretWarning,
+        message: l10n.mfaEnrolSecretWarning,
         tone: KararStatusTone.warning,
       ),
       const IdentityGap.large(),
-      IdentityBody(strings.mfaEnrolStepConfirm),
+      IdentityBody(l10n.mfaEnrolStepConfirm),
       const IdentityGap(),
       KararTextField(
-        label: strings.mfaCodeLabel,
+        label: l10n.mfaCodeLabel,
         controller: _code,
-        hint: strings.mfaCodeHint,
+        hint: l10n.mfaCodeHint,
         isRequired: true,
         isEnabled: !state.isSubmitting,
         keyboardType: TextInputType.number,
         normalizeArabicDigits: true,
-        errorText: state.codeMissing ? strings.codeEmpty : null,
+        errorText: state.codeMissing ? l10n.codeEmpty : null,
         onSubmitted: (_) =>
             ref.read(mfaEnrolmentControllerProvider.notifier).confirm(code: _code.text),
       ),
       const IdentityGap.large(),
       KararButton(
-        label: strings.mfaConfirmAction,
+        label: l10n.mfaConfirmAction,
         isFullWidth: true,
         size: KararButtonSize.large,
         isLoading: state.isSubmitting,
@@ -161,16 +161,16 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
 
   List<Widget> _codesIssued(
     BuildContext context,
-    IdentityStrings strings,
+    AppLocalizations l10n,
     MfaEnrolmentViewState state,
   ) {
     final MfaRecoveryCodes? codes = state.recoveryCodes;
     if (codes == null) {
-      return <Widget>[KararStateView.error(message: strings.failureUnexpected)];
+      return <Widget>[KararStateView.error(message: l10n.failureUnexpected)];
     }
     return <Widget>[
       KararBanner(
-        message: strings.mfaRecoveryCodesWarning,
+        message: l10n.mfaRecoveryCodesWarning,
         tone: KararStatusTone.warning,
       ),
       const IdentityGap.large(),
@@ -179,15 +179,12 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
           padding: EdgeInsetsDirectional.only(bottom: context.spacing.sm),
           child: _RecoveryCodeRow(
             code: codes.codes[index],
-            semanticLabel: strings.recoveryCodePosition(
-              position: context.formatter.integer(index + 1),
-              total: context.formatter.integer(codes.count),
-            ),
+            semanticLabel: l10n.a11yRecoveryCodePosition(index + 1, codes.count),
           ),
         ),
       const IdentityGap(),
       KararCheckboxTile(
-        label: strings.mfaRecoveryCodesAcknowledge,
+        label: l10n.mfaRecoveryCodesAcknowledge,
         value: state.isAcknowledged,
         onChanged: (bool value) => ref
             .read(mfaEnrolmentControllerProvider.notifier)
@@ -195,7 +192,7 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
       ),
       const IdentityGap.large(),
       KararButton(
-        label: strings.mfaRecoveryCodesDone,
+        label: l10n.actionDone,
         isFullWidth: true,
         size: KararButtonSize.large,
         // Disabled until acknowledged: these codes cannot be shown again, and

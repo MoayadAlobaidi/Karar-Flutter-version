@@ -8,11 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/lifecycle/startup_state.dart';
+import '../../../../l10n/karar_localization.dart';
 import '../../../../shared/shared.dart';
 import '../../domain/value_objects/password.dart';
 import '../controllers/authentication_controllers.dart';
 import '../localization/identity_failure_messages.dart';
-import '../localization/identity_strings.dart';
 import '../providers/authentication_providers.dart';
 import '../routes/identity_routes.dart';
 import '../widgets/identity_scaffold.dart';
@@ -59,7 +59,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final SignInViewState state = ref.watch(signInControllerProvider);
     final PasswordPolicy policy = ref.watch(passwordPolicyProvider);
     final bool secureStorageUnavailable = switch (widget.startupState) {
@@ -68,21 +68,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     };
 
     return IdentityScaffold(
-      title: strings.signInTitle,
+      title: l10n.signInTitle,
       children: <Widget>[
         if (secureStorageUnavailable)
           IdentityFailureNotice(
-            message: strings.signInSecureStorageNotice,
+            message: l10n.signInSecureStorageNotice,
             tone: KararStatusTone.warning,
           ),
         if (state.failure != null)
           IdentityFailureNotice(
-            message: signInFailureMessage(strings, state.failure!),
+            message: signInFailureMessage(l10n, state.failure!),
           ),
-        IdentityBody(strings.signInSubtitle),
+        IdentityBody(l10n.signInSubtitle),
         const IdentityGap.large(),
         KararTextField(
-          label: strings.signInEmailLabel,
+          label: l10n.signInEmailLabel,
           controller: _email,
           isRequired: true,
           isEnabled: !state.isSubmitting,
@@ -92,12 +92,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           prefixIcon: KararIcons.document,
           errorText: state.emailViolation == null
               ? null
-              : emailViolationMessage(strings, state.emailViolation!),
+              : emailViolationMessage(l10n, state.emailViolation!),
           onSubmitted: (_) => _passwordFocus.requestFocus(),
         ),
         const IdentityGap(),
         KararTextField(
-          label: strings.signInPasswordLabel,
+          label: l10n.signInPasswordLabel,
           controller: _password,
           focusNode: _passwordFocus,
           isRequired: true,
@@ -108,7 +108,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           errorText: state.passwordViolation == null
               ? null
               : passwordViolationMessage(
-                  strings,
+                  l10n,
                   state.passwordViolation!,
                   policy: policy,
                 ),
@@ -116,7 +116,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ),
         const IdentityGap.large(),
         KararButton(
-          label: strings.signInAction,
+          label: l10n.signInAction,
           onPressed: state.isSubmitting ? null : _submit,
           isLoading: state.isSubmitting,
           isFullWidth: true,
@@ -124,7 +124,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ),
         const IdentityGap(),
         KararButton(
-          label: strings.signInForgotPassword,
+          label: l10n.signInForgotPassword,
           variant: KararButtonVariant.tertiary,
           isFullWidth: true,
           onPressed: state.isSubmitting
@@ -133,7 +133,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ),
         const IdentityGap.small(),
         KararButton(
-          label: strings.signInCreateAccount,
+          label: l10n.signInCreateAccount,
           variant: KararButtonVariant.secondary,
           isFullWidth: true,
           onPressed:

@@ -8,10 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routing/route_paths.dart';
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/domain/value_objects/password.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/providers/authentication_providers.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import '../../authentication/presentation/widgets/sensitive_screen.dart';
@@ -60,22 +60,22 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final ResetPasswordViewState state = ref.watch(resetPasswordControllerProvider);
     final PasswordPolicy policy = ref.watch(passwordPolicyProvider);
 
     if (state.isReset) {
       return IdentityScaffold(
-        title: strings.resetPasswordTitle,
+        title: l10n.resetPasswordTitle,
         children: <Widget>[
           KararStateView.empty(
             icon: KararIcons.statusSuccess,
-            title: strings.resetPasswordSuccessTitle,
-            message: strings.resetPasswordSuccessMessage,
+            title: l10n.resetPasswordSuccessTitle,
+            message: l10n.resetPasswordSuccessMessage,
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.signInAction,
+            label: l10n.signInAction,
             isFullWidth: true,
             size: KararButtonSize.large,
             onPressed: () => context.go(RoutePaths.signIn),
@@ -86,45 +86,45 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
     return SensitiveScreen(
       child: IdentityScaffold(
-        title: strings.resetPasswordTitle,
+        title: l10n.resetPasswordTitle,
         onBack: () => context.pop(),
         children: <Widget>[
           if (state.failure != null)
             IdentityFailureNotice(
-              message: resetTokenFailureMessage(strings, state.failure!),
+              message: resetTokenFailureMessage(l10n, state.failure!),
             ),
-          IdentityBody(strings.resetPasswordSubtitle),
+          IdentityBody(l10n.resetPasswordSubtitle),
           const IdentityGap.large(),
           KararTextField(
-            label: strings.resetPasswordTokenLabel,
+            label: l10n.resetPasswordTokenLabel,
             controller: _token,
-            hint: strings.resetPasswordTokenHint,
+            hint: l10n.resetPasswordTokenHint,
             isRequired: true,
             isEnabled: !state.isSubmitting,
             textInputAction: TextInputAction.next,
-            errorText: state.tokenMissing ? strings.tokenEmpty : null,
+            errorText: state.tokenMissing ? l10n.tokenEmpty : null,
           ),
           const IdentityGap(),
           KararTextField(
-            label: strings.resetPasswordNewLabel,
+            label: l10n.resetPasswordNewLabel,
             controller: _password,
             isRequired: true,
             isEnabled: !state.isSubmitting,
             obscureText: true,
             textInputAction: TextInputAction.next,
             autofillHints: const <String>[AutofillHints.newPassword],
-            helperText: strings.registerPasswordHelp,
+            helperText: l10n.registerPasswordHelp,
             errorText: state.passwordViolation == null
                 ? null
                 : passwordViolationMessage(
-                    strings,
+                    l10n,
                     state.passwordViolation!,
                     policy: policy,
                   ),
           ),
           const IdentityGap(),
           KararTextField(
-            label: strings.registerConfirmPasswordLabel,
+            label: l10n.registerConfirmPasswordLabel,
             controller: _confirmation,
             isRequired: true,
             isEnabled: !state.isSubmitting,
@@ -132,12 +132,12 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             textInputAction: TextInputAction.done,
             autofillHints: const <String>[AutofillHints.newPassword],
             errorText:
-                state.confirmationMismatch ? strings.confirmPasswordMismatch : null,
+                state.confirmationMismatch ? l10n.confirmPasswordMismatch : null,
             onSubmitted: (_) => _submit(),
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.resetPasswordAction,
+            label: l10n.resetPasswordAction,
             onPressed: state.isSubmitting ? null : _submit,
             isLoading: state.isSubmitting,
             isFullWidth: true,

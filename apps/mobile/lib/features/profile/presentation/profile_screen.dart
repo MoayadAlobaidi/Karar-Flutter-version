@@ -11,10 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../domain/user_profile.dart';
 import 'profile_providers.dart';
-import 'profile_strings.dart';
 
 /// The profile surface.
 final class ProfileScreen extends ConsumerStatefulWidget {
@@ -36,25 +36,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = ProfileStrings.of(context);
+    final l10n = context.l10n;
     final view = ref.watch(ownProfileProvider);
     final edit = ref.watch(profileEditControllerProvider);
 
     return Scaffold(
       appBar: KararAppBar(
-        title: strings.screenTitle,
+        title: l10n.profileScreenTitle,
         onBack: () => context.pop(),
       ),
       body: SafeArea(
         top: false,
         child: view.when(
-          loading: () => KararLoadingView(subject: strings.screenTitle),
-          error: (Object error, StackTrace _) => _Unavailable(strings: strings, ref: ref),
+          loading: () => KararLoadingView(subject: l10n.profileScreenTitle),
+          error: (Object error, StackTrace _) => _Unavailable(l10n: l10n, ref: ref),
           data: (ProfileView value) => switch (value) {
-            ProfileUnavailable() => _Unavailable(strings: strings, ref: ref),
+            ProfileUnavailable() => _Unavailable(l10n: l10n, ref: ref),
             ProfileLoaded(:final profile) => _ProfileBody(
                 profile: profile,
-                strings: strings,
+                l10n: l10n,
                 edit: edit,
                 displayName: _seedController(profile),
                 onSave: () => unawaited(
@@ -85,9 +85,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 }
 
 final class _Unavailable extends StatelessWidget {
-  const _Unavailable({required this.strings, required this.ref});
+  const _Unavailable({required this.l10n, required this.ref});
 
-  final ProfileStrings strings;
+  final AppLocalizations l10n;
   final WidgetRef ref;
 
   @override
@@ -95,8 +95,8 @@ final class _Unavailable extends StatelessWidget {
         child: SingleChildScrollView(
           padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
           child: KararStateView.error(
-            title: strings.unavailableTitle,
-            message: strings.unavailableDescription,
+            title: l10n.profileUnavailableTitle,
+            message: l10n.profileUnavailableDescription,
             actionLabel: context.l10n.actionRetry,
             onAction: () => unawaited(ref.read(ownProfileProvider.notifier).refresh()),
           ),
@@ -107,14 +107,14 @@ final class _Unavailable extends StatelessWidget {
 final class _ProfileBody extends StatelessWidget {
   const _ProfileBody({
     required this.profile,
-    required this.strings,
+    required this.l10n,
     required this.edit,
     required this.displayName,
     required this.onSave,
   });
 
   final UserProfile profile;
-  final ProfileStrings strings;
+  final AppLocalizations l10n;
   final ProfileEditState edit;
   final TextEditingController displayName;
   final VoidCallback onSave;
@@ -129,8 +129,8 @@ final class _ProfileBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               KararTextField(
-                label: strings.displayNameLabel,
-                helperText: strings.displayNameHelper,
+                label: l10n.profileDisplayNameLabel,
+                helperText: l10n.profileDisplayNameHelper,
                 controller: displayName,
                 isEnabled: edit is! ProfileEditSubmitting,
                 maxLength: 120,
@@ -152,7 +152,7 @@ final class _ProfileBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               KararStatusBadge(
-                label: accountStatusLabel(profile.status, strings),
+                label: accountStatusLabel(profile.status, l10n),
                 tone: switch (profile.status) {
                   AccountStatus.active => KararStatusTone.success,
                   AccountStatus.disableRequested ||
@@ -165,29 +165,29 @@ final class _ProfileBody extends StatelessWidget {
               if (profile.status == AccountStatus.disableRequested) ...<Widget>[
                 SizedBox(height: context.spacing.md),
                 KararBanner(
-                  message: strings.statusDisableRequestedNote,
+                  message: l10n.profileStatusDisableRequestedNote,
                   tone: KararStatusTone.info,
                 ),
               ],
               SizedBox(height: context.spacing.md),
-              _Labelled(label: strings.languageLabel, value: profile.locale),
+              _Labelled(label: l10n.profileLanguageLabel, value: profile.locale),
               SizedBox(height: context.spacing.sm),
               _Labelled(
-                label: strings.residencyLabel,
-                value: profile.residencyJurisdictionRef ?? strings.notStated,
+                label: l10n.profileResidencyLabel,
+                value: profile.residencyJurisdictionRef ?? l10n.profileNotStated,
               ),
               SizedBox(height: context.spacing.sm),
-              _Labelled(label: strings.organisationLabel, value: profile.tenantId),
+              _Labelled(label: l10n.profileOrganisationLabel, value: profile.tenantId),
               SizedBox(height: context.spacing.sm),
-              _Labelled(label: strings.accountReferenceLabel, value: profile.userId),
+              _Labelled(label: l10n.profileAccountReferenceLabel, value: profile.userId),
               SizedBox(height: context.spacing.sm),
               _Labelled(
-                label: strings.memberSinceLabel,
+                label: l10n.profileMemberSinceLabel,
                 value: context.formatter.date(profile.createdAt),
               ),
               SizedBox(height: context.spacing.sm),
               _Labelled(
-                label: strings.lastUpdatedLabel,
+                label: l10n.profileLastUpdatedLabel,
                 value: context.formatter.date(profile.updatedAt),
               ),
             ],
@@ -205,16 +205,16 @@ final class _ProfileBody extends StatelessWidget {
       case ProfileEditSaved():
         return <Widget>[
           SizedBox(height: context.spacing.md),
-          KararBanner(message: strings.saveConfirmation, tone: KararStatusTone.success),
+          KararBanner(message: l10n.profileSaveConfirmation, tone: KararStatusTone.success),
         ];
       case ProfileEditRejected(:final noApprovedChanges):
         return <Widget>[
           SizedBox(height: context.spacing.md),
           KararBanner(
-            title: noApprovedChanges ? strings.noChangesTitle : strings.saveFailedTitle,
+            title: noApprovedChanges ? l10n.profileNoChangesTitle : l10n.profileSaveFailedTitle,
             message: noApprovedChanges
-                ? strings.noChangesDescription
-                : strings.saveFailedDescription,
+                ? l10n.profileNoChangesDescription
+                : l10n.profileSaveFailedDescription,
             tone: noApprovedChanges ? KararStatusTone.info : KararStatusTone.danger,
           ),
         ];
@@ -257,11 +257,11 @@ final class _Labelled extends StatelessWidget {
 }
 
 /// The label for an account status.
-String accountStatusLabel(AccountStatus status, ProfileStrings strings) =>
+String accountStatusLabel(AccountStatus status, AppLocalizations l10n) =>
     switch (status) {
-      AccountStatus.active => strings.statusActive,
-      AccountStatus.disableRequested => strings.statusDisableRequested,
-      AccountStatus.deletionRequested => strings.statusDeletionRequested,
-      AccountStatus.disabled => strings.statusDisabled,
-      AccountStatus.unrecognised => strings.statusUnrecognised,
+      AccountStatus.active => l10n.profileStatusActive,
+      AccountStatus.disableRequested => l10n.profileStatusDisableRequested,
+      AccountStatus.deletionRequested => l10n.profileStatusDeletionRequested,
+      AccountStatus.disabled => l10n.profileStatusDisabled,
+      AccountStatus.unrecognised => l10n.profileStatusUnrecognised,
     };

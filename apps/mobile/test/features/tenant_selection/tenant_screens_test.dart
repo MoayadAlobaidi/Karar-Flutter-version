@@ -19,7 +19,7 @@ import 'package:karar_mobile/features/tenant_selection/domain/tenant_binding.dar
 import 'package:karar_mobile/features/tenant_selection/presentation/organisation_screen.dart';
 import 'package:karar_mobile/features/tenant_selection/presentation/tenant_providers.dart';
 import 'package:karar_mobile/features/tenant_selection/presentation/tenant_selection_screen.dart';
-import 'package:karar_mobile/features/tenant_selection/presentation/tenant_strings.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../../core/support/fakes.dart';
 import '../platform_bootstrap/support/feature_harness.dart';
@@ -75,11 +75,11 @@ Future<({FakeBootstrapGateway gateway, List<Override> overrides})>
   );
 }
 
-TenantStrings selectionStrings(WidgetTester tester) =>
-    TenantStrings.of(tester.element(find.byType(TenantSelectionScreen)));
+AppLocalizations selectionStrings(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(TenantSelectionScreen)));
 
-TenantStrings organisationStrings(WidgetTester tester) =>
-    TenantStrings.of(tester.element(find.byType(OrganisationScreen)));
+AppLocalizations organisationStrings(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(OrganisationScreen)));
 
 void main() {
   group('the selection gate', () {
@@ -189,11 +189,11 @@ void main() {
             ...(await coordinatorHarness()).overrides,
           ],
         );
-        final strings = selectionStrings(tester);
+        final l10n = selectionStrings(tester);
 
-        expect(find.text(strings.noMembershipTitle), findsOneWidget);
-        expect(find.text(strings.noMembershipDescription), findsOneWidget);
-        expect(find.text(strings.invitationHeading), findsOneWidget);
+        expect(find.text(l10n.tenantNoMembershipTitle), findsOneWidget);
+        expect(find.text(l10n.tenantNoMembershipDescription), findsOneWidget);
+        expect(find.text(l10n.tenantInvitationHeading), findsOneWidget);
         expect(find.text('First Organisation'), findsNothing);
       },
       textScales: featureTextScales,
@@ -216,14 +216,14 @@ void main() {
           ...harness.overrides,
         ],
       );
-      final strings = selectionStrings(tester);
+      final l10n = selectionStrings(tester);
 
       await tester.enterText(find.byType(TextField), 'invitation-code');
-      await tester.tap(find.text(strings.invitationAction));
+      await tester.tap(find.text(l10n.tenantInvitationAction));
       await tester.pumpAndSettle();
 
       expect(repository.tokens, <String>['invitation-code']);
-      expect(find.text(strings.invitationRedeemed), findsOneWidget);
+      expect(find.text(l10n.tenantInvitationRedeemed), findsOneWidget);
       expect(harness.gateway.callCount, greaterThan(0));
     });
 
@@ -242,9 +242,9 @@ void main() {
           ...(await coordinatorHarness()).overrides,
         ],
       );
-      final strings = selectionStrings(tester);
+      final l10n = selectionStrings(tester);
 
-      await tester.tap(find.text(strings.invitationAction));
+      await tester.tap(find.text(l10n.tenantInvitationAction));
       await tester.pumpAndSettle();
 
       expect(repository.tokens, isEmpty);
@@ -269,12 +269,12 @@ void main() {
             ...(await coordinatorHarness()).overrides,
           ],
         );
-        final strings = selectionStrings(tester);
+        final l10n = selectionStrings(tester);
 
         await tester.tap(find.text('Second Organisation'));
         await tester.pumpAndSettle();
 
-        expect(find.text(strings.membershipRefusedTitle), findsOneWidget);
+        expect(find.text(l10n.tenantMembershipRefusedTitle), findsOneWidget);
       },
     );
 
@@ -297,12 +297,12 @@ void main() {
             ...(await coordinatorHarness()).overrides,
           ],
         );
-        final strings = selectionStrings(tester);
+        final l10n = selectionStrings(tester);
 
         await tester.tap(find.text('Second Organisation'));
         await tester.pumpAndSettle();
 
-        expect(find.text(strings.membershipChangedTitle), findsOneWidget);
+        expect(find.text(l10n.tenantMembershipChangedTitle), findsOneWidget);
       },
     );
   });
@@ -323,11 +323,11 @@ void main() {
             ...(await coordinatorHarness()).overrides,
           ],
         );
-        final strings = organisationStrings(tester);
+        final l10n = organisationStrings(tester);
 
         expect(find.text('First Organisation'), findsOneWidget);
-        expect(find.text(strings.currentOrganisationLabel), findsOneWidget);
-        expect(find.text(strings.noAlternativesTitle), findsOneWidget);
+        expect(find.text(l10n.tenantCurrentOrganisationLabel), findsOneWidget);
+        expect(find.text(l10n.tenantNoAlternativesTitle), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
         expect(
           directionUnder(tester, find.byType(OrganisationScreen)),
@@ -350,9 +350,9 @@ void main() {
             ...(await coordinatorHarness()).overrides,
           ],
         );
-        final strings = organisationStrings(tester);
+        final l10n = organisationStrings(tester);
 
-        expect(find.text(strings.unboundTitle), findsOneWidget);
+        expect(find.text(l10n.tenantUnboundTitle), findsOneWidget);
       },
     );
 
@@ -381,7 +381,7 @@ void main() {
           ...harness.overrides,
         ],
       );
-      final strings = organisationStrings(tester);
+      final l10n = organisationStrings(tester);
 
       await tester.tap(find.text('Second Organisation'));
       await tester.pumpAndSettle();
@@ -389,7 +389,7 @@ void main() {
       expect(scopedState.discards, 1);
       expect(repository.boundTenantIds, <String>['tenant-0002']);
       expect(harness.gateway.callCount, greaterThan(0));
-      expect(find.text(strings.switchedConfirmation), findsOneWidget);
+      expect(find.text(l10n.tenantSwitchedConfirmation), findsOneWidget);
     });
 
     testInBothDirections(

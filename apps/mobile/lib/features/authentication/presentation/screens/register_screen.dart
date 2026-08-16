@@ -11,11 +11,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/routing/route_paths.dart';
+import '../../../../l10n/karar_localization.dart';
 import '../../../../shared/shared.dart';
 import '../../domain/value_objects/password.dart';
 import '../controllers/authentication_controllers.dart';
 import '../localization/identity_failure_messages.dart';
-import '../localization/identity_strings.dart';
 import '../providers/authentication_providers.dart';
 import '../routes/identity_routes.dart';
 import '../widgets/identity_scaffold.dart';
@@ -49,30 +49,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final RegisterViewState state = ref.watch(registerControllerProvider);
     final PasswordPolicy policy = ref.watch(passwordPolicyProvider);
 
     if (state.isAcknowledged) {
       return IdentityScaffold(
-        title: strings.registerTitle,
+        title: l10n.registerTitle,
         onBack: () => context.pop(),
         children: <Widget>[
           KararStateView.empty(
             icon: KararIcons.statusSuccess,
-            title: strings.registerAcknowledgementTitle,
-            message: strings.registerAcknowledgementMessage,
+            title: l10n.registerAcknowledgementTitle,
+            message: l10n.registerAcknowledgementMessage,
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.verifyEmailTitle,
+            label: l10n.verifyEmailTitle,
             isFullWidth: true,
             size: KararButtonSize.large,
             onPressed: () => context.go(IdentityRoutes.verifyEmailPreAuth),
           ),
           const IdentityGap.small(),
           KararButton(
-            label: strings.registerBackToSignIn,
+            label: l10n.registerBackToSignIn,
             variant: KararButtonVariant.tertiary,
             isFullWidth: true,
             onPressed: () => context.go(RoutePaths.signIn),
@@ -82,17 +82,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     return IdentityScaffold(
-      title: strings.registerTitle,
+      title: l10n.registerTitle,
       onBack: () => context.pop(),
       children: <Widget>[
         if (state.failure != null)
           IdentityFailureNotice(
-            message: identityFailureMessage(strings, state.failure!),
+            message: identityFailureMessage(l10n, state.failure!),
           ),
-        IdentityBody(strings.registerSubtitle),
+        IdentityBody(l10n.registerSubtitle),
         const IdentityGap.large(),
         KararTextField(
-          label: strings.signInEmailLabel,
+          label: l10n.signInEmailLabel,
           controller: _email,
           isRequired: true,
           isEnabled: !state.isSubmitting,
@@ -101,37 +101,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           autofillHints: const <String>[AutofillHints.username],
           errorText: state.emailViolation == null
               ? null
-              : emailViolationMessage(strings, state.emailViolation!),
+              : emailViolationMessage(l10n, state.emailViolation!),
         ),
         const IdentityGap(),
         KararTextField(
-          label: strings.signInPasswordLabel,
+          label: l10n.signInPasswordLabel,
           controller: _password,
           isRequired: true,
           isEnabled: !state.isSubmitting,
           obscureText: true,
           textInputAction: TextInputAction.next,
           autofillHints: const <String>[AutofillHints.newPassword],
-          helperText: strings.registerPasswordHelp,
+          helperText: l10n.registerPasswordHelp,
           errorText: state.passwordViolation == null
               ? null
-              : passwordViolationMessage(strings, state.passwordViolation!, policy: policy),
+              : passwordViolationMessage(l10n, state.passwordViolation!, policy: policy),
         ),
         const IdentityGap(),
         KararTextField(
-          label: strings.registerConfirmPasswordLabel,
+          label: l10n.registerConfirmPasswordLabel,
           controller: _confirmation,
           isRequired: true,
           isEnabled: !state.isSubmitting,
           obscureText: true,
           textInputAction: TextInputAction.done,
           autofillHints: const <String>[AutofillHints.newPassword],
-          errorText: state.confirmationMismatch ? strings.confirmPasswordMismatch : null,
+          errorText: state.confirmationMismatch ? l10n.confirmPasswordMismatch : null,
           onSubmitted: (_) => _submit(),
         ),
         const IdentityGap.large(),
         KararButton(
-          label: strings.registerAction,
+          label: l10n.registerAction,
           onPressed: state.isSubmitting ? null : _submit,
           isLoading: state.isSubmitting,
           isFullWidth: true,

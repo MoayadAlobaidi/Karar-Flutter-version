@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/networking/http_method.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/screens/register_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/identity_harness.dart';
 
@@ -26,7 +26,7 @@ Future<List<String>> _registerAndCapture(
   required JsonMapFixture body,
   required Locale locale,
   required double textScale,
-  required IdentityStrings strings,
+  required AppLocalizations l10n,
 }) async {
   final IdentityHarness harness = IdentityHarness();
   harness.transport.onPost('/auth/register', body, statusCode: 202);
@@ -36,7 +36,7 @@ Future<List<String>> _registerAndCapture(
   await enterIdentityField(tester, 0, 'person@example.test');
   await enterIdentityField(tester, 1, 'correct-horse-battery');
   await enterIdentityField(tester, 2, 'correct-horse-battery');
-  await tapIdentityButton(tester, strings.registerAction);
+  await tapIdentityButton(tester, l10n.registerAction);
   await tester.pumpAndSettle();
 
   final List<String> rendered = _renderedText(tester);
@@ -53,14 +53,13 @@ void main() {
   testEveryDirectionAndScale('renders the form in the locale direction',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(tester, const RegisterScreen(),
         harness: harness, locale: locale, textScale: textScale);
 
-    expect(find.text(strings.registerSubtitle), findsOneWidget);
-    expect(find.text(strings.registerConfirmPasswordLabel), findsOneWidget);
+    expect(find.text(l10n.registerSubtitle), findsOneWidget);
+    expect(find.text(l10n.registerConfirmPasswordLabel), findsOneWidget);
     expect(
       Directionality.of(tester.element(find.byType(RegisterScreen))),
       locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -71,9 +70,7 @@ void main() {
   testEveryDirectionAndScale(
     'a new address and an already-registered address render identically',
     (WidgetTester tester, Locale locale, double textScale) async {
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       final List<String> fresh = await _registerAndCapture(
         tester,
@@ -83,7 +80,7 @@ void main() {
         },
         locale: locale,
         textScale: textScale,
-        strings: strings,
+        l10n: l10n,
       );
 
       final List<String> existing = await _registerAndCapture(
@@ -96,13 +93,13 @@ void main() {
         },
         locale: locale,
         textScale: textScale,
-        strings: strings,
+        l10n: l10n,
       );
 
       // Identical, not merely similar. Any difference at all — a word, a
       // count, a timestamp — tells an attacker whether the address exists.
       expect(existing, equals(fresh));
-      expect(fresh, contains(strings.registerAcknowledgementMessage));
+      expect(fresh, contains(l10n.registerAcknowledgementMessage));
       // Nothing the server wrote is on screen.
       expect(
         fresh.where((String value) => value.contains('already registered')),
@@ -115,26 +112,24 @@ void main() {
   testEveryDirectionAndScale('rejects a mismatched confirmation before sending',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(tester, const RegisterScreen(),
         harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await enterIdentityField(tester, 2, 'correct-horse-batteryX');
-    await tapIdentityButton(tester, strings.registerAction);
+    await tapIdentityButton(tester, l10n.registerAction);
     await tester.pumpAndSettle();
 
-    expect(find.text(strings.confirmPasswordMismatch), findsOneWidget);
+    expect(find.text(l10n.confirmPasswordMismatch), findsOneWidget);
     expect(harness.transport.requests, isEmpty);
   });
 
   testEveryDirectionAndScale('surfaces a rate limit without a diagnostic',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.failWith(
       HttpMethod.post,
       '/auth/register',
@@ -147,10 +142,10 @@ void main() {
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await enterIdentityField(tester, 2, 'correct-horse-battery');
-    await tapIdentityButton(tester, strings.registerAction);
+    await tapIdentityButton(tester, l10n.registerAction);
     await tester.pumpAndSettle();
 
-    expect(find.text(strings.failureRateLimited), findsOneWidget);
+    expect(find.text(l10n.failureRateLimited), findsOneWidget);
     expect(find.textContaining('BUDGET_EXHAUSTED'), findsNothing);
     expect(find.textContaining('429'), findsNothing);
   });

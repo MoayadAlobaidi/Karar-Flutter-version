@@ -8,10 +8,10 @@ import 'package:karar_mobile/core/networking/http_method.dart';
 import 'package:karar_mobile/features/authentication/domain/entities/neutral_receipt.dart';
 import 'package:karar_mobile/features/authentication/domain/value_objects/email_address.dart';
 import 'package:karar_mobile/features/authentication/domain/value_objects/password.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/email_verification/domain/email_verification_repository.dart';
 import 'package:karar_mobile/features/email_verification/presentation/email_verification_providers.dart';
 import 'package:karar_mobile/features/email_verification/presentation/verify_email_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../authentication/support/identity_harness.dart';
 
@@ -124,15 +124,13 @@ void main() {
     testEveryDirectionAndScale('renders in the locale direction',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const VerifyEmailScreen(),
           harness: harness, locale: locale, textScale: textScale);
 
-      expect(find.text(strings.verifyEmailSubtitle), findsOneWidget);
-      expect(find.text(strings.verifyEmailCodeLabel), findsOneWidget);
+      expect(find.text(l10n.verifyEmailSubtitle), findsOneWidget);
+      expect(find.text(l10n.verifyEmailCodeLabel), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(VerifyEmailScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -143,9 +141,7 @@ void main() {
     testEveryDirectionAndScale('a rejected code shows one generic message',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.failWith(
         HttpMethod.post,
         '/auth/verify-email',
@@ -157,20 +153,18 @@ void main() {
           harness: harness, locale: locale, textScale: textScale);
       await enterIdentityField(tester, 0, 'person@example.test');
       await enterIdentityField(tester, 1, 'WRONGONE');
-      await tapIdentityButton(tester, strings.verifyEmailAction);
+      await tapIdentityButton(tester, l10n.verifyEmailAction);
       await tester.pumpAndSettle();
 
       // Wrong, expired, capped and unknown codes are one answer.
-      expect(find.text(strings.verifyEmailInvalidCode), findsOneWidget);
+      expect(find.text(l10n.verifyEmailInvalidCode), findsOneWidget);
       expect(find.textContaining('401'), findsNothing);
     });
 
     testEveryDirectionAndScale(
       'every resend outcome renders the same acknowledgement',
       (WidgetTester tester, Locale locale, double textScale) async {
-        final IdentityStrings strings = locale.languageCode == 'ar'
-            ? IdentityStrings.arabic
-            : IdentityStrings.english;
+        final AppLocalizations l10n = lookupAppLocalizations(locale);
         final List<List<String>> renderings = <List<String>>[];
 
         for (final Map<String, Object?> body in <Map<String, Object?>>[
@@ -187,7 +181,7 @@ void main() {
           await pumpIdentity(tester, const VerifyEmailScreen(),
               harness: harness, locale: locale, textScale: textScale);
           await enterIdentityField(tester, 0, 'person@example.test');
-          await tapIdentityButton(tester, strings.verifyEmailResendAction);
+          await tapIdentityButton(tester, l10n.verifyEmailResendAction);
           await tester.pumpAndSettle();
 
           renderings.add(_renderedText(tester));
@@ -196,7 +190,7 @@ void main() {
         }
 
         expect(renderings[1], equals(renderings[0]));
-        expect(renderings[0], contains(strings.verifyEmailResendAcknowledgement));
+        expect(renderings[0], contains(l10n.verifyEmailResendAcknowledgement));
         expect(
           renderings[0].where((String value) => value.contains('already verified')),
           isEmpty,

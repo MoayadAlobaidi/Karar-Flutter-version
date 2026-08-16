@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../l10n/karar_localization.dart';
 import '../../../../shared/shared.dart';
 import '../../domain/value_objects/password.dart';
 import '../controllers/authentication_controllers.dart';
 import '../localization/identity_failure_messages.dart';
-import '../localization/identity_strings.dart';
 import '../providers/authentication_providers.dart';
 import '../widgets/identity_scaffold.dart';
 import '../widgets/sensitive_screen.dart';
@@ -44,23 +44,23 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final ChangePasswordViewState state = ref.watch(changePasswordControllerProvider);
     final PasswordPolicy policy = ref.watch(passwordPolicyProvider);
 
     if (state.isChanged) {
       return IdentityScaffold(
-        title: strings.changePasswordTitle,
+        title: l10n.changePasswordTitle,
         onBack: () => context.pop(),
         children: <Widget>[
           KararStateView.empty(
             icon: KararIcons.statusSuccess,
-            title: strings.changePasswordSuccessTitle,
-            message: strings.changePasswordSuccessMessage,
+            title: l10n.changePasswordSuccessTitle,
+            message: l10n.changePasswordSuccessMessage,
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.mfaRecoveryCodesDone,
+            label: l10n.actionDone,
             isFullWidth: true,
             size: KararButtonSize.large,
             onPressed: () => context.pop(),
@@ -71,46 +71,46 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
     return SensitiveScreen(
       child: IdentityScaffold(
-        title: strings.changePasswordTitle,
+        title: l10n.changePasswordTitle,
         onBack: () => context.pop(),
         children: <Widget>[
           if (state.failure != null)
             IdentityFailureNotice(
-              message: changePasswordFailureMessage(strings, state.failure!),
+              message: changePasswordFailureMessage(l10n, state.failure!),
             ),
-          IdentityBody(strings.changePasswordSubtitle),
+          IdentityBody(l10n.changePasswordSubtitle),
           const IdentityGap.large(),
           KararTextField(
-            label: strings.changePasswordCurrentLabel,
+            label: l10n.changePasswordCurrentLabel,
             controller: _current,
             isRequired: true,
             isEnabled: !state.isSubmitting,
             obscureText: true,
             textInputAction: TextInputAction.next,
             autofillHints: const <String>[AutofillHints.password],
-            errorText: state.currentMissing ? strings.passwordEmpty : null,
+            errorText: state.currentMissing ? l10n.passwordEmpty : null,
           ),
           const IdentityGap(),
           KararTextField(
-            label: strings.changePasswordNewLabel,
+            label: l10n.changePasswordNewLabel,
             controller: _next,
             isRequired: true,
             isEnabled: !state.isSubmitting,
             obscureText: true,
             textInputAction: TextInputAction.next,
             autofillHints: const <String>[AutofillHints.newPassword],
-            helperText: strings.registerPasswordHelp,
+            helperText: l10n.registerPasswordHelp,
             errorText: state.passwordViolation == null
                 ? null
                 : passwordViolationMessage(
-                    strings,
+                    l10n,
                     state.passwordViolation!,
                     policy: policy,
                   ),
           ),
           const IdentityGap(),
           KararTextField(
-            label: strings.registerConfirmPasswordLabel,
+            label: l10n.registerConfirmPasswordLabel,
             controller: _confirmation,
             isRequired: true,
             isEnabled: !state.isSubmitting,
@@ -118,12 +118,12 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             textInputAction: TextInputAction.done,
             autofillHints: const <String>[AutofillHints.newPassword],
             errorText:
-                state.confirmationMismatch ? strings.confirmPasswordMismatch : null,
+                state.confirmationMismatch ? l10n.confirmPasswordMismatch : null,
             onSubmitted: (_) => _submit(),
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.changePasswordAction,
+            label: l10n.changePasswordAction,
             onPressed: state.isSubmitting ? null : _submit,
             isLoading: state.isSubmitting,
             isFullWidth: true,

@@ -16,11 +16,11 @@ import 'package:go_router/go_router.dart';
 import '../../../app/dependency_injection/providers.dart';
 import '../../../app/lifecycle/bootstrap_snapshot.dart' as shell;
 import '../../../app/lifecycle/startup_state.dart';
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../domain/tenant_binding.dart';
 import 'tenant_providers.dart';
 import 'tenant_selection_screen.dart' show tenantChoicesOf;
-import 'tenant_strings.dart';
 
 /// The binding as this feature reads it from the shell.
 @immutable
@@ -64,13 +64,13 @@ final class OrganisationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final strings = TenantStrings.of(context);
+    final l10n = context.l10n;
     final view = ref.watch(tenantBindingViewProvider);
     final binding = ref.watch(tenantBindingControllerProvider);
 
     return Scaffold(
       appBar: KararAppBar(
-        title: strings.organisationTitle,
+        title: l10n.tenantOrganisationTitle,
         onBack: () => context.pop(),
       ),
       body: SafeArea(
@@ -80,11 +80,11 @@ final class OrganisationScreen extends ConsumerWidget {
             : ListView(
                 padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
                 children: <Widget>[
-                  _CurrentCard(view: view, strings: strings),
+                  _CurrentCard(view: view, l10n: l10n),
                   SizedBox(height: context.spacing.sectionGap),
                   _SwitchCard(
                     view: view,
-                    strings: strings,
+                    l10n: l10n,
                     binding: binding,
                     onSwitch: (TenantChoice choice) => unawaited(
                       ref.read(tenantBindingControllerProvider.notifier).switchTo(choice),
@@ -98,10 +98,10 @@ final class OrganisationScreen extends ConsumerWidget {
 }
 
 final class _CurrentCard extends StatelessWidget {
-  const _CurrentCard({required this.view, required this.strings});
+  const _CurrentCard({required this.view, required this.l10n});
 
   final TenantBindingView view;
-  final TenantStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -109,8 +109,8 @@ final class _CurrentCard extends StatelessWidget {
     if (current == null) {
       return KararCard(
         child: KararBanner(
-          title: strings.unboundTitle,
-          message: strings.unboundDescription,
+          title: l10n.tenantUnboundTitle,
+          message: l10n.tenantUnboundDescription,
           tone: KararStatusTone.info,
         ),
       );
@@ -120,7 +120,7 @@ final class _CurrentCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            strings.currentOrganisationLabel,
+            l10n.tenantCurrentOrganisationLabel,
             textAlign: TextAlign.start,
             style: context.typography.labelMedium.copyWith(
               color: context.colors.contentSecondary,
@@ -139,7 +139,7 @@ final class _CurrentCard extends StatelessWidget {
           // pair keeps a long role readable at a large text scale in both
           // reading directions.
           Text(
-            strings.roleLabel,
+            l10n.tenantRoleLabel,
             textAlign: TextAlign.start,
             style: context.typography.labelMedium.copyWith(
               color: context.colors.contentSecondary,
@@ -161,13 +161,13 @@ final class _CurrentCard extends StatelessWidget {
 final class _SwitchCard extends StatelessWidget {
   const _SwitchCard({
     required this.view,
-    required this.strings,
+    required this.l10n,
     required this.binding,
     required this.onSwitch,
   });
 
   final TenantBindingView view;
-  final TenantStrings strings;
+  final AppLocalizations l10n;
   final TenantBindingUiState binding;
   final ValueChanged<TenantChoice> onSwitch;
 
@@ -184,7 +184,7 @@ final class _SwitchCard extends StatelessWidget {
           Semantics(
             header: true,
             child: Text(
-              strings.switchHeading,
+              l10n.tenantSwitchHeading,
               textAlign: TextAlign.start,
               style: context.typography.titleMedium.copyWith(
                 color: context.colors.contentPrimary,
@@ -193,7 +193,7 @@ final class _SwitchCard extends StatelessWidget {
           ),
           SizedBox(height: context.spacing.sm),
           Text(
-            strings.switchDescription,
+            l10n.tenantSwitchDescription,
             textAlign: TextAlign.start,
             style: context.typography.bodySmall.copyWith(
               color: context.colors.contentSecondary,
@@ -202,8 +202,8 @@ final class _SwitchCard extends StatelessWidget {
           SizedBox(height: context.spacing.md),
           if (view.alternatives.isEmpty)
             KararBanner(
-              title: strings.noAlternativesTitle,
-              message: strings.noAlternativesDescription,
+              title: l10n.tenantNoAlternativesTitle,
+              message: l10n.tenantNoAlternativesDescription,
               tone: KararStatusTone.info,
             )
           else
@@ -212,9 +212,9 @@ final class _SwitchCard extends StatelessWidget {
                 padding: EdgeInsetsDirectional.only(bottom: context.spacing.sm),
                 child: KararListRow(
                   title: choice.name,
-                  subtitle: strings.roleWithValue(choice.roleHint),
+                  subtitle: l10n.tenantRoleValuePattern(l10n.tenantRoleLabel, choice.roleHint),
                   semanticLabel:
-                      context.l10n.a11yTitleWithSubtitle(strings.switchAction, choice.name),
+                      context.l10n.a11yTitleWithSubtitle(l10n.tenantSwitchAction, choice.name),
                   trailing: submittingId == choice.tenantId
                       ? const KararLoadingIndicator.inline()
                       : null,
@@ -225,8 +225,8 @@ final class _SwitchCard extends StatelessWidget {
             SizedBox(height: context.spacing.md),
             KararBanner(
               message: (binding as TenantBindingConfirmed).outcome is TenantSwitched
-                  ? strings.switchedConfirmation
-                  : strings.boundConfirmation,
+                  ? l10n.tenantSwitchedConfirmation
+                  : l10n.tenantBoundConfirmation,
               tone: KararStatusTone.success,
             ),
           ],
@@ -234,11 +234,11 @@ final class _SwitchCard extends StatelessWidget {
             SizedBox(height: context.spacing.md),
             KararBanner(
               title: (binding as TenantBindingRejected).membershipChangedConcurrently
-                  ? strings.membershipChangedTitle
-                  : strings.selectionFailedTitle,
+                  ? l10n.tenantMembershipChangedTitle
+                  : l10n.tenantSelectionFailedTitle,
               message: (binding as TenantBindingRejected).membershipChangedConcurrently
-                  ? strings.membershipChangedDescription
-                  : strings.selectionFailedDescription,
+                  ? l10n.tenantMembershipChangedDescription
+                  : l10n.tenantSelectionFailedDescription,
               tone: KararStatusTone.danger,
             ),
           ],

@@ -9,9 +9,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import '../../authentication/presentation/widgets/sensitive_screen.dart';
 import 'mfa_providers.dart';
@@ -46,21 +46,21 @@ class _MfaChallengeScreenState extends ConsumerState<MfaChallengeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final MfaChallengeViewState state = ref.watch(mfaChallengeControllerProvider);
     final bool isRecovery = state.mode == MfaChallengeMode.recoveryCode;
 
     if (state.isExpired) {
       return IdentityScaffold(
-        title: strings.mfaChallengeTitle,
+        title: l10n.mfaChallengeTitle,
         children: <Widget>[
           KararStateView.error(
-            title: strings.mfaChallengeTitle,
-            message: strings.mfaChallengeExpired,
+            title: l10n.mfaChallengeTitle,
+            message: l10n.mfaChallengeExpired,
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.mfaChallengeAbandon,
+            label: l10n.mfaChallengeAbandon,
             isFullWidth: true,
             size: KararButtonSize.large,
             onPressed: () => ref.read(mfaChallengeControllerProvider.notifier).abandon(),
@@ -71,33 +71,33 @@ class _MfaChallengeScreenState extends ConsumerState<MfaChallengeScreen> {
 
     return SensitiveScreen(
       child: IdentityScaffold(
-        title: strings.mfaChallengeTitle,
+        title: l10n.mfaChallengeTitle,
         children: <Widget>[
           if (state.failure != null)
             IdentityFailureNotice(
-              message: mfaChallengeFailureMessage(strings, state.failure!),
+              message: mfaChallengeFailureMessage(l10n, state.failure!),
             ),
           IdentityBody(
-            isRecovery ? strings.mfaRecoveryCodeSubtitle : strings.mfaChallengeSubtitle,
+            isRecovery ? l10n.mfaRecoveryCodeSubtitle : l10n.mfaChallengeSubtitle,
           ),
           const IdentityGap.large(),
           KararTextField(
             // The key forces a fresh field when the mode changes, so the
             // label, hint and keyboard all switch together.
             key: ValueKey<MfaChallengeMode>(state.mode),
-            label: isRecovery ? strings.mfaRecoveryCodeLabel : strings.mfaCodeLabel,
+            label: isRecovery ? l10n.mfaRecoveryCodeLabel : l10n.mfaCodeLabel,
             controller: _code,
-            hint: isRecovery ? strings.mfaRecoveryCodeHint : strings.mfaCodeHint,
+            hint: isRecovery ? l10n.mfaRecoveryCodeHint : l10n.mfaCodeHint,
             isRequired: true,
             isEnabled: !state.isSubmitting,
             keyboardType: isRecovery ? TextInputType.text : TextInputType.number,
             normalizeArabicDigits: true,
-            errorText: state.codeMissing ? strings.codeEmpty : null,
+            errorText: state.codeMissing ? l10n.codeEmpty : null,
             onSubmitted: (_) => _submit(),
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.mfaChallengeAction,
+            label: l10n.actionContinue,
             onPressed: state.isSubmitting ? null : _submit,
             isLoading: state.isSubmitting,
             isFullWidth: true,
@@ -106,8 +106,8 @@ class _MfaChallengeScreenState extends ConsumerState<MfaChallengeScreen> {
           const IdentityGap(),
           KararButton(
             label: isRecovery
-                ? strings.mfaChallengeUseTotp
-                : strings.mfaChallengeUseRecovery,
+                ? l10n.mfaChallengeUseTotp
+                : l10n.mfaChallengeUseRecovery,
             variant: KararButtonVariant.secondary,
             isFullWidth: true,
             onPressed: state.isSubmitting
@@ -120,7 +120,7 @@ class _MfaChallengeScreenState extends ConsumerState<MfaChallengeScreen> {
           ),
           const IdentityGap.small(),
           KararButton(
-            label: strings.mfaChallengeAbandon,
+            label: l10n.mfaChallengeAbandon,
             variant: KararButtonVariant.tertiary,
             isFullWidth: true,
             onPressed: state.isSubmitting

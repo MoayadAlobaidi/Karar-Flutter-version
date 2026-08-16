@@ -29,12 +29,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../domain/consent_repository.dart';
 import '../domain/consent_state.dart';
 import '../domain/legal_document.dart';
 import 'consent_providers.dart';
-import 'consent_strings.dart';
 
 /// Consent status per purpose, and the actions over it.
 final class ConsentScreen extends ConsumerWidget {
@@ -42,27 +42,27 @@ final class ConsentScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final strings = ConsentStrings.of(context);
+    final l10n = context.l10n;
     final surface = ref.watch(consentSurfaceControllerProvider);
 
     return Scaffold(
       appBar: KararAppBar(
-        title: strings.screenTitle,
+        title: l10n.consentScreenTitle,
         onBack: () => context.pop(),
       ),
       body: SafeArea(
         top: false,
         child: surface.when(
-          loading: () => KararLoadingView(subject: strings.screenTitle),
+          loading: () => KararLoadingView(subject: l10n.consentScreenTitle),
           error: (Object error, StackTrace _) => KararStateView.error(
-            title: strings.surfaceUnavailableTitle,
-            message: strings.surfaceUnavailableDescription,
+            title: l10n.consentSurfaceUnavailableTitle,
+            message: l10n.consentSurfaceUnavailableDescription,
             actionLabel: context.l10n.actionRetry,
             onAction: () => unawaited(
               ref.read(consentSurfaceControllerProvider.notifier).refresh(),
             ),
           ),
-          data: (ConsentSurface value) => _SurfaceBody(surface: value, strings: strings),
+          data: (ConsentSurface value) => _SurfaceBody(surface: value, l10n: l10n),
         ),
       ),
     );
@@ -70,10 +70,10 @@ final class ConsentScreen extends ConsumerWidget {
 }
 
 final class _SurfaceBody extends ConsumerWidget {
-  const _SurfaceBody({required this.surface, required this.strings});
+  const _SurfaceBody({required this.surface, required this.l10n});
 
   final ConsentSurface surface;
-  final ConsentStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,8 +84,8 @@ final class _SurfaceBody extends ConsumerWidget {
           child: SingleChildScrollView(
             padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
             child: KararStateView.error(
-              title: strings.surfaceUnavailableTitle,
-              message: strings.surfaceUnavailableDescription,
+              title: l10n.consentSurfaceUnavailableTitle,
+              message: l10n.consentSurfaceUnavailableDescription,
               detail:
                   reference == null ? null : context.l10n.stateErrorReference(reference),
               actionLabel: context.l10n.actionRetry,
@@ -101,8 +101,8 @@ final class _SurfaceBody extends ConsumerWidget {
             child: SingleChildScrollView(
               padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
               child: KararStateView.empty(
-                title: strings.nothingToAgreeTitle,
-                message: strings.nothingToAgreeDescription,
+                title: l10n.consentNothingToAgreeTitle,
+                message: l10n.consentNothingToAgreeDescription,
               ),
             ),
           );
@@ -111,7 +111,7 @@ final class _SurfaceBody extends ConsumerWidget {
           padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
           children: <Widget>[
             Text(
-              strings.screenDescription,
+              l10n.consentScreenDescription,
               textAlign: TextAlign.start,
               style: context.typography.bodySmall.copyWith(
                 color: context.colors.contentSecondary,
@@ -121,7 +121,7 @@ final class _SurfaceBody extends ConsumerWidget {
             for (final overview in purposes)
               Padding(
                 padding: EdgeInsetsDirectional.only(bottom: context.spacing.sectionGap),
-                child: _PurposeCard(overview: overview, strings: strings),
+                child: _PurposeCard(overview: overview, l10n: l10n),
               ),
           ],
         );
@@ -130,10 +130,10 @@ final class _SurfaceBody extends ConsumerWidget {
 }
 
 final class _PurposeCard extends ConsumerWidget {
-  const _PurposeCard({required this.overview, required this.strings});
+  const _PurposeCard({required this.overview, required this.l10n});
 
   final ConsentOverview overview;
-  final ConsentStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -146,14 +146,14 @@ final class _PurposeCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           KararStatusBadge(
-            label: consentStateLabel(overview.state, strings),
+            label: consentStateLabel(overview.state, l10n),
             tone: consentStateTone(overview.state),
           ),
           SizedBox(height: context.spacing.md),
-          _Labelled(label: strings.purposeLabel, value: overview.purposeRef),
+          _Labelled(label: l10n.consentPurposeLabel, value: overview.purposeRef),
           SizedBox(height: context.spacing.sm),
           Text(
-            consentStateDescription(overview.state, strings),
+            consentStateDescription(overview.state, l10n),
             textAlign: TextAlign.start,
             style: context.typography.bodyMedium.copyWith(
               color: context.colors.contentSecondary,
@@ -161,11 +161,11 @@ final class _PurposeCard extends ConsumerWidget {
           ),
           if (overview.noticeRequired && overview.state == ConsentState.active) ...<Widget>[
             SizedBox(height: context.spacing.md),
-            KararBanner(message: strings.noticeRequiredNote, tone: KararStatusTone.info),
+            KararBanner(message: l10n.consentNoticeRequiredNote, tone: KararStatusTone.info),
           ],
           if (overview.document != null) ...<Widget>[
             SizedBox(height: context.spacing.md),
-            _DocumentDetails(document: overview.document!, strings: strings),
+            _DocumentDetails(document: overview.document!, l10n: l10n),
           ],
           ..._blockers(context),
           ..._actions(context, ref, isSubmitting: isSubmitting),
@@ -187,9 +187,9 @@ final class _PurposeCard extends ConsumerWidget {
           padding: EdgeInsetsDirectional.only(bottom: context.spacing.sm),
           child: KararBanner(
             message: switch (blocker) {
-              ConsentBlocker.jurisdictionNotAssigned => strings.blockerJurisdiction,
-              ConsentBlocker.policyPackNotApproved => strings.blockerPolicy,
-              ConsentBlocker.operatingEntityNotAssigned => strings.blockerEntity,
+              ConsentBlocker.jurisdictionNotAssigned => l10n.consentBlockerJurisdiction,
+              ConsentBlocker.policyPackNotApproved => l10n.consentBlockerPolicy,
+              ConsentBlocker.operatingEntityNotAssigned => l10n.consentBlockerEntity,
             },
             tone: KararStatusTone.warning,
           ),
@@ -209,7 +209,7 @@ final class _PurposeCard extends ConsumerWidget {
         if (overview.state == ConsentState.reconsentRequired) ...<Widget>[
           SizedBox(height: context.spacing.md),
           Text(
-            strings.reconsentCreatesNewGrantNote,
+            l10n.consentReconsentCreatesNewGrantNote,
             textAlign: TextAlign.start,
             style: context.typography.bodySmall.copyWith(
               color: context.colors.contentSecondary,
@@ -218,7 +218,7 @@ final class _PurposeCard extends ConsumerWidget {
         ],
         SizedBox(height: context.spacing.md),
         KararButton(
-          label: strings.acceptAction,
+          label: l10n.consentAcceptAction,
           isFullWidth: true,
           isLoading: isSubmitting,
           onPressed: () => unawaited(
@@ -234,10 +234,10 @@ final class _PurposeCard extends ConsumerWidget {
     if (overview.canWithdraw && grant != null) {
       return <Widget>[
         SizedBox(height: context.spacing.md),
-        _Labelled(label: strings.grantReferenceLabel, value: grant.grantId),
+        _Labelled(label: l10n.consentGrantReferenceLabel, value: grant.grantId),
         SizedBox(height: context.spacing.md),
         KararButton(
-          label: strings.withdrawAction,
+          label: l10n.consentWithdrawAction,
           variant: KararButtonVariant.destructive,
           isFullWidth: true,
           isLoading: isSubmitting,
@@ -265,7 +265,7 @@ final class _PurposeCard extends ConsumerWidget {
         return <Widget>[
           SizedBox(height: context.spacing.md),
           KararBanner(
-            message: strings.acceptedConfirmation,
+            message: l10n.consentAcceptedConfirmation,
             tone: KararStatusTone.success,
           ),
         ];
@@ -276,8 +276,8 @@ final class _PurposeCard extends ConsumerWidget {
         return <Widget>[
           SizedBox(height: context.spacing.md),
           KararBanner(
-            title: strings.withdrawnConfirmation,
-            message: strings.historyPreservedNote,
+            title: l10n.consentWithdrawnConfirmation,
+            message: l10n.consentHistoryPreservedNote,
             tone: KararStatusTone.info,
           ),
         ];
@@ -289,10 +289,10 @@ final class _PurposeCard extends ConsumerWidget {
         return <Widget>[
           SizedBox(height: context.spacing.md),
           KararBanner(
-            title: strings.actionFailedTitle,
+            title: l10n.consentActionFailedTitle,
             message: reference == null
-                ? strings.actionFailedDescription
-                : '${strings.actionFailedDescription} '
+                ? l10n.consentActionFailedDescription
+                : '${l10n.consentActionFailedDescription} '
                     '${context.l10n.stateErrorReference(reference)}',
             tone: KararStatusTone.danger,
           ),
@@ -303,10 +303,10 @@ final class _PurposeCard extends ConsumerWidget {
 
 /// The safe metadata of a document version, and nothing beyond it.
 final class _DocumentDetails extends StatelessWidget {
-  const _DocumentDetails({required this.document, required this.strings});
+  const _DocumentDetails({required this.document, required this.l10n});
 
   final LegalDocument document;
-  final ConsentStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -314,29 +314,29 @@ final class _DocumentDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _Labelled(label: strings.documentLabel, value: document.kind),
+        _Labelled(label: l10n.consentDocumentLabel, value: document.kind),
         SizedBox(height: context.spacing.sm),
-        _Labelled(label: strings.publishedByLabel, value: document.entityId),
+        _Labelled(label: l10n.consentPublishedByLabel, value: document.entityId),
         SizedBox(height: context.spacing.sm),
-        _Labelled(label: strings.regimeLabel, value: document.jurisdictionRef),
+        _Labelled(label: l10n.consentRegimeLabel, value: document.jurisdictionRef),
         if (version != null) ...<Widget>[
           SizedBox(height: context.spacing.sm),
-          _Labelled(label: strings.versionLabel, value: version.version),
+          _Labelled(label: l10n.consentVersionLabel, value: version.version),
           if (version.effectiveAt != null) ...<Widget>[
             SizedBox(height: context.spacing.sm),
             _Labelled(
-              label: strings.effectiveFromLabel,
+              label: l10n.consentEffectiveFromLabel,
               value: context.formatter.date(version.effectiveAt!),
             ),
           ],
           SizedBox(height: context.spacing.sm),
           _Labelled(
-            label: strings.requiredActionLabel,
+            label: l10n.consentRequiredActionLabel,
             value: switch (version.action) {
-              LegalDocumentAction.reacceptanceRequired => strings.actionReacceptance,
-              LegalDocumentAction.noticeRequired => strings.actionNotice,
-              LegalDocumentAction.noUserActionRequired => strings.actionNone,
-              LegalDocumentAction.unstated => strings.actionUnstated,
+              LegalDocumentAction.reacceptanceRequired => l10n.consentActionReacceptance,
+              LegalDocumentAction.noticeRequired => l10n.consentActionNotice,
+              LegalDocumentAction.noUserActionRequired => l10n.consentActionNone,
+              LegalDocumentAction.unstated => l10n.consentActionUnstated,
             },
           ),
         ],
@@ -388,28 +388,28 @@ final class _Labelled extends StatelessWidget {
 }
 
 /// The label for a consent state.
-String consentStateLabel(ConsentState state, ConsentStrings strings) => switch (state) {
-      ConsentState.notRequired => strings.stateNotRequired,
-      ConsentState.consentRequired => strings.stateRequired,
-      ConsentState.reconsentRequired => strings.stateReconsentRequired,
-      ConsentState.active => strings.stateActive,
-      ConsentState.withdrawn => strings.stateWithdrawn,
-      ConsentState.unavailable => strings.stateUnavailable,
-      ConsentState.legalDocumentUnavailable => strings.stateDocumentUnavailable,
-      ConsentState.policyNotApproved => strings.statePolicyNotApproved,
+String consentStateLabel(ConsentState state, AppLocalizations l10n) => switch (state) {
+      ConsentState.notRequired => l10n.consentStateNotRequired,
+      ConsentState.consentRequired => l10n.consentStateRequired,
+      ConsentState.reconsentRequired => l10n.consentStateReconsentRequired,
+      ConsentState.active => l10n.consentStateActive,
+      ConsentState.withdrawn => l10n.consentStateWithdrawn,
+      ConsentState.unavailable => l10n.consentStateUnavailable,
+      ConsentState.legalDocumentUnavailable => l10n.consentStateDocumentUnavailable,
+      ConsentState.policyNotApproved => l10n.consentStatePolicyNotApproved,
     };
 
 /// The explanation for a consent state.
-String consentStateDescription(ConsentState state, ConsentStrings strings) =>
+String consentStateDescription(ConsentState state, AppLocalizations l10n) =>
     switch (state) {
-      ConsentState.notRequired => strings.describeNotRequired,
-      ConsentState.consentRequired => strings.describeRequired,
-      ConsentState.reconsentRequired => strings.describeReconsentRequired,
-      ConsentState.active => strings.describeActive,
-      ConsentState.withdrawn => strings.describeWithdrawn,
-      ConsentState.unavailable => strings.describeUnavailable,
-      ConsentState.legalDocumentUnavailable => strings.describeDocumentUnavailable,
-      ConsentState.policyNotApproved => strings.describePolicyNotApproved,
+      ConsentState.notRequired => l10n.consentDescribeNotRequired,
+      ConsentState.consentRequired => l10n.consentDescribeRequired,
+      ConsentState.reconsentRequired => l10n.consentDescribeReconsentRequired,
+      ConsentState.active => l10n.consentDescribeActive,
+      ConsentState.withdrawn => l10n.consentDescribeWithdrawn,
+      ConsentState.unavailable => l10n.consentDescribeUnavailable,
+      ConsentState.legalDocumentUnavailable => l10n.consentDescribeDocumentUnavailable,
+      ConsentState.policyNotApproved => l10n.consentDescribePolicyNotApproved,
     };
 
 /// The tone for a consent state. Colour never carries the meaning on its own;

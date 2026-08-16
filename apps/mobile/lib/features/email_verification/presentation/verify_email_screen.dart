@@ -12,9 +12,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import 'email_verification_providers.dart';
 
@@ -58,31 +58,31 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final VerifyEmailViewState state = ref.watch(verifyEmailControllerProvider);
 
     return IdentityScaffold(
-      title: strings.verifyEmailTitle,
+      title: l10n.verifyEmailTitle,
       onBack: widget.onBack,
       children: <Widget>[
         if (state.isVerified)
           IdentityFailureNotice(
-            message: strings.verifyEmailSuccess,
+            message: l10n.verifyEmailSuccess,
             tone: KararStatusTone.success,
           ),
         if (state.hasResendAcknowledgement)
           IdentityFailureNotice(
-            message: strings.verifyEmailResendAcknowledgement,
+            message: l10n.verifyEmailResendAcknowledgement,
             tone: KararStatusTone.info,
           ),
         if (state.failure != null)
           IdentityFailureNotice(
-            message: verificationFailureMessage(strings, state.failure!),
+            message: verificationFailureMessage(l10n, state.failure!),
           ),
-        IdentityBody(strings.verifyEmailSubtitle),
+        IdentityBody(l10n.verifyEmailSubtitle),
         const IdentityGap.large(),
         KararTextField(
-          label: strings.signInEmailLabel,
+          label: l10n.signInEmailLabel,
           controller: _email,
           isRequired: true,
           isEnabled: !state.isBusy,
@@ -90,25 +90,25 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           textInputAction: TextInputAction.next,
           errorText: state.emailViolation == null
               ? null
-              : emailViolationMessage(strings, state.emailViolation!),
+              : emailViolationMessage(l10n, state.emailViolation!),
         ),
         const IdentityGap(),
         KararTextField(
-          label: strings.verifyEmailCodeLabel,
+          label: l10n.verifyEmailCodeLabel,
           controller: _code,
-          hint: strings.verifyEmailCodeHint,
+          hint: l10n.verifyEmailCodeHint,
           isRequired: true,
           isEnabled: !state.isBusy,
           textInputAction: TextInputAction.done,
           // The code is issued in ASCII; a keypad set to Arabic-Indic digits
           // would otherwise submit characters the server cannot match.
           normalizeArabicDigits: true,
-          errorText: state.codeMissing ? strings.codeEmpty : null,
+          errorText: state.codeMissing ? l10n.codeEmpty : null,
           onSubmitted: (_) => _submit(),
         ),
         const IdentityGap.large(),
         KararButton(
-          label: strings.verifyEmailAction,
+          label: l10n.verifyEmailAction,
           onPressed: state.isBusy ? null : _submit,
           isLoading: state.isSubmitting,
           isFullWidth: true,
@@ -116,7 +116,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         ),
         const IdentityGap(),
         KararButton(
-          label: strings.verifyEmailResendAction,
+          label: l10n.verifyEmailResendAction,
           variant: KararButtonVariant.secondary,
           onPressed: state.isBusy ? null : _resend,
           isLoading: state.isResending,

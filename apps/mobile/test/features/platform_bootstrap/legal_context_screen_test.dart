@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/features/platform_bootstrap/domain/platform_context.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/legal_context_screen.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_providers.dart';
-import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_strings.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/feature_harness.dart';
 import 'support/fixtures.dart';
@@ -29,17 +29,17 @@ Future<void> pumpLegal(
       ],
     );
 
-PlatformStrings mountedStrings(WidgetTester tester) =>
-    PlatformStrings.of(tester.element(find.byType(LegalContextScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(LegalContextScreen)));
 
 void main() {
   testInBothDirections(
     'renders the reviewed safe summary of an assigned entity',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpLegal(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.operatingEntityNameLabel), findsOneWidget);
+      expect(find.text(l10n.platformOperatingEntityNameLabel), findsOneWidget);
       expect(find.text('Example Operating Entity'), findsOneWidget);
       expect(find.text('jurisdiction-a'), findsWidgets);
       expect(find.text('privacy@example.invalid'), findsOneWidget);
@@ -100,8 +100,8 @@ void main() {
         textScale: scale,
         platform: platformContext(operatingEntity: const OperatingEntityUnassigned()),
       );
-      var strings = mountedStrings(tester);
-      expect(find.text(strings.operatingEntityUnassignedTitle), findsOneWidget);
+      var l10n = mountedL10n(tester);
+      expect(find.text(l10n.platformOperatingEntityUnassignedTitle), findsOneWidget);
 
       await pumpLegal(
         tester,
@@ -109,8 +109,8 @@ void main() {
         textScale: scale,
         platform: platformContext(operatingEntity: const OperatingEntityUnavailable()),
       );
-      strings = mountedStrings(tester);
-      expect(find.text(strings.operatingEntityUnavailableTitle), findsOneWidget);
+      l10n = mountedL10n(tester);
+      expect(find.text(l10n.platformOperatingEntityUnavailableTitle), findsOneWidget);
 
       await pumpLegal(
         tester,
@@ -118,8 +118,8 @@ void main() {
         textScale: scale,
         platform: platformContext(operatingEntity: const OperatingEntityUnrecognised()),
       );
-      strings = mountedStrings(tester);
-      expect(find.text(strings.operatingEntityUnrecognisedTitle), findsOneWidget);
+      l10n = mountedL10n(tester);
+      expect(find.text(l10n.platformOperatingEntityUnrecognisedTitle), findsOneWidget);
     },
   );
 
@@ -127,9 +127,9 @@ void main() {
     'renders the governing policy version and status as data',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpLegal(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.policyPackHeading), findsOneWidget);
+      expect(find.text(l10n.platformPolicyPackHeading), findsOneWidget);
       expect(find.text('1.0.0'), findsOneWidget);
       expect(find.text('ACTIVE'), findsOneWidget);
     },
@@ -144,9 +144,9 @@ void main() {
         textScale: scale,
         platform: platformContext(policyPack: const PolicyPackStatus()),
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.policyPackAbsent), findsOneWidget);
+      expect(find.text(l10n.platformPolicyPackAbsent), findsOneWidget);
     },
   );
 

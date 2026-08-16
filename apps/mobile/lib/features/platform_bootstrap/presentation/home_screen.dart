@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../consent/presentation/consent_routes.dart';
 import '../../profile/presentation/profile_routes.dart';
@@ -27,7 +28,6 @@ import '../domain/platform_capability.dart';
 import '../domain/platform_context.dart';
 import 'platform_providers.dart';
 import 'platform_routes.dart';
-import 'platform_strings.dart';
 
 /// The signed-in landing surface.
 final class PlatformHomeScreen extends ConsumerWidget {
@@ -36,10 +36,10 @@ final class PlatformHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final context_ = ref.watch(platformContextProvider);
-    final strings = PlatformStrings.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: KararAppBar(title: strings.homeTitle),
+      appBar: KararAppBar(title: l10n.platformHomeTitle),
       body: SafeArea(
         top: false,
         child: context_ == null
@@ -47,17 +47,17 @@ final class PlatformHomeScreen extends ConsumerWidget {
             // Rendering progress is the honest answer to "the context is not
             // here yet"; an error would claim a failure that did not happen.
             ? const KararLoadingView()
-            : _HomeBody(platform: context_, strings: strings),
+            : _HomeBody(platform: context_, l10n: l10n),
       ),
     );
   }
 }
 
 final class _HomeBody extends StatelessWidget {
-  const _HomeBody({required this.platform, required this.strings});
+  const _HomeBody({required this.platform, required this.l10n});
 
   final PlatformContext platform;
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -65,77 +65,77 @@ final class _HomeBody extends StatelessWidget {
       padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
       children: <Widget>[
         _Section(
-          heading: strings.sectionServices,
-          child: _ServicesState(platform: platform, strings: strings),
+          heading: l10n.platformSectionServices,
+          child: _ServicesState(platform: platform, l10n: l10n),
         ),
         _Section(
-          heading: strings.sectionAccount,
+          heading: l10n.platformSectionAccount,
           padded: false,
           child: KararListRow(
-            title: strings.profileRowTitle,
-            subtitle: strings.profileRowSubtitle,
+            title: l10n.platformProfileRowTitle,
+            subtitle: l10n.platformProfileRowSubtitle,
             leadingIcon: KararIcons.statusNeutral,
             onPressed: () => context.go(ProfileRoutes.profile),
           ),
         ),
         _Section(
-          heading: strings.sectionSession,
+          heading: l10n.platformSectionSession,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               KararStatusBadge(
-                label: strings.sessionActive,
+                label: l10n.platformSessionActive,
                 tone: KararStatusTone.success,
               ),
               SizedBox(height: context.spacing.md),
               _LabelledValue(
-                label: strings.sessionReferenceLabel,
+                label: l10n.platformSessionReferenceLabel,
                 value: platform.sessionId,
               ),
             ],
           ),
         ),
         _Section(
-          heading: strings.sectionOrganisation,
+          heading: l10n.platformSectionOrganisation,
           padded: false,
-          child: _OrganisationRow(platform: platform, strings: strings),
+          child: _OrganisationRow(platform: platform, l10n: l10n),
         ),
         _Section(
-          heading: strings.sectionJurisdiction,
+          heading: l10n.platformSectionJurisdiction,
           padded: false,
           child: KararListRow(
-            title: jurisdictionStateLabel(platform.jurisdiction.state, strings),
-            subtitle: strings.jurisdictionRowSubtitle,
+            title: jurisdictionStateLabel(platform.jurisdiction.state, l10n),
+            subtitle: l10n.platformJurisdictionRowSubtitle,
             leadingIcon: KararIcons.statusInfo,
             onPressed: () => context.go(PlatformRoutes.jurisdiction),
           ),
         ),
         _Section(
-          heading: strings.sectionLegal,
+          heading: l10n.platformSectionLegal,
           padded: false,
           child: KararListRow(
-            title: operatingEntityLabel(platform.operatingEntity, strings),
-            subtitle: strings.legalRowSubtitle,
+            title: operatingEntityLabel(platform.operatingEntity, l10n),
+            subtitle: l10n.platformLegalRowSubtitle,
             leadingIcon: KararIcons.document,
             onPressed: () => context.go(PlatformRoutes.legal),
           ),
         ),
         _Section(
-          heading: strings.sectionConsent,
+          heading: l10n.platformSectionConsent,
           padded: false,
           child: KararListRow(
-            title: strings.sectionConsent,
-            subtitle: strings.consentRowSubtitle,
+            title: l10n.platformSectionConsent,
+            subtitle: l10n.platformConsentRowSubtitle,
             leadingIcon: KararIcons.check,
             onPressed: () => context.go(ConsentRoutes.consent),
           ),
         ),
         _Section(
-          heading: strings.sectionSettings,
+          heading: l10n.platformSectionSettings,
           padded: false,
           child: KararListRow(
-            title: strings.sectionSettings,
-            subtitle: strings.settingsRowSubtitle,
+            title: l10n.platformSectionSettings,
+            subtitle: l10n.platformSettingsRowSubtitle,
             leadingIcon: KararIcons.language,
             onPressed: () => context.go(SettingsRoutes.settings),
           ),
@@ -152,10 +152,10 @@ final class _HomeBody extends StatelessWidget {
 /// while a resolution that did not complete is a closed door. A destination
 /// list is only ever built from what the platform returned.
 final class _ServicesState extends StatelessWidget {
-  const _ServicesState({required this.platform, required this.strings});
+  const _ServicesState({required this.platform, required this.l10n});
 
   final PlatformContext platform;
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -163,15 +163,15 @@ final class _ServicesState extends StatelessWidget {
     switch (navigation) {
       case CapabilityNavigationUnresolved():
         return KararBanner(
-          title: strings.capabilitiesUnresolvedTitle,
-          message: strings.capabilitiesUnresolvedDescription,
+          title: l10n.platformCapabilitiesUnresolvedTitle,
+          message: l10n.platformCapabilitiesUnresolvedDescription,
           tone: KararStatusTone.warning,
         );
       case CapabilityNavigationResolved(:final destinations):
         if (destinations.isEmpty) {
           return KararStateView.empty(
-            title: strings.noServicesTitle,
-            message: strings.noServicesDescription,
+            title: l10n.platformNoServicesTitle,
+            message: l10n.platformNoServicesDescription,
           );
         }
         return Column(
@@ -188,17 +188,17 @@ final class _ServicesState extends StatelessWidget {
 }
 
 final class _OrganisationRow extends StatelessWidget {
-  const _OrganisationRow({required this.platform, required this.strings});
+  const _OrganisationRow({required this.platform, required this.l10n});
 
   final PlatformContext platform;
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
     final tenant = platform.boundTenant;
     return KararListRow(
-      title: tenant?.name ?? strings.organisationUnbound,
-      subtitle: tenant == null ? null : strings.organisationRowSubtitle,
+      title: tenant?.name ?? l10n.platformOrganisationUnbound,
+      subtitle: tenant == null ? null : l10n.platformOrganisationRowSubtitle,
       leadingIcon: KararIcons.statusNeutral,
       onPressed: () => context.go(TenantRoutes.organisation),
     );
@@ -286,20 +286,20 @@ final class _LabelledValue extends StatelessWidget {
 
 /// The label for a jurisdiction state. Names the STATE, never the regime's
 /// rules.
-String jurisdictionStateLabel(PlatformJurisdictionState state, PlatformStrings strings) =>
+String jurisdictionStateLabel(PlatformJurisdictionState state, AppLocalizations l10n) =>
     switch (state) {
-      PlatformJurisdictionState.none => strings.jurisdictionNone,
-      PlatformJurisdictionState.unverified => strings.jurisdictionUnverified,
-      PlatformJurisdictionState.verified => strings.jurisdictionVerified,
-      PlatformJurisdictionState.unrecognised => strings.jurisdictionUnrecognised,
+      PlatformJurisdictionState.none => l10n.platformJurisdictionNone,
+      PlatformJurisdictionState.unverified => l10n.platformJurisdictionUnverified,
+      PlatformJurisdictionState.verified => l10n.platformJurisdictionVerified,
+      PlatformJurisdictionState.unrecognised => l10n.platformJurisdictionUnrecognised,
     };
 
 /// The label for the operating-entity state. The assigned case shows the
 /// registered legal name the platform published, and nothing derived from it.
-String operatingEntityLabel(OperatingEntityContext entity, PlatformStrings strings) =>
+String operatingEntityLabel(OperatingEntityContext entity, AppLocalizations l10n) =>
     switch (entity) {
       OperatingEntityAssigned(:final entity) => entity.name,
-      OperatingEntityUnassigned() => strings.operatingEntityUnassignedTitle,
-      OperatingEntityUnavailable() => strings.operatingEntityUnavailableTitle,
-      OperatingEntityUnrecognised() => strings.operatingEntityUnrecognisedTitle,
+      OperatingEntityUnassigned() => l10n.platformOperatingEntityUnassignedTitle,
+      OperatingEntityUnavailable() => l10n.platformOperatingEntityUnavailableTitle,
+      OperatingEntityUnrecognised() => l10n.platformOperatingEntityUnrecognisedTitle,
     };

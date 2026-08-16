@@ -19,8 +19,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/dependency_injection/providers.dart';
 import '../../../../app/lifecycle/startup_state.dart';
 import '../../../../core/errors/failure.dart';
+import '../../../../l10n/karar_localization.dart';
 import '../../../../shared/shared.dart';
-import '../localization/identity_strings.dart';
 import '../widgets/identity_scaffold.dart';
 
 /// Explains why a session ended and routes back to sign-in.
@@ -31,17 +31,17 @@ class SessionExpiredScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final SessionEndReason reason = switch (state) {
       SessionExpired(:final reason) => reason,
       _ => SessionEndReason.expired,
     };
     final String message = switch (reason) {
-      SessionEndReason.expired => strings.sessionEndedExpired,
-      SessionEndReason.revoked => strings.sessionEndedRevoked,
-      SessionEndReason.refreshTokenReuseDetected => strings.sessionEndedReuseDetected,
-      SessionEndReason.refreshRejected => strings.sessionEndedRefreshRejected,
-      SessionEndReason.signedOut => strings.sessionEndedSignedOut,
+      SessionEndReason.expired => l10n.sessionEndedExpired,
+      SessionEndReason.revoked => l10n.sessionEndedRevoked,
+      SessionEndReason.refreshTokenReuseDetected => l10n.sessionEndedReuseDetected,
+      SessionEndReason.refreshRejected => l10n.sessionEndedRefreshRejected,
+      SessionEndReason.signedOut => l10n.sessionEndedSignedOut,
     };
     // Reuse detection is the one reason that warrants the stronger tone: it is
     // the only one that may mean someone else has the credential.
@@ -50,14 +50,14 @@ class SessionExpiredScreen extends ConsumerWidget {
         : KararStatusTone.warning;
 
     return IdentityScaffold(
-      title: strings.sessionEndedTitle,
+      title: l10n.sessionEndedTitle,
       children: <Widget>[
         IdentityFailureNotice(message: message, tone: tone),
         const IdentityGap(),
-        IdentityBody(strings.signInSubtitle),
+        IdentityBody(l10n.signInSubtitle),
         const IdentityGap.large(),
         KararButton(
-          label: strings.sessionEndedAction,
+          label: l10n.sessionEndedAction,
           isFullWidth: true,
           size: KararButtonSize.large,
           // The coordinator owns the transition. Re-running the sequence finds

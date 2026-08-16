@@ -8,9 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/routes/identity_routes.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import 'password_recovery_providers.dart';
@@ -43,22 +43,22 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final ForgotPasswordViewState state = ref.watch(forgotPasswordControllerProvider);
 
     if (state.isAcknowledged) {
       return IdentityScaffold(
-        title: strings.forgotPasswordTitle,
+        title: l10n.forgotPasswordTitle,
         onBack: () => context.pop(),
         children: <Widget>[
           KararStateView.empty(
             icon: KararIcons.statusSuccess,
-            title: strings.forgotPasswordAcknowledgementTitle,
-            message: strings.forgotPasswordAcknowledgementMessage,
+            title: l10n.forgotPasswordAcknowledgementTitle,
+            message: l10n.forgotPasswordAcknowledgementMessage,
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.resetPasswordTitle,
+            label: l10n.resetPasswordTitle,
             isFullWidth: true,
             size: KararButtonSize.large,
             onPressed: () => context.go(IdentityRoutes.resetPassword),
@@ -68,17 +68,17 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     }
 
     return IdentityScaffold(
-      title: strings.forgotPasswordTitle,
+      title: l10n.forgotPasswordTitle,
       onBack: () => context.pop(),
       children: <Widget>[
         if (state.failure != null)
           IdentityFailureNotice(
-            message: identityFailureMessage(strings, state.failure!),
+            message: identityFailureMessage(l10n, state.failure!),
           ),
-        IdentityBody(strings.forgotPasswordSubtitle),
+        IdentityBody(l10n.forgotPasswordSubtitle),
         const IdentityGap.large(),
         KararTextField(
-          label: strings.signInEmailLabel,
+          label: l10n.signInEmailLabel,
           controller: _email,
           isRequired: true,
           isEnabled: !state.isSubmitting,
@@ -86,12 +86,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           textInputAction: TextInputAction.done,
           errorText: state.emailViolation == null
               ? null
-              : emailViolationMessage(strings, state.emailViolation!),
+              : emailViolationMessage(l10n, state.emailViolation!),
           onSubmitted: (_) => _submit(),
         ),
         const IdentityGap.large(),
         KararButton(
-          label: strings.forgotPasswordAction,
+          label: l10n.forgotPasswordAction,
           onPressed: state.isSubmitting ? null : _submit,
           isLoading: state.isSubmitting,
           isFullWidth: true,

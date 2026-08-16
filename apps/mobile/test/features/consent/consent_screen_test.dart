@@ -19,7 +19,7 @@ import 'package:karar_mobile/features/consent/domain/consent_state.dart';
 import 'package:karar_mobile/features/consent/domain/legal_document.dart';
 import 'package:karar_mobile/features/consent/presentation/consent_providers.dart';
 import 'package:karar_mobile/features/consent/presentation/consent_screen.dart';
-import 'package:karar_mobile/features/consent/presentation/consent_strings.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../platform_bootstrap/support/feature_harness.dart';
 import '../platform_bootstrap/support/fixtures.dart';
@@ -113,8 +113,8 @@ Future<void> pumpConsent(
       ],
     );
 
-ConsentStrings mountedStrings(WidgetTester tester) =>
-    ConsentStrings.of(tester.element(find.byType(ConsentScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(ConsentScreen)));
 
 void main() {
   testInBothDirections(
@@ -130,10 +130,10 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.stateRequired), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsOneWidget);
+      expect(find.text(l10n.consentStateRequired), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsOneWidget);
       expect(
         directionUnder(tester, find.byType(ConsentScreen)),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -158,15 +158,15 @@ void main() {
           operatingEntityAssigned: true,
         ),
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.statePolicyNotApproved), findsOneWidget);
+      expect(find.text(l10n.consentStatePolicyNotApproved), findsOneWidget);
       expect(
-        find.text(strings.acceptAction),
+        find.text(l10n.consentAcceptAction),
         findsNothing,
         reason: 'a control that cannot work is not rendered as one that might',
       );
-      expect(find.text(strings.blockerPolicy), findsOneWidget);
+      expect(find.text(l10n.consentBlockerPolicy), findsOneWidget);
     },
     textScales: featureTextScales,
   );
@@ -182,10 +182,10 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.stateDocumentUnavailable), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsNothing);
+      expect(find.text(l10n.consentStateDocumentUnavailable), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
     },
   );
 
@@ -198,10 +198,10 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.nothingToAgreeTitle), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsNothing);
+      expect(find.text(l10n.consentNothingToAgreeTitle), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
     },
     textScales: featureTextScales,
   );
@@ -219,15 +219,15 @@ void main() {
     );
 
     await pumpConsent(tester, repository: repository);
-    final strings = mountedStrings(tester);
+    final l10n = mountedL10n(tester);
 
-    await tester.tap(find.text(strings.acceptAction));
+    await tester.tap(find.text(l10n.consentAcceptAction));
     await tester.pumpAndSettle();
 
     expect(repository.accepts, 1);
     expect(repository.acceptedVersionId, testVersionId);
-    expect(find.text(strings.acceptedConfirmation), findsNothing);
-    expect(find.text(strings.actionFailedTitle), findsOneWidget);
+    expect(find.text(l10n.consentAcceptedConfirmation), findsNothing);
+    expect(find.text(l10n.consentActionFailedTitle), findsOneWidget);
     expect(find.textContaining('req-60'), findsOneWidget);
   });
 
@@ -239,13 +239,13 @@ void main() {
     );
 
     await pumpConsent(tester, repository: repository);
-    final strings = mountedStrings(tester);
+    final l10n = mountedL10n(tester);
 
-    await tester.tap(find.text(strings.acceptAction));
+    await tester.tap(find.text(l10n.consentAcceptAction));
     await tester.pumpAndSettle();
 
     expect(repository.accepts, 1);
-    expect(find.text(strings.acceptedConfirmation), findsOneWidget);
+    expect(find.text(l10n.consentAcceptedConfirmation), findsOneWidget);
   });
 
   testInBothDirections(
@@ -266,18 +266,18 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.stateActive), findsOneWidget);
-      expect(find.text(strings.withdrawAction), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsNothing);
+      expect(find.text(l10n.consentStateActive), findsOneWidget);
+      expect(find.text(l10n.consentWithdrawAction), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
 
-      await tester.tap(find.text(strings.withdrawAction));
+      await tester.tap(find.text(l10n.consentWithdrawAction));
       await tester.pumpAndSettle();
 
       expect(repository.withdrawals, 1);
-      expect(find.text(strings.withdrawnConfirmation), findsOneWidget);
-      expect(find.text(strings.historyPreservedNote), findsOneWidget);
+      expect(find.text(l10n.consentWithdrawnConfirmation), findsOneWidget);
+      expect(find.text(l10n.consentHistoryPreservedNote), findsOneWidget);
     },
   );
 
@@ -293,11 +293,11 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.stateReconsentRequired), findsOneWidget);
-      expect(find.text(strings.reconsentCreatesNewGrantNote), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsOneWidget);
+      expect(find.text(l10n.consentStateReconsentRequired), findsOneWidget);
+      expect(find.text(l10n.consentReconsentCreatesNewGrantNote), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsOneWidget);
     },
   );
 
@@ -315,11 +315,11 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.surfaceUnavailableTitle), findsOneWidget);
+      expect(find.text(l10n.consentSurfaceUnavailableTitle), findsOneWidget);
       expect(find.textContaining('req-61'), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsNothing);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
     },
     textScales: featureTextScales,
   );
@@ -338,10 +338,10 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.stateUnavailable), findsOneWidget);
-      expect(find.text(strings.acceptAction), findsNothing);
+      expect(find.text(l10n.consentStateUnavailable), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
     },
   );
 
@@ -356,13 +356,13 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.versionLabel), findsOneWidget);
+      expect(find.text(l10n.consentVersionLabel), findsOneWidget);
       expect(find.text('1.0.0'), findsOneWidget);
-      expect(find.text(strings.publishedByLabel), findsOneWidget);
+      expect(find.text(l10n.consentPublishedByLabel), findsOneWidget);
       expect(find.text(testEntityId), findsOneWidget);
-      expect(find.text(strings.actionReacceptance), findsOneWidget);
+      expect(find.text(l10n.consentActionReacceptance), findsOneWidget);
       expect(find.text(testPurposeRef), findsOneWidget);
     },
     textScales: featureTextScales,

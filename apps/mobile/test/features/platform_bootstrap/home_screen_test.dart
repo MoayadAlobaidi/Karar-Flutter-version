@@ -11,7 +11,6 @@ import 'package:karar_mobile/features/platform_bootstrap/domain/platform_capabil
 import 'package:karar_mobile/features/platform_bootstrap/domain/platform_context.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/home_screen.dart';
 import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_providers.dart';
-import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_strings.dart';
 import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/feature_harness.dart';
@@ -35,8 +34,8 @@ Future<void> pumpHome(
 
 /// The catalogue the mounted screen resolved, so an assertion compares against
 /// the same strings the widget rendered rather than against a copy.
-PlatformStrings mountedStrings(WidgetTester tester) =>
-    PlatformStrings.of(tester.element(find.byType(PlatformHomeScreen)));
+AppLocalizations mountedL10n(WidgetTester tester) =>
+    AppLocalizations.of(tester.element(find.byType(PlatformHomeScreen)));
 
 void main() {
   testInBothDirections(
@@ -44,12 +43,12 @@ void main() {
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpHome(tester, locale: locale, textScale: scale);
 
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.noServicesTitle), findsOneWidget);
-      expect(find.text(strings.noServicesDescription), findsOneWidget);
-      expect(find.text(strings.capabilitiesUnresolvedTitle), findsNothing);
-      expect(find.text(strings.serviceUnavailableTitle), findsNothing);
+      expect(find.text(l10n.platformNoServicesTitle), findsOneWidget);
+      expect(find.text(l10n.platformNoServicesDescription), findsOneWidget);
+      expect(find.text(l10n.platformCapabilitiesUnresolvedTitle), findsNothing);
+      expect(find.text(l10n.platformServiceUnavailableTitle), findsNothing);
     },
     textScales: featureTextScales,
   );
@@ -71,17 +70,17 @@ void main() {
     'renders every platform section',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpHome(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
       for (final heading in <String>[
-        strings.sectionServices,
-        strings.sectionAccount,
-        strings.sectionSession,
-        strings.sectionOrganisation,
-        strings.sectionJurisdiction,
-        strings.sectionLegal,
-        strings.sectionConsent,
-        strings.sectionSettings,
+        l10n.platformSectionServices,
+        l10n.platformSectionAccount,
+        l10n.platformSectionSession,
+        l10n.platformSectionOrganisation,
+        l10n.platformSectionJurisdiction,
+        l10n.platformSectionLegal,
+        l10n.platformSectionConsent,
+        l10n.platformSectionSettings,
       ]) {
         expect(
           find.text(heading),
@@ -97,10 +96,10 @@ void main() {
     'shows the bound organisation and the session status',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpHome(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
       expect(find.text('Example Organisation'), findsOneWidget);
-      expect(find.text(strings.sessionActive), findsOneWidget);
+      expect(find.text(l10n.platformSessionActive), findsOneWidget);
       expect(find.text(testSessionId), findsOneWidget);
     },
     textScales: featureTextScales,
@@ -115,9 +114,9 @@ void main() {
         textScale: scale,
         platform: platformContext(tenant: const TenantContextUnbound()),
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.organisationUnbound), findsOneWidget);
+      expect(find.text(l10n.platformOrganisationUnbound), findsOneWidget);
     },
   );
 
@@ -130,10 +129,10 @@ void main() {
         textScale: scale,
         platform: platformContext(navigation: const CapabilityNavigationUnresolved()),
       );
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
-      expect(find.text(strings.capabilitiesUnresolvedTitle), findsOneWidget);
-      expect(find.text(strings.noServicesTitle), findsNothing);
+      expect(find.text(l10n.platformCapabilitiesUnresolvedTitle), findsOneWidget);
+      expect(find.text(l10n.platformNoServicesTitle), findsNothing);
     },
     textScales: featureTextScales,
   );
@@ -141,18 +140,18 @@ void main() {
   testInBothDirections(
     'names each operating-entity state honestly',
     (WidgetTester tester, Locale locale, double scale) async {
-      for (final entry in <(OperatingEntityContext, String Function(PlatformStrings))>[
+      for (final entry in <(OperatingEntityContext, String Function(AppLocalizations))>[
         (
           const OperatingEntityUnassigned(),
-          (PlatformStrings s) => s.operatingEntityUnassignedTitle,
+          (AppLocalizations s) => s.platformOperatingEntityUnassignedTitle,
         ),
         (
           const OperatingEntityUnavailable(),
-          (PlatformStrings s) => s.operatingEntityUnavailableTitle,
+          (AppLocalizations s) => s.platformOperatingEntityUnavailableTitle,
         ),
         (
           const OperatingEntityUnrecognised(),
-          (PlatformStrings s) => s.operatingEntityUnrecognisedTitle,
+          (AppLocalizations s) => s.platformOperatingEntityUnrecognisedTitle,
         ),
       ]) {
         await pumpHome(
@@ -161,8 +160,8 @@ void main() {
           textScale: scale,
           platform: platformContext(operatingEntity: entry.$1),
         );
-        final strings = mountedStrings(tester);
-        expect(find.text(entry.$2(strings)), findsOneWidget);
+        final l10n = mountedL10n(tester);
+        expect(find.text(entry.$2(l10n)), findsOneWidget);
       }
     },
   );
@@ -172,11 +171,11 @@ void main() {
     (WidgetTester tester, Locale locale, double scale) async {
       final handle = tester.ensureSemantics();
       await pumpHome(tester, locale: locale, textScale: scale);
-      final strings = mountedStrings(tester);
+      final l10n = mountedL10n(tester);
 
       expect(
-        tester.getSemantics(find.text(strings.sectionServices).first),
-        matchesSemantics(label: strings.sectionServices, isHeader: true),
+        tester.getSemantics(find.text(l10n.platformSectionServices).first),
+        matchesSemantics(label: l10n.platformSectionServices, isHeader: true),
       );
       handle.dispose();
     },

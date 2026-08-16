@@ -6,8 +6,8 @@ import 'package:karar_mobile/app/lifecycle/startup_state.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/networking/api_transport.dart';
 import 'package:karar_mobile/core/networking/http_method.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/screens/sign_in_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/identity_harness.dart';
 
@@ -15,16 +15,15 @@ void main() {
   testEveryDirectionAndScale('renders and reads in the locale direction',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(tester, const SignInScreen(),
         harness: harness, locale: locale, textScale: textScale);
 
-    expect(find.text(strings.signInTitle), findsWidgets);
-    expect(find.text(strings.signInSubtitle), findsOneWidget);
-    expect(find.text(strings.signInEmailLabel), findsOneWidget);
-    expect(find.text(strings.signInPasswordLabel), findsOneWidget);
+    expect(find.text(l10n.signInTitle), findsWidgets);
+    expect(find.text(l10n.signInSubtitle), findsOneWidget);
+    expect(find.text(l10n.signInEmailLabel), findsOneWidget);
+    expect(find.text(l10n.signInPasswordLabel), findsOneWidget);
 
     // Direction is derived by the framework from the locale, never passed in,
     // so this proves Arabic actually produces an RTL tree.
@@ -39,8 +38,7 @@ void main() {
   testEveryDirectionAndScale('shows the generic message for rejected credentials',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.failWith(
       HttpMethod.post,
       '/auth/login',
@@ -52,12 +50,12 @@ void main() {
         harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
-    await tapIdentityButton(tester, strings.signInAction);
+    await tapIdentityButton(tester, l10n.signInAction);
     await tester.pumpAndSettle();
 
     // One message covers unknown address, wrong password, disabled account and
     // an engaged lockout — the same single answer the platform gives.
-    expect(find.text(strings.signInInvalidCredentials), findsOneWidget);
+    expect(find.text(l10n.signInInvalidCredentials), findsOneWidget);
     // No diagnostic leaks into the UI.
     expect(find.textContaining('401'), findsNothing);
     expect(find.textContaining('authentication_required'), findsNothing);
@@ -66,19 +64,18 @@ void main() {
   testEveryDirectionAndScale('announces field errors rather than colouring them',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(tester, const SignInScreen(),
         harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'not-an-address');
     await enterIdentityField(tester, 1, 'short');
-    await tapIdentityButton(tester, strings.signInAction);
+    await tapIdentityButton(tester, l10n.signInAction);
     await tester.pumpAndSettle();
 
     // Status is carried by words, not by a red border alone.
-    expect(find.text(strings.emailMalformed), findsOneWidget);
-    expect(find.text(strings.passwordTooShortFor(8)), findsOneWidget);
+    expect(find.text(l10n.emailMalformed), findsOneWidget);
+    expect(find.text(l10n.passwordTooShort(8)), findsOneWidget);
     // Nothing was sent: the client stopped at its own validation.
     expect(harness.transport.requests, isEmpty);
   });
@@ -86,8 +83,7 @@ void main() {
   testEveryDirectionAndScale('blocks a second submission while one is in flight',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.on(HttpMethod.post, '/auth/login', (_) async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       return ApiResponse(
@@ -100,11 +96,11 @@ void main() {
         harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
-    await tapIdentityButton(tester, strings.signInAction);
+    await tapIdentityButton(tester, l10n.signInAction);
     await tester.pump();
 
     // A double tap must not spend two attempts against the per-address budget.
-    await tester.tap(identityButton(strings.signInAction), warnIfMissed: false);
+    await tester.tap(identityButton(l10n.signInAction), warnIfMissed: false);
     await tester.pump();
     await tester.pumpAndSettle();
 
@@ -114,8 +110,7 @@ void main() {
   testEveryDirectionAndScale('explains a secure-storage failure at the gate',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(
       tester,
@@ -127,7 +122,7 @@ void main() {
       textScale: textScale,
     );
 
-    expect(find.text(strings.signInSecureStorageNotice), findsOneWidget);
+    expect(find.text(l10n.signInSecureStorageNotice), findsOneWidget);
   });
 
   testEveryDirectionAndScale('never renders the password it was given',
@@ -135,14 +130,13 @@ void main() {
     final IdentityHarness harness = IdentityHarness();
     harness.transport
         .onPost('/auth/login', sessionPayload(now: harness.clock.nowUtc()));
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(tester, const SignInScreen(),
         harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
-    await tapIdentityButton(tester, strings.signInAction);
+    await tapIdentityButton(tester, l10n.signInAction);
     await tester.pumpAndSettle();
 
     // The credential must not survive in any rendered Text, and no token may

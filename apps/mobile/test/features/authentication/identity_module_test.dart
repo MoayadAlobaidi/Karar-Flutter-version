@@ -10,12 +10,17 @@ import 'package:karar_mobile/app/routing/app_router.dart';
 import 'package:karar_mobile/app/routing/route_paths.dart';
 import 'package:karar_mobile/app/routing/startup_route_resolver.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/routes/identity_module.dart';
 import 'package:karar_mobile/features/authentication/presentation/routes/identity_routes.dart';
 import 'package:karar_mobile/features/authentication/presentation/widgets/sensitive_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/identity_harness.dart';
+
+/// The English catalogue, for assertions that do not depend on the locale.
+final AppLocalizations _english = lookupAppLocalizations(
+  KararLocalization.english,
+);
 
 void main() {
   group('gate screens', () {
@@ -172,7 +177,7 @@ void main() {
         reason: 'the covered content must also leave the semantics tree',
       );
       expect(
-        find.text(IdentityStrings.english.a11ySensitiveScreen, skipOffstage: false),
+        find.text(_english.a11ySensitiveScreen, skipOffstage: false),
         findsNothing,
         reason: 'the cover announces itself by label, not by rendered text',
       );

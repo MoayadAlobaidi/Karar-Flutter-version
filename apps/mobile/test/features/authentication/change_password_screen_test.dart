@@ -3,26 +3,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/networking/http_method.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/screens/change_password_screen.dart';
 import 'package:karar_mobile/features/authentication/presentation/widgets/sensitive_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/identity_harness.dart';
+
+/// The English catalogue, for assertions that do not depend on the locale.
+final AppLocalizations _english = lookupAppLocalizations(
+  KararLocalization.english,
+);
 
 void main() {
   testEveryDirectionAndScale('renders the form in the locale direction',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(tester, const ChangePasswordScreen(),
         harness: harness, locale: locale, textScale: textScale);
 
-    expect(find.text(strings.changePasswordSubtitle), findsOneWidget);
-    expect(find.text(strings.changePasswordCurrentLabel), findsOneWidget);
-    expect(find.text(strings.changePasswordNewLabel), findsOneWidget);
+    expect(find.text(l10n.changePasswordSubtitle), findsOneWidget);
+    expect(find.text(l10n.changePasswordCurrentLabel), findsOneWidget);
+    expect(find.text(l10n.changePasswordNewLabel), findsOneWidget);
     expect(
       Directionality.of(tester.element(find.byType(ChangePasswordScreen))),
       locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -34,8 +38,7 @@ void main() {
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport
         .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
     harness.refreshTransport
@@ -46,10 +49,10 @@ void main() {
     await enterIdentityField(tester, 0, 'old-password');
     await enterIdentityField(tester, 1, 'brand-new-password');
     await enterIdentityField(tester, 2, 'brand-new-password');
-    await tapIdentityButton(tester, strings.changePasswordAction);
+    await tapIdentityButton(tester, l10n.changePasswordAction);
     await tester.pumpAndSettle();
 
-    expect(find.text(strings.changePasswordSuccessMessage), findsOneWidget);
+    expect(find.text(l10n.changePasswordSuccessMessage), findsOneWidget);
     // The access token was rotated, because the server bumped the token
     // version.
     expect(harness.refreshTransport.callsTo('/auth/refresh'), 1);
@@ -59,8 +62,7 @@ void main() {
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.failWith(
       HttpMethod.post,
       '/auth/change-password',
@@ -73,10 +75,10 @@ void main() {
     await enterIdentityField(tester, 0, 'wrong-password');
     await enterIdentityField(tester, 1, 'brand-new-password');
     await enterIdentityField(tester, 2, 'brand-new-password');
-    await tapIdentityButton(tester, strings.changePasswordAction);
+    await tapIdentityButton(tester, l10n.changePasswordAction);
     await tester.pumpAndSettle();
 
-    expect(find.text(strings.changePasswordIncorrectCurrent), findsOneWidget);
+    expect(find.text(l10n.changePasswordIncorrectCurrent), findsOneWidget);
   });
 
   testWidgets('neither password appears anywhere in the rendered tree',
@@ -92,7 +94,7 @@ void main() {
     await enterIdentityField(tester, 0, 'old-password');
     await enterIdentityField(tester, 1, 'brand-new-password');
     await enterIdentityField(tester, 2, 'brand-new-password');
-    await tapIdentityButton(tester, IdentityStrings.english.changePasswordAction);
+    await tapIdentityButton(tester, _english.changePasswordAction);
     await tester.pumpAndSettle();
 
     for (final Text text in tester.widgetList<Text>(find.byType(Text))) {

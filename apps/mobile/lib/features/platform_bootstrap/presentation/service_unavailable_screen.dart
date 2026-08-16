@@ -24,7 +24,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/dependency_injection/providers.dart';
 import '../../../app/lifecycle/startup_state.dart';
 import '../../../shared/shared.dart';
-import 'platform_strings.dart';
 
 /// Renders the service-unavailable startup gate.
 final class ServiceUnavailableScreen extends ConsumerWidget {
@@ -34,7 +33,7 @@ final class ServiceUnavailableScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final strings = PlatformStrings.of(context);
+    final l10n = context.l10n;
     final reference = state.failure.correlationId;
     // Null means the platform did not say. A retry is offered in that case,
     // because withholding one would strand a person over a silence.
@@ -46,12 +45,12 @@ final class ServiceUnavailableScreen extends ConsumerWidget {
           child: SingleChildScrollView(
             padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
             child: KararStateView.error(
-              title: strings.serviceUnavailableTitle,
+              title: l10n.platformServiceUnavailableTitle,
               message: canRetry
-                  ? strings.serviceUnavailableDescription
-                  : strings.serviceUnavailableFinalDescription,
+                  ? l10n.platformServiceUnavailableDescription
+                  : l10n.platformServiceUnavailableFinalDescription,
               detail: reference == null ? null : context.l10n.stateErrorReference(reference),
-              actionLabel: canRetry ? context.l10n.actionRetry : strings.actionStartOver,
+              actionLabel: canRetry ? context.l10n.actionRetry : l10n.platformActionStartOver,
               onAction: () {
                 final coordinator = ref.read(startupCoordinatorProvider);
                 unawaited(canRetry ? coordinator.retryBootstrap() : coordinator.start());

@@ -11,8 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routing/route_paths.dart';
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import '../domain/app_lock.dart';
 import 'app_lock_providers.dart';
@@ -40,27 +40,27 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final AppLockViewState state = ref.watch(appLockControllerProvider);
 
     return IdentityScaffold(
-      title: strings.appLockTitle,
+      title: l10n.appLockTitle,
       children: <Widget>[
         if (state.lastOutcome != null)
           IdentityFailureNotice(
-            message: _outcomeMessage(strings, state.lastOutcome!),
+            message: _outcomeMessage(l10n, state.lastOutcome!),
             tone: state.lastOutcome is LocalAuthCancelled
                 ? KararStatusTone.info
                 : KararStatusTone.warning,
           ),
         KararStateView.empty(
           icon: KararIcons.hidden,
-          title: strings.appLockLockedTitle,
-          message: strings.appLockLockedMessage,
+          title: l10n.appLockLockedTitle,
+          message: l10n.appLockLockedMessage,
         ),
         const IdentityGap.large(),
         KararButton(
-          label: strings.appLockUnlockAction,
+          label: l10n.appLockUnlockAction,
           isFullWidth: true,
           size: KararButtonSize.large,
           isLoading: state.isPrompting,
@@ -68,14 +68,14 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
               ? null
               : () => ref
                   .read(appLockControllerProvider.notifier)
-                  .unlock(reason: strings.appLockPromptReason),
+                  .unlock(reason: l10n.appLockPromptReason),
         ),
         const IdentityGap(),
         // Always available. A user whose device authenticator has stopped
         // working must not be trapped behind a lock they cannot open; the
         // password is the fallback, and it is real authentication.
         KararButton(
-          label: strings.appLockSignInInstead,
+          label: l10n.appLockSignInInstead,
           variant: KararButtonVariant.secondary,
           isFullWidth: true,
           onPressed: state.isBusy ? null : () => context.go(RoutePaths.signIn),
@@ -106,44 +106,44 @@ class _AppLockSettingsScreenState extends ConsumerState<AppLockSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final AppLockViewState state = ref.watch(appLockControllerProvider);
 
     return IdentityScaffold(
-      title: strings.appLockSettingsTitle,
+      title: l10n.appLockSettingsTitle,
       onBack: () => context.pop(),
       children: <Widget>[
         if (state.requiresSession)
           IdentityFailureNotice(
-            message: strings.appLockRequiresSession,
+            message: l10n.appLockRequiresSession,
             tone: KararStatusTone.warning,
           ),
         if (state.lastOutcome != null && state.lastOutcome is! LocalAuthSucceeded)
           IdentityFailureNotice(
-            message: _outcomeMessage(strings, state.lastOutcome!),
+            message: _outcomeMessage(l10n, state.lastOutcome!),
             tone: KararStatusTone.warning,
           ),
-        IdentityBody(strings.appLockSettingsDescription),
+        IdentityBody(l10n.appLockSettingsDescription),
         const IdentityGap.large(),
         if (state.isChecking)
-          KararLoadingView(subject: strings.appLockSettingsTitle)
+          KararLoadingView(subject: l10n.appLockSettingsTitle)
         else if (!state.canEnable)
           KararStateView.empty(
             icon: KararIcons.hidden,
-            title: strings.appLockUnavailableTitle,
+            title: l10n.appLockUnavailableTitle,
             message: state.availability == LocalAuthAvailability.notEnrolled
-                ? strings.appLockNotEnrolledMessage
-                : strings.appLockUnavailableMessage,
+                ? l10n.appLockNotEnrolledMessage
+                : l10n.appLockUnavailableMessage,
           )
         else
           KararCheckboxTile(
-            label: strings.appLockToggleLabel,
+            label: l10n.appLockToggleLabel,
             value: state.isEnabled,
             onChanged: state.isBusy
                 ? null
                 : (bool value) => ref
                     .read(appLockControllerProvider.notifier)
-                    .setEnabled(enabled: value, reason: strings.appLockPromptReason),
+                    .setEnabled(enabled: value, reason: l10n.appLockPromptReason),
           ),
       ],
     );
@@ -151,13 +151,13 @@ class _AppLockSettingsScreenState extends ConsumerState<AppLockSettingsScreen> {
 }
 
 /// The message for a prompt result. Never names the account or the method.
-String _outcomeMessage(IdentityStrings strings, LocalAuthOutcome outcome) =>
+String _outcomeMessage(AppLocalizations l10n, LocalAuthOutcome outcome) =>
     switch (outcome) {
-      LocalAuthSucceeded() => strings.appLockUnlockAction,
-      LocalAuthCancelled() => strings.appLockCancelled,
+      LocalAuthSucceeded() => l10n.appLockUnlockAction,
+      LocalAuthCancelled() => l10n.appLockCancelled,
       LocalAuthFailed(:final reason) => switch (reason) {
-          LocalAuthFailureReason.notRecognised => strings.appLockNotRecognised,
-          LocalAuthFailureReason.lockedOut => strings.appLockLockedOut,
-          LocalAuthFailureReason.unavailable => strings.appLockUnavailableMessage,
+          LocalAuthFailureReason.notRecognised => l10n.appLockNotRecognised,
+          LocalAuthFailureReason.lockedOut => l10n.appLockLockedOut,
+          LocalAuthFailureReason.unavailable => l10n.appLockUnavailableMessage,
         },
     };

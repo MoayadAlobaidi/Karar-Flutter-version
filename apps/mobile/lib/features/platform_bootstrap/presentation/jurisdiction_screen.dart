@@ -19,12 +19,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../domain/jurisdiction_declaration.dart';
 import '../domain/platform_context.dart';
 import 'home_screen.dart' show jurisdictionStateLabel;
 import 'platform_providers.dart';
-import 'platform_strings.dart';
 
 /// The jurisdiction surface.
 final class JurisdictionScreen extends ConsumerStatefulWidget {
@@ -40,13 +40,13 @@ class _JurisdictionScreenState extends ConsumerState<JurisdictionScreen> {
   @override
   Widget build(BuildContext context) {
     final platform = ref.watch(platformContextProvider);
-    final strings = PlatformStrings.of(context);
+    final l10n = context.l10n;
     final options = ref.watch(jurisdictionReferenceOptionsProvider);
     final declaration = ref.watch(jurisdictionDeclarationControllerProvider);
 
     return Scaffold(
       appBar: KararAppBar(
-        title: strings.jurisdictionScreenTitle,
+        title: l10n.platformJurisdictionScreenTitle,
         onBack: () => context.pop(),
       ),
       body: SafeArea(
@@ -56,10 +56,10 @@ class _JurisdictionScreenState extends ConsumerState<JurisdictionScreen> {
             : ListView(
                 padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
                 children: <Widget>[
-                  _StatusCard(status: platform.jurisdiction, strings: strings),
+                  _StatusCard(status: platform.jurisdiction, l10n: l10n),
                   SizedBox(height: context.spacing.sectionGap),
                   _DeclarationCard(
-                    strings: strings,
+                    l10n: l10n,
                     options: options,
                     selected: _selected,
                     declarationState: declaration,
@@ -81,10 +81,10 @@ class _JurisdictionScreenState extends ConsumerState<JurisdictionScreen> {
 }
 
 final class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.status, required this.strings});
+  const _StatusCard({required this.status, required this.l10n});
 
   final JurisdictionStatus status;
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +94,7 @@ final class _StatusCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           KararStatusBadge(
-            label: jurisdictionStateLabel(status.state, strings),
+            label: jurisdictionStateLabel(status.state, l10n),
             tone: switch (status.state) {
               PlatformJurisdictionState.verified => KararStatusTone.success,
               PlatformJurisdictionState.unverified => KararStatusTone.info,
@@ -105,7 +105,7 @@ final class _StatusCard extends StatelessWidget {
           if (identifier != null) ...<Widget>[
             SizedBox(height: context.spacing.md),
             Text(
-              strings.jurisdictionReferenceLabel,
+              l10n.platformJurisdictionReferenceLabel,
               textAlign: TextAlign.start,
               style: context.typography.labelMedium.copyWith(
                 color: context.colors.contentSecondary,
@@ -121,7 +121,7 @@ final class _StatusCard extends StatelessWidget {
           ],
           SizedBox(height: context.spacing.md),
           Text(
-            strings.jurisdictionRowSubtitle,
+            l10n.platformJurisdictionRowSubtitle,
             textAlign: TextAlign.start,
             style: context.typography.bodySmall.copyWith(
               color: context.colors.contentSecondary,
@@ -135,7 +135,7 @@ final class _StatusCard extends StatelessWidget {
 
 final class _DeclarationCard extends StatelessWidget {
   const _DeclarationCard({
-    required this.strings,
+    required this.l10n,
     required this.options,
     required this.selected,
     required this.declarationState,
@@ -143,7 +143,7 @@ final class _DeclarationCard extends StatelessWidget {
     required this.onDeclare,
   });
 
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
   final List<JurisdictionReference> options;
   final JurisdictionReference? selected;
   final JurisdictionDeclarationState declarationState;
@@ -159,7 +159,7 @@ final class _DeclarationCard extends StatelessWidget {
           Semantics(
             header: true,
             child: Text(
-              strings.jurisdictionDeclareTitle,
+              l10n.platformJurisdictionDeclareTitle,
               textAlign: TextAlign.start,
               style: context.typography.titleMedium.copyWith(
                 color: context.colors.contentPrimary,
@@ -168,7 +168,7 @@ final class _DeclarationCard extends StatelessWidget {
           ),
           SizedBox(height: context.spacing.sm),
           Text(
-            strings.jurisdictionDeclareDescription,
+            l10n.platformJurisdictionDeclareDescription,
             textAlign: TextAlign.start,
             style: context.typography.bodySmall.copyWith(
               color: context.colors.contentSecondary,
@@ -177,7 +177,7 @@ final class _DeclarationCard extends StatelessWidget {
           SizedBox(height: context.spacing.md),
           if (options.isEmpty)
             KararBanner(
-              message: strings.jurisdictionSelectionUnavailable,
+              message: l10n.platformJurisdictionSelectionUnavailable,
               tone: KararStatusTone.info,
             )
           else ...<Widget>[
@@ -191,7 +191,7 @@ final class _DeclarationCard extends StatelessWidget {
               ),
             SizedBox(height: context.spacing.md),
             KararButton(
-              label: strings.jurisdictionDeclareAction,
+              label: l10n.platformJurisdictionDeclareAction,
               isFullWidth: true,
               isLoading: declarationState is JurisdictionDeclarationSubmitting,
               onPressed: onDeclare,
@@ -213,9 +213,9 @@ final class _DeclarationCard extends StatelessWidget {
           SizedBox(height: context.spacing.md),
           KararBanner(
             title: declaration.recorded
-                ? strings.jurisdictionRecorded
-                : strings.jurisdictionAlreadyInEffect,
-            message: strings.jurisdictionRemainsUnverified,
+                ? l10n.platformJurisdictionRecorded
+                : l10n.platformJurisdictionAlreadyInEffect,
+            message: l10n.platformJurisdictionRemainsUnverified,
             tone: KararStatusTone.info,
           ),
         ];

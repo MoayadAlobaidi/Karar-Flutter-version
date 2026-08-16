@@ -3,7 +3,8 @@ import 'package:intl/intl.dart' show Bidi;
 
 import 'generated/app_localizations.dart';
 
-export 'generated/app_localizations.dart' show AppLocalizations;
+export 'generated/app_localizations.dart'
+    show AppLocalizations, lookupAppLocalizations;
 
 /// The localization surface the application shell wires into `MaterialApp`.
 ///

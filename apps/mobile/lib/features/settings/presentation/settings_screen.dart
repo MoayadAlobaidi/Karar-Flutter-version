@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/locale_preference.dart';
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../consent/presentation/consent_routes.dart';
 import '../../platform_bootstrap/presentation/platform_routes.dart';
@@ -21,7 +22,6 @@ import '../../profile/presentation/profile_providers.dart';
 import '../../profile/presentation/profile_routes.dart';
 import '../../tenant_selection/presentation/tenant_routes.dart';
 import 'settings_providers.dart';
-import 'settings_strings.dart';
 
 /// The settings surface.
 final class SettingsScreen extends ConsumerWidget {
@@ -29,7 +29,7 @@ final class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final strings = SettingsStrings.of(context);
+    final l10n = context.l10n;
     final selectedLocale = ref.watch(selectedLocaleProvider);
     final selectedTheme = ref.watch(selectedThemeProvider);
     final preferences = ref.watch(presentationPreferencesProvider);
@@ -37,7 +37,7 @@ final class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: KararAppBar(
-        title: strings.screenTitle,
+        title: l10n.settingsScreenTitle,
         onBack: () => context.pop(),
       ),
       body: SafeArea(
@@ -60,15 +60,15 @@ final class SettingsScreen extends ConsumerWidget {
               ),
             ),
             _Group(
-              heading: strings.appearanceTitle,
+              heading: l10n.settingsAppearanceTitle,
               child: Column(
                 children: <Widget>[
                   for (final theme in ThemePreference.values)
                     KararCheckboxTile(
                       label: switch (theme) {
-                        ThemePreference.system => strings.themeSystem,
-                        ThemePreference.light => strings.themeLight,
-                        ThemePreference.dark => strings.themeDark,
+                        ThemePreference.system => l10n.settingsThemeSystem,
+                        ThemePreference.light => l10n.settingsThemeLight,
+                        ThemePreference.dark => l10n.settingsThemeDark,
                       },
                       value: selectedTheme == theme,
                       onChanged: (bool _) => unawaited(preferences.setTheme(theme)),
@@ -77,36 +77,36 @@ final class SettingsScreen extends ConsumerWidget {
               ),
             ),
             _Group(
-              heading: strings.yourAccountTitle,
+              heading: l10n.settingsYourAccountTitle,
               padded: false,
               child: Column(
                 children: <Widget>[
                   KararListRow(
-                    title: strings.profileRow,
+                    title: l10n.settingsProfileRow,
                     onPressed: () => context.go(ProfileRoutes.profile),
                   ),
                   KararListRow(
-                    title: strings.organisationRow,
+                    title: l10n.settingsOrganisationRow,
                     onPressed: () => context.go(TenantRoutes.organisation),
                   ),
                   KararListRow(
-                    title: strings.jurisdictionRow,
+                    title: l10n.settingsJurisdictionRow,
                     onPressed: () => context.go(PlatformRoutes.jurisdiction),
                   ),
                   KararListRow(
-                    title: strings.legalRow,
+                    title: l10n.settingsLegalRow,
                     onPressed: () => context.go(PlatformRoutes.legal),
                   ),
                   KararListRow(
-                    title: strings.consentRow,
+                    title: l10n.settingsConsentRow,
                     onPressed: () => context.go(ConsentRoutes.consent),
                   ),
                 ],
               ),
             ),
             _Group(
-              heading: strings.dangerTitle,
-              child: _DisableCard(strings: strings, state: disable),
+              heading: l10n.settingsDangerTitle,
+              child: _DisableCard(l10n: l10n, state: disable),
             ),
           ],
         ),
@@ -122,9 +122,9 @@ final class SettingsScreen extends ConsumerWidget {
 }
 
 final class _DisableCard extends ConsumerWidget {
-  const _DisableCard({required this.strings, required this.state});
+  const _DisableCard({required this.l10n, required this.state});
 
-  final SettingsStrings strings;
+  final AppLocalizations l10n;
   final AccountDisableState state;
 
   @override
@@ -133,7 +133,7 @@ final class _DisableCard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          strings.disableTitle,
+          l10n.settingsDisableTitle,
           textAlign: TextAlign.start,
           style: context.typography.bodyLarge.copyWith(
             color: context.colors.contentPrimary,
@@ -141,7 +141,7 @@ final class _DisableCard extends ConsumerWidget {
         ),
         SizedBox(height: context.spacing.xs),
         Text(
-          strings.disableDescription,
+          l10n.settingsDisableDescription,
           textAlign: TextAlign.start,
           style: context.typography.bodySmall.copyWith(
             color: context.colors.contentSecondary,
@@ -149,7 +149,7 @@ final class _DisableCard extends ConsumerWidget {
         ),
         SizedBox(height: context.spacing.md),
         KararButton(
-          label: strings.disableAction,
+          label: l10n.settingsDisableAction,
           variant: KararButtonVariant.destructive,
           isFullWidth: true,
           isLoading: state is AccountDisableSubmitting,
@@ -164,9 +164,9 @@ final class _DisableCard extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => KararDialog(
-        title: strings.disableConfirmTitle,
-        message: strings.disableConfirmMessage,
-        confirmLabel: strings.disableAction,
+        title: l10n.settingsDisableConfirmTitle,
+        message: l10n.settingsDisableConfirmMessage,
+        confirmLabel: l10n.settingsDisableAction,
         cancelLabel: dialogContext.l10n.actionCancel,
         isDestructive: true,
         onConfirm: () => Navigator.of(dialogContext).pop(true),
@@ -187,10 +187,10 @@ final class _DisableCard extends ConsumerWidget {
         return <Widget>[
           SizedBox(height: context.spacing.md),
           KararBanner(
-            title: strings.disableRecordedTitle,
+            title: l10n.settingsDisableRecordedTitle,
             message: request.auditRecorded
-                ? strings.disableRecordedMessage
-                : '${strings.disableRecordedMessage} ${strings.disableAuditWarning}',
+                ? l10n.settingsDisableRecordedMessage
+                : '${l10n.settingsDisableRecordedMessage} ${l10n.settingsDisableAuditWarning}',
             tone: request.auditRecorded
                 ? KararStatusTone.info
                 : KararStatusTone.warning,
@@ -200,8 +200,8 @@ final class _DisableCard extends ConsumerWidget {
         return <Widget>[
           SizedBox(height: context.spacing.md),
           KararBanner(
-            title: strings.disableFailedTitle,
-            message: strings.disableFailedMessage,
+            title: l10n.settingsDisableFailedTitle,
+            message: l10n.settingsDisableFailedMessage,
             tone: KararStatusTone.danger,
           ),
         ];

@@ -248,6 +248,12 @@ void main() {
       expect(await stateFor('SOMETHING_NEWER'), ConsentStatusState.unrecognised);
     });
 
+    // The listing no longer carries `storageRef` at all: the contract dropped
+    // it and set `additionalProperties: false`, and the text is now read
+    // through `/consent/documents/{documentId}/content`. The locator is kept in
+    // this ONE fixture on purpose — a field the contract forbids is exactly
+    // what a misbehaving or rolled-back server would send, and the point of the
+    // assertion is that the client would still not put it on a screen.
     test('maps a document to its safe metadata and nothing else', () async {
       final result = await repositoryReturning(<String, Object?>{
         'documents': <Object?>[
@@ -273,8 +279,8 @@ void main() {
       expect(document.kind, 'LOCAL_SEED_SYNTHETIC_NOTICE');
       expect(document.effectiveVersion?.versionId, testVersionId);
       expect(document.effectiveVersion?.action, LegalDocumentAction.reacceptanceRequired);
-      // The storage locator and the content hash are internal references and
-      // are deliberately not modelled, so they cannot reach a screen.
+      // Neither the locator nor the content hash is modelled, so neither can
+      // reach a screen — including the locator the contract no longer defines.
       expect(document.toString(), isNot(contains('internal://locator')));
       expect(document.toString(), isNot(contains('sha256-abc')));
     });
@@ -291,7 +297,6 @@ void main() {
             'effectiveVersion': <String, Object?>{
               'classification': 'SOMETHING_NEWER',
               'contentHash': 'h',
-              'storageRef': 's',
               'version': '1.0.0',
               'versionId': testVersionId,
             },

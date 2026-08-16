@@ -18,11 +18,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/lifecycle/bootstrap_snapshot.dart';
 import '../../../app/lifecycle/startup_state.dart';
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../domain/invitation_redemption.dart';
 import '../domain/tenant_binding.dart';
 import 'tenant_providers.dart';
-import 'tenant_strings.dart';
 
 /// The gate-screen builder registered for [StartupStage.tenantSelectionRequired].
 Widget buildTenantSelectionScreen(BuildContext context, StartupState state) =>
@@ -85,24 +85,24 @@ class _TenantSelectionScreenState extends ConsumerState<TenantSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = TenantStrings.of(context);
+    final l10n = context.l10n;
     final decision = _policy.decide(widget.choices);
     final binding = ref.watch(tenantBindingControllerProvider);
 
     return Scaffold(
-      appBar: KararAppBar(title: strings.selectionTitle),
+      appBar: KararAppBar(title: l10n.tenantSelectionTitle),
       body: SafeArea(
         top: false,
         child: switch (decision) {
           NoTenantMembership() => _NoMembershipBody(
-              strings: strings,
+              l10n: l10n,
               controller: _invitationController,
               onRedeem: _redeem,
             ),
-          BindSingleTenant() => KararLoadingView(subject: strings.organisationTitle),
+          BindSingleTenant() => KararLoadingView(subject: l10n.tenantOrganisationTitle),
           ChooseTenant(:final choices) => _ChoiceList(
               choices: choices,
-              strings: strings,
+              l10n: l10n,
               binding: binding,
               onSelect: (TenantChoice choice) => unawaited(
                 ref.read(tenantBindingControllerProvider.notifier).bind(choice),
@@ -125,13 +125,13 @@ class _TenantSelectionScreenState extends ConsumerState<TenantSelectionScreen> {
 final class _ChoiceList extends StatelessWidget {
   const _ChoiceList({
     required this.choices,
-    required this.strings,
+    required this.l10n,
     required this.binding,
     required this.onSelect,
   });
 
   final List<TenantChoice> choices;
-  final TenantStrings strings;
+  final AppLocalizations l10n;
   final TenantBindingUiState binding;
   final ValueChanged<TenantChoice> onSelect;
 
@@ -145,7 +145,7 @@ final class _ChoiceList extends StatelessWidget {
       padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
       children: <Widget>[
         Text(
-          strings.selectionDescription,
+          l10n.tenantSelectionDescription,
           textAlign: TextAlign.start,
           style: context.typography.bodyMedium.copyWith(
             color: context.colors.contentSecondary,
@@ -153,7 +153,7 @@ final class _ChoiceList extends StatelessWidget {
         ),
         SizedBox(height: context.spacing.lg),
         if (binding is TenantBindingRejected) ...<Widget>[
-          _RejectionBanner(rejection: binding as TenantBindingRejected, strings: strings),
+          _RejectionBanner(rejection: binding as TenantBindingRejected, l10n: l10n),
           SizedBox(height: context.spacing.lg),
         ],
         for (final choice in choices)
@@ -163,9 +163,9 @@ final class _ChoiceList extends StatelessWidget {
               padding: EdgeInsetsDirectional.zero,
               child: KararListRow(
                 title: choice.name,
-                subtitle: strings.roleWithValue(choice.roleHint),
+                subtitle: l10n.tenantRoleValuePattern(l10n.tenantRoleLabel, choice.roleHint),
                 semanticLabel: context.l10n
-                    .a11yTitleWithSubtitle(strings.selectSemanticPrefix, choice.name),
+                    .a11yTitleWithSubtitle(l10n.tenantSelectSemanticPrefix, choice.name),
                 trailing: submittingId == choice.tenantId
                     ? const KararLoadingIndicator.inline()
                     : null,
@@ -180,12 +180,12 @@ final class _ChoiceList extends StatelessWidget {
 
 final class _NoMembershipBody extends ConsumerWidget {
   const _NoMembershipBody({
-    required this.strings,
+    required this.l10n,
     required this.controller,
     required this.onRedeem,
   });
 
-  final TenantStrings strings;
+  final AppLocalizations l10n;
   final TextEditingController controller;
   final VoidCallback onRedeem;
 
@@ -196,8 +196,8 @@ final class _NoMembershipBody extends ConsumerWidget {
       padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
       children: <Widget>[
         KararStateView.empty(
-          title: strings.noMembershipTitle,
-          message: strings.noMembershipDescription,
+          title: l10n.tenantNoMembershipTitle,
+          message: l10n.tenantNoMembershipDescription,
         ),
         SizedBox(height: context.spacing.lg),
         KararCard(
@@ -207,7 +207,7 @@ final class _NoMembershipBody extends ConsumerWidget {
               Semantics(
                 header: true,
                 child: Text(
-                  strings.invitationHeading,
+                  l10n.tenantInvitationHeading,
                   textAlign: TextAlign.start,
                   style: context.typography.titleMedium.copyWith(
                     color: context.colors.contentPrimary,
@@ -216,7 +216,7 @@ final class _NoMembershipBody extends ConsumerWidget {
               ),
               SizedBox(height: context.spacing.sm),
               Text(
-                strings.invitationDescription,
+                l10n.tenantInvitationDescription,
                 textAlign: TextAlign.start,
                 style: context.typography.bodySmall.copyWith(
                   color: context.colors.contentSecondary,
@@ -224,7 +224,7 @@ final class _NoMembershipBody extends ConsumerWidget {
               ),
               SizedBox(height: context.spacing.md),
               KararTextField(
-                label: strings.invitationFieldLabel,
+                label: l10n.tenantInvitationFieldLabel,
                 controller: controller,
                 isEnabled: redemption is! InvitationRedemptionSubmitting,
                 textInputAction: TextInputAction.done,
@@ -232,7 +232,7 @@ final class _NoMembershipBody extends ConsumerWidget {
               ),
               SizedBox(height: context.spacing.md),
               KararButton(
-                label: strings.invitationAction,
+                label: l10n.tenantInvitationAction,
                 isFullWidth: true,
                 isLoading: redemption is InvitationRedemptionSubmitting,
                 onPressed: onRedeem,
@@ -240,15 +240,15 @@ final class _NoMembershipBody extends ConsumerWidget {
               if (redemption is InvitationRedemptionAccepted) ...<Widget>[
                 SizedBox(height: context.spacing.md),
                 KararBanner(
-                  message: strings.invitationRedeemed,
+                  message: l10n.tenantInvitationRedeemed,
                   tone: KararStatusTone.success,
                 ),
               ],
               if (redemption is InvitationRedemptionRejected) ...<Widget>[
                 SizedBox(height: context.spacing.md),
                 KararBanner(
-                  title: strings.invitationFailedTitle,
-                  message: strings.invitationFailedDescription,
+                  title: l10n.tenantInvitationFailedTitle,
+                  message: l10n.tenantInvitationFailedDescription,
                   tone: KararStatusTone.danger,
                 ),
               ],
@@ -262,24 +262,24 @@ final class _NoMembershipBody extends ConsumerWidget {
 
 /// A refused binding, described without naming what the platform withheld.
 final class _RejectionBanner extends StatelessWidget {
-  const _RejectionBanner({required this.rejection, required this.strings});
+  const _RejectionBanner({required this.rejection, required this.l10n});
 
   final TenantBindingRejected rejection;
-  final TenantStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
     final reference = rejection.failure.correlationId;
     final (String title, String message) = switch (rejection) {
       _ when rejection.membershipChangedConcurrently => (
-          strings.membershipChangedTitle,
-          strings.membershipChangedDescription,
+          l10n.tenantMembershipChangedTitle,
+          l10n.tenantMembershipChangedDescription,
         ),
       _ when rejection.membershipRefused => (
-          strings.membershipRefusedTitle,
-          strings.membershipRefusedDescription,
+          l10n.tenantMembershipRefusedTitle,
+          l10n.tenantMembershipRefusedDescription,
         ),
-      _ => (strings.selectionFailedTitle, strings.selectionFailedDescription),
+      _ => (l10n.tenantSelectionFailedTitle, l10n.tenantSelectionFailedDescription),
     };
     return KararBanner(
       title: title,

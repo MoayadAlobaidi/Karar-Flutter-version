@@ -9,11 +9,11 @@ import 'package:karar_mobile/core/networking/http_method.dart';
 import 'package:karar_mobile/features/authentication/domain/entities/neutral_receipt.dart';
 import 'package:karar_mobile/features/authentication/domain/value_objects/email_address.dart';
 import 'package:karar_mobile/features/authentication/domain/value_objects/password.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/widgets/sensitive_screen.dart';
 import 'package:karar_mobile/features/password_recovery/presentation/forgot_password_screen.dart';
 import 'package:karar_mobile/features/password_recovery/presentation/password_recovery_providers.dart';
 import 'package:karar_mobile/features/password_recovery/presentation/reset_password_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../authentication/support/identity_harness.dart';
 
@@ -158,14 +158,12 @@ void main() {
     testEveryDirectionAndScale('renders in the locale direction',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const ForgotPasswordScreen(),
           harness: harness, locale: locale, textScale: textScale);
 
-      expect(find.text(strings.forgotPasswordSubtitle), findsOneWidget);
+      expect(find.text(l10n.forgotPasswordSubtitle), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(ForgotPasswordScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -176,9 +174,7 @@ void main() {
     testEveryDirectionAndScale(
       'a known and an unknown address render identically',
       (WidgetTester tester, Locale locale, double textScale) async {
-        final IdentityStrings strings = locale.languageCode == 'ar'
-            ? IdentityStrings.arabic
-            : IdentityStrings.english;
+        final AppLocalizations l10n = lookupAppLocalizations(locale);
         final List<List<String>> renderings = <List<String>>[];
 
         for (final Map<String, Object?> body in <Map<String, Object?>>[
@@ -195,7 +191,7 @@ void main() {
           await pumpIdentity(tester, const ForgotPasswordScreen(),
               harness: harness, locale: locale, textScale: textScale);
           await enterIdentityField(tester, 0, 'person@example.test');
-          await tapIdentityButton(tester, strings.forgotPasswordAction);
+          await tapIdentityButton(tester, l10n.forgotPasswordAction);
           await tester.pumpAndSettle();
 
           renderings.add(_renderedText(tester));
@@ -204,7 +200,7 @@ void main() {
         }
 
         expect(renderings[1], equals(renderings[0]));
-        expect(renderings[0], contains(strings.forgotPasswordAcknowledgementMessage));
+        expect(renderings[0], contains(l10n.forgotPasswordAcknowledgementMessage));
         expect(
           renderings[0].where((String value) => value.contains('No account')),
           isEmpty,
@@ -217,15 +213,13 @@ void main() {
     testEveryDirectionAndScale('renders in the locale direction',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const ResetPasswordScreen(),
           harness: harness, locale: locale, textScale: textScale);
 
-      expect(find.text(strings.resetPasswordTokenLabel), findsOneWidget);
-      expect(find.text(strings.resetPasswordNewLabel), findsOneWidget);
+      expect(find.text(l10n.resetPasswordTokenLabel), findsOneWidget);
+      expect(find.text(l10n.resetPasswordNewLabel), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(ResetPasswordScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -266,9 +260,7 @@ void main() {
     testEveryDirectionAndScale('states that every session ended, on success',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport
           .onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
 
@@ -277,10 +269,10 @@ void main() {
       await enterIdentityField(tester, 0, 'reset-token-fixture');
       await enterIdentityField(tester, 1, 'brand-new-password');
       await enterIdentityField(tester, 2, 'brand-new-password');
-      await tapIdentityButton(tester, strings.resetPasswordAction);
+      await tapIdentityButton(tester, l10n.resetPasswordAction);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.resetPasswordSuccessMessage), findsOneWidget);
+      expect(find.text(l10n.resetPasswordSuccessMessage), findsOneWidget);
     });
 
     testWidgets('every interactive control carries a name',

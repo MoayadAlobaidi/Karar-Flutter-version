@@ -9,11 +9,11 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/app/dependency_injection/providers.dart';
 import 'package:karar_mobile/core/security/app_lock.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/session_management/data/platform_local_authenticator.dart';
 import 'package:karar_mobile/features/session_management/domain/app_lock.dart';
 import 'package:karar_mobile/features/session_management/presentation/app_lock_providers.dart';
 import 'package:karar_mobile/features/session_management/presentation/app_lock_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../authentication/support/identity_harness.dart';
 
@@ -23,6 +23,11 @@ IdentityHarness _harnessWith(ScriptedLocalAuthenticator authenticator) =>
         localAuthenticatorProvider.overrideWithValue(authenticator),
       ],
     );
+
+/// The English catalogue, for assertions that do not depend on the locale.
+final AppLocalizations _english = lookupAppLocalizations(
+  KararLocalization.english,
+);
 
 void main() {
   group('AppLockPolicy', () {
@@ -99,7 +104,7 @@ void main() {
 
       await harness.container.read(appLockControllerProvider.notifier).setEnabled(
             enabled: true,
-            reason: IdentityStrings.english.appLockPromptReason,
+            reason: _english.appLockPromptReason,
           );
 
       final AppLockViewState state = harness.container.read(appLockControllerProvider);
@@ -120,7 +125,7 @@ void main() {
 
       await harness.container.read(appLockControllerProvider.notifier).setEnabled(
             enabled: true,
-            reason: IdentityStrings.english.appLockPromptReason,
+            reason: _english.appLockPromptReason,
           );
 
       expect(harness.container.read(appLockGateProvider).isEnabled, isFalse);
@@ -139,13 +144,13 @@ void main() {
 
       await harness.container.read(appLockControllerProvider.notifier).setEnabled(
             enabled: true,
-            reason: IdentityStrings.english.appLockPromptReason,
+            reason: _english.appLockPromptReason,
           );
 
       expect(authenticator.promptCount, 1);
       expect(harness.container.read(appLockGateProvider).isEnabled, isTrue);
       // The prompt sentence came from the localized catalogue, not a literal.
-      expect(authenticator.reasons.single, IdentityStrings.english.appLockPromptReason);
+      expect(authenticator.reasons.single, _english.appLockPromptReason);
     });
 
     test('stands the choice down when the device can no longer satisfy it',
@@ -170,7 +175,7 @@ void main() {
       expect(harness.container.read(appLockGateProvider).isLocked, isTrue);
 
       await harness.container.read(appLockControllerProvider.notifier).unlock(
-            reason: IdentityStrings.english.appLockPromptReason,
+            reason: _english.appLockPromptReason,
           );
 
       expect(harness.container.read(appLockGateProvider).isLocked, isFalse);
@@ -190,7 +195,7 @@ void main() {
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
 
       await harness.container.read(appLockControllerProvider.notifier).unlock(
-            reason: IdentityStrings.english.appLockPromptReason,
+            reason: _english.appLockPromptReason,
           );
 
       expect(harness.container.read(appLockGateProvider).isLocked, isTrue);
@@ -204,7 +209,7 @@ void main() {
 
       await harness.container.read(appLockControllerProvider.notifier).setEnabled(
             enabled: false,
-            reason: IdentityStrings.english.appLockPromptReason,
+            reason: _english.appLockPromptReason,
           );
 
       expect(harness.container.read(appLockGateProvider).isEnabled, isFalse);
@@ -296,19 +301,17 @@ void main() {
     testEveryDirectionAndScale('renders the locked state in the locale direction',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const AppLockScreen(),
           harness: harness, locale: locale, textScale: textScale);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.appLockLockedMessage), findsOneWidget);
-      expect(identityButton(strings.appLockUnlockAction), findsOneWidget);
+      expect(find.text(l10n.appLockLockedMessage), findsOneWidget);
+      expect(identityButton(l10n.appLockUnlockAction), findsOneWidget);
       // The password fallback is always offered: a broken authenticator must
       // not trap the user behind a lock they cannot open.
-      expect(identityButton(strings.appLockSignInInstead), findsOneWidget);
+      expect(identityButton(l10n.appLockSignInInstead), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(AppLockScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -325,14 +328,14 @@ void main() {
           ],
         ),
       );
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
 
       await pumpIdentity(tester, const AppLockScreen(), harness: harness);
       await tester.pumpAndSettle();
-      await tapIdentityButton(tester, strings.appLockUnlockAction);
+      await tapIdentityButton(tester, l10n.appLockUnlockAction);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.appLockLockedOut), findsOneWidget);
+      expect(find.text(l10n.appLockLockedOut), findsOneWidget);
     });
   });
 
@@ -341,9 +344,7 @@ void main() {
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const AppLockSettingsScreen(),
           harness: harness, locale: locale, textScale: textScale);
@@ -351,8 +352,8 @@ void main() {
 
       // The copy states plainly that this is not authentication and that no
       // biometric data reaches Karar.
-      expect(find.text(strings.appLockSettingsDescription), findsOneWidget);
-      expect(find.text(strings.appLockToggleLabel), findsOneWidget);
+      expect(find.text(l10n.appLockSettingsDescription), findsOneWidget);
+      expect(find.text(l10n.appLockToggleLabel), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(AppLockSettingsScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -368,16 +369,14 @@ void main() {
         ),
       );
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const AppLockSettingsScreen(),
           harness: harness, locale: locale, textScale: textScale);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.appLockUnavailableMessage), findsOneWidget);
-      expect(find.text(strings.appLockToggleLabel), findsNothing);
+      expect(find.text(l10n.appLockUnavailableMessage), findsOneWidget);
+      expect(find.text(l10n.appLockToggleLabel), findsNothing);
     });
 
     testWidgets('an unenrolled device says what to do about it',
@@ -393,7 +392,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(IdentityStrings.english.appLockNotEnrolledMessage),
+        find.text(_english.appLockNotEnrolledMessage),
         findsOneWidget,
       );
     });

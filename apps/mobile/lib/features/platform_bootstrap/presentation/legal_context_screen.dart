@@ -17,11 +17,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../consent/presentation/consent_routes.dart';
 import '../domain/platform_context.dart';
 import 'platform_providers.dart';
-import 'platform_strings.dart';
 
 /// The contracting entity and the governing policy version.
 final class LegalContextScreen extends ConsumerWidget {
@@ -30,11 +30,11 @@ final class LegalContextScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final platform = ref.watch(platformContextProvider);
-    final strings = PlatformStrings.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: KararAppBar(
-        title: strings.legalScreenTitle,
+        title: l10n.platformLegalScreenTitle,
         onBack: () => context.pop(),
       ),
       body: SafeArea(
@@ -46,16 +46,16 @@ final class LegalContextScreen extends ConsumerWidget {
                 children: <Widget>[
                   _OperatingEntityCard(
                     entity: platform.operatingEntity,
-                    strings: strings,
+                    l10n: l10n,
                   ),
                   SizedBox(height: context.spacing.sectionGap),
-                  _PolicyPackCard(policyPack: platform.policyPack, strings: strings),
+                  _PolicyPackCard(policyPack: platform.policyPack, l10n: l10n),
                   SizedBox(height: context.spacing.sectionGap),
                   KararCard(
                     padding: EdgeInsetsDirectional.zero,
                     child: KararListRow(
-                      title: strings.sectionConsent,
-                      subtitle: strings.consentRowSubtitle,
+                      title: l10n.platformSectionConsent,
+                      subtitle: l10n.platformConsentRowSubtitle,
                       leadingIcon: KararIcons.document,
                       onPressed: () => context.go(ConsentRoutes.consent),
                     ),
@@ -68,10 +68,10 @@ final class LegalContextScreen extends ConsumerWidget {
 }
 
 final class _OperatingEntityCard extends StatelessWidget {
-  const _OperatingEntityCard({required this.entity, required this.strings});
+  const _OperatingEntityCard({required this.entity, required this.l10n});
 
   final OperatingEntityContext entity;
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +82,7 @@ final class _OperatingEntityCard extends StatelessWidget {
           Semantics(
             header: true,
             child: Text(
-              strings.operatingEntityHeading,
+              l10n.platformOperatingEntityHeading,
               textAlign: TextAlign.start,
               style: context.typography.titleMedium.copyWith(
                 color: context.colors.contentPrimary,
@@ -101,26 +101,26 @@ final class _OperatingEntityCard extends StatelessWidget {
       case OperatingEntityAssigned(:final entity):
         return <Widget>[
           _LabelledValue(
-            label: strings.operatingEntityNameLabel,
+            label: l10n.platformOperatingEntityNameLabel,
             value: entity.name,
           ),
           if (entity.jurisdictionRef != null) ...<Widget>[
             SizedBox(height: context.spacing.md),
             _LabelledValue(
-              label: strings.operatingEntityJurisdictionLabel,
+              label: l10n.platformOperatingEntityJurisdictionLabel,
               value: entity.jurisdictionRef!,
             ),
           ],
           if (entity.contactReference != null) ...<Widget>[
             SizedBox(height: context.spacing.md),
             _LabelledValue(
-              label: strings.operatingEntityContactLabel,
+              label: l10n.platformOperatingEntityContactLabel,
               value: entity.contactReference!,
             ),
           ],
           SizedBox(height: context.spacing.md),
           Text(
-            strings.operatingEntityAssignedNote,
+            l10n.platformOperatingEntityAssignedNote,
             textAlign: TextAlign.start,
             style: context.typography.bodySmall.copyWith(
               color: context.colors.contentSecondary,
@@ -130,24 +130,24 @@ final class _OperatingEntityCard extends StatelessWidget {
       case OperatingEntityUnassigned():
         return <Widget>[
           _StateNote(
-            title: strings.operatingEntityUnassignedTitle,
-            message: strings.operatingEntityUnassignedDescription,
+            title: l10n.platformOperatingEntityUnassignedTitle,
+            message: l10n.platformOperatingEntityUnassignedDescription,
             tone: KararStatusTone.info,
           ),
         ];
       case OperatingEntityUnavailable():
         return <Widget>[
           _StateNote(
-            title: strings.operatingEntityUnavailableTitle,
-            message: strings.operatingEntityUnavailableDescription,
+            title: l10n.platformOperatingEntityUnavailableTitle,
+            message: l10n.platformOperatingEntityUnavailableDescription,
             tone: KararStatusTone.warning,
           ),
         ];
       case OperatingEntityUnrecognised():
         return <Widget>[
           _StateNote(
-            title: strings.operatingEntityUnrecognisedTitle,
-            message: strings.operatingEntityUnrecognisedDescription,
+            title: l10n.platformOperatingEntityUnrecognisedTitle,
+            message: l10n.platformOperatingEntityUnrecognisedDescription,
             tone: KararStatusTone.warning,
           ),
         ];
@@ -156,10 +156,10 @@ final class _OperatingEntityCard extends StatelessWidget {
 }
 
 final class _PolicyPackCard extends StatelessWidget {
-  const _PolicyPackCard({required this.policyPack, required this.strings});
+  const _PolicyPackCard({required this.policyPack, required this.l10n});
 
   final PolicyPackStatus policyPack;
-  final PlatformStrings strings;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +172,7 @@ final class _PolicyPackCard extends StatelessWidget {
           Semantics(
             header: true,
             child: Text(
-              strings.policyPackHeading,
+              l10n.platformPolicyPackHeading,
               textAlign: TextAlign.start,
               style: context.typography.titleMedium.copyWith(
                 color: context.colors.contentPrimary,
@@ -182,7 +182,7 @@ final class _PolicyPackCard extends StatelessWidget {
           SizedBox(height: context.spacing.md),
           if (version == null && status == null)
             Text(
-              strings.policyPackAbsent,
+              l10n.platformPolicyPackAbsent,
               textAlign: TextAlign.start,
               style: context.typography.bodyMedium.copyWith(
                 color: context.colors.contentSecondary,
@@ -190,10 +190,10 @@ final class _PolicyPackCard extends StatelessWidget {
             )
           else ...<Widget>[
             if (version != null)
-              _LabelledValue(label: strings.policyPackVersionLabel, value: version),
+              _LabelledValue(label: l10n.platformPolicyPackVersionLabel, value: version),
             if (status != null) ...<Widget>[
               SizedBox(height: context.spacing.md),
-              _LabelledValue(label: strings.policyPackStatusLabel, value: status),
+              _LabelledValue(label: l10n.platformPolicyPackStatusLabel, value: status),
             ],
           ],
         ],

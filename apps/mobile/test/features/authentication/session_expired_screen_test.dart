@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/app/dependency_injection/providers.dart';
 import 'package:karar_mobile/app/lifecycle/startup_state.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/screens/session_expired_screen.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import 'support/identity_harness.dart';
 
@@ -18,8 +18,7 @@ void main() {
   testEveryDirectionAndScale('names theft plainly when a token was reused',
       (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    final IdentityStrings strings =
-        locale.languageCode == 'ar' ? IdentityStrings.arabic : IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(
       tester,
@@ -31,8 +30,8 @@ void main() {
       textScale: textScale,
     );
 
-    expect(find.text(strings.sessionEndedReuseDetected), findsOneWidget);
-    expect(find.text(strings.sessionEndedTitle), findsWidgets);
+    expect(find.text(l10n.sessionEndedReuseDetected), findsOneWidget);
+    expect(find.text(l10n.sessionEndedTitle), findsWidgets);
     expect(
       Directionality.of(tester.element(find.byType(SessionExpiredScreen))),
       locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
@@ -42,13 +41,13 @@ void main() {
 
   testWidgets('each reason has its own guidance and the same one action',
       (WidgetTester tester) async {
-    const IdentityStrings strings = IdentityStrings.english;
+    final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
     final Map<SessionEndReason, String> expected = <SessionEndReason, String>{
-      SessionEndReason.expired: strings.sessionEndedExpired,
-      SessionEndReason.revoked: strings.sessionEndedRevoked,
-      SessionEndReason.refreshRejected: strings.sessionEndedRefreshRejected,
-      SessionEndReason.refreshTokenReuseDetected: strings.sessionEndedReuseDetected,
-      SessionEndReason.signedOut: strings.sessionEndedSignedOut,
+      SessionEndReason.expired: l10n.sessionEndedExpired,
+      SessionEndReason.revoked: l10n.sessionEndedRevoked,
+      SessionEndReason.refreshRejected: l10n.sessionEndedRefreshRejected,
+      SessionEndReason.refreshTokenReuseDetected: l10n.sessionEndedReuseDetected,
+      SessionEndReason.signedOut: l10n.sessionEndedSignedOut,
     };
 
     for (final MapEntry<SessionEndReason, String> entry in expected.entries) {
@@ -61,7 +60,7 @@ void main() {
 
       expect(find.text(entry.value), findsOneWidget, reason: entry.key.name);
       // Every reason ends at the same safe destination.
-      expect(identityButton(strings.sessionEndedAction), findsOneWidget);
+      expect(identityButton(l10n.sessionEndedAction), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();

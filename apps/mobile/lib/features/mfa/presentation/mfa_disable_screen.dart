@@ -7,9 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/localization/identity_failure_messages.dart';
-import '../../authentication/presentation/localization/identity_strings.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
 import '../../authentication/presentation/widgets/sensitive_screen.dart';
 import 'mfa_providers.dart';
@@ -36,21 +36,21 @@ class _MfaDisableScreenState extends ConsumerState<MfaDisableScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final IdentityStrings strings = IdentityStrings.of(context);
+    final AppLocalizations l10n = context.l10n;
     final MfaDisableViewState state = ref.watch(mfaDisableControllerProvider);
 
     if (state.isDisabled) {
       return IdentityScaffold(
-        title: strings.mfaDisableTitle,
+        title: l10n.mfaDisableTitle,
         children: <Widget>[
           KararStateView.empty(
             icon: KararIcons.statusSuccess,
-            title: strings.mfaDisableTitle,
-            message: strings.mfaDisableSuccess,
+            title: l10n.mfaDisableTitle,
+            message: l10n.mfaDisableSuccess,
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.mfaRecoveryCodesDone,
+            label: l10n.actionDone,
             isFullWidth: true,
             size: KararButtonSize.large,
             onPressed: () => context.pop(),
@@ -61,31 +61,31 @@ class _MfaDisableScreenState extends ConsumerState<MfaDisableScreen> {
 
     return SensitiveScreen(
       child: IdentityScaffold(
-        title: strings.mfaDisableTitle,
+        title: l10n.mfaDisableTitle,
         onBack: () => context.pop(),
         children: <Widget>[
           if (state.failure != null)
             IdentityFailureNotice(
-              message: mfaDisableFailureMessage(strings, state.failure!),
+              message: mfaDisableFailureMessage(l10n, state.failure!),
             ),
           KararBanner(
-            message: strings.mfaDisableWarning,
+            message: l10n.mfaDisableWarning,
             tone: KararStatusTone.warning,
           ),
           const IdentityGap.large(),
           KararTextField(
-            label: strings.mfaCodeLabel,
+            label: l10n.mfaCodeLabel,
             controller: _code,
-            hint: strings.mfaCodeHint,
+            hint: l10n.mfaCodeHint,
             isRequired: true,
             isEnabled: !state.isSubmitting,
             normalizeArabicDigits: true,
-            errorText: state.codeMissing ? strings.codeEmpty : null,
+            errorText: state.codeMissing ? l10n.codeEmpty : null,
             onSubmitted: (_) => _submit(),
           ),
           const IdentityGap.large(),
           KararButton(
-            label: strings.mfaDisableAction,
+            label: l10n.mfaDisableAction,
             variant: KararButtonVariant.destructive,
             onPressed: state.isSubmitting ? null : _submit,
             isLoading: state.isSubmitting,

@@ -12,7 +12,6 @@ import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/networking/http_method.dart';
 import 'package:karar_mobile/features/authentication/domain/entities/authentication_outcome.dart';
 import 'package:karar_mobile/features/authentication/domain/value_objects/password.dart';
-import 'package:karar_mobile/features/authentication/presentation/localization/identity_strings.dart';
 import 'package:karar_mobile/features/authentication/presentation/providers/authentication_providers.dart';
 import 'package:karar_mobile/features/authentication/presentation/widgets/sensitive_screen.dart';
 import 'package:karar_mobile/features/mfa/domain/mfa_entities.dart';
@@ -21,6 +20,7 @@ import 'package:karar_mobile/features/mfa/presentation/mfa_challenge_screen.dart
 import 'package:karar_mobile/features/mfa/presentation/mfa_disable_screen.dart';
 import 'package:karar_mobile/features/mfa/presentation/mfa_enrolment_screen.dart';
 import 'package:karar_mobile/features/mfa/presentation/mfa_providers.dart';
+import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'package:karar_mobile/shared/shared.dart';
 
 import '../authentication/support/identity_harness.dart';
@@ -29,6 +29,11 @@ const List<String> _recoveryCodes = <String>[
   'AAAA-1111', 'BBBB-2222', 'CCCC-3333', 'DDDD-4444', 'EEEE-5555',
   'FFFF-6666', 'GGGG-7777', 'HHHH-8888', 'IIII-9999', 'JJJJ-0000',
 ];
+
+/// The English catalogue, for assertions that do not depend on the locale.
+final AppLocalizations _english = lookupAppLocalizations(
+  KararLocalization.english,
+);
 
 void main() {
   group('challenge status', () {
@@ -232,9 +237,7 @@ void main() {
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.onPost('/auth/mfa/enroll', <String, Object?>{
         'status': 'enrolment_started',
         'secret': 'JBSWY3DPEHPK3PXP',
@@ -247,21 +250,21 @@ void main() {
 
       await pumpIdentity(tester, const MfaEnrolmentScreen(),
           harness: harness, locale: locale, textScale: textScale);
-      expect(find.text(strings.mfaEnrolIntro), findsOneWidget);
+      expect(find.text(l10n.mfaEnrolIntro), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(MfaEnrolmentScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       );
 
-      await tapIdentityButton(tester, strings.mfaEnrolStartAction);
+      await tapIdentityButton(tester, l10n.mfaEnrolStartAction);
       await tester.pumpAndSettle();
-      expect(find.text(strings.mfaEnrolSecretWarning), findsOneWidget);
+      expect(find.text(l10n.mfaEnrolSecretWarning), findsOneWidget);
 
       await enterIdentityField(tester, 0, '123456');
-      await tapIdentityButton(tester, strings.mfaConfirmAction);
+      await tapIdentityButton(tester, l10n.mfaConfirmAction);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.mfaRecoveryCodesWarning), findsOneWidget);
+      expect(find.text(l10n.mfaRecoveryCodesWarning), findsOneWidget);
       expect(find.text('AAAA-1111'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -270,7 +273,7 @@ void main() {
         (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
       harness.transport.onPost('/auth/mfa/enroll', <String, Object?>{
         'status': 'enrolment_started',
         'secret': 'JBSWY3DPEHPK3PXP',
@@ -282,17 +285,17 @@ void main() {
       });
 
       await pumpIdentity(tester, const MfaEnrolmentScreen(), harness: harness);
-      await tapIdentityButton(tester, strings.mfaEnrolStartAction);
+      await tapIdentityButton(tester, l10n.mfaEnrolStartAction);
       await tester.pumpAndSettle();
       await enterIdentityField(tester, 0, '123456');
-      await tapIdentityButton(tester, strings.mfaConfirmAction);
+      await tapIdentityButton(tester, l10n.mfaConfirmAction);
       await tester.pumpAndSettle();
 
       // These codes cannot be shown again; leaving without saving them loses
       // the way back into the account.
       expect(
         tester
-            .widget<KararButton>(identityButton(strings.mfaRecoveryCodesDone))
+            .widget<KararButton>(identityButton(l10n.actionDone))
             .onPressed,
         isNull,
       );
@@ -304,7 +307,7 @@ void main() {
 
       expect(
         tester
-            .widget<KararButton>(identityButton(strings.mfaRecoveryCodesDone))
+            .widget<KararButton>(identityButton(l10n.actionDone))
             .onPressed,
         isNotNull,
       );
@@ -314,7 +317,7 @@ void main() {
         (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
       harness.transport.onPost('/auth/mfa/enroll', <String, Object?>{
         'status': 'enrolment_started',
         'secret': 'JBSWY3DPEHPK3PXP',
@@ -322,12 +325,12 @@ void main() {
       });
 
       await pumpIdentity(tester, const MfaEnrolmentScreen(), harness: harness);
-      await tapIdentityButton(tester, strings.mfaEnrolStartAction);
+      await tapIdentityButton(tester, l10n.mfaEnrolStartAction);
       await tester.pumpAndSettle();
 
       // The system clipboard is readable by other applications and is
       // synchronised across devices, so a one-time secret never goes near it.
-      expect(find.text(IdentityStrings.english.mfaRecoveryCodesDone), findsNothing);
+      expect(find.text(_english.actionDone), findsNothing);
       expect(find.byIcon(KararIcons.copy), findsNothing);
       expect(find.byType(SensitiveScreen), findsOneWidget);
     });
@@ -336,7 +339,7 @@ void main() {
         (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
       harness.transport.onPost('/auth/mfa/enroll', <String, Object?>{
         'status': 'enrolment_started',
         'secret': 'JBSWY3DPEHPK3PXP',
@@ -344,7 +347,7 @@ void main() {
       });
 
       await pumpIdentity(tester, const MfaEnrolmentScreen(), harness: harness);
-      await tapIdentityButton(tester, strings.mfaEnrolStartAction);
+      await tapIdentityButton(tester, l10n.mfaEnrolStartAction);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('otpauth://'), findsNothing);
@@ -356,9 +359,7 @@ void main() {
     testEveryDirectionAndScale('renders and switches to the recovery-code mode',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport
           .onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
       await harness.container.read(authenticationRepositoryProvider).signIn(
@@ -369,39 +370,37 @@ void main() {
       await pumpIdentity(tester, const MfaChallengeScreen(),
           harness: harness, locale: locale, textScale: textScale);
 
-      expect(find.text(strings.mfaChallengeSubtitle), findsOneWidget);
+      expect(find.text(l10n.mfaChallengeSubtitle), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(MfaChallengeScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
       );
 
-      await tapIdentityButton(tester, strings.mfaChallengeUseRecovery);
+      await tapIdentityButton(tester, l10n.mfaChallengeUseRecovery);
       await tester.pumpAndSettle();
 
-      expect(find.text(strings.mfaRecoveryCodeSubtitle), findsOneWidget);
+      expect(find.text(l10n.mfaRecoveryCodeSubtitle), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
     testEveryDirectionAndScale('an expired challenge offers only a fresh sign-in',
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
       // No challenge was ever issued, which is what a relaunch mid-challenge
       // looks like: the token lived in memory and did not survive.
 
       await pumpIdentity(tester, const MfaChallengeScreen(),
           harness: harness, locale: locale, textScale: textScale);
 
-      expect(find.text(strings.mfaChallengeExpired), findsOneWidget);
-      expect(identityButton(strings.mfaChallengeAbandon), findsOneWidget);
+      expect(find.text(l10n.mfaChallengeExpired), findsOneWidget);
+      expect(identityButton(l10n.mfaChallengeAbandon), findsOneWidget);
     });
 
     testWidgets('a rejected code shows one generic message',
         (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
-      const IdentityStrings strings = IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
       harness.transport
           .onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
       await harness.container.read(authenticationRepositoryProvider).signIn(
@@ -417,12 +416,12 @@ void main() {
 
       await pumpIdentity(tester, const MfaChallengeScreen(), harness: harness);
       await enterIdentityField(tester, 0, '000000');
-      await tapIdentityButton(tester, strings.mfaChallengeAction);
+      await tapIdentityButton(tester, l10n.actionContinue);
       await tester.pumpAndSettle();
 
       // A wrong code, an expired challenge and a recovery lockout are one
       // answer.
-      expect(find.text(strings.mfaInvalidCode), findsOneWidget);
+      expect(find.text(l10n.mfaInvalidCode), findsOneWidget);
     });
 
     testWidgets('every interactive control carries a name',
@@ -449,14 +448,12 @@ void main() {
         (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final IdentityStrings strings = locale.languageCode == 'ar'
-          ? IdentityStrings.arabic
-          : IdentityStrings.english;
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
       await pumpIdentity(tester, const MfaDisableScreen(),
           harness: harness, locale: locale, textScale: textScale);
 
-      expect(find.text(strings.mfaDisableWarning), findsOneWidget);
+      expect(find.text(l10n.mfaDisableWarning), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(MfaDisableScreen))),
         locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
