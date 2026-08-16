@@ -7,8 +7,11 @@ describe('toProblemDetails — status and identity mapping', () => {
   it.each([
     // [code, status, title]
     [ErrorCode.VALIDATION_ERROR, 400, 'Validation failed'],
+    [ErrorCode.AUTHENTICATION_REQUIRED, 401, 'Authentication required'],
+    [ErrorCode.NOT_AUTHORIZED, 403, 'Not authorized'],
     [ErrorCode.CONFIGURATION_ERROR, 500, 'Configuration error'],
     [ErrorCode.DEPENDENCY_UNAVAILABLE, 503, 'Dependency unavailable'],
+    [ErrorCode.OPERATION_RESTRICTED, 503, 'Operation restricted'],
     [ErrorCode.CONFLICT, 409, 'Conflict'],
     [ErrorCode.NOT_FOUND, 404, 'Not found'],
     [ErrorCode.RATE_LIMITED, 429, 'Rate limited'],

@@ -3,3 +3,5 @@ export const APP_CONFIG = Symbol.for('karar.api.config');
 export const APP_LOGGER = Symbol.for('karar.api.logger');
 export const READINESS_PROBES = Symbol.for('karar.api.readiness-probes');
 export const TELEMETRY = Symbol.for('karar.api.telemetry');
+/** Extra closeables (Prisma handle, Redis client) drained on shutdown. */
+export const SHUTDOWN_RESOURCES = Symbol.for('karar.api.shutdown-resources');

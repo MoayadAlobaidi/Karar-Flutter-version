@@ -33,5 +33,6 @@ The two gates are deliberately separate documents with separate owners: engineer
 |---|---|
 | [`phase-01.md`](phase-01.md) | 1 — Foundation: monorepo, tooling, Compose, CI, architecture tests, docs |
 | [`phase-02.md`](phase-02.md) | 2 — Platform and data foundation: PostgreSQL, kernel, audit, events/outbox/jobs, observability |
+| [`phase-03.md`](phase-03.md) | 3 — Identity, tenancy and access control: authentication, sessions, users, tenancy, RLS, RBAC, consent, kill switches |
 
 Phases 0 and 0.5 predate this template; their records are [`../phase-0-completion.md`](../phase-0-completion.md) and [`../phase-05-consolidation.md`](../phase-05-consolidation.md).

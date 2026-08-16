@@ -14,6 +14,12 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
+    ignore:
+      # The @types/node major must track the supported runtime major (Node 25,
+      # pinned in .tool-versions). A runtime upgrade is a deliberate, separately
+      # reviewed change — never a drive-by types bump (PR #3 closed for this).
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       npm-minor-patch:
         applies-to: version-updates

@@ -1,0 +1,25 @@
+# Gitleaks false-positive fingerprints (commit:file:rule:line), each with a
+# recorded reason. An entry suppresses exactly one historical occurrence;
+# never add one without reading the flagged line first. Reasons here describe
+# the flagged text ABSTRACTLY — quoting it verbatim would re-trigger the rule
+# on this very file.
+
+# Documentation prose in the tenancy data-lifecycle table: the flagged line
+# describes tenant_invitations column contents (digest-at-rest storage of the
+# invitation credential — the control itself). Words matched the rule; no
+# value is present on the line.
+# Reviewed at Phase 3 close (2026-08-16): historical line re-read at the
+# pinned commit; confirmed documentation prose, no credential or secret
+# material; fingerprint is commit+file+rule+line exact and cannot mask any
+# other finding. Maintainer-directed review, recorded as EV-318.
+1945b2ea5654a185ce389fd676102d4ee736ed8c:modules/tenancy/MODULE.md:generic-api-key:29
+
+# The first revision of THIS file quoted the flagged prose verbatim in its
+# reason comment, so the full-history scan flags that historical revision
+# forever even though the comment was reworded. Same non-finding as above,
+# one commit later.
+# Reviewed at Phase 3 close (2026-08-16): historical line re-read at the
+# pinned commit; it is the prior revision of this file's own comment, no
+# secret material; exact fingerprint, cannot mask other findings.
+# Maintainer-directed review, recorded as EV-318.
+a44cc35da98bcc5cba1472f442c69ef56b44bf66:.gitleaksignore:generic-api-key:6

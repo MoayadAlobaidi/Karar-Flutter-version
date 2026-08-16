@@ -2,6 +2,7 @@
 // See config.ts for the two-reader `process.env` convention and the
 // deployment/business split (docs/architecture/environments.md §7).
 export { ConfigurationError } from './configuration-error.js';
+export { redisEndpointFromEnv, type RedisEndpoint } from './redis-endpoint.js';
 export {
   KARAR_ENVS,
   LOG_LEVELS,

@@ -1,6 +1,6 @@
 # Karar Documentation
 
-**Phase 2 — platform and data foundation in progress.** Backend platform foundation (config, database, audit, events, jobs, observability); no product capability is implemented. Current status lives in the [root README status block](../README.md#status).
+**Phase 3 complete — identity, tenancy and access control; Phase 3.5 not started.** Backend platform foundation (Phase 2) plus authentication, sessions, users, tenancy, RBAC, consent, and kill switches; no consumer product capability is implemented. Current status lives in the [root README status block](../README.md#status).
 
 ---
 
@@ -97,7 +97,8 @@ Reproducible from the documentation alone — a Phase 0 exit criterion.
 | [phases/](phases/README.md) | Phase reports and the phase-end update ritual |
 | [phases/PHASE_TEMPLATE](phases/PHASE_TEMPLATE.md) | The required structure of every phase report |
 | [phases/phase-01](phases/phase-01.md) | Phase 1 report — foundation |
-| [phases/phase-02](phases/phase-02.md) | Phase 2 report — platform and data foundation (in progress) |
+| [phases/phase-02](phases/phase-02.md) | Phase 2 report — platform and data foundation |
+| [phases/phase-03](phases/phase-03.md) | Phase 3 report — identity, tenancy and access control |
 | [MODULE_TEMPLATE](MODULE_TEMPLATE.md) | Required for every module |
 | [phase-0-completion](phase-0-completion.md) | Phase 0 exit-criteria verification |
 | [phase-05-consolidation](phase-05-consolidation.md) | Phase 0.5 consolidation record — D1–D6 resolved, portability canonical |

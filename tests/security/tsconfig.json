@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["fixtures.ts", "__tests__/**/*"],
+  "exclude": ["dist", "node_modules"],
+  "references": [{ "path": "../../packages/platform" }, { "path": "../../packages/shared-kernel" }]
+}

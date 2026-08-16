@@ -22,8 +22,11 @@ export interface ProblemDetails {
 
 const STATUS: Readonly<Record<ErrorCode, number>> = Object.freeze({
   [ErrorCode.VALIDATION_ERROR]: 400,
+  [ErrorCode.AUTHENTICATION_REQUIRED]: 401,
+  [ErrorCode.NOT_AUTHORIZED]: 403,
   [ErrorCode.CONFIGURATION_ERROR]: 500,
   [ErrorCode.DEPENDENCY_UNAVAILABLE]: 503,
+  [ErrorCode.OPERATION_RESTRICTED]: 503,
   [ErrorCode.CONFLICT]: 409,
   [ErrorCode.NOT_FOUND]: 404,
   [ErrorCode.RATE_LIMITED]: 429,
@@ -32,8 +35,11 @@ const STATUS: Readonly<Record<ErrorCode, number>> = Object.freeze({
 
 const TITLE: Readonly<Record<ErrorCode, string>> = Object.freeze({
   [ErrorCode.VALIDATION_ERROR]: 'Validation failed',
+  [ErrorCode.AUTHENTICATION_REQUIRED]: 'Authentication required',
+  [ErrorCode.NOT_AUTHORIZED]: 'Not authorized',
   [ErrorCode.CONFIGURATION_ERROR]: 'Configuration error',
   [ErrorCode.DEPENDENCY_UNAVAILABLE]: 'Dependency unavailable',
+  [ErrorCode.OPERATION_RESTRICTED]: 'Operation restricted',
   [ErrorCode.CONFLICT]: 'Conflict',
   [ErrorCode.NOT_FOUND]: 'Not found',
   [ErrorCode.RATE_LIMITED]: 'Rate limited',

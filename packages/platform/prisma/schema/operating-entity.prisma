@@ -1,0 +1,129 @@
+// Prisma mapping for the operating-entity module's tables (migrations
+// 0060-0063). The SQL migrations remain authoritative; this file maps them
+// exactly so `make prisma-drift` stays meaningful (base.prisma header).
+//
+// Deliberately NOT expressed here, enforced by the migrations and their
+// tests instead: CHECK constraints (status vocabularies, EVIDENCED-requires-
+// evidence, migration-state invariants), the immutability/guard triggers,
+// and grants. Prisma's schema language does not carry them; the integration
+// suites prove them live.
+//
+// Prisma types never leave infrastructure/persistence code (architecture
+// test 4); relation fields exist only within this module's own tables —
+// cross-module references (tenant_id, user_id, reconsent_evaluation_id) are
+// plain scalars by design (data-model.md §2).
+
+model OperatingEntity {
+  id                        String   @id @db.Uuid
+  legalName                 String   @map("legal_name")
+  registrationNumber        String   @map("registration_number")
+  registeredJurisdictionRef String   @map("registered_jurisdiction_ref")
+  contractingCapacity       Boolean  @map("contracting_capacity")
+  dataProtectionContact     String   @map("data_protection_contact")
+  status                    String
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  jurisdictionPermissions EntityJurisdictionPermission[]
+  licences                EntityLicence[]
+  roleAssignments         DataProtectionRoleAssignment[]
+  assignments             OperatingEntityAssignment[]
+  migrationsFrom          EntityMigration[]              @relation("EntityMigrationFrom")
+  migrationsTo            EntityMigration[]              @relation("EntityMigrationTo")
+
+  @@unique([registeredJurisdictionRef, registrationNumber], map: "operating_entities_registry_key")
+  @@map("operating_entities")
+}
+
+model EntityJurisdictionPermission {
+  id              String    @id @db.Uuid
+  entityId        String    @map("entity_id") @db.Uuid
+  jurisdictionRef String    @map("jurisdiction_ref")
+  permittedFrom   DateTime  @map("permitted_from") @db.Timestamptz(6)
+  permittedTo     DateTime? @map("permitted_to") @db.Timestamptz(6)
+  basisReference  String    @map("basis_reference")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  entity OperatingEntity @relation(fields: [entityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([entityId, jurisdictionRef], map: "entity_jurisdiction_permissions_entity_idx")
+  @@map("entity_jurisdiction_permissions")
+}
+
+model EntityLicence {
+  id                String    @id @db.Uuid
+  entityId          String    @map("entity_id") @db.Uuid
+  licenceTypeRef    String    @map("licence_type_ref")
+  status            String
+  sourceProvenance  String    @map("source_provenance")
+  effectiveDate     DateTime? @map("effective_date") @db.Date
+  expiryDate        DateTime? @map("expiry_date") @db.Date
+  reviewOwner       String    @map("review_owner")
+  evidenceReference String?   @map("evidence_reference")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  entity OperatingEntity @relation(fields: [entityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([entityId, licenceTypeRef], map: "entity_licences_entity_idx")
+  @@map("entity_licences")
+}
+
+model DataProtectionRoleAssignment {
+  id                String    @id @db.Uuid
+  operatingEntityId String    @map("operating_entity_id") @db.Uuid
+  tenantId          String?   @map("tenant_id") @db.Uuid
+  purposeRef        String    @map("purpose_ref")
+  jurisdictionRef   String    @map("jurisdiction_ref")
+  role              String
+  effectiveFrom     DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo       DateTime? @map("effective_to") @db.Timestamptz(6)
+  contractReference String?   @map("contract_reference")
+  createdBy         String    @map("created_by")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  entity OperatingEntity @relation(fields: [operatingEntityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([operatingEntityId, jurisdictionRef, purposeRef, effectiveFrom], map: "data_protection_role_assignments_resolution_idx")
+  @@index([tenantId], map: "data_protection_role_assignments_tenant_idx")
+  @@map("data_protection_role_assignments")
+}
+
+model OperatingEntityAssignment {
+  id            String    @id @db.Uuid
+  scope         String
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  userId        String?   @map("user_id") @db.Uuid
+  entityId      String    @map("entity_id") @db.Uuid
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz(6)
+  createdBy     String    @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  entity OperatingEntity @relation(fields: [entityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([tenantId, scope, effectiveFrom], map: "operating_entity_assignments_tenant_idx")
+  @@index([userId, scope, effectiveFrom], map: "operating_entity_assignments_user_idx")
+  @@map("operating_entity_assignments")
+}
+
+model EntityMigration {
+  id                    String    @id @db.Uuid
+  scope                 String
+  subjectRef            String    @map("subject_ref")
+  fromEntity            String    @map("from_entity") @db.Uuid
+  toEntity              String    @map("to_entity") @db.Uuid
+  status                String
+  reason                String
+  reconsentEvaluationId String?   @map("reconsent_evaluation_id") @db.Uuid
+  proposedBy            String    @map("proposed_by")
+  proposedAt            DateTime  @map("proposed_at") @db.Timestamptz(6)
+  completedAt           DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  from OperatingEntity @relation("EntityMigrationFrom", fields: [fromEntity], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  to   OperatingEntity @relation("EntityMigrationTo", fields: [toEntity], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([subjectRef, proposedAt], map: "entity_migrations_subject_idx")
+  @@map("entity_migrations")
+}

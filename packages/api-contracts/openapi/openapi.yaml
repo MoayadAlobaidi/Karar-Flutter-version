@@ -1,10 +1,79 @@
 # Authored by hand, never generated from code (ADR-0009).
-# Phase 1: info block only. Endpoints are added here before they are implemented.
+# Endpoints are designed in per-module fragments under paths/ and merged here
+# by the phase lead via $ref (JSON Pointer, `/` escaped as `~1`). The
+# operating-entity fragment is CONTRACT-ONLY in Phase 3: its admin surface
+# mounts behind the control-plane gateway when that phase lands (ADR-0021),
+# so its paths are deliberately NOT merged yet — an unimplemented path in
+# this document would be a false claim.
 openapi: 3.1.0
 info:
   title: Karar API
-  version: 0.0.0
+  version: 0.3.0
   description: >-
-    Contract-first API surface for the Karar platform. Empty until the first
-    endpoint is designed; SDKs are generated from this file and committed.
-paths: {}
+    Contract-first API surface for the Karar platform. Phase 3 exposes
+    authentication and session lifecycle (identity), own-profile management
+    (users), tenant membership and invitations (tenancy), and consumer
+    consent (consent). SDKs are generated from this file and committed.
+    Phase 3 reachability note: tenant-bound endpoints (users, tenancy except
+    invitation redemption, consent) require the session to carry a
+    server-side tenant binding; Phase 3 issues sessions unbound and ships no
+    binding mechanism, so those endpoints answer 401 until it lands — the
+    contracts are authoritative for the shapes, not yet exercisable
+    end-to-end.
+paths:
+  /auth/register:
+    $ref: './paths/identity.yaml#/~1auth~1register'
+  /auth/verify-email:
+    $ref: './paths/identity.yaml#/~1auth~1verify-email'
+  /auth/resend-verification:
+    $ref: './paths/identity.yaml#/~1auth~1resend-verification'
+  /auth/login:
+    $ref: './paths/identity.yaml#/~1auth~1login'
+  /auth/refresh:
+    $ref: './paths/identity.yaml#/~1auth~1refresh'
+  /auth/logout:
+    $ref: './paths/identity.yaml#/~1auth~1logout'
+  /auth/forgot-password:
+    $ref: './paths/identity.yaml#/~1auth~1forgot-password'
+  /auth/reset-password:
+    $ref: './paths/identity.yaml#/~1auth~1reset-password'
+  /auth/change-password:
+    $ref: './paths/identity.yaml#/~1auth~1change-password'
+  /auth/mfa/enroll:
+    $ref: './paths/identity.yaml#/~1auth~1mfa~1enroll'
+  /auth/mfa/confirm:
+    $ref: './paths/identity.yaml#/~1auth~1mfa~1confirm'
+  /auth/mfa/challenge:
+    $ref: './paths/identity.yaml#/~1auth~1mfa~1challenge'
+  /auth/mfa/recovery:
+    $ref: './paths/identity.yaml#/~1auth~1mfa~1recovery'
+  /auth/mfa/disable:
+    $ref: './paths/identity.yaml#/~1auth~1mfa~1disable'
+  /auth/sessions:
+    $ref: './paths/identity.yaml#/~1auth~1sessions'
+  /auth/sessions/{sessionId}:
+    $ref: './paths/identity.yaml#/~1auth~1sessions~1{sessionId}'
+  /auth/sessions/revoke-others:
+    $ref: './paths/identity.yaml#/~1auth~1sessions~1revoke-others'
+  /users/me:
+    $ref: './paths/users.yaml#/~1users~1me'
+  /users/me/disable-request:
+    $ref: './paths/users.yaml#/~1users~1me~1disable-request'
+  /tenancy/tenant:
+    $ref: './paths/tenancy.yaml#/~1tenancy~1tenant'
+  /tenancy/members:
+    $ref: './paths/tenancy.yaml#/~1tenancy~1members'
+  /tenancy/invitations:
+    $ref: './paths/tenancy.yaml#/~1tenancy~1invitations'
+  /tenancy/invitations/{invitationId}/revoke:
+    $ref: './paths/tenancy.yaml#/~1tenancy~1invitations~1{invitationId}~1revoke'
+  /tenancy/invitations/redeem:
+    $ref: './paths/tenancy.yaml#/~1tenancy~1invitations~1redeem'
+  /consent/documents:
+    $ref: './paths/consent.yaml#/~1consent~1documents'
+  /consent/acceptances:
+    $ref: './paths/consent.yaml#/~1consent~1acceptances'
+  /consent/withdrawals:
+    $ref: './paths/consent.yaml#/~1consent~1withdrawals'
+  /consent/status:
+    $ref: './paths/consent.yaml#/~1consent~1status'

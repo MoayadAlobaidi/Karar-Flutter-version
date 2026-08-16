@@ -1,0 +1,75 @@
+// authorization module mapping (migrations 0050_authorization_permissions.sql,
+// 0051_authorization_roles.sql, 0052_role_assignments.sql; grant/revoke pins
+// in 0054 are grants-only and invisible to Prisma). Prisma maps the canonical
+// SQL — it is NOT a second migration system (see base.prisma).
+//
+// role_assignments.{user_id,tenant_id,granted_by,revoked_by} are raw uuid
+// references across module boundaries (identity accounts, tenants) — no FK
+// by design (data-model.md §2). In-module FKs (role_permissions -> roles /
+// permissions, role_assignments -> roles) are modeled with NoAction to match
+// PostgreSQL's default referential actions exactly.
+//
+// The 0052 partial unique index (role_assignments_active_unique, WHERE
+// status = 'ACTIVE', NULLS NOT DISTINCT) is outside Prisma's schema language
+// and deliberately unmapped — the drift gate compares columns, and the
+// repository relies on the database error, not the mapping, for conflicts.
+//
+// RLS note: role_assignments access happens inside withPrincipalContext
+// transactions; the 0052 policies are the boundary, repository filters are
+// convenience. The catalogue tables are SELECT-only for karar_app.
+
+model Permission {
+  id          String   @id
+  capability  String
+  description String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id
+  description String
+  scope       String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+  assignments     RoleAssignment[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "role_permissions_role_id_fkey")
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "role_permissions_permission_id_fkey")
+
+  @@id([roleId, permissionId], map: "role_permissions_pkey")
+  @@map("role_permissions")
+}
+
+model RoleAssignment {
+  id            String    @id @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  roleId        String    @map("role_id")
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  status        String    @default("ACTIVE")
+  grantedBy     String    @map("granted_by") @db.Uuid
+  reason        String
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedBy     String?   @map("revoked_by") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "role_assignments_role_id_fkey")
+
+  @@index([userId, status], map: "role_assignments_user_idx")
+  @@index([tenantId], map: "role_assignments_tenant_idx")
+  @@map("role_assignments")
+}

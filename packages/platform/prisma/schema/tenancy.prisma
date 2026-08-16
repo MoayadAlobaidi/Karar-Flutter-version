@@ -1,0 +1,68 @@
+// tenancy module mapping (migrations 0041_tenants.sql, 0042_tenant_members.sql,
+// 0043_tenant_invitations.sql; redemption policies in 0044 are RLS-only and
+// invisible to Prisma). Prisma maps the canonical SQL — it is NOT a second
+// migration system (see base.prisma).
+//
+// tenant_members.user_id / tenant_invitations.{redeemed_by,created_by} are
+// raw uuid references to identity_accounts.id — no FK across the module
+// boundary (data-model.md §2). The in-module FKs to tenants are modeled with
+// NoAction to match PostgreSQL's default referential actions exactly.
+//
+// RLS note: all access happens inside withPrincipalContext/withTenant
+// transactions; the 0041-0044 policies are the boundary, repository filters
+// are convenience.
+
+model Tenant {
+  id                       String   @id @db.Uuid
+  type                     String
+  name                     String
+  status                   String   @default("ACTIVE")
+  defaultOperatingEntityId String?  @map("default_operating_entity_id") @db.Uuid
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  members     TenantMember[]
+  invitations TenantInvitation[]
+
+  @@map("tenants")
+}
+
+model TenantMember {
+  id            String    @id @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  roleHint      String    @default("MEMBER") @map("role_hint")
+  state         String    @default("ACTIVE")
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz(6)
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tenant_members_tenant_id_fkey")
+
+  @@unique([tenantId, userId], map: "tenant_members_tenant_user_unique")
+  @@index([userId], map: "tenant_members_user_idx")
+  @@map("tenant_members")
+}
+
+model TenantInvitation {
+  id          String    @id @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  email       String
+  tokenHash   String    @unique(map: "tenant_invitations_token_hash_unique") @map("token_hash")
+  roleHint    String    @default("MEMBER") @map("role_hint")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  redeemedAt  DateTime? @map("redeemed_at") @db.Timestamptz(6)
+  redeemedBy  String?   @map("redeemed_by") @db.Uuid
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  createdBy   String    @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tenant_invitations_tenant_id_fkey")
+
+  @@index([tenantId, createdAt], map: "tenant_invitations_tenant_idx")
+  @@map("tenant_invitations")
+}

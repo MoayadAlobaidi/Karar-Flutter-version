@@ -113,3 +113,55 @@ visible as step annotations and the JSON report is uploaded as the
   has run clean at high severity on `main` for 14 consecutive days, or once
   every remaining finding has a documented exception in the evidence register.
 - Owner: Engineering Owner. Review no later than Phase 2 kickoff.
+
+## Phase 3 close — security-suppression review (2026-08-16, EV-318)
+
+Every Phase 3 suppression was re-reviewed before merging PR #5. Scope and
+findings:
+
+- **Gitleaks** (2 entries in `.gitleaksignore`): both fingerprints are
+  commit+file+rule+line exact; both historical lines were re-read at their
+  pinned commits and are documentation prose (the tenancy data-lifecycle
+  description and the prior revision of the ignore file's own comment). No
+  credential, token, private key, MFA seed, verification/recovery code, or
+  password exists at either location, and per-occurrence fingerprints cannot
+  suppress future findings. No regex, path, directory, or rule-level
+  suppression exists anywhere.
+- **CodeQL** (1 dismissed alert, recorded below): the dismissal is
+  per-alert; the workflow runs plain `codeql-action init`/`analyze` with no
+  query exclusions, path ignores, or configuration file — no global
+  suppression exists. Actual password hashing is argon2id with versioned
+  parameters (`Argon2PasswordHasher`); the flagged path digests rate-limit
+  subject keys.
+- **Regression pair**: `modules/identity/__tests__/password-hash-format.test.ts`
+  pins passwords to versioned argon2id PHC strings (never a bare digest) and
+  `packages/platform/src/ratelimit/ratelimit.test.ts` pins subject keys to
+  HMAC digests (never the raw identifier) — a change that confused the two
+  purposes fails one of them.
+
+This review is maintainer-directed agent review, not organizationally
+independent human assurance. Registered as EV-318.
+
+## Code-scanning dismissal record — CodeQL alert 1 (2026-08-16)
+
+CodeQL flagged `js/insufficient-password-hash` (high) on the rate-limit key
+digester (`packages/platform/src/ratelimit/keys.ts`), tracing the refresh
+flow's `idKey(tokenHash)` call. Dismissed as a false positive with this
+rationale: the digested value is the SHA-256 of a 256-bit random refresh
+token — not a human-chosen password — and the HMAC-SHA256-under-pepper
+digest is a pseudonymized rate-limit bucket key, not a verification hash.
+Key-stretching defends low-entropy secrets against brute force; it adds
+nothing against a 256-bit random and would break constant-key lookups.
+Passwords themselves are hashed with argon2id with parameter versioning
+(`modules/identity`, KAR-CTL-066). Dismissals are per-alert, reasoned, and
+reversible in the code-scanning UI; never dismiss without a written
+rationale here.
+
+## Dependency-management note — @types/node majors (2026-08-16)
+
+Dependabot PR #3 (`@types/node` 25 → 26) was closed without merging: the types
+major must track the supported runtime major, and the runtime is pinned to
+Node 25. `.github/dependabot.yml` now ignores `version-update:semver-major`
+for `@types/node`; patch/minor updates within the supported major continue to
+arrive normally. A Node runtime major upgrade is its own reviewed change and
+is never combined with a feature phase.

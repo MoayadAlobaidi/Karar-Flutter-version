@@ -69,7 +69,7 @@ if (unreachable !== null) {
 }
 
 /** Test-only probe: the "domain state" whose transaction the outbox must share. */
-const PROBE_MIGRATION = `-- 0030_outbox_probe_state
+const PROBE_MIGRATION = `-- 9930_outbox_probe_state
 -- Test-only probe table proving state change + outbox enqueue share one
 -- transaction. Lives only in this scratch database.
 -- rollback: test scratch database; removed by dropping the database.
@@ -142,7 +142,7 @@ describe.skipIf(unreachable !== null)('transactional outbox (live PostgreSQL)', 
         await copyFile(join(defaultMigrationsDir(), entry), join(migrationsDir, entry));
       }
     }
-    await writeFile(join(migrationsDir, '0030_outbox_probe_state.sql'), PROBE_MIGRATION);
+    await writeFile(join(migrationsDir, '9930_outbox_probe_state.sql'), PROBE_MIGRATION);
     const migrator = new PostgresPersistenceAdapter(
       LocalPostgresConnectionProfile.fromEnv('migrator', { database: dbName }),
     );

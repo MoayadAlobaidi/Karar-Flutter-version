@@ -1,0 +1,30 @@
+{
+  "name": "@karar/authorization",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deny-by-default RBAC: the permission/role catalogue, role assignments, the central PolicyService, and the permission guard.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/audit": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*",
+    "@nestjs/common": "^11.2.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@karar/consent": "workspace:*",
+    "@karar/operating-entity": "workspace:*",
+    "@karar/tenancy": "workspace:*",
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}

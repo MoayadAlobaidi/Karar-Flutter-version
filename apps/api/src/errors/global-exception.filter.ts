@@ -1,4 +1,4 @@
-import { Catch, HttpException, Inject } from '@nestjs/common';
+import { Catch, HttpException, Inject, ServiceUnavailableException } from '@nestjs/common';
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 import { ErrorCode, PlatformError, toProblemDetails } from '@karar/platform/dist/errors/index.js';
@@ -21,10 +21,39 @@ interface RequestLike {
 /** Framework 4xx statuses mapped onto the platform's infrastructure codes. */
 const HTTP_STATUS_TO_CODE: Readonly<Record<number, ErrorCode>> = Object.freeze({
   400: ErrorCode.VALIDATION_ERROR,
+  401: ErrorCode.AUTHENTICATION_REQUIRED,
+  403: ErrorCode.NOT_AUTHORIZED,
   404: ErrorCode.NOT_FOUND,
   409: ErrorCode.CONFLICT,
   429: ErrorCode.RATE_LIMITED,
 });
+
+/**
+ * The kill-switch guards (identity/tenancy operation gates and the
+ * control-plane guard) throw `ServiceUnavailableException` with exactly this
+ * body. It is an INTENTIONAL, module-authored denial — the one framework 5xx
+ * that must pass through as its coded problem instead of being genericized.
+ */
+interface OperationDeniedBody {
+  readonly code: 'OPERATION_RESTRICTED' | 'DEPENDENCY_UNAVAILABLE';
+  readonly switchId: string;
+  readonly message: string;
+}
+
+function operationDeniedBodyOf(exception: HttpException): OperationDeniedBody | null {
+  if (!(exception instanceof ServiceUnavailableException)) return null;
+  const body = exception.getResponse();
+  if (typeof body !== 'object' || body === null) return null;
+  const candidate = body as Partial<OperationDeniedBody>;
+  if (
+    (candidate.code === 'OPERATION_RESTRICTED' || candidate.code === 'DEPENDENCY_UNAVAILABLE') &&
+    typeof candidate.switchId === 'string' &&
+    typeof candidate.message === 'string'
+  ) {
+    return candidate as OperationDeniedBody;
+  }
+  return null;
+}
 
 /**
  * The single error boundary of the HTTP entrypoint.
@@ -53,7 +82,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const problem = this.toProblem(exception, route, traceId);
 
     // Log ONCE, at this boundary. Stack and cause stay SERVER-SIDE only.
-    if (problem.status >= 500) {
+    // An operator-set kill-switch restriction is an intentional denial, not a
+    // failure: it logs as a rejection so an incident does not flood the error
+    // signal. A switch-store outage stays in the error branch — it is real.
+    if (problem.status >= 500 && problem.code !== ErrorCode.OPERATION_RESTRICTED) {
       this.logger.error(
         {
           err: exception instanceof Error ? exception : new Error(String(exception)),
@@ -84,6 +116,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   ): ProblemDetails {
     const context = { instance, ...(traceId !== undefined ? { traceId } : {}) };
     if (!(exception instanceof PlatformError) && exception instanceof HttpException) {
+      const denial = operationDeniedBodyOf(exception);
+      if (denial !== null) {
+        // Kill-switch denial: keep its code, its safe message, and the switch
+        // id (a registry constant, safe by construction) — 503 both ways.
+        return toProblemDetails(
+          new PlatformError({
+            code:
+              denial.code === 'OPERATION_RESTRICTED'
+                ? ErrorCode.OPERATION_RESTRICTED
+                : ErrorCode.DEPENDENCY_UNAVAILABLE,
+            message: denial.message,
+            origin: 'infrastructure',
+            details: { switchId: denial.switchId },
+          }),
+          context,
+        );
+      }
       const status = exception.getStatus();
       if (status < 500) {
         // Framework rejections (unknown route, bad payload shape) become the

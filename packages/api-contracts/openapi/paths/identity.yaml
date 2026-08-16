@@ -1,0 +1,354 @@
+# Identity paths fragment — authored by hand (ADR-0009), merged into
+# openapi.yaml by the phase lead. Deliberately schema-light and HONEST:
+# response shapes here are what the controllers actually return, including
+# the enumeration-resistant sameness of the pre-auth flows. Errors are
+# RFC 7807 (application/problem+json) via the platform error model; 401s are
+# generic on purpose (one invalid-credentials answer, whatever the cause).
+#
+# Documented policies (modules/identity/MODULE.md):
+# - access tokens: ES256 JWT, 10 minutes, claims {sub, sid, iss=karar,
+#   aud=karar-api, iat, exp, tv} — no roles, permissions, or e-mail;
+# - refresh tokens: 32-byte one-time, rotated on every use; reuse revokes the
+#   whole family AND its session and notifies the account;
+# - rate limits (429; store-down behaviour per policy): login 10/15m per
+#   address digest + 30/15m per IP digest (fail closed 503), verification
+#   sends 3/h (fail closed), reset sends 3/h (fail closed), mfa verification
+#   10/15m (fail closed), refresh 60/15m (fails open to a bounded in-process
+#   fallback);
+# - lockout: 10 failed logins per (account, IP digest) in 15m — response
+#   stays the generic 401, the lock never resets its counter;
+# - password reset revokes ALL sessions; password change revokes all OTHER
+#   sessions and bumps the token version (refresh to get a fresh access token).
+
+/auth/register:
+  post:
+    operationId: identityRegister
+    summary: Register an account and send a verification code
+    description: >-
+      Enumeration-resistant: an already-registered address returns the SAME
+      202 body as a fresh registration. The verification code travels only in
+      the e-mail; it is never in a response.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email: { type: string }
+              password: { type: string, minLength: 8, maxLength: 512 }
+    responses:
+      '202':
+        description: 'Accepted (identical whether or not the address was new): {status: accepted, detail}'
+      '400': { description: Malformed e-mail or password outside the length policy (problem+json) }
+      '429': { description: Verification-send budget exhausted (3/h per address) }
+      '503':
+        {
+          description: Rate limiting or a required dependency unavailable — the request was not processed,
+        }
+
+/auth/verify-email:
+  post:
+    operationId: identityVerifyEmail
+    summary: Consume a one-time e-mail verification code
+    description: >-
+      One generic failure for wrong, expired, capped, or unknown codes.
+      Verifying an already-verified account is an idempotent success.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, code]
+            properties:
+              email: { type: string }
+              code: { type: string, description: 8-character code from the e-mail }
+    responses:
+      '200': { description: '{status: verified}' }
+      '401': { description: That code did not verify (generic) }
+
+/auth/resend-verification:
+  post:
+    operationId: identityResendVerification
+    summary: Re-send the verification code
+    description: >-
+      Always 202 — unknown, already-verified, disabled, and cooling-down
+      (60s per account) cases are indistinguishable from a successful send.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email: { type: string }
+    responses:
+      '202': { description: 'Accepted: {status: accepted, detail}' }
+      '429': { description: Send budget exhausted (3/h per address) }
+
+/auth/login:
+  post:
+    operationId: identityLogin
+    summary: Password login
+    description: >-
+      One generic 401 covers unknown address, wrong password, disabled
+      account, and an engaged lockout. Accounts with confirmed MFA receive a
+      5-minute challenge token instead of a session.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email: { type: string }
+              password: { type: string }
+    responses:
+      '200':
+        description: >-
+          Either {status: authenticated, accessToken, accessTokenExpiresAt,
+          refreshToken, refreshTokenExpiresAt, sessionId} or
+          {status: mfa_required, challengeToken, challengeExpiresAt}.
+      '401': { description: Invalid credentials (generic, always) }
+      '429': { description: Login budget exhausted (10/15m per address, 30/15m per IP) }
+      '503': { description: Rate limiting unavailable — login fails closed }
+
+/auth/refresh:
+  post:
+    operationId: identityRefresh
+    summary: Rotate a refresh token
+    description: >-
+      One-time: the presented token is consumed and a successor returned.
+      Presenting a used or superseded token is treated as theft — the family
+      and its session are revoked, the event recorded, the account notified —
+      and still answers the same generic 401.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [refreshToken]
+            properties:
+              refreshToken: { type: string }
+    responses:
+      '200':
+        description: '{status: refreshed, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt}'
+      '401': { description: The refresh token is not valid (generic; includes the reuse case) }
+      '429': { description: Refresh budget exhausted (60/15m per token) }
+
+/auth/logout:
+  post:
+    operationId: identityLogout
+    summary: Revoke the current session
+    security: [{ bearerAuth: [] }]
+    responses:
+      '200': { description: '{status: logged_out} (idempotent)' }
+      '401': { description: Authentication required }
+
+/auth/forgot-password:
+  post:
+    operationId: identityForgotPassword
+    summary: Request a password-reset token
+    description: >-
+      Always 202 — existing, unknown, disabled, and cooling-down (60s per
+      account) addresses are indistinguishable. The token travels only in the
+      e-mail.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email: { type: string }
+    responses:
+      '202': { description: 'Accepted: {status: accepted, detail}' }
+      '429': { description: Reset-send budget exhausted (3/h per address) }
+      '503': { description: Rate limiting unavailable — the flow fails closed }
+
+/auth/reset-password:
+  post:
+    operationId: identityResetPassword
+    summary: Consume a reset token and set a new password
+    description: >-
+      One-time, 30-minute token. Completing a reset revokes EVERY session and
+      refresh-token family and bumps the token version.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token, newPassword]
+            properties:
+              token: { type: string }
+              newPassword: { type: string, minLength: 8, maxLength: 512 }
+    responses:
+      '200': { description: '{status: reset}' }
+      '400': { description: New password outside the length policy }
+      '401': { description: The reset token is not valid (generic) }
+
+/auth/change-password:
+  post:
+    operationId: identityChangePassword
+    summary: Change the password (requires the current one)
+    description: >-
+      Revokes every OTHER session and bumps the token version; the calling
+      session's refresh chain stays valid — refresh to obtain a fresh access
+      token.
+    security: [{ bearerAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [currentPassword, newPassword]
+            properties:
+              currentPassword: { type: string }
+              newPassword: { type: string, minLength: 8, maxLength: 512 }
+    responses:
+      '200': { description: '{status: changed}' }
+      '400': { description: New password outside the length policy }
+      '401': { description: Authentication required, or the current password is not correct }
+
+/auth/mfa/enroll:
+  post:
+    operationId: identityMfaEnroll
+    summary: Start TOTP enrolment
+    description: >-
+      Returns the shared secret and otpauth URL EXACTLY ONCE; the secret is
+      stored encrypted (key-version provenance) and never retrievable again.
+    security: [{ bearerAuth: [] }]
+    responses:
+      '200': { description: '{status: enrolment_started, secret, otpauthUrl}' }
+      '401': { description: Authentication required }
+      '409': { description: MFA is already enrolled }
+
+/auth/mfa/confirm:
+  post:
+    operationId: identityMfaConfirm
+    summary: Prove possession and activate MFA
+    description: Returns the ten one-time recovery codes EXACTLY ONCE.
+    security: [{ bearerAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code]
+            properties:
+              code: { type: string, description: current 6-digit TOTP code }
+    responses:
+      '200': { description: '{status: confirmed, recoveryCodes: [10 one-time codes]}' }
+      '401': { description: That code did not verify }
+      '409': { description: No pending enrolment }
+
+/auth/mfa/challenge:
+  post:
+    operationId: identityMfaChallenge
+    summary: Complete an MFA login with a TOTP code
+    description: >-
+      Exchanges the login-issued challenge token plus a current TOTP code
+      (±30s window) for a session. Budget 10/15m per account, fail closed.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [challengeToken, code]
+            properties:
+              challengeToken: { type: string }
+              code: { type: string }
+    responses:
+      '200': { description: 'Session payload (as /auth/login authenticated)' }
+      '401': { description: The challenge did not verify (generic) }
+      '429': { description: MFA verification budget exhausted }
+
+/auth/mfa/recovery:
+  post:
+    operationId: identityMfaRecovery
+    summary: Complete an MFA login with a one-time recovery code
+    description: >-
+      Each code works once. Five failed recovery attempts per account in 15
+      minutes lock recovery for the remainder of the window (the counter
+      never resets on lock).
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [challengeToken, recoveryCode]
+            properties:
+              challengeToken: { type: string }
+              recoveryCode: { type: string }
+    responses:
+      '200': { description: 'Session payload (as /auth/login authenticated)' }
+      '401': { description: The challenge did not verify (generic; includes the locked case) }
+      '429': { description: MFA verification budget exhausted }
+
+/auth/mfa/disable:
+  post:
+    operationId: identityMfaDisable
+    summary: Disable MFA (requires a current TOTP or recovery code)
+    description: Destroys the recovery-code set; audited and notified.
+    security: [{ bearerAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code]
+            properties:
+              code: { type: string, description: TOTP code or an unused recovery code }
+    responses:
+      '200': { description: '{status: disabled}' }
+      '401': { description: That code did not verify }
+      '409': { description: MFA is not enrolled }
+
+/auth/sessions:
+  get:
+    operationId: identityListSessions
+    summary: List the caller's live sessions
+    description: >-
+      Owner-scoped by FORCEd row-level security. Metadata is minimized at the
+      edge: a coarse user-agent summary; no raw addresses or user agents.
+    security: [{ bearerAuth: [] }]
+    responses:
+      '200':
+        description: '{sessions: [{sessionId, createdAt, lastSeenAt, absoluteExpiresAt, current, userAgentSummary}]}'
+      '401': { description: Authentication required }
+
+/auth/sessions/{sessionId}:
+  delete:
+    operationId: identityRevokeSession
+    summary: Revoke one of the caller's sessions
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    responses:
+      '200': { description: '{status: revoked} — the session and its refresh families are dead' }
+      '401': { description: Authentication required }
+      '404': { description: No live session with that id belongs to this account }
+
+/auth/sessions/revoke-others:
+  post:
+    operationId: identityRevokeOtherSessions
+    summary: Revoke every session except the current one
+    security: [{ bearerAuth: [] }]
+    responses:
+      '200': { description: '{status: revoked, revokedCount}' }
+      '401': { description: Authentication required }

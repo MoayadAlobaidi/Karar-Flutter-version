@@ -4,7 +4,7 @@ The control framework and evidence structure for Karar V2's SOC 2 Type II and IS
 
 ## What is claimed
 
-**Nothing.** Karar holds no SOC 2 report, no ISO/IEC 27001 certificate, no regulatory approval, and claims none (Assurance Claim Registry AC-009). No control in this directory is asserted as OPERATING or EVIDENCED. As of Phase 2 (2026-08-15) there is still no cloud, no customer, and no production environment; what exists is a documented control set, registers with honest contents, Phase-1 CI tooling with first-run evidence collected, and Phase-2 platform code whose controls are IMPLEMENTED in the matrix's narrow sense — mechanisms in-repo with tests run locally and in CI, deployed nowhere, with evidence rows PENDING. Any document or conversation representing more than that is wrong and should be corrected against this page.
+**Nothing.** Karar holds no SOC 2 report, no ISO/IEC 27001 certificate, no regulatory approval, and claims none (Assurance Claim Registry AC-009). No control in this directory is asserted as OPERATING or EVIDENCED. As of Phase 3 (2026-08-16) there is still no cloud, no customer, and no production environment; what exists is a documented control set, registers with honest contents, Phase-1 CI tooling with first-run evidence collected, and Phase-2 platform and Phase-3 identity/tenancy/access-control code whose controls are IMPLEMENTED in the matrix's narrow sense — mechanisms in-repo with tests run locally and in CI, deployed nowhere. Any document or conversation representing more than that is wrong and should be corrected against this page.
 
 ## How the pieces relate
 
@@ -20,7 +20,7 @@ control-owners ──> control-matrix <── exceptions-register       │ phas
                         └──────────── phase-compliance-gate <───┘
 ```
 
-The **[control matrix](control-matrix.md)** is the core: 65 controls with honest statuses (50 from Phase 1, 15 platform-foundation controls added at Phase 2). Everything else either feeds it (risks, exceptions, policies) or views it (SOC 2 mapping, ISO SoA). Statuses live in the matrix only — the framework views must never fork them.
+The **[control matrix](control-matrix.md)** is the core: 78 controls with honest statuses (50 from Phase 1, 15 platform-foundation controls added at Phase 2, 13 identity/tenancy/access controls added at Phase 3). Everything else either feeds it (risks, exceptions, policies) or views it (SOC 2 mapping, ISO SoA). Statuses live in the matrix only — the framework views must never fork them.
 
 ## Reading order
 

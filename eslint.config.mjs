@@ -7,6 +7,7 @@ import tseslint from 'typescript-eslint';
 export default [
   {
     ignores: [
+      'packages/platform/prisma/client/**',
       '**/node_modules/**',
       '**/dist/**',
       '**/build/**',

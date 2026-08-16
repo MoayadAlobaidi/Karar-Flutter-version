@@ -1,6 +1,8 @@
 # Exceptions Register
 
-**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** every phase gate
+**Status:** ACTIVE register · **Owner:** Compliance Owner · **Version:** 0.3 · **Date:** 2026-08-16 · **Review:** every phase gate
+
+**v0.3 (2026-08-16, Phase 3):** EXC-002's compensating-control facts refreshed — the short-lived-token/server-side-revocation leg moved from Phase 3 design to Phase 3 code (KAR-CTL-067, 068). No exception opened, closed, or re-approved; re-affirmations are Phase 3 gate business.
 
 **v0.2 (2026-08-15, Phase 2 review):** EXC-001, 002, 003 re-affirmed; no exit trigger fired; no exception opened or closed. EXC-003 carries a dated re-affirmation note.
 
@@ -43,7 +45,7 @@ An exception is a recorded, bounded deviation from a stated policy or control �
 |---|---|
 | Deviation | Transport hardening beyond platform trust stores (mobile client) is not implemented in v1 |
 | Reason | Accepted risk carried from the threat model (§4, challenge C11), retained from Plan v1; pinning's operational failure modes (bricked clients on rotation) were judged worse than the marginal gain at this scale |
-| Compensating controls | TLS everywhere; token lifetimes short with server-side revocation (Phase 3 design); no sensitive value cached client-side beyond design rules (Phase 4) |
+| Compensating controls | TLS everywhere; token lifetimes short with server-side revocation — delivered as code at Phase 3, 2026-08-16 (KAR-CTL-067, 068, IMPLEMENTED [P3]: minimal ES256 access tokens with token-version invalidation, rotating refresh families with reuse detection); no sensitive value cached client-side beyond design rules (Phase 4) |
 | Risk link | KAR-RSK-013 (ACCEPTED) |
 | Approved by | Platform Owner |
 | Opened | 2026-08-15 (formalizing the existing threat-model acceptance) |
@@ -67,3 +69,5 @@ An exception is a recorded, bounded deviation from a stated policy or control �
 ## Closed exceptions
 
 None yet.
+
+**Phase 3 gate re-affirmation (2026-08-16):** EXC-001 OPEN (single maintainer; no exit trigger fired), EXC-002 compensating controls verified as delivered code, EXC-003 unchanged. Recorded in the Phase 3 gate record (phase-compliance-gate.md v0.4).

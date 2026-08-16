@@ -12,4 +12,4 @@ Imported by `application/` and `infrastructure/` within this module. **Never by 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 3: implemented — see the module sources in this directory._

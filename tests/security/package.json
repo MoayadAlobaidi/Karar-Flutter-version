@@ -1,0 +1,21 @@
+{
+  "name": "@karar/security-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-cutting adversarial security suite: cross-tenant isolation on non-empty data, pooled-connection context hygiene, and privilege abuse across the Phase 3 module boundaries.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}

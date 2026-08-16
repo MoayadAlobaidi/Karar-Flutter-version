@@ -1,0 +1,240 @@
+# consent surface (§49) — path-item fragments (ADR-0009: authored by hand,
+# never generated from code). The phase lead merges these into openapi.yaml
+# via $ref per path, e.g.:
+#   /consent/status:
+#     $ref: './paths/consent.yaml#/~1consent~1status'
+#
+# Contract rules made visible here:
+#   * Every operation acts for the AUTHENTICATED principal and nobody else.
+#     No operation accepts a userId or tenantId — not in query, header, or
+#     body; the subject is the session's subject. There is deliberately no
+#     accept-on-behalf-of operation anywhere in this surface
+#     (modules/consent/MODULE.md, permissions deliberately absent).
+#   * A grant pins (operatingEntity, purpose, jurisdiction) and the exact
+#     accepted version at creation (ADR-0024); withdrawal preserves the row;
+#     re-granting creates a new one.
+#   * Status fails closed: NO_GRANT, WITHDRAWN, and RECONSENT_REQUIRED all
+#     deny processing; only ACTIVE permits it. RECONSENT_REQUIRED appears
+#     when the effective published version is MATERIAL_REACCEPTANCE_REQUIRED
+#     and newer than the granted version.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`.
+
+/consent/documents:
+  get:
+    operationId: listApplicableConsentDocuments
+    summary: List the legal documents applicable to the caller, with their effective versions
+    description: >-
+      Documents for the operating entity effective for the caller (user
+      contracting binding first, tenant default second), each with its
+      currently effective published version. A document without an effective
+      version has nothing to accept yet.
+    tags: [consent]
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: jurisdictionRef
+        in: query
+        required: false
+        schema: { type: string }
+        description: Restrict to one jurisdiction reference.
+    responses:
+      '200':
+        description: The applicable documents.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [documents]
+              properties:
+                documents:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      [documentId, entityId, jurisdictionRef, purposeRefs, kind, effectiveVersion]
+                    properties:
+                      documentId: { type: string, format: uuid }
+                      entityId: { type: string, format: uuid }
+                      jurisdictionRef: { type: string }
+                      purposeRefs:
+                        type: array
+                        items: { type: string }
+                      kind: { type: string }
+                      effectiveVersion:
+                        type: [object, 'null']
+                        required:
+                          [versionId, version, contentHash, storageRef, classification, effectiveAt]
+                        properties:
+                          versionId: { type: string, format: uuid }
+                          version: { type: string }
+                          contentHash: { type: string }
+                          storageRef: { type: string }
+                          classification:
+                            type: [string, 'null']
+                            enum:
+                              [
+                                MATERIAL_REACCEPTANCE_REQUIRED,
+                                NOTICE_REQUIRED,
+                                NO_USER_ACTION_REQUIRED,
+                                null,
+                              ]
+                          effectiveAt: { type: [string, 'null'], format: date-time }
+      '401': { description: Not authenticated. }
+      '409': { description: No operating entity is bound for the caller — consent fails closed. }
+
+/consent/acceptances:
+  post:
+    operationId: recordOwnConsentAcceptance
+    summary: Record the caller's OWN acceptance of a published document version
+    description: >-
+      Creates an immutable consent grant pinned to the document's operating
+      entity, jurisdiction, the named purpose, and the exact accepted version
+      (ADR-0024). Any prior ACTIVE grant for the same triple is marked
+      SUPERSEDED in the same transaction. The evidence reference is derived
+      from the request identity server-side, never accepted from the client.
+    tags: [consent]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [legalDocumentVersionId, purposeRef]
+            properties:
+              legalDocumentVersionId: { type: string, format: uuid }
+              purposeRef: { type: string }
+    responses:
+      '201':
+        description: The recorded grant.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                [
+                  grantId,
+                  operatingEntityId,
+                  purposeRef,
+                  jurisdictionRef,
+                  consentVersion,
+                  legalDocumentVersionId,
+                  grantedAt,
+                  status,
+                ]
+              properties:
+                grantId: { type: string, format: uuid }
+                operatingEntityId: { type: string, format: uuid }
+                purposeRef: { type: string }
+                jurisdictionRef: { type: string }
+                consentVersion: { type: string }
+                legalDocumentVersionId: { type: string, format: uuid }
+                grantedAt: { type: string, format: date-time }
+                status: { type: string, enum: [ACTIVE] }
+      '400':
+        description: >-
+          Unpublished version, purpose not covered by the document, or the
+          document belongs to an entity that is not effective for the caller
+          (consent to Entity A is not consent to Entity B).
+      '401': { description: Not authenticated. }
+      '404': { description: Unknown document version. }
+      '409': { description: No operating entity is bound for the caller — consent fails closed. }
+
+/consent/withdrawals:
+  post:
+    operationId: withdrawOwnConsent
+    summary: Withdraw the caller's OWN consent grant
+    description: >-
+      Sets withdrawn_at and status WITHDRAWN on the caller's own ACTIVE
+      grant. The row is preserved as evidence; re-granting later creates a
+      NEW grant. Another subject's grant id is indistinguishable from an
+      unknown one (404) — row-level security scopes the lookup.
+    tags: [consent]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [grantId]
+            properties:
+              grantId: { type: string, format: uuid }
+    responses:
+      '200':
+        description: The withdrawn grant.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantId, status, withdrawnAt]
+              properties:
+                grantId: { type: string, format: uuid }
+                status: { type: string, enum: [WITHDRAWN] }
+                withdrawnAt: { type: string, format: date-time }
+      '401': { description: Not authenticated. }
+      '404': { description: Unknown grant — including any grant that is not the caller's own. }
+      '409': { description: The grant is not ACTIVE (already withdrawn or superseded). }
+
+/consent/status:
+  get:
+    operationId: readOwnConsentStatus
+    summary: Read the caller's OWN consent status for a purpose
+    description: >-
+      Resolves the caller's consent for (purpose, jurisdiction?) against the
+      operating entity effective for them. States: ACTIVE (processing
+      permitted; noticeRequired flags a pending NOTICE_REQUIRED
+      republication), WITHDRAWN, RECONSENT_REQUIRED (a newer
+      MATERIAL_REACCEPTANCE_REQUIRED version is in force — fails closed), and
+      NO_GRANT (no acceptance, or no published document — fails closed).
+    tags: [consent]
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: purposeRef
+        in: query
+        required: true
+        schema: { type: string }
+      - name: jurisdictionRef
+        in: query
+        required: false
+        schema: { type: string }
+        description: Required only when documents in several jurisdictions cover the purpose.
+    responses:
+      '200':
+        description: The resolved status.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                [
+                  state,
+                  noticeRequired,
+                  purposeRef,
+                  jurisdictionRef,
+                  operatingEntityId,
+                  documentId,
+                  grantId,
+                  grantedVersion,
+                  effectiveVersionId,
+                  effectiveVersion,
+                ]
+              properties:
+                state:
+                  type: string
+                  enum: [ACTIVE, WITHDRAWN, RECONSENT_REQUIRED, NO_GRANT]
+                noticeRequired: { type: boolean }
+                purposeRef: { type: string }
+                jurisdictionRef: { type: [string, 'null'] }
+                operatingEntityId: { type: string, format: uuid }
+                documentId: { type: [string, 'null'], format: uuid }
+                grantId: { type: [string, 'null'], format: uuid }
+                grantedVersion: { type: [string, 'null'] }
+                effectiveVersionId: { type: [string, 'null'], format: uuid }
+                effectiveVersion: { type: [string, 'null'] }
+      '400': { description: Ambiguous jurisdiction — name one. }
+      '401': { description: Not authenticated. }
+      '409': { description: No operating entity is bound for the caller — consent fails closed. }

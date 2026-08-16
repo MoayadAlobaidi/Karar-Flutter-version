@@ -10,4 +10,4 @@ May import this module's `application/`. **Never another module's `domain/`.**
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 3: implemented — see the module sources in this directory._

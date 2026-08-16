@@ -67,3 +67,6 @@ postgres-data/
 # User backup artifacts — never commit (scoped: only the known root archive,
 # so legitimate zip fixtures elsewhere are not silently ignored)
 /Archive.zip
+
+# Prisma generated client (regenerated via make prisma-generate)
+packages/platform/prisma/client/

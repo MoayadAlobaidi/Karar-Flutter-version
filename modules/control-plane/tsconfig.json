@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "public-api.ts",
+    "domain/**/*",
+    "application/**/*",
+    "infrastructure/**/*",
+    "presentation/**/*",
+    "__tests__/**/*"
+  ],
+  "exclude": ["dist", "node_modules"],
+  "references": [
+    { "path": "../../packages/platform" },
+    { "path": "../../packages/shared-kernel" },
+    { "path": "../audit" },
+    { "path": "../authorization" }
+  ]
+}
