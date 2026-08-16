@@ -17,10 +17,10 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **Phase 2 COMPLETE — Phase 3 NOT STARTED** ([phase report](docs/phases/phase-02.md)) |
+| Current phase | **3 — in progress** ([phase report](docs/phases/phase-03.md)) |
 | Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
 | Branch model | `main` + phase branches (`claude/karar-v2-phase-1-foundation`) |
-| Application implementation | Foundation only — no product capabilities are implemented |
+| Application implementation | Platform foundation plus identity, tenancy, and access control — no consumer product capabilities are implemented |
 | Cloud | None provisioned; local development is cloud-free |
 | Compliance | Readiness framework in place; **no certification is claimed** |
 
@@ -87,8 +87,8 @@ graph TB
 | `apps/api` | NestJS modular monolith — the only public API surface |
 | `apps/worker` | Second entrypoint over the same modules: outbox relay, projections, scheduled jobs |
 | `apps/admin` | Super Admin SPA; talks to the control plane only, carries no database driver |
-| `packages/` | Six shared packages; four are framework-free pure. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation, errors, observability, events/outbox/jobs |
-| `modules/` | 20 bounded contexts, each behind a `public-api.ts` |
+| `packages/` | Six shared packages; four are framework-free pure. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation (including the Prisma runtime and the RLS principal context), errors, observability, events/outbox/jobs |
+| `modules/` | 21 bounded contexts, each behind a `public-api.ts` |
 | PostgreSQL | The one authoritative store — RLS-enforced tenant isolation |
 | Local infra | Docker Compose ([`docker-compose.yml`](docker-compose.yml)): `postgres`, `redis`, `minio`, `otel-collector` — zero cloud dependency |
 | Provider adapters | Every external dependency (AI, storage, keys, messaging, identity, billing) behind a port in `infrastructure/` |
@@ -132,7 +132,7 @@ Cross-module imports resolve to the target module's `public-api.ts` and nothing 
 ```
 apps/        mobile · api · worker · admin — entrypoints, no business logic
 packages/    shared-kernel · financial-engine · jurisdiction-policy · state-machine · api-contracts · platform
-modules/     20 bounded contexts, each with public-api.ts and MODULE.md
+modules/     21 bounded contexts, each with public-api.ts and MODULE.md
 infra/       Terraform — contracts · providers · per-deployment compositions
 docs/        architecture · adr · security · compliance · phases · legacy · onboarding
 scripts/     verification, checks, helpers
@@ -158,6 +158,7 @@ Full detail, including availability, gates, and external providers: [`capability
 | `identity` | Authentication, sessions, MFA |
 | `users` | Profile and preferences |
 | `tenancy` | Tenant model and isolation |
+| `authorization` | Deny-by-default RBAC — permission catalogue, roles, the central `PolicyService` |
 | `operating-entity` | Legal person, controller/processor roles, entity migration |
 | `consent` | Consent triple, legal documents, re-consent |
 | `audit` | Append-only audit records |
@@ -223,24 +224,26 @@ White label distinguishes the **control plane** (configuring a partner tenant) f
 Prerequisites are pinned in [`.tool-versions`](.tool-versions) (Node, pnpm, Flutter); Docker is required. Then:
 
 ```bash
-make doctor      # verify your toolchain matches the pins
-make bootstrap   # install workspace and Flutter dependencies
-make dev         # bring up local infra; prints how to start each entrypoint
-pnpm build       # compile once — the db CLI runs from dist
-make db-create   # bootstrap database roles and grants (first run)
-make db-migrate  # apply migrations as the restricted migrator role
-make verify      # run the full local check suite
+make doctor           # verify your toolchain matches the pins
+make bootstrap        # install workspace and Flutter dependencies
+make dev              # bring up local infra; prints how to start each entrypoint
+make prisma-generate  # generate the Prisma client (git-ignored; needed before compiling)
+pnpm build            # compile once — the db CLI runs from dist
+make db-create        # bootstrap database roles and grants (first run)
+make db-migrate       # apply migrations as the restricted migrator role
+make verify           # run the full local check suite
 ```
 
-`make help` lists the remaining targets. `make dev` starts the Compose services and tells you how to run the API, worker, admin, and mobile entrypoints; the API surface is health endpoints (`/readyz` answers 503 until the database is created and migrated — a real check, not a constant). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` in `.env` first. A clean-machine walkthrough of these commands is part of phase verification.
+`make help` lists the remaining targets (`prisma-drift` verifies the Prisma mapping against the live database). `make dev` starts the Compose services and tells you how to run the API, worker, admin, and mobile entrypoints; the API always serves the health endpoints (`/readyz` answers 503 until the database is created and migrated — a real check, not a constant). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` in `.env` first. A clean-machine walkthrough of these commands is part of phase verification.
 
 No cloud account, API key, or shared database is required for any of it — that is a design rule, not a convenience ([`environments.md` §3](docs/architecture/environments.md)).
 
 ## Testing and CI
 
 - **Unit tests** for `domain/` and the pure packages — no mocks, no container.
-- **Integration tests** against real PostgreSQL in Docker — since Phase 2 the workspace suite (469 passing tests at Phase 2 close, plus a 22-test gated readiness matrix) includes live-PostgreSQL runs of the migration, audit-immutability, outbox, and jobs suites, with concurrency proofs (two relays over 200 events; two workers over 100 jobs). `make dev` first; see the quick-start port note for machines with a host PostgreSQL.
-- **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today; cloud provider legs are future.
+- **Integration tests** against real PostgreSQL in Docker — since Phase 2 the workspace suite includes live-PostgreSQL runs of the migration, audit-immutability, outbox, and jobs suites, with concurrency proofs (two relays over 200 events; two workers over 100 jobs). `make dev` first; see the quick-start port note for machines with a host PostgreSQL.
+- **Adversarial security tests** — since Phase 3, per-module isolation suites plus the cross-cutting [`tests/security/`](tests/security) suite: two tenants seeded with real rows, own-tenant data proven non-empty first, then cross-tenant SELECT/INSERT/UPDATE/DELETE denial, pooled-connection context hygiene, and privilege-escalation probes ([`tenancy.md`](docs/architecture/tenancy.md)).
+- **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today, module repository ports since Phase 3; cloud provider legs are future.
 - **Architecture tests** — 26 CI-blocking structural tests, kept in a registry with per-test activation phases; a test activates when the structure it guards exists.
 - **Security scans and SBOM** — dependency and secret scanning, software bill of materials, supply-chain checks.
 
@@ -250,7 +253,7 @@ Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never
 
 ## Roadmap and phase discipline
 
-Completed: 0, 0.5, and 1. Current: **2** — platform and data foundation (config, PostgreSQL and migrations, audit, event catalogue and outbox, jobs, observability, classification, key-custody design). Next: 3 (identity, tenancy, RLS).
+Completed: 0, 0.5, 1, and 2. Current: **3** — identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, adversarial cross-tenant tests. Next: 3.5 (jurisdiction and capability foundation — PolicyPacks, capability availability, `SubjectPolicySelection` resolution).
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 

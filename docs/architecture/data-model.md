@@ -1,6 +1,6 @@
 # Data Model
 
-**ADRs:** 0005, 0006, 0008, 0022, 0027 · **Phase:** 2–3
+**ADRs:** 0005, 0006, 0008, 0022, 0026 · **Phase:** 2–3
 
 ---
 
@@ -61,7 +61,7 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
 | `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
 
-**As implemented in Phase 2** — the `platform` and `audit` schemas exist (five migrations, `0001` through `0021`, owned by `karar_migrator`), holding five tables. Full six-field lifecycle declarations: [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) and [`modules/audit/MODULE.md`](../../modules/audit/MODULE.md). RLS policies activate with the first tenant-scoped domain tables in Phase 3 (architecture test 22); `readmodel` and `sealed` arrive with their phases.
+**As implemented in Phases 2–3** — 26 migrations (`0001`–`0065`, number ranges owned per workstream with deliberate gaps), 37 tables. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`, every one RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
 
 | Table | Purpose | Classification |
 |---|---|---|
@@ -70,6 +70,18 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `platform.event_consumer_receipts` | Consumer idempotency — `(consumer, event id)` receipts | `INTERNAL` |
 | `platform.jobs` | Background jobs with lease, retry, and dead-letter semantics | mirrors the payload; at most `CONFIDENTIAL` in Phase 2 |
 | `audit.audit_events` | Append-only accountability record | `CONFIDENTIAL` |
+
+The Phase 3 domain tables, by owning module (purpose, classification, and lifecycle are declared per table in the linked `MODULE.md`; the migration files carry the same headers):
+
+| Module | Tables (migrations) |
+|---|---|
+| [`identity`](../../modules/identity/MODULE.md) | `identity_accounts`, `password_credentials`, `email_verifications`, `password_reset_requests`, `sessions`, `refresh_token_families`, `refresh_tokens`, `mfa_enrolments`, `mfa_recovery_codes`, `authentication_security_events` (`0030`–`0034`) |
+| [`users`](../../modules/users/MODULE.md) | `user_profiles`, `user_status_history` (`0040`) |
+| [`tenancy`](../../modules/tenancy/MODULE.md) | `tenants`, `tenant_members`, `tenant_invitations` (`0041`–`0044`) |
+| [`authorization`](../../modules/authorization/MODULE.md) | `permissions`, `roles`, `role_permissions`, `role_assignments` (`0050`–`0052`, `0054`) |
+| [`control-plane`](../../modules/control-plane/MODULE.md) | `kill_switches`, `kill_switch_history` (`0053`) |
+| [`operating-entity`](../../modules/operating-entity/MODULE.md) | `operating_entities`, `entity_jurisdiction_permissions`, `entity_licences`, `data_protection_role_assignments`, `operating_entity_assignments`, `entity_migrations` (`0060`–`0063`) |
+| [`consent`](../../modules/consent/MODULE.md) | `legal_documents`, `legal_document_versions`, `consent_grants`, `reconsent_evaluations`, `processing_basis_references` (`0064`–`0065`) |
 
 ## 4. Columns every tenant-owned table carries
 
@@ -80,7 +92,7 @@ created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 updated_at   TIMESTAMPTZ NOT NULL
 ```
 
-The Phase 2 `platform` and `audit` tables are platform infrastructure, not tenant-owned domain tables — they carry opaque tenant *references* where an envelope or audit row concerns one, never the RLS-predicate `tenant_id` column above. The first tenant-owned tables arrive in Phase 3 and carry all four columns.
+The Phase 2 `platform` and `audit` tables are platform infrastructure, not tenant-owned domain tables — they carry opaque tenant *references* where an envelope or audit row concerns one, never the RLS-predicate `tenant_id` column above. The first tenant-owned tables arrived in Phase 3 (`user_profiles`, `tenant_members`, `consent_grants`, and their siblings) and carry these columns. Two recorded variations, decided per table in the owning migration: identity's tables are keyed by **account** rather than tenant (their RLS predicate is `app.user_id` — [`modules/identity/MODULE.md`](../../modules/identity/MODULE.md)), and the platform-global legal/reference tables (operating entities, legal documents, the RBAC catalogue, kill switches) carry no `tenant_id` because no tenant owns them — each is allow-listed with its reason (§12).
 
 ## 5. Pinning — records with legal consequence
 
@@ -101,6 +113,8 @@ subject_policy_selection_version         TEXT     NULL   -- where the capability
 - **Subject profile version** — the elective conventions in force, so a Zakat assessment remains explainable under the conventions the customer had chosen. See [`plan-v2-deltas.md` D1](plan-v2-deltas.md).
 
 Architecture test 21 asserts the pinning columns exist on every table declared to carry legal consequence. `EntityMigration` is an explicit, audited operation with a re-consent evaluation step — never an `UPDATE`.
+
+**As implemented in Phase 3:** two tables carry declared legal consequence — `consent_grants` and `data_protection_role_assignments` — and both pin the jurisdiction reference and the operating entity at creation, so an assignment change never silently migrates a consent (proven by the consent module's integration suite). The policy-pack-version and subject-selection dimensions of the pinning block above cannot exist before PolicyPacks do; architecture test 21 carries an explicit activation gate that begins requiring them at Phase 3.5.
 
 The legacy validates the pattern independently: its Zakat assessments snapshot the jurisprudential settings in force into every assessment, which is exactly this rule applied to one capability.
 
@@ -220,7 +234,7 @@ Architecture test 22 detects all three failure shapes the legacy exhibits:
 | Enabled but no policy | The only shape the legacy's own guard tested for |
 | **FORCEd but not enabled** | The admin audit log itself (RLS-02) |
 
-See [`tenancy.md`](tenancy.md).
+**Active since Phase 3** (CODE): 37 tables scanned — 17 RLS-enabled and FORCEd, 27 allow-listed in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, 7 deliberately both (identity's bootstrap-armed tables). Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
 
 ## 13. Migrations
 

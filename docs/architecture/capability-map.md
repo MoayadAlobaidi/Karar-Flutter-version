@@ -29,6 +29,7 @@ Capability × bounded context × owning module × dependencies × jurisdiction a
 | `IDENTITY` | `identity` | Authentication, sessions, MFA | 3 |
 | `USERS` | `users` | Profile, preferences | 3 |
 | `TENANCY` | `tenancy` | Tenant model, isolation | 3 |
+| `AUTHORIZATION` | `authorization` | Deny-by-default RBAC: permission/role catalogue, assignments, `PolicyService` | 3 |
 | `OPERATING_ENTITY` | `operating-entity` | Legal person, controller/processor, migration | 3 |
 | `CONSENT` | `consent` | Consent triple, legal documents, re-consent | 3 |
 | `AUDIT` | `audit` | Append-only records | 2 |
@@ -37,7 +38,7 @@ Capability × bounded context × owning module × dependencies × jurisdiction a
 | `SEALED_VAULT` | `sealed-vault` | Grant-gated sealed storage | 13 |
 | `NOTIFICATIONS` | `notifications` | Delivery behind channel ports | 9 |
 | `PROJECTIONS` | `projections` | Read models for admin/ops | 8 |
-| `CONTROL_PLANE` | `control-plane` | Security gateway, token minting | 8 |
+| `CONTROL_PLANE` | `control-plane` | Security gateway, token minting | 3 (kill-switch slice) / 8 (gateway) |
 
 ## 3. Pure packages
 
@@ -59,6 +60,7 @@ graph TB
 
     subgraph "Identity, Tenancy & Legal"
         ID[identity] --- US[users] --- TN[tenancy]
+        AZ[authorization] --- TN
         OE[operating-entity] --- CO[consent]
     end
     subgraph "Financial Data"

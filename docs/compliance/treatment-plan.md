@@ -1,6 +1,8 @@
 # Risk Treatment Plan
 
-**Status:** ACTIVE register · **Owner:** Security Owner · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** every phase gate
+**Status:** ACTIVE register · **Owner:** Security Owner · **Version:** 0.3 · **Date:** 2026-08-16 · **Review:** every phase gate
+
+**v0.3 (2026-08-16, Phase 3):** rows 016–020 added with their risks; row 009 carries its Phase 3 note in the register.
 
 **v0.2 (2026-08-15, Phase 2):** rows 003, 009, 010 updated with delivered Phase 2 steps; rows 014, 015 added with their risks.
 
@@ -25,6 +27,12 @@ Maps each open risk in the [risk register](risk-register.md) to concrete treatme
 | KAR-RSK-013 no cert pinning | Accepted (EXC-002, threat model §4/C11); revisit when the Flutter network layer is built (Phase 4) and at production readiness (Phase 20) | Revisit 4, 20 | Superseding decision, or re-acceptance recorded at Phase 20 |
 | KAR-RSK-014 queue exhaustion | Caps and bounded behaviour delivered with the queues at Phase 2 (bounded retries → dead-letter, payload cap, leases, stale-claim recovery — KAR-CTL-058, 059); DLQ-depth and backlog **alerting** with monitoring at Phase 20 (KAR-CTL-041); per-tenant/producer quotas assessed when tenancy exists (Phase 3+) | 2 done (caps); 3+, 20 | Never fully — standing operational risk, re-scored per gate; alerting closes the residual's detection half |
 | KAR-RSK-015 schema drift | Checksums, drift detection, forward-only history, and from-zero rebuild delivered with the runner at Phase 2 (KAR-CTL-053, 054); `/readyz` reports migration status (062); re-scored when additional environments exist (Phase 17+), where drift surface multiplies | 2 done; re-score 17+ | Never fully — held by verify-per-run; re-scored per gate |
+| KAR-RSK-016 refresh replay | Rotation, families, reuse detection revoking family and session, sha256-only storage delivered with identity at Phase 3 (KAR-CTL-068); client-side token custody rules with the Flutter network layer (Phase 4); reuse-signal alerting with monitoring (Phase 20, KAR-CTL-041) | 3 done (mechanism); 4, 20 | Never fully — bearer tokens carry inherent theft risk; held by rotation + detection, re-scored per gate |
+| KAR-RSK-017 cross-tenant exposure | FORCE RLS with fail-closed principal context, architecture tests 9/22 merge-blocking, and adversarial non-empty-data suites delivered at Phase 3 (KAR-CTL-011, 071); per-module isolation coverage accretes with every new tenant-scoped table; re-score at Phase 17+ when real environments multiply the surface | 3 done; ongoing per table; re-score 17+ | Never fully — standing isolation risk, held by FORCE RLS and merge-blocking tests |
+| KAR-RSK-018 privilege escalation | Deny-by-default closed catalogue, peer-delegation rule, RLS-bound assignment writes, audited grants delivered at Phase 3 (KAR-CTL-072, 073); the audited, reason-capturing HTTP admin surface arrives with the control plane (ADR-0021, KAR-CTL-013); access reviews at every gate (KAR-CTL-014) | 3 done; control-plane phase | Never fully — re-scored when an HTTP administration surface exists |
+| KAR-RSK-019 unmounted kill-switch guards | Lead mounts `KillSwitchGuard`/`RequireOperationAllowed` on registration/login/refresh/invitation routes at phase integration, before the Phase 3 PR; the Phase 3 gate verifies the mounting (gate checklist item 3) | 3 close | The gate verification records the mounting — closes at the Phase 3 gate, or stays OPEN with reason and owner |
+| KAR-RSK-020 fail-closed availability | Failure modes declared per policy in code at Phase 3 (fail-closed pre-auth limits and kill-switch reads; fail-open-with-fallback refresh; local-only providers refusing outside local — KAR-CTL-070, 075, 078); real mail/KMS providers selected at Phase 17+; dependency-outage alerting with monitoring at Phase 20 | 3 done (declared); 17+, 20 | Re-accepted or superseded when real environments and providers exist |
+| KAR-RSK-021 tenant-bound surface dormant | Dormancy documented across phase-03, MODULE.md files, and the OpenAPI description (2026-08-16); binding mechanism (bind-at-login or explicit tenant selection) delivered as entry work of the first phase that needs the tenant-bound surface live | 3.5/4 entry | Closed when a binding mechanism lands with its own adversarial tests |
 
 ## Reading the plan
 

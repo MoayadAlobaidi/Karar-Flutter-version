@@ -69,16 +69,17 @@ If you are building a sealed capability: split metadata from payload so **lifecy
 ### 6. How do I run the system locally?
 
 ```bash
-make doctor      # verify your toolchain matches the pins
-make bootstrap   # install workspace and Flutter dependencies
-make dev         # bring up local infra; prints how to start each entrypoint
-pnpm build       # compile once — the db CLI runs from dist
-make db-create   # bootstrap roles, the local database, and grants (first run)
-make db-migrate  # apply migrations as karar_migrator
-make verify      # run the full local check suite
+make doctor           # verify your toolchain matches the pins
+make bootstrap        # install workspace and Flutter dependencies
+make dev              # bring up local infra; prints how to start each entrypoint
+make prisma-generate  # generate the Prisma client (git-ignored; needed before compiling)
+pnpm build            # compile once — the db CLI runs from dist
+make db-create        # bootstrap roles, the local database, and grants (first run)
+make db-migrate       # apply migrations as karar_migrator
+make verify           # run the full local check suite
 ```
 
-`make help` lists everything else. **Local development has zero cloud dependency** — no GCP account, no API key, no shared database. Without the two db steps the API boots but `/readyz` honestly answers 503 (Q40). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` first (Q48). As of Phase 2 the running system is infrastructure, real readiness, and the platform foundation; product capabilities do not exist yet (Q39).
+`make help` lists everything else. **Local development has zero cloud dependency** — no GCP account, no API key, no shared database. Without the two db steps the API boots but `/readyz` honestly answers 503 (Q40). If a host-level PostgreSQL already occupies 5432, set `POSTGRES_PORT=5433` first (Q48). As of Phase 3 the running system is the platform foundation plus identity, users, tenancy, authorization, operating-entity, consent, and the kill-switch slice; financial product capabilities do not exist yet (Q39).
 
 ### 7. What do I need installed?
 
@@ -126,13 +127,13 @@ This is simultaneously the numeric-safety mechanism and the Arabic/RTL/multi-cur
 
 ### 13. How is tenant data isolated?
 
-Four layers: RBAC, tenant-scoped repositories, **PostgreSQL RLS**, and adversarial tests.
+Four layers: RBAC, tenant-scoped repositories, **PostgreSQL RLS**, and adversarial tests. All four are implemented as of Phase 3.
 
-**RLS is the boundary. The Prisma extension is convenience on top of it** — this is the thing most likely to be misremembered. ([`../architecture/tenancy.md`](../architecture/tenancy.md), [ADR-0022](../adr/0022-rls-phase-3.md))
+**RLS is the boundary. The repository filter is convenience on top of it** — this is the thing most likely to be misremembered. ([`../architecture/tenancy.md`](../architecture/tenancy.md), [ADR-0022](../adr/0022-rls-phase-3.md))
 
 ### 14. Why must every tenant query be inside a transaction?
 
-Prisma cannot set a session GUC per query outside an interactive transaction, and RLS needs `SET LOCAL app.tenant_id`. All tenant-scoped queries route through `withTenant(ctx, fn)`. This costs connection overhead and constrains query style — a documented, accepted cost.
+Prisma cannot set a session GUC per query outside an interactive transaction, and RLS needs transaction-local (`SET LOCAL`) GUC bindings. All principal-scoped queries route through `withPrincipalContext` — or its tenant+user sugar `withTenant` — which binds the `app.*` GUCs as the transaction's first statement (Q49). This costs connection overhead and constrains query style — a documented, accepted cost.
 
 ### 15. How do modules talk to each other?
 
@@ -182,9 +183,9 @@ See [`../testing/architecture-tests.md`](../testing/architecture-tests.md) and t
 
 ### 22. How do I add a database table?
 
-One forward-only migration file in `packages/platform/db/migrations/`, named `NNNN_description.sql` with the next free number **in your workstream's range** (`0001`–`0009` platform core, `0010`–`0019` audit, `0020`–`0029` eventing/jobs; later ranges assigned by the phase lead). In the same file: grant `karar_app` the **minimal DML the table needs** (audit tables `SELECT, INSERT` only; never `GRANT ALL`), and end with the mandatory `-- rollback:` recovery block — the runner rejects files without one. Then `pnpm --filter @karar/platform db:migrate && db:verify`. Canonical rules: [`packages/platform/db/migrations/README.md`](../../packages/platform/db/migrations/README.md).
+One forward-only migration file in `packages/platform/db/migrations/`, named `NNNN_description.sql` with the next free number **in your workstream's range** (`0001`–`0009` platform core, `0010`–`0019` audit, `0020`–`0029` eventing/jobs; Phase 3 assigned `0030`–`0034` identity, `0040`–`0044` users/tenancy, `0050`–`0054` authorization/kill-switch, `0060`–`0065` operating-entity/consent; later ranges assigned by the phase lead — unused numbers in a range stay unused, never backfilled). In the same file: grant `karar_app` the **minimal DML the table needs** (audit tables `SELECT, INSERT` only; never `GRANT ALL`), and end with the mandatory `-- rollback:` recovery block — the runner rejects files without one. Then `pnpm --filter @karar/platform db:migrate && db:verify`. Canonical rules: [`packages/platform/db/migrations/README.md`](../../packages/platform/db/migrations/README.md).
 
-The table also needs: `tenant_id` if tenant-owned, RLS enabled **and** FORCEd (activates Phase 3), and a full **lifecycle declaration** — in `MODULE.md` for module-owned tables, in [`DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) for platform tables no module owns ([ADR-0026](../adr/0026-data-lifecycle.md)) — plus pinning columns if it carries legal consequence. The SQL is **provider-neutral PostgreSQL**: no cloud-specific database feature without the documented exception in [`../architecture/database-portability.md` §3](../architecture/database-portability.md).
+The table also needs: `tenant_id` if tenant-owned, RLS enabled **and** FORCEd — active since Phase 3; a table with neither RLS nor an entry in [`rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) fails the build — and a full **lifecycle declaration** — in `MODULE.md` for module-owned tables, in [`DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) for platform tables no module owns ([ADR-0026](../adr/0026-data-lifecycle.md)) — plus pinning columns if it carries legal consequence. If domain repositories will read it through Prisma, add the model to the mapping and regenerate (Q50). The SQL is **provider-neutral PostgreSQL**: no cloud-specific database feature without the documented exception in [`../architecture/database-portability.md` §3](../architecture/database-portability.md).
 
 ### 23. How do I add an external dependency?
 
@@ -272,11 +273,11 @@ Not a new adapter — the one `PostgresPersistenceAdapter` serves every approved
 
 ### 38. What is the current phase?
 
-Phase 2 — platform and data foundation, in progress. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-02.md`](../phases/phase-02.md).
+Phase 3 — identity, tenancy, and access control, in progress. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-03.md`](../phases/phase-03.md).
 
 ### 39. What is explicitly out of scope right now?
 
-Product capabilities. Phase 2 delivers the backend platform foundation — configuration, database, audit, events/outbox/jobs, observability — with no budgets, transactions, Zakat, AI, identity, or tenancy, and no cloud provisioned. The full out-of-scope list is in [`../phases/phase-02.md`](../phases/phase-02.md).
+Financial product capabilities and policy resolution. Phase 3 delivers identity, users, tenancy, operating entities, RBAC, consent, and kill switches — with no budgets, transactions, Zakat, or AI; no jurisdiction PolicyPacks or capability availability (Phase 3.5); and no cloud provisioned. The full out-of-scope list is in [`../phases/phase-03.md`](../phases/phase-03.md).
 
 ---
 
@@ -327,3 +328,35 @@ Logs are operational telemetry — free-form, retention by ops policy, consumed 
 ### 48. How do I run every test, including the live-PostgreSQL suites?
 
 `make test` (or `pnpm test` plus `flutter test`) runs the whole workspace — the platform's migration, audit-immutability, outbox, and jobs suites included, which need the Compose PostgreSQL: `make dev` first. On machines where a host-level PostgreSQL already listens on 5432, point everything at the Compose instance with `POSTGRES_PORT=5433` in `.env` (compose republishes on it) — the test suites and the db CLI read the same variable, `PGPORT` works too. `make verify` runs the full local gate; CI runs the same suites against its own Compose PostgreSQL. ([Q32](#32-how-do-i-run-all-checks); [`../architecture/backend.md` §12](../architecture/backend.md))
+
+---
+
+## Identity, tenancy, and access control
+
+Added in Phase 3, when principals, isolation, and authorization became real.
+
+### 49. How do I run a query under RLS — and what happens if I forget the context?
+
+Every query touching principal-scoped tables runs inside `withPrincipalContext` (or the tenant+user sugar `withTenant`) from `packages/platform/src/db/principal-context.ts`. The wrapper opens one transaction and binds `app.tenant_id`, `app.user_id`, `app.session_id`, and `app.request_id` transaction-locally as its first statement; the values come from the caller's own session or membership record, **never from client input**.
+
+Forgetting is not a data leak — it is an empty result or a typed error. A missing required key throws `PrincipalContextError` before any query runs, and a transaction that somehow reaches the database without context matches **no rows**, because every policy reads its GUC through `NULLIF(current_setting(name, true), '')`. `SET SESSION` on any `app.*` GUC is forbidden (architecture test 9) — a session-scoped value would outlive the transaction on a pooled connection. Canonical mechanism: [`../architecture/tenancy.md` §3](../architecture/tenancy.md).
+
+### 50. How does Prisma fit in — and how do I regenerate the client or check drift?
+
+Prisma is a **mapping over the canonical SQL schema, not a second migration system**. The SQL migrations (Q40) remain the only thing that changes the database; the multi-file schema in `packages/platform/prisma/schema/` maps the tables domain repositories use, and the client is constructed only through `createPrismaClient` — a driver adapter over the same connection profiles as the raw adapter, confined to infrastructure code (architecture test 4).
+
+Two make targets carry the workflow: `make prisma-generate` regenerates the client into the git-ignored `packages/platform/prisma/client/` (run it after cloning and after any schema-folder change), and `make prisma-drift` fails if any mapped model diverges from the live database — run it against a migrated database after adding a migration or touching a `.prisma` file. ([`../architecture/backend.md` §6](../architecture/backend.md))
+
+### 51. How do I run the adversarial security suite — and what is the scratch-database pattern?
+
+`pnpm --filter @karar/security-tests test` runs the cross-cutting suite in `tests/security/` (cross-tenant isolation and privilege abuse across the Phase 3 module boundaries); the per-module adversarial suites run with their modules under `make test`. Both need the Compose services: `make dev` first, and on machines with a host-level PostgreSQL set `POSTGRES_PORT=5433` in `.env` (Q48) — the suites read the same variable.
+
+These suites follow the **scratch-database pattern**: each suite bootstraps its own throwaway database from zero (roles, grants, full migration history — the same from-zero path as Q40), runs against it, and drops it afterwards. Nothing is shared between suites, every run re-proves the migration bootstrap, and seeding is itself an assertion — tenants are provisioned as the bootstrap superuser (provisioning is never a runtime path), everything else is written as `karar_app` under the exact principal context the runtime uses, and each tenant's own data is proven **non-empty before any denial is asserted**.
+
+### 52. How do I check a permission?
+
+Twice, like capability checks (Q18): mount `requirePermission('x.y.z')` on the controller route AND call `authorize()` inside the use case — HTTP is not the only caller. Both resolve through the authorization module's deny-by-default `PolicyService`: unknown permission, unassigned role, wrong tenant scope, and an unreachable store all deny, with machine-readable reasons. Roles are re-derived from the database on every check, so revocation is immediate — nothing caches authority, and access tokens carry no roles at all. The permission universe is closed: a permission exists because a migration seeded it and the compile-time catalogue lists it (test-asserted equal); wildcards are structurally impossible. ([`../../modules/authorization/MODULE.md`](../../modules/authorization/MODULE.md), [`../security/access-control.md`](../security/access-control.md))
+
+### 53. What can restrict my endpoint at runtime — and what happens during an outage?
+
+Restrict-only kill switches (`NEW_REGISTRATIONS`, `PASSWORD_LOGIN`, `SESSION_REFRESH`, `TENANT_INVITATIONS`). A switch can only **deny** its operation: inactive, missing, and expired all mean unrestricted, and no state enables or widens anything. An active restriction answers 503 `OPERATION_RESTRICTED`; when switch state cannot be read at all, guarded operations fail **closed** with 503 `DEPENDENCY_UNAVAILABLE` — an outage must not silently enable. Every change is versioned, append-only ledgered, and audited with actor and reason. ([`../../modules/control-plane/MODULE.md`](../../modules/control-plane/MODULE.md))

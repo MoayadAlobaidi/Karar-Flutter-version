@@ -1,7 +1,7 @@
 # Backend Architecture
 
-**Stack:** NestJS · strict TypeScript · PostgreSQL · node-postgres in the platform foundation · Prisma planned for domain repositories (both confined to infrastructure code — §6)
-**ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–2
+**Stack:** NestJS · strict TypeScript · PostgreSQL · node-postgres in the platform foundation · Prisma for domain repositories since Phase 3 (both confined to infrastructure code — §6)
+**ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–3
 
 ---
 
@@ -35,7 +35,9 @@ karar/
 │   ├── state-machine/      — pure. ~100 lines
 │   ├── api-contracts/      — OpenAPI spec + event catalogue
 │   └── platform/           — backend platform library: config, DB foundation,
-│                             errors, observability, events/outbox/jobs (Phase 2)
+│                             errors, observability, events/outbox/jobs (Phase 2);
+│                             Prisma runtime, principal context, rate limiting,
+│                             trusted-proxy http, notifications port (Phase 3)
 ├── modules/                — bounded contexts
 ├── infra/terraform/        — contracts + provider modules + per-deployment compositions
 └── docs/
@@ -70,6 +72,23 @@ modules/<name>/
 
 Wiring is **ordinary NestJS module imports**. The capability registry governs availability and entitlement; it does not resolve dependencies and performs no dynamic loading (ADR-0016).
 
+### Modules with code, as of Phase 3
+
+Eight bounded contexts have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. One phrase each:
+
+| Module | Landed mechanics (Phase) |
+|---|---|
+| `audit` | Append-only `audit.audit_events` writer with metadata-classification guard (2) |
+| `identity` | Accounts and e-mail verification; argon2id with parameter versioning and rehash-on-login; server-side sessions; one-time rotating refresh-token families with reuse detection; non-resetting lockout; TOTP MFA with encrypted secrets and recovery codes; append-only security ledger (3) |
+| `users` | Separate bounded context for the person: profile (display name, locale) and account-status intent; `user_profiles.user_id` IS the identity account id (3) |
+| `tenancy` | Tenants, memberships, invitations with sha256 token hashes and token-scoped RLS redemption (3) |
+| `authorization` | Deny-by-default RBAC: closed permission/role catalogue, role assignments, the one `PolicyService` engine behind the sibling modules' ports, `requirePermission(...)` guard and `authorize()` helper (3) |
+| `operating-entity` | Entity register, licences as typed references, relationship-scoped data-protection role assignments, entity bindings and the audited EntityMigration workflow; HTTP contract-only this phase (3) |
+| `consent` | Legal documents with reviewed re-consent classification on publication, immutable entity-pinned grants, fail-closed `AssertConsentFor` (3) |
+| `control-plane` | Kill-switch slice only: restrict-only switches, fail-closed on store outage, versioned append-only history; the gateway itself is Phase 8 (3) |
+
+Access tokens are ES256 and carry `{sub, sid, iss, aud, iat, exp, tv}` and nothing else — roles are re-derived from the database on every request, so a revoked grant takes effect immediately.
+
 ## 4. Request lifecycle
 
 ```mermaid
@@ -90,8 +109,8 @@ sequenceDiagram
     G->>CTRL: validated DTO + context
     CTRL->>UC: execute(input, context)
     UC->>UC: re-check capability (HTTP is not the only caller)
-    UC->>TX: withTenant(ctx, fn)
-    TX->>DB: BEGIN; SET LOCAL app.tenant_id = …
+    UC->>TX: withPrincipalContext(ctx, fn)
+    TX->>DB: BEGIN; set_config('app.*', …, true)
     TX->>DB: queries under RLS
     TX->>DB: INSERT INTO outbox_events
     TX->>DB: COMMIT
@@ -123,7 +142,14 @@ Resolved once, at the edge, and threaded through `AsyncLocalStorage`. **Use case
 
 Repositories are declared as ports in `application/ports/` and implemented here. They map persistence models to domain objects explicitly; there is no ORM object flowing into the domain.
 
-**Phase 2 state, recorded plainly:** the platform foundation (`packages/platform/src/db`) reaches PostgreSQL through **node-postgres**, inside the platform package's infrastructure code — one `PostgresPersistenceAdapter` constructed from a connection profile, exposing `query` and `withTransaction`. **Prisma remains the plan for domain repositories from Phase 3**; ADR-0005 is unchanged. Neither library appears outside infrastructure code.
+**Phase 2 state, recorded plainly:** the platform foundation (`packages/platform/src/db`) reaches PostgreSQL through **node-postgres**, inside the platform package's infrastructure code — one `PostgresPersistenceAdapter` constructed from a connection profile, exposing `query` and `withTransaction`.
+
+**Phase 3 state:** Prisma 7 landed for domain repositories, infrastructure-only, exactly as ADR-0005 planned:
+
+- **One sanctioned constructor.** `createPrismaClient` ([`packages/platform/src/db/prisma.ts`](../../packages/platform/src/db/prisma.ts)) is the only way a Prisma client exists — it rides the `@prisma/adapter-pg` driver adapter over a `pg` pool built from the **same `ConnectionProfile` machinery** as the raw adapter, so connection truth stays in profiles and no URL lives in the schema.
+- **Prisma maps; SQL migrates.** The multi-file schema under `packages/platform/prisma/schema/*.prisma` (one file per Phase 3 module) maps the tables the canonical SQL migrations created. The forward-only SQL migrations remain **the only migration system**; Prisma migrate is not used. Drift is detected one-directionally by `scripts/db/prisma-mapping-check.mjs` (`make prisma-drift`): every mapped model must match the live table shape, while unmapped platform tables (reached via the raw adapter) are not drift. The client regenerates via `make prisma-generate` into the git-ignored `packages/platform/prisma/client/`.
+- **Containment, test-enforced.** Architecture test 4 now confines `prisma`/`@prisma` and `pg` imports to `packages/platform/src/db/**` and `packages/platform/prisma/client/**`; module repositories consume the handle through the platform, and no Prisma type appears outside `infrastructure/persistence/` code.
+- **Tenant-scoped queries** run through `withPrincipalContext` (§7); the `DataSourceResolver` seam exists with its single-datasource Phase 3 implementation ([`database-portability.md` §4](database-portability.md)).
 
 ### Schemas
 
@@ -152,11 +178,13 @@ Migrations are forward-only — no executable down-scripts. Every file ends with
 The isolation mechanism is **PostgreSQL RLS**. The Prisma extension is convenience on top of it, not the boundary.
 
 ```ts
-await withTenant(ctx, async (tx) => { /* queries */ })
-// BEGIN; SET LOCAL app.tenant_id = $1; … ; COMMIT
+await withTenant(prisma, tenantId, userId, async (tx) => { /* queries */ })
+// BEGIN; SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true), …; COMMIT
 ```
 
 **Documented cost:** Prisma cannot set a session GUC per query outside an interactive transaction, so all tenant-scoped queries route through this wrapper. That costs connection overhead and constrains query style. It is accepted and recorded rather than worked around, because the alternative — trusting an application-layer filter — is the failure mode RLS exists to prevent.
+
+**Implemented in Phase 3** as `withPrincipalContext` (with `withTenant` as the tenant+user sugar): one parameterized `set_config(…, true)` statement binds `app.tenant_id`, `app.user_id`, `app.session_id`, and `app.request_id` transaction-locally; required-but-missing context fails closed with a typed error before any query; policies read the GUCs via `NULLIF(current_setting(name, true), '')` so an unset context matches no rows. The full landed mechanism, the bootstrap-arm decisions, and the adversarial proof are canonical in [`tenancy.md` §3–§4](tenancy.md); architecture test 9 enforces the wrapper and forbids session-scoped `app.*` bindings.
 
 The application role has **no `BYPASSRLS`**. Migrations run as a separate role. See [`tenancy.md`](tenancy.md).
 
@@ -199,6 +227,8 @@ Each of these exists because the legacy audit found its absence. See [`../legacy
 | Staff reads | **Audited**, including reads that return nothing | AZ5 |
 
 The health row is implemented as of Phase 2: `apps/api` `/readyz` executes real checks — `SELECT 1` on the application role and a read-only migration verify (applied == latest) — and answers 503 with per-check states on any failure, states only, never hosts or driver errors. The worker runs its own loopback-only health server (`KARAR_WORKER_PORT`, default 3001) whose `/readyz` additionally checks that the relay and poller loops are recently alive.
+
+Implemented as of Phase 3 (`packages/platform/src/http`, `src/ratelimit`; consumed by the identity module): the **trusted proxy** row — `X-Forwarded-For` is honored only under explicit trusted-proxy configuration, never on the header's own authority; and the **rate limiting** rows — a Redis sliding window keyed on HMAC digests (never raw identifiers), with an explicit per-policy store-failure mode: **fail-closed** for every credential-guessing surface (login, verification, password reset, MFA — a limiter outage must not open an unlimited guessing window) and fail-open under a small in-process fallback for token refresh only, which presents an unguessable 256-bit token and should not sign everyone out during a Redis outage. The **consent gates** row is implemented by the consent module: `AssertConsentFor` fails closed — no published disclosure, an unresolvable operating entity, a withdrawn grant, and an outstanding material re-consent all deny the same way.
 
 ## 11. Observability
 

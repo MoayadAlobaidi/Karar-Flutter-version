@@ -113,3 +113,12 @@ visible as step annotations and the JSON report is uploaded as the
   has run clean at high severity on `main` for 14 consecutive days, or once
   every remaining finding has a documented exception in the evidence register.
 - Owner: Engineering Owner. Review no later than Phase 2 kickoff.
+
+## Dependency-management note — @types/node majors (2026-08-16)
+
+Dependabot PR #3 (`@types/node` 25 → 26) was closed without merging: the types
+major must track the supported runtime major, and the runtime is pinned to
+Node 25. `.github/dependabot.yml` now ignores `version-update:semver-major`
+for `@types/node`; patch/minor updates within the supported major continue to
+arrive normally. A Node runtime major upgrade is its own reviewed change and
+is never combined with a feature phase.

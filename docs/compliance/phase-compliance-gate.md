@@ -1,6 +1,8 @@
 # Phase Compliance Gate
 
-**Status:** DRAFT · **Owner:** Compliance Owner · **Approver:** Platform Owner (pending) · **Version:** 0.2 · **Date:** 2026-08-15 · **Review:** Phase 2 gate
+**Status:** DRAFT · **Owner:** Compliance Owner · **Approver:** Platform Owner (pending) · **Version:** 0.3 · **Date:** 2026-08-16 · **Review:** Phase 3 gate
+
+**v0.3 (2026-08-16):** Phase 3 gate checklist appended — checklist only, outcome PENDING; the gate record itself is written by the lead at Phase 3 closeout.
 
 **v0.2 (2026-08-15):** Phase 2 gate checklist appended — checklist only; the gate record itself is written by the lead at phase close.
 
@@ -94,3 +96,24 @@ Evaluated against the checklist above at commit `324fce1` plus the closeout comm
 **Deferred items (with owners and targets):** policy approval (Platform Owner, before first non-local deployment) · protected evidence store (Platform Owner, before Phase 4 or external audit) · KAR-CTL-025 threshold tightening (Engineering Owner, criterion in the settings doc) · custody/canary implementation (Phase 13/20) · EXC-001 (team growth trigger).
 
 **Outcome: PASS_WITH_DOCUMENTED_DEFERRED_ITEMS.** No hard roadmap gate was waived; every deferred item carries an owner and a target.
+
+## Phase 3 specifics — gate checklist
+
+**Status: PREPARED, outcome PENDING. This is the checklist, not the record.** The gate is executed at Phase 3 closeout; its outcome (PASS or findings) is recorded by the lead below this block, following the Phase 1 and Phase 2 patterns. Prepared 2026-08-16 alongside the Phase 3 compliance updates (matrix v0.3, evidence register v0.4, risk register v0.3, SoA v0.3). Nothing in this checklist asserts or presumes an outcome.
+
+The Phase 3 gate report must verify, beyond the standard eight sections:
+
+1. **EV-301–EV-317 instances.** The Phase 3 PR CI run URL(s) recorded and EV-317 moved PENDING → COLLECTED; EV-301–EV-316's executed-run basis re-confirmed on the closing head; the phase report's verification sections (`docs/phases/phase-03.md`) completed and referenced. Expected counts to reproduce: full workspace suite 797 passed / 5 skipped (802 total) across 80 passed / 1 skipped test files, the skipped file being the KARAR_INTEGRATION-gated readiness suite, which runs in CI. Any row that cannot cite a green run reverts to PENDING with a reason and owner.
+2. **Control deltas with pointers.** KAR-CTL-066–078 added (13 IMPLEMENTED [P3]); KAR-CTL-010, 011, 049 moved DEFERRED → IMPLEMENTED [P3]; KAR-CTL-020's Phase 3 activation note. Each move cites its pointer; confirm no control anywhere claims OPERATING or EVIDENCED and nothing is represented as deployed.
+3. **Kill-switch guard mounting.** The integration wiring mounts `KillSwitchGuard`/`RequireOperationAllowed` on the registration, login, refresh, and invitation routes; verify on the closing head and close KAR-RSK-019 on that verification — or hold it OPEN with reason and owner. Until verified, kill-switch route enforcement is not claimed anywhere.
+4. **Phase 3.5 boundaries hold.** No jurisdiction PolicyPack, capability-availability, or SubjectPolicySelection behaviour smuggled in; architecture test 21's registry activation gate for the Phase 3.5 pinning columns present (the run fails when 3.5 arrives without them); `LocalDevEncryptionProvider`/`LocalMailSink` still refuse outside local; SoA 8.24 deliberately not advanced — no cloud KMS, no production keys, no operating canary claimed anywhere.
+5. **Permission-absence honesty.** `identity.account.disable`/`enable` remain documented-but-unseeded (migration 0050 header); `amanat.content.read` absence still test-pinned; no permission returns credential material; DB seed == code catalogue on the closing run (14 permissions, 8 roles).
+6. **Policy approval decision.** The 14 policies remain DRAFT under the Phase 2 gate's deadline (before the first non-local deployment); the gate records Platform Owner approval or re-affirms the deadline. Silence fails the gate.
+7. **Risk review record (EV-008 pattern).** Register v0.3 deltas signed: KAR-RSK-016–020 added, 009 note dated, no re-scores; the only closure candidate is KAR-RSK-019 under item 3; every other row confirmed reviewed.
+8. **Exceptions.** EXC-001, 002, 003 re-affirmed or updated; EXC-002's compensating-control refresh (short-lived tokens with server-side revocation delivered as Phase 3 code) verified; confirm no exit trigger fired — the team is still one person.
+9. **Mapping deltas match the matrix.** SoA v0.3 (four rows to IMPLEMENTED, tally 43/28/10/12/0) and trust-services mapping v0.3 quote matrix v0.3 exactly; any disagreement resolves toward the matrix.
+10. **Claims reconciliation.** The threat model's "Phase 3 identity, tenancy, and access-control threats" evidence refs (EV-301–EV-313) resolve one-for-one against the evidence register; assurance-claim entries touched by Phase 3 re-reviewed; architecture test 26 green on the closing run.
+11. **Architecture-test activation.** Tests 9 (tenant scoping), 21 (pinning), 22 (RLS coverage) ACTIVE and test 4 narrowed; 23 passed / 0 failed / 5 skipped with zero registry activation errors; built-in self-test 35/35 seeded cases (EV-315).
+12. **Database-reality checks.** Spot-verify in the CI/local logs: the RLS inventory matches EV-316 (37 tables = 17 ENABLE+FORCE + 27 allow-listed, 7 in both); the adversarial suites' non-empty two-tenant seeding visible before denial assertions; escalation probes (SET ROLE, DDL, trigger disabling, `session_replication_role`) rejected; append-only ledgers hold against the migrator role.
+13. **Fresh-clone verification.** Executed at phase close and recorded (per-phase frequency on the EV-218 row; KAR-CTL-046).
+14. **KAR-CTL-025 threshold.** Unchanged from the Phase 2 gate decision (package-manager audit report-only; dependency-review blocking at the PR boundary); re-affirm the tightening criterion and owner, or act on it.

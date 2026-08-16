@@ -166,6 +166,34 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 ---
 
+## Identity, tenancy, and access control (Phase 3)
+
+**Bootstrap arm** — an explicit no-principal clause in an RLS policy on a table that authentication must read **before a principal exists** (you cannot know who is logging in without reading the row that identifies them). Each arm is recorded in the RLS allow-list with its justification; a transaction that *has* a user context stays confined to its own rows. Sessions and MFA tables carry none.
+
+**Consent classification** — the reviewed decision required before a legal-document version may be published: `MATERIAL_REACCEPTANCE_REQUIRED`, `NOTICE_REQUIRED`, or `NO_USER_ACTION_REQUIRED`, with reviewer and reason recorded and **no default in either direction**. An unclassified publication is blocked by typed error and by CHECK constraint. (ADR-0024; the inversion of legacy finding P12)
+
+**DataProtectionRoleAssignment** — a stored legal decision: which entity is controller, joint controller, or processor **per (entity, tenant, purpose, jurisdiction) relationship**, from when to when — never a property of the entity alone. What makes the white-label controller/processor inversion configuration rather than code. ([`architecture/operating-entity.md`](architecture/operating-entity.md))
+
+**Delegation peer rule** — assigning `PLATFORM_ADMIN` requires *holding* `PLATFORM_ADMIN`; granting any role requires `authorization.role.assign`. No path exists by which an actor widens their own authority. Revocation carries no peer rule — revoking only ever shrinks authority.
+
+**GUC** — a PostgreSQL configuration variable (grand unified configuration), settable per session or per transaction. Karar binds the principal GUCs `app.tenant_id`, `app.user_id`, `app.session_id`, and `app.request_id` **transaction-locally only** (`set_config(…, true)` = `SET LOCAL`); RLS policies read them via `NULLIF(current_setting(name, true), '')`, so an unset GUC matches no rows. `SET SESSION` on `app.*` is forbidden (architecture test 9).
+
+**Identity vs users (bounded contexts)** — two deliberately separate contexts: `identity` owns the credential and the session (who a principal *is*); `users` owns the person (profile, locale, status intent). They share one identifier — `identity_accounts.id` **is** the platform `UserId`, the value `user_profiles.user_id` stores and `app.user_id` carries. There is no second user id.
+
+**Kill switch (restrict-only)** — an operational control that can only **deny** its operation. `INACTIVE`, expired, and missing all mean "no restriction recorded"; no state enables, widens, or bypasses anything. An active restriction answers 503 `OPERATION_RESTRICTED`; an unreadable switch store fails **closed** (503 `DEPENDENCY_UNAVAILABLE`) — absence of a restriction is an answer, absence of the store is not. Every change is versioned, append-only ledgered, and audited.
+
+**Principal context** — the transaction-local binding of the caller's identity into the principal GUCs, set by `withPrincipalContext` as the transaction's first statement, from the caller's own record — **never from client input**. Required-but-missing context fails closed with a typed error before any query. RLS decides row visibility from it. ([`architecture/tenancy.md` §3](architecture/tenancy.md))
+
+**Refresh-token family** — the rotation lineage of one session grant: each refresh consumes a one-time token (stored only as its SHA-256) and issues a successor in the same family. The family is the **unit of revocation** when reuse is detected.
+
+**Reuse detection** — presenting an already-rotated refresh token is treated as evidence of theft, not a retry: the whole family and its session are revoked. Rotation is one-time and atomic, so a replayed token can never mint a parallel session.
+
+**RLS allow-list** — [`../packages/platform/db/rls-allow-list.json`](../packages/platform/db/rls-allow-list.json): the only sanctioned way a table exists without tenant/user RLS policies. One entry per table with a written reason and compensating controls; architecture test 22 fails any table that is neither `ENABLE`+`FORCE` nor listed.
+
+**Token version (`tv`)** — a per-account counter carried in every access token. Security-relevant account changes (disabling an account, resetting a password) bump it, and the request guard re-reads the account on every request, so previously issued tokens die immediately — no waiting for expiry. Access tokens carry `{sub, sid, iss, aud, iat, exp, tv}` and nothing else; roles are never in the token.
+
+---
+
 ## Evidence labels
 
 Used on every factual claim about a system.
