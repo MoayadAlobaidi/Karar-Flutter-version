@@ -1,0 +1,207 @@
+# users surface — path-item fragments (ADR-0009: authored by hand, never
+# generated from code). The phase lead merges these into openapi.yaml via
+# $ref per path, e.g.:
+#   /users/me:
+#     $ref: './paths/users.yaml#/~1users~1me'
+#
+# Contract rules made visible here:
+#   * Tenant identity comes ONLY from the authenticated session. There is no
+#     tenantId parameter on any operation — not in query, header, or body —
+#     and a request carrying one is answered as if it were absent (asserted
+#     by test).
+#   * PATCH accepts exactly the two approved subject-editable fields
+#     (displayName, locale); unknown fields are ignored, never applied.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`.
+
+/users/me:
+  get:
+    operationId: getOwnUserProfile
+    summary: Read the authenticated principal's own profile
+    tags: [users]
+    security:
+      - sessionAuth: []
+    responses:
+      '200':
+        description: The caller's profile in their own tenant.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/UserProfile'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No profile exists for the principal in their tenant (code PROFILE_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+  patch:
+    operationId: updateOwnUserProfile
+    summary: Update the approved subject-editable fields (displayName, locale)
+    tags: [users]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            minProperties: 1
+            properties:
+              displayName:
+                type: string
+                minLength: 1
+                maxLength: 120
+                description: Trimmed before storage; control characters rejected.
+              locale:
+                type: string
+                pattern: '^[a-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}$'
+                description: BCP-47-shaped tag ('ar', 'ar-QA', 'en-US').
+    responses:
+      '200':
+        description: The updated profile.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/UserProfile'
+      '400':
+        description: Invalid field value or empty change set (codes INVALID_PROFILE_FIELD, NO_APPROVED_FIELD_CHANGES).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No profile exists for the principal in their tenant (code PROFILE_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/users/me/disable-request:
+  post:
+    operationId: requestOwnAccountDisable
+    summary: Record the principal's intent to disable their account
+    description: >-
+      Disable/deletion-request FOUNDATION (Phase 3): records the intent
+      (status ACTIVE -> DISABLE_REQUESTED, an append-only status-history row,
+      and an audit event). Nothing acts on the intent yet — session
+      revocation and the disable itself arrive in later phases and consume
+      the recorded state.
+    tags: [users]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              reason:
+                type: string
+                maxLength: 500
+    responses:
+      '202':
+        description: The intent is recorded; nothing has been disabled yet.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, requestedAt, auditRecorded]
+              properties:
+                status:
+                  type: string
+                  enum: [DISABLE_REQUESTED]
+                requestedAt:
+                  type: string
+                  format: date-time
+                auditRecorded:
+                  type: boolean
+                  description: False when the state change committed but the audit append failed.
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No profile exists for the principal in their tenant (code PROFILE_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: The account is not in a state that can request disable (code INVALID_STATUS_TRANSITION).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  UserProfile:
+    type: object
+    required:
+      [
+        userId,
+        tenantId,
+        displayName,
+        locale,
+        status,
+        residencyJurisdictionRef,
+        createdAt,
+        updatedAt,
+      ]
+    properties:
+      userId:
+        type: string
+        format: uuid
+        description: The identity account id — IS the platform UserId.
+      tenantId:
+        type: string
+        format: uuid
+      displayName:
+        type: string
+      locale:
+        type: string
+      status:
+        type: string
+        enum: [ACTIVE, DISABLE_REQUESTED, DISABLED, DELETION_REQUESTED]
+      residencyJurisdictionRef:
+        type: [string, 'null']
+        description: Typed unresolved reference; resolved by Phase 3.5 policy machinery.
+      createdAt:
+        type: string
+        format: date-time
+      updatedAt:
+        type: string
+        format: date-time
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        type: integer
+      code:
+        type: string
+        description: Machine-readable reason (e.g. AUTHENTICATION_REQUIRED, PROFILE_NOT_FOUND).
+      detail:
+        type: string
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

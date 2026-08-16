@@ -1,0 +1,191 @@
+[
+  {
+    "table": "public.operating_entities",
+    "reason": "Platform-global legal-person register (ADR-0024): one entity serves many tenants and jurisdictions, so no tenant_id exists to scope on; a tenant predicate would fabricate a relationship the dimension exists to keep orthogonal.",
+    "owner": "operating-entity module (modules/operating-entity/MODULE.md)",
+    "compensatingGrants": "Writes are platform-operator-only through the PolicyService port (entity.entity.manage); karar_app holds SELECT/INSERT/UPDATE only (no DELETE); consumer reads go through purpose-built resolution queries (effective entity, permitted-in-jurisdiction), never register enumeration.",
+    "reviewPhase": "3.5 (capability resolution) and 8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.entity_jurisdiction_permissions",
+    "reason": "Where a legal person may lawfully operate — reference data about entities, keyed on (entity, jurisdiction); carries no tenant or subject column by design (migration 0060).",
+    "owner": "operating-entity module (modules/operating-entity/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only writes via PolicyService (entity.entity.manage); SELECT/INSERT/UPDATE grants only; end-only correction discipline (permitted_to), no DELETE grant.",
+    "reviewPhase": "3.5 (capability resolution gates on these rows)"
+  },
+  {
+    "table": "public.entity_licences",
+    "reason": "Typed licence references per entity (ADR-0024: a row never implies a legal fact); platform-global reference data with provenance-carrying statuses, no tenant or subject column (migration 0061).",
+    "owner": "operating-entity module (modules/operating-entity/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only writes via PolicyService (entity.entity.manage); EVIDENCED-requires-evidence CHECK; SELECT/INSERT/UPDATE grants only, no DELETE — revocation is a status, never an absent row.",
+    "reviewPhase": "3.5 (requiredOperatingEntityLicenses resolution)"
+  },
+  {
+    "table": "public.data_protection_role_assignments",
+    "reason": "Relationship-scoped legal decisions ABOUT tenants owned by the platform operator (ADR-0024: role per relationship). Resolution must run across tenants from one place, and rows with tenant_id NULL (an entity's own direct-consumer relationship) have no tenant predicate at all (migration 0062).",
+    "owner": "operating-entity module (modules/operating-entity/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only writes via PolicyService (entity.entity.manage); guard trigger permits only ending (effective_to, once) and raises on any edit, DELETE, or TRUNCATE even for the table owner; no DELETE grant.",
+    "reviewPhase": "8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.operating_entity_assignments",
+    "reason": "Forward entity bindings for tenants and users — platform-operator records about which legal person serves whom (ADR-0024 SS4). The resolution query (which entity applies to this principal) must run for every tenant before any tenant context exists (migration 0063).",
+    "owner": "operating-entity module (modules/operating-entity/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only writes via PolicyService (entity.entity.manage); guard trigger permits only ending an open row and raises on edits/DELETE/TRUNCATE even for the owner; consumers learn only their own effective entity through ResolveEffectiveOperatingEntity, never the register.",
+    "reviewPhase": "8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.entity_migrations",
+    "reason": "Audited history of entity-binding migrations with re-consent outcomes (ADR-0024 SS5: never silent). History must stay queryable across every tenant an entity serves — it is the Super Admin Operating Entities Center's record (migration 0063).",
+    "owner": "operating-entity module (modules/operating-entity/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only writes via PolicyService (entity.migration.approve); state machine enforced in the use case AND by CHECK (no terminal state without completed_at, no post-PROPOSED state without a recorded evaluation); terminal rows immutable by trigger even for the owner; no DELETE grant.",
+    "reviewPhase": "8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.legal_documents",
+    "reason": "PUBLIC legal-document catalogue per (entity, jurisdiction) pair (ADR-0024; consent MODULE.md: 'public catalogue; no RLS, correctly'). Subjects must read the catalogue BEFORE consenting — a consent gate that cannot show its document fails closed into uselessness. No tenant or subject column exists (migration 0064).",
+    "owner": "consent module (modules/consent/MODULE.md)",
+    "compensatingGrants": "Writes are platform-operator-only via PolicyService (consent.document.publish); karar_app holds SELECT/INSERT only — no UPDATE and no DELETE grants on the catalogue.",
+    "reviewPhase": "3.5 (policy-pack integration)"
+  },
+  {
+    "table": "public.legal_document_versions",
+    "reason": "PUBLIC versioned legal texts consent grants pin (migration 0064). Version content and lifecycle are platform-global evidence; subject-specific state lives in consent_grants, which IS RLS-protected.",
+    "owner": "consent module (modules/consent/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only lifecycle via PolicyService (consent.document.publish); the publication rule as CHECK constraints (no effective_at or published_at without classification); published versions immutable by trigger even for the owner; no DELETE grant.",
+    "reviewPhase": "3.5 (policy-pack integration)"
+  },
+  {
+    "table": "public.reconsent_evaluations",
+    "reason": "Reviewed re-consent decisions about DOCUMENT VERSIONS, applying to every affected subject; carries no tenant/user column by design — per-subject consequences are resolved by querying RLS-protected consent_grants against the version, and subjects must be able to learn why their status says RECONSENT_REQUIRED (migration 0065).",
+    "owner": "consent module (modules/consent/MODULE.md)",
+    "compensatingGrants": "Append-only by BOTH mechanisms (data-model.md SS10): karar_app holds SELECT/INSERT only, and the immutability trigger raises on UPDATE/DELETE/TRUNCATE even for the table owner; writes gated on consent.document.publish and the evaluation must match the version's classification.",
+    "reviewPhase": "3.5 (policy-pack integration)"
+  },
+  {
+    "table": "public.processing_basis_references",
+    "reason": "Typed (purpose, jurisdiction) -> basis reference registry (ADR-0024: consent is one basis among several). Platform-global reference data with no subject or tenant column; asserts no jurisdictional conclusion — resolution is Phase 3.5 and an absent row fails closed (migration 0065).",
+    "owner": "consent module (modules/consent/MODULE.md)",
+    "compensatingGrants": "Platform-operator-only writes via PolicyService (consent.document.publish); SELECT/INSERT/UPDATE grants only, no DELETE.",
+    "reviewPhase": "3.5 (policy-pack resolution replaces interim declarations)"
+  },
+  {
+    "table": "public.identity_accounts",
+    "reason": "Authentication bootstrap arms (policies identity_accounts_bootstrap_select/_insert and the bootstrap arm of identity_accounts_update, migration 0030): login, e-mail verification, and password reset must find the account by e-mail BEFORE any principal exists — the row being read is what establishes who the principal is — and registration inserts before one exists by definition. Identity tables are ACCOUNT-scoped via the app.user_id GUC (identity_accounts.id IS the platform UserId), not tenant-scoped; a transaction that HAS a principal context remains confined to its own row.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "SELECT/INSERT/UPDATE only (DELETE revoked, 0034); unique lower(email) lookup confined to identity repositories; enumeration-resistant generic responses on every pre-auth flow; per-key distributed rate limits (address digest + IP digest) in front of every pre-auth entry point; all pre-auth mutations recorded to authentication_security_events and audited.",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "public.password_credentials",
+    "reason": "Bootstrap arm of policy password_credentials_access (migration 0030): login verifies the argon2id hash before a principal exists; registration and pre-auth password reset write the credential row in the same window.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "No DELETE grant; hashes compared only inside the argon2 verifier (library constant-time); hash values never serialized outward (SECRET classification, leak-regression tested); lockout ledger throttles verification attempts per (account, IP digest) at 10/15m without reset-on-lock.",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "public.email_verifications",
+    "reason": "Bootstrap arm of policy email_verifications_access (migration 0030): the entire flow is pre-authentication — codes are issued at registration/resend and consumed at verify, all before a session exists. No user-context read path exists.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "Codes stored as HMAC-SHA256 under the KARAR_VERIFICATION_PEPPER server secret (raw code never persists); 30-minute expiry; 5-attempt cap per code; 60s per-account resend cooldown; one-time consumption; sends rate-limited 3/h per address digest (fail-closed).",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "public.password_reset_requests",
+    "reason": "Bootstrap arm of policy password_reset_requests_access (migration 0030): requests are created from an unauthenticated forgot-password and consumed by token before a session exists. No user-context read path exists.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "32-byte tokens stored as HMAC-SHA256 (raw token never persists); 30-minute expiry; 5-attempt cap; 60s per-account cooldown; one-time consumption; generic responses regardless of account existence; sends rate-limited 3/h (fail-closed); requester IP stored as HMAC digest only.",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "public.refresh_token_families",
+    "reason": "Bootstrap SELECT arm of policy refresh_token_families_select (migration 0031): refresh presents an opaque one-time token before any principal exists; the family row is what names the account the transaction then scopes itself to (SET LOCAL app.user_id) before any mutation.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "SELECT-only bootstrap arm — INSERT and UPDATE require the owner context; reachable pre-auth only by joining from an unguessable 256-bit token hash; reuse detection revokes the family and its session, records refresh_reuse_detected, and notifies the account.",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "public.refresh_tokens",
+    "reason": "Bootstrap SELECT arm of policy refresh_tokens_select (migration 0031): token presentation looks up the SHA-256 hash of the presented token before any principal exists. Rotation (UPDATE used_at, INSERT successor) happens only after the transaction is scoped to the family's account.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "SELECT-only bootstrap arm; token_hash is SHA-256 of a 32-byte random value, so a leaked hash cannot be replayed as a credential; one-time use is atomic (UPDATE ... WHERE used_at IS NULL RETURNING); refresh endpoint rate-limited 60/15m per token digest (fail-open to the documented in-process fallback).",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "public.permissions",
+    "reason": "Static platform-global permission catalogue (access-control.md §2): names, capability labels, and descriptions only — no subject or tenant column exists to scope on, and the catalogue must be readable while resolving ANY principal's authorization, including platform staff with no tenant binding (migration 0050).",
+    "owner": "authorization module (modules/authorization/MODULE.md)",
+    "compensatingGrants": "karar_app holds SELECT only — INSERT/UPDATE/DELETE never granted and pinned by explicit REVOKEs (0054); the catalogue changes by reviewed migration mirrored in the compile-time catalogue (DB seed == code catalogue is test-asserted); the name-grammar CHECK refuses wildcards structurally.",
+    "reviewPhase": "3.5 (policy-pack integration) and 8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.roles",
+    "reason": "Static platform-global role catalogue with binding scope (access-control.md §3): eight seeded roles, no subject or tenant column; read during every authorization resolution regardless of tenant context (migration 0051).",
+    "owner": "authorization module (modules/authorization/MODULE.md)",
+    "compensatingGrants": "karar_app holds SELECT only, pinned by 0054; new roles are reviewed migrations mirrored in code; role scope (PLATFORM/TENANT/BOTH) is CHECK-constrained and enforced by the AssignRole use case against the compile-time catalogue.",
+    "reviewPhase": "3.5 and 8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.role_permissions",
+    "reason": "The reviewed role→permission mapping deny-by-default resolves against — static reference data keyed on (role, permission), no subject or tenant column (migration 0051). The FK to permissions makes an absent permission structurally ungrantable.",
+    "owner": "authorization module (modules/authorization/MODULE.md)",
+    "compensatingGrants": "karar_app holds SELECT only, pinned by 0054; the mapping changes by reviewed migration; deny-by-default means an absent row denies — there is no permissive default to protect.",
+    "reviewPhase": "3.5 and 8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.kill_switches",
+    "reason": "Global operational restriction records (modules/control-plane/MODULE.md): GLOBAL scope by CHECK, no subject or tenant column, and the switches gate PRE-AUTH operations (registration, login, refresh) — the read must happen before any principal exists, so no principal-keyed policy can apply (migration 0053).",
+    "owner": "control-plane module (modules/control-plane/MODULE.md)",
+    "compensatingGrants": "Restrict-only mechanism — a readable row can only DENY an operation, never enable one (test-asserted); karar_app holds SELECT + UPDATE only (no INSERT — closed id registry; no DELETE — removal is a migration; both pinned by 0054); every UPDATE must increment version by exactly one and auto-appends the history ledger (triggers); operate is gated on controlplane.killswitch.operate via the PolicyService and audited; store outage on guarded operations fails CLOSED (503 DEPENDENCY_UNAVAILABLE).",
+    "reviewPhase": "8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.kill_switch_history",
+    "reason": "Append-only kill-switch state ledger — operational accountability rows about switches, not subjects; carries no subject or tenant column and must be reviewable across the platform (migration 0053).",
+    "owner": "control-plane module (modules/control-plane/MODULE.md)",
+    "compensatingGrants": "Append-only by BOTH mechanisms (data-model.md §10): karar_app holds SELECT only (no INSERT/UPDATE/DELETE, pinned by 0054) and the immutability trigger raises on UPDATE/DELETE/TRUNCATE even for the table owner; rows are written solely by the kill_switches AFTER UPDATE SECURITY DEFINER trigger, and UNIQUE (switch_id, version) forbids skipped or forked history.",
+    "reviewPhase": "8 (control-plane admin surface)"
+  },
+  {
+    "table": "public.authentication_security_events",
+    "reason": "Bootstrap arms of policies authentication_security_events_select/_insert (migration 0033): failed and locked logins are recorded — and the lockout count derived — before any principal exists; some events (malformed presentations) resolve no account at all, hence the account_id IS NULL insert arm.",
+    "owner": "identity module (modules/identity/MODULE.md)",
+    "compensatingGrants": "Append-only by grants (SELECT+INSERT only, UPDATE/DELETE explicitly revoked in 0034), by an immutability trigger raising even for the table owner, and by the absence of UPDATE/DELETE policies under FORCEd RLS; metadata carries guarded scalars only (guard throws on credential-shaped keys), never codes, tokens, raw addresses, or e-mail addresses.",
+    "reviewPhase": "3.5"
+  },
+  {
+    "table": "platform.schema_migrations",
+    "reason": "Migration bookkeeping written by karar_migrator inside each migration's own transaction (migration 0001): version, name, checksum, applied_at, applied_by — the database's verifiable history. No subject or tenant column exists to scope on, and drift verification (db:verify) plus the health/readiness schema-version surface must read it regardless of any principal.",
+    "owner": "platform package (packages/platform/db/DATA_LIFECYCLE.md; packages/platform/src/db/migrations.ts)",
+    "compensatingGrants": "karar_app holds SELECT only (0001) — writes happen exclusively as karar_migrator inside migration transactions; sha256 checksum drift, missing files, and renamed applied files hard-fail migrate and verify, so a tampered row is detected rather than trusted.",
+    "reviewPhase": "8 (control-plane operational surface)"
+  },
+  {
+    "table": "audit.audit_events",
+    "reason": "The platform-wide append-only accountability record (migration 0010; data-model.md §10): rows describe actions across every tenant and pre/post-auth contexts, and platform-level actions carry tenant_ref NULL — actor_ref and tenant_ref are deliberately opaque references, not RLS predicates, so history survives subject erasure. No principal-keyed policy can carry the write path, which must record denied and pre-auth attempts too.",
+    "owner": "audit module (modules/audit/MODULE.md)",
+    "compensatingGrants": "Append-only by BOTH mechanisms (data-model.md §10): karar_app holds SELECT+INSERT only, and the audit_events_immutable trigger raises on UPDATE/DELETE/TRUNCATE even for the table owner, FOR EACH STATEMENT so a zero-row UPDATE raises too; the metadata guard keeps payloads and secrets out of before/after_metadata; staff read paths arrive with the control plane via projections under audited elevation, not by widening grants.",
+    "reviewPhase": "3.5 (PolicyPack-owned retention) and 8 (control-plane read surface)"
+  },
+  {
+    "table": "platform.outbox_events",
+    "reason": "Transactional-outbox plumbing (migration 0020; ADR-0012): producers insert envelopes inside their own state-changing transactions from ANY principal context, and the relay in apps/worker claims and publishes rows across all tenants with no principal at all — a tenant predicate would stop delivery, not protect data. Envelope payload rules are governed by the event catalogue (tests 8/15), not by row visibility.",
+    "owner": "platform package (packages/platform/db/DATA_LIFECYCLE.md; packages/platform/src/outbox)",
+    "compensatingGrants": "karar_app holds SELECT, INSERT, UPDATE only — no DELETE (purge belongs to the later-phase retention job); classification column CHECK-constrained to the six classes with SEALED envelopes carrying identifiers/status only (ADR-0025); one-terminal-state and claim-has-expiry CHECKs; relay claims use FOR UPDATE SKIP LOCKED under bounded retry then dead-letter.",
+    "reviewPhase": "3.5 (PolicyPack-owned retention windows; purge machinery lands with the retention job)"
+  },
+  {
+    "table": "platform.event_consumer_receipts",
+    "reason": "Consumer idempotency receipts (migration 0020; ADR-0012): (consumer_name, event_id) pairs that make at-least-once delivery safe. Consumers record receipts inside their own transactions regardless of which tenant an envelope concerns; rows hold names and uuids only, and no subject or tenant column exists to scope on.",
+    "owner": "platform package (packages/platform/db/DATA_LIFECYCLE.md; packages/platform/src/outbox)",
+    "compensatingGrants": "Append-only by grants: karar_app holds SELECT+INSERT only — no UPDATE, no DELETE (purge is the retention job's, aligned to the outbox rows the receipts refer to); the primary key on (consumer_name, event_id) is what makes duplicate delivery a no-op.",
+    "reviewPhase": "3.5 (retention aligned to the outbox; purge machinery lands with the retention job)"
+  },
+  {
+    "table": "platform.jobs",
+    "reason": "Background-job queue (migration 0021; ADR-0013): workers in apps/worker claim requested work across all tenants with FOR UPDATE SKIP LOCKED before any per-job principal exists — the queue is execution plumbing, and a tenant predicate would orphan cross-tenant work. Job payloads may carry tenant/subject identifiers when later phases enqueue tenant-scoped work; the handler, not row visibility, re-establishes principal context.",
+    "owner": "platform package (packages/platform/db/DATA_LIFECYCLE.md; packages/platform/src/jobs)",
+    "compensatingGrants": "karar_app holds SELECT, INSERT, UPDATE only — no DELETE (purge belongs to the retention job); classification CHECK-constrained with the same six classes; lease-shape CHECK ties lease columns to the leased status; idempotent enqueue via the partial unique index on (job_type, idempotency_key); attempts >= max_attempts dead-letters terminally.",
+    "reviewPhase": "3.5 (PolicyPack-owned retention windows; purge machinery lands with the retention job)"
+  }
+]

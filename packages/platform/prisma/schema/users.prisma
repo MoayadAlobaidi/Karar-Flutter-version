@@ -1,0 +1,41 @@
+// users module mapping (migrations 0040_user_profiles.sql). Prisma maps the
+// canonical SQL — it is NOT a second migration system (see base.prisma).
+//
+// user_profiles.user_id IS the platform UserId (identity_accounts.id); the
+// cross-module reference is a raw uuid with no FK (data-model.md §2).
+// Status values and their CHECK constraints live in SQL; Prisma sees text.
+//
+// RLS note: these models are readable/writable ONLY inside a transaction
+// opened by withPrincipalContext/withTenant (src/db/principal-context.ts).
+// Any `where: { tenantId }` a repository adds is Layer-2 convenience — the
+// policies in 0040 are the boundary.
+
+model UserProfile {
+  userId                       String   @id @map("user_id") @db.Uuid
+  tenantId                     String   @map("tenant_id") @db.Uuid
+  displayName                  String   @map("display_name")
+  locale                       String
+  status                       String   @default("ACTIVE")
+  residencyJurisdictionRef     String?  @map("residency_jurisdiction_ref")
+  contractingOperatingEntityId String?  @map("contracting_operating_entity_id") @db.Uuid
+  createdAt                    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId], map: "user_profiles_tenant_idx")
+  @@map("user_profiles")
+}
+
+model UserStatusHistory {
+  id         String   @id @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  fromStatus String   @map("from_status")
+  toStatus   String   @map("to_status")
+  reason     String?
+  actor      String
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, userId, occurredAt], map: "user_status_history_user_idx")
+  @@map("user_status_history")
+}

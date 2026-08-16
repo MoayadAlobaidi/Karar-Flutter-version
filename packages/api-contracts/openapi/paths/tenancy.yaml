@@ -1,0 +1,358 @@
+# tenancy surface — path-item fragments (ADR-0009: authored by hand, never
+# generated from code). The phase lead merges these into openapi.yaml via
+# $ref per path, e.g.:
+#   /tenancy/tenant:
+#     $ref: './paths/tenancy.yaml#/~1tenancy~1tenant'
+#
+# Contract rules made visible here:
+#   * Tenant identity comes ONLY from server-side membership/session state.
+#     No operation accepts a tenantId — not in query, header, or body; a
+#     request carrying one is answered as if it were absent (asserted by
+#     test). Redemption is the one flow whose caller may hold no tenant yet:
+#     the tenant is read from the invitation record, server-side.
+#   * The invitation token is returned exactly once, in the creation
+#     response; only its sha256 is stored, and no read endpoint returns it.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`;
+#     redemption denials avoid oracles (unknown token == invisible token).
+
+/tenancy/tenant:
+  get:
+    operationId: getOwnTenant
+    summary: Read the caller's own tenant and their own membership
+    tags: [tenancy]
+    security:
+      - sessionAuth: []
+    responses:
+      '200':
+        description: The bound tenant and the caller's membership in it.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant, membership]
+              properties:
+                tenant:
+                  $ref: '#/components/Tenant'
+                membership:
+                  $ref: '#/components/Membership'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '403':
+        description: The principal holds no membership in the bound tenant (code MEMBERSHIP_REQUIRED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '404':
+        description: The bound tenant does not resolve (code TENANT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/tenancy/members:
+  get:
+    operationId: listTenantMembers
+    summary: List memberships of the caller's own tenant
+    description: >-
+      Requires an ACTIVE membership and the tenancy.member.read permission
+      (PolicyService, deny-by-default). RLS bounds the rows to the caller's
+      tenant beneath both checks.
+    tags: [tenancy]
+    security:
+      - sessionAuth: []
+    responses:
+      '200':
+        description: The tenant's memberships, oldest first.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [members]
+              properties:
+                members:
+                  type: array
+                  items:
+                    $ref: '#/components/Membership'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '403':
+        description: Missing membership or denied permission (codes MEMBERSHIP_REQUIRED, NOT_AUTHORIZED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/tenancy/invitations:
+  post:
+    operationId: createTenantInvitation
+    summary: Invite an email address into the caller's own tenant
+    description: >-
+      Requires an ACTIVE membership and the tenancy.invitation.create
+      permission. The response carries the bearer token ONCE; only its
+      sha256 is stored and no endpoint ever returns it again.
+    tags: [tenancy]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+                maxLength: 320
+                description: Normalized (trim + lowercase) before storage and matching.
+              roleHint:
+                type: string
+                pattern: '^[A-Z][A-Z_]{0,39}$'
+                default: MEMBER
+                description: Informational only — authoritative roles live in the authorization module.
+              expiresInHours:
+                type: integer
+                minimum: 1
+                maximum: 720
+                default: 72
+    responses:
+      '201':
+        description: The invitation, plus the one-time bearer token.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitation, token]
+              properties:
+                invitation:
+                  $ref: '#/components/Invitation'
+                token:
+                  type: string
+                  description: Shown once; never retrievable again.
+      '400':
+        description: Invalid email, role hint, or expiry (code INVALID_INVITATION_INPUT).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '403':
+        description: Missing membership or denied permission (codes MEMBERSHIP_REQUIRED, NOT_AUTHORIZED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/tenancy/invitations/{invitationId}/revoke:
+  post:
+    operationId: revokeTenantInvitation
+    summary: Revoke a still-open invitation in the caller's own tenant
+    description: >-
+      One-time (an already-terminal invitation answers 404, indistinguishable
+      from an unknown or cross-tenant id). Requires an ACTIVE membership and
+      the tenancy.invitation.revoke permission.
+    tags: [tenancy]
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: invitationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: The revoked invitation.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitation]
+              properties:
+                invitation:
+                  $ref: '#/components/Invitation'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '403':
+        description: Missing membership or denied permission (codes MEMBERSHIP_REQUIRED, NOT_AUTHORIZED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '404':
+        description: No open invitation with that id in the bound tenant (code INVITATION_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/tenancy/invitations/redeem:
+  post:
+    operationId: redeemTenantInvitation
+    summary: Redeem an invitation token as the authenticated principal
+    description: >-
+      The redeemer must be logged in; they need not (yet) belong to any
+      tenant. The invited email must match the redeemer's identity-verified
+      email — never a client-supplied claim. Redemption is one-time and
+      attempt-capped, runs under the redeemer's own principal context with
+      narrow token-scoped visibility (never platform elevation), and binds
+      the new membership to the authenticated redeemer at the RLS layer.
+    tags: [tenancy]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [token]
+            properties:
+              token:
+                type: string
+                minLength: 20
+                maxLength: 128
+    responses:
+      '200':
+        description: The membership created for the authenticated redeemer.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, membership]
+              properties:
+                tenantId:
+                  type: string
+                  format: uuid
+                  description: From the invitation record, server-side — never from the request.
+                membership:
+                  $ref: '#/components/Membership'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: The token identifies no invitation the caller may redeem (code INVITATION_NOT_FOUND; deliberately oracle-free).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: Not redeemable (code INVITATION_NOT_REDEEMABLE with reason revoked | already_redeemed | expired | attempts_exhausted | email_mismatch) or already a member (code ALREADY_MEMBER).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  Tenant:
+    type: object
+    required: [id, type, name, status, createdAt]
+    properties:
+      id:
+        type: string
+        format: uuid
+      type:
+        type: string
+        enum: [FIRST_PARTY, WHITE_LABEL, INTERNAL]
+      name:
+        type: string
+      status:
+        type: string
+        enum: [ACTIVE, SUSPENDED, CLOSED]
+      createdAt:
+        type: string
+        format: date-time
+  Membership:
+    type: object
+    required: [id, tenantId, userId, roleHint, state, effectiveFrom, effectiveTo]
+    properties:
+      id:
+        type: string
+        format: uuid
+      tenantId:
+        type: string
+        format: uuid
+      userId:
+        type: string
+        format: uuid
+        description: The identity account id — IS the platform UserId.
+      roleHint:
+        type: string
+        description: Informational only — authoritative roles live in the authorization module.
+      state:
+        type: string
+        enum: [INVITED, ACTIVE, SUSPENDED, REMOVED]
+      effectiveFrom:
+        type: string
+        format: date-time
+      effectiveTo:
+        type: [string, 'null']
+        format: date-time
+  Invitation:
+    type: object
+    required: [id, tenantId, email, roleHint, expiresAt, redeemedAt, revokedAt, createdAt]
+    properties:
+      id:
+        type: string
+        format: uuid
+      tenantId:
+        type: string
+        format: uuid
+      email:
+        type: string
+        description: Normalized invitee email. The token hash is never exposed.
+      roleHint:
+        type: string
+      expiresAt:
+        type: string
+        format: date-time
+      redeemedAt:
+        type: [string, 'null']
+        format: date-time
+      revokedAt:
+        type: [string, 'null']
+        format: date-time
+      createdAt:
+        type: string
+        format: date-time
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type:
+        type: string
+      title:
+        type: string
+      status:
+        type: integer
+      code:
+        type: string
+        description: Machine-readable reason (e.g. AUTHENTICATION_REQUIRED, NOT_AUTHORIZED, INVITATION_NOT_REDEEMABLE).
+      detail:
+        type: string
+      reason:
+        type: string
+        description: Finer-grained reason where applicable (permission name, redemption denial reason).
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

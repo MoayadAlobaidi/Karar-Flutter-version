@@ -26,9 +26,15 @@ migration runs in its own transaction and is recorded in
 | 0001-0009 | platform core (schemas, hygiene) — workstream B |
 | 0010-0019 | audit — workstream F |
 | 0020-0029 | eventing and jobs — workstream D |
+| 0030-0039 | identity and sessions — Phase 3 identity workstream |
+| 0040-0049 | users and tenancy — Phase 3 tenancy workstream |
+| 0050-0059 | authorization and kill switches — Phase 3 RBAC workstream |
+| 0060-0069 | operating entities and consent — Phase 3 entity/consent workstream |
 
 Later ranges are assigned by the phase lead. Never take a number outside your
-range; renumbering after apply is impossible.
+range; renumbering after apply is impossible. Unused numbers inside a range
+(0035-0039, 0045-0049, 0055-0059, 0066-0069) stay unused — gaps are never
+back-filled. Test fixtures use the 99xx range and never ship.
 
 ## Grant convention
 

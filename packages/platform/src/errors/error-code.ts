@@ -10,10 +10,16 @@
 export const ErrorCode = Object.freeze({
   /** The request was understood but its content failed validation. */
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  /** The request carries no usable authenticated principal. */
+  AUTHENTICATION_REQUIRED: 'AUTHENTICATION_REQUIRED',
+  /** The authenticated principal may not perform this operation. */
+  NOT_AUTHORIZED: 'NOT_AUTHORIZED',
   /** The platform's own configuration is unusable; the request had no chance. */
   CONFIGURATION_ERROR: 'CONFIGURATION_ERROR',
   /** A dependency (database, provider, queue) did not respond usefully. */
   DEPENDENCY_UNAVAILABLE: 'DEPENDENCY_UNAVAILABLE',
+  /** A platform kill switch restricts this operation (restrict-only, operator-set). */
+  OPERATION_RESTRICTED: 'OPERATION_RESTRICTED',
   /** The request conflicts with current state (versioning, uniqueness, concurrency). */
   CONFLICT: 'CONFLICT',
   /** The addressed resource does not exist for this caller. */

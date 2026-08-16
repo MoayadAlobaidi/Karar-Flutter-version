@@ -1,0 +1,49 @@
+// control-plane module mapping — kill-switch slice (migration
+// 0053_kill_switches.sql; grant pins in 0054 are invisible to Prisma). Prisma
+// maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma).
+//
+// Both tables are deliberately global (rls-allow-list.json): switch state is
+// read PRE-AUTH, so reads run outside any principal context. Writes go
+// through the OperateKillSwitch use case only — version increments are
+// trigger-enforced and every UPDATE auto-appends a kill_switch_history row
+// via a SECURITY DEFINER trigger; the history table is append-only and
+// SELECT-only for karar_app, so KillSwitchHistory is mapped for reads and
+// never written through Prisma.
+//
+// The in-module FK (kill_switch_history -> kill_switches) is modeled with
+// NoAction to match PostgreSQL's default referential actions exactly.
+
+model KillSwitch {
+  id            String    @id
+  state         String    @default("INACTIVE")
+  scope         String    @default("GLOBAL")
+  reason        String
+  actor         String
+  version       Int       @default(1)
+  effectiveFrom DateTime  @default(now()) @map("effective_from") @db.Timestamptz(6)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  history KillSwitchHistory[]
+
+  @@map("kill_switches")
+}
+
+model KillSwitchHistory {
+  id            String    @id @db.Uuid
+  switchId      String    @map("switch_id")
+  state         String
+  scope         String
+  reason        String
+  actor         String
+  version       Int
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz(6)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz(6)
+  recordedAt    DateTime  @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  switch KillSwitch @relation(fields: [switchId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "kill_switch_history_switch_id_fkey")
+
+  @@unique([switchId, version], map: "kill_switch_history_switch_version_unique")
+  @@map("kill_switch_history")
+}

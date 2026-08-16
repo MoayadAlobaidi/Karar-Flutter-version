@@ -10,4 +10,4 @@ May import this module's `application/` ports and `domain/`, plus frameworks. **
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 3: the kill-switch slice is implemented (registry, CheckKillSwitch/OperateKillSwitch, the operation guard, the Prisma store). The Phase 8 gateway remains planned._
