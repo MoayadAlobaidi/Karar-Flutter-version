@@ -88,11 +88,52 @@ final class ConfigurationLoader {
   /// Hosts that identify a developer machine or emulator loopback.
   static const Set<String> _loopbackHosts = <String>{
     'localhost',
-    '127.0.0.1',
-    '::1',
+    '0.0.0.0',
     // Android emulator alias for the host machine.
     '10.0.2.2',
   };
+
+  /// Domain suffixes that never resolve on the public internet.
+  ///
+  /// `.local` is mDNS, `.internal` is private cloud DNS, and RFC 2606 reserves
+  /// `.test` and `.localhost` so they can never be delegated.
+  static const List<String> _localOnlySuffixes = <String>[
+    '.local',
+    '.localhost',
+    '.internal',
+    '.test',
+  ];
+
+  /// Whether [host] only ever resolves on a developer machine.
+  ///
+  /// THIS MUST STAY AS WIDE AS THE BUILD GUARDS. `android/app/build.gradle.kts`
+  /// and `ios/Scripts/verify_packaged_bundle.sh` refuse to BUILD a deployed
+  /// artifact pointed at any of these; this function is why such an artifact
+  /// would also refuse to START if one were produced another way. The two
+  /// layers are each meant to be sufficient alone, so a host rejected there and
+  /// accepted here is a hole in the backstop rather than a difference of
+  /// opinion — and there was one: the build guards were widened for the
+  /// bracketed IPv6 literal and the trailing-dot form, and this was not.
+  static bool _isLocalOnlyHost(String rawHost) {
+    // A trailing dot is the fully-qualified form. `localhost.` resolves exactly
+    // as `localhost` does and compares equal to nothing.
+    final host = rawHost.toLowerCase().replaceAll(RegExp(r'\.+$'), '');
+    if (host.isEmpty) return true;
+    if (_loopbackHosts.contains(host)) return true;
+
+    // The whole 127.0.0.0/8 block, not merely 127.0.0.1.
+    if (host.startsWith('127.')) return true;
+
+    // Any spelling of the IPv6 loopback: `::1` and `0:0:0:0:0:0:0:1` are the
+    // same address. Dart's Uri strips the brackets required in a URL, so the
+    // host reaching here is already unwrapped.
+    if (host.contains(':')) {
+      if (host.replaceAll('0', '').replaceAll(':', '') == '1') return true;
+      if (host == '::' || host == '::ffff:127.0.0.1') return true;
+    }
+
+    return _localOnlySuffixes.any(host.endsWith);
+  }
 
   /// Substrings that mark a configuration KEY as one that must never be
   /// compiled into a client binary.
@@ -168,10 +209,7 @@ final class ConfigurationLoader {
         if (parsed.scheme != 'https' && !environment.allowsInsecureTransport) {
           violations.add(ConfigurationViolation.apiBaseUrlInsecure);
         }
-        final isLoopback = _loopbackHosts.contains(parsed.host) ||
-            parsed.host.endsWith('.local') ||
-            parsed.host.endsWith('.localhost');
-        if (isLoopback && environment != AppEnvironment.local) {
+        if (_isLocalOnlyHost(parsed.host) && environment != AppEnvironment.local) {
           violations.add(ConfigurationViolation.apiBaseUrlLocalInNonLocal);
         }
       }

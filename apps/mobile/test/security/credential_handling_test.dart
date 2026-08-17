@@ -174,7 +174,7 @@ void main() {
 
     test('query values are removed while the shape of the URL is kept', () {
       final rendered = _redactor.redactUri(
-        Uri.parse('https://api.example.test/v1/sessions?token=leaked&page=2'),
+        Uri.parse('https://api.karar.example/v1/sessions?token=leaked&page=2'),
       );
       expect(rendered, isNot(contains('leaked')));
       expect(rendered, contains('/v1/sessions'));
@@ -183,7 +183,7 @@ void main() {
 
     test('userinfo in a URL is dropped rather than redacted in place', () {
       final rendered = _redactor.redactUri(
-        Uri.parse('https://user:password@api.example.test/v1/ping'),
+        Uri.parse('https://user:password@api.karar.example/v1/ping'),
       );
       expect(rendered, isNot(contains('password')));
       expect(rendered, isNot(contains('user:')));

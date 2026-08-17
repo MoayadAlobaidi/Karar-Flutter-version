@@ -66,11 +66,40 @@ void main() {
     });
 
     test('refuses a loopback host', () {
+      // THIS LIST MUST MATCH THE BUILD GUARDS, AND ONCE DID NOT.
+      //
+      // Two layers exist deliberately: the Gradle and iOS build guards refuse
+      // to PRODUCE a deployed artifact aimed at a developer machine, and this
+      // loader refuses to START one if it is produced another way. Each is
+      // meant to stand alone, so a host the build guards reject and this one
+      // accepts is not a difference of scope — it is the backstop having a
+      // hole in exactly the place the front stop was reinforced.
+      //
+      // That is what happened. The guards were widened for the bracketed IPv6
+      // literal, the whole 127/8 block and the trailing-dot form, and this
+      // loader was not, so `https://localhost.` was refused at build time and
+      // accepted at run time. The cases below are the guards' list, verbatim.
       for (final host in <String>[
         'http://localhost:3000',
         'https://127.0.0.1',
         'https://10.0.2.2:3000',
         'https://api.local',
+        // The fully-qualified form of localhost. Resolves identically and
+        // compares equal to nothing.
+        'https://localhost.',
+        // Any address in 127.0.0.0/8, not merely 127.0.0.1.
+        'https://127.13.9.2',
+        // The unspecified address, which routes to the local host.
+        'https://0.0.0.0',
+        // Both spellings of the IPv6 loopback. A URL requires the brackets;
+        // Dart's Uri strips them before the host is compared.
+        'https://[::1]:8443',
+        'https://[0:0:0:0:0:0:0:1]',
+        // Private cloud DNS, and an RFC 2606 reserved name that can never be
+        // delegated publicly.
+        'https://api.internal',
+        'https://api.example.test',
+        'https://api.svc.localhost',
       ]) {
         final result = loader.load(
           values: <String, String>{

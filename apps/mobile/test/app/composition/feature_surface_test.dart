@@ -7,6 +7,7 @@
 // that the two stage sets are disjoint — so a future collision is a failure
 // here rather than one workstream quietly overriding the other.
 
+import 'package:flutter/material.dart' show Brightness;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -78,6 +79,33 @@ void main() {
         reason: 'both workstreams claim the same startup stage; decide the '
             'precedence explicitly in feature_surface.dart rather than '
             'depending on merge order',
+      );
+    });
+
+    test('the design system themes are actually installed', () {
+      // The shell reads these two providers straight into MaterialApp's `theme`
+      // and `darkTheme`. Their defaults are null, which MaterialApp accepts
+      // silently by falling back to Flutter's own ThemeData — so a missing
+      // override is not an error anywhere, it is a differently-coloured
+      // application. That is what shipped: KararTheme described itself as the
+      // theme "the application shell installs" and nothing installed it.
+      //
+      // It stayed invisible because Karar components read their tokens from
+      // context rather than from ThemeData, so the screens looked right while
+      // everything the framework draws for us did not.
+      final light = container.read(lightThemeProvider);
+      final dark = container.read(darkThemeProvider);
+
+      expect(light, isNotNull, reason: 'MaterialApp would fall back to the '
+          'framework default theme');
+      expect(dark, isNotNull);
+      expect(light!.brightness, Brightness.light);
+      expect(dark!.brightness, Brightness.dark);
+      expect(
+        light.colorScheme.primary,
+        isNot(dark.colorScheme.primary),
+        reason: 'both providers resolving to the same palette would mean one '
+            'of them is not the theme it claims to be',
       );
     });
 

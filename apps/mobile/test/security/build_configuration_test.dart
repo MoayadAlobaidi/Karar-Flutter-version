@@ -89,7 +89,7 @@ void main() {
     test('plain HTTP is rejected outside LOCAL', () {
       for (final environment in _nonLocalEnvironments) {
         expect(
-          _violations(_load(_valid(environment.identifier, 'http://api.example.test'))),
+          _violations(_load(_valid(environment.identifier, 'http://api.karar.example'))),
           contains(ConfigurationViolation.apiBaseUrlInsecure),
           reason: '${environment.identifier} must require TLS',
         );
@@ -119,7 +119,7 @@ void main() {
     test('a missing environment is a hard failure, not a default', () {
       expect(
         _violations(_load(<String, String>{
-          ConfigurationKeys.apiBaseUrl: 'https://api.example.test',
+          ConfigurationKeys.apiBaseUrl: 'https://api.karar.example',
         })),
         contains(ConfigurationViolation.environmentMissing),
       );
@@ -153,7 +153,7 @@ void main() {
     test('a release build must state its version and build number', () {
       final violations = _violations(_load(<String, String>{
         ConfigurationKeys.environment: 'PRODUCTION',
-        ConfigurationKeys.apiBaseUrl: 'https://api.example.test',
+        ConfigurationKeys.apiBaseUrl: 'https://api.karar.example',
       }));
       expect(violations, contains(ConfigurationViolation.appVersionMissing));
       expect(violations, contains(ConfigurationViolation.buildNumberMissing));
@@ -171,7 +171,7 @@ void main() {
         'GOOGLE_SERVICE_ACCOUNT',
         'KARAR_KEYSTORE_PASSWORD',
       ]) {
-        final values = _valid('PRODUCTION', 'https://api.example.test')
+        final values = _valid('PRODUCTION', 'https://api.karar.example')
           ..[key] = 'anything-at-all';
         final violations = _violations(_load(values));
         expect(
@@ -187,7 +187,7 @@ void main() {
 
     test('credentials embedded in the API base URL are rejected', () {
       expect(
-        _violations(_load(_valid('PRODUCTION', 'https://user:pass@api.example.test'))),
+        _violations(_load(_valid('PRODUCTION', 'https://user:pass@api.karar.example'))),
         contains(ConfigurationViolation.apiBaseUrlCredentialsPresent),
       );
     });
@@ -217,7 +217,7 @@ void main() {
       // The negative cases above would pass trivially if nothing were ever
       // accepted. This proves the loader is discriminating, not just refusing.
       expect(
-        _load(_valid('PRODUCTION', 'https://api.example.test')),
+        _load(_valid('PRODUCTION', 'https://api.karar.example')),
         isA<Success<Object?>>(),
       );
     });
