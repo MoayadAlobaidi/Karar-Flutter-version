@@ -122,6 +122,10 @@ and nowhere else. A feature **MUST NOT** decide any of this for itself.
 
 **View state** is immutable. Rebuild it; never mutate it.
 
+**User-facing text.** Every message a person can read lives in `l10n/arb/app_en.arb` and `app_ar.arb`, with a `description` on the English entry, and reaches a widget through the generated `AppLocalizations`. A feature **MUST NOT** carry its own string catalogue — six of them existed, holding 335 messages outside every localization gate the project runs, and they were consolidated for exactly that reason. A literal passed to `Text()` fails `test/l10n/localization_lint_test.dart`, as does any hardcoded `left`/`right` layout: Arabic reads right to left, so a left inset is a defect, not a style choice.
+
+**Golden baselines.** Do not add one under `test/features/` — a test enforces this, and the reason is disclosure rather than tidiness: a golden is a committed image of whatever was on screen, and the MFA setup key, the recovery codes and the session list must never end up in one. The four design-system baselines live under `test/shared/`, are not CI-enforced, and are explained in `docs/architecture/flutter.md` §5.
+
 ## Security rules
 
 - Tokens live in platform secure storage only (`core/security`). Never in

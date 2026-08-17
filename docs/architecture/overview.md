@@ -214,7 +214,7 @@ Items 5 and 6 rank immediately after clear architecture, and **neither justifies
 |---|---|
 | [`clean-architecture.md`](clean-architecture.md) | Layers, the dependency rule, enforcement |
 | [`backend.md`](backend.md) | NestJS structure, module anatomy, entrypoints |
-| [`flutter.md`](flutter.md) | Client architecture, RTL, capability-aware navigation |
+| [`flutter.md`](flutter.md) | Client architecture, the startup state machine, capability-aware navigation, RTL, storage, build guards |
 | [`data-model.md`](data-model.md) | Schemas, pinning, money, IDs |
 | [`tenancy.md`](tenancy.md) | Tenant isolation, RLS, the four layers |
 | [`jurisdiction-policy.md`](jurisdiction-policy.md) | PolicyPacks, settings, resolution strategies, subject profiles |
@@ -241,8 +241,10 @@ Items 5 and 6 rank immediately after clear architecture, and **neither justifies
 
 ## 12. Status
 
-Phases 0–3 are complete and Phase 3.5 delivered the jurisdiction and capability foundation. What exists is the platform substrate — identity, users, tenancy, operating entities, RBAC, consent, kill switches, PostgreSQL RLS, and now Country/Jurisdiction with typed PolicyPacks, the capability registry with deny-by-default availability and tenant entitlements, `SubjectPolicySelection`, session tenant binding, and the authenticated client bootstrap surface.
+Phases 0–3.5 are complete and Phase 4 delivered the client. What exists is the platform substrate — identity, users, tenancy, operating entities, RBAC, consent, kill switches, PostgreSQL RLS, Country/Jurisdiction with typed PolicyPacks, the capability registry with deny-by-default availability and tenant entitlements, `SubjectPolicySelection`, session tenant binding, and the authenticated client bootstrap surface — plus a Flutter client that consumes it: a startup state machine, a generated Dart API client with contract drift detection, authentication and session flows, secure token storage with single-flight refresh, application lock, tenant selection, capability-aware navigation, the consent surface, and a design system with Arabic and RTL first-class ([`flutter.md`](flutter.md)).
 
-**No consumer product capability is implemented.** Every entry in the capability registry is `NOT_IMPLEMENTED` and deployed nowhere, no jurisdiction is approved, no PolicyPack is approved, and no capability is reachable anywhere. The rest of this document remains largely a set of decisions; the per-document phase headers and the implemented-state notes inside them say which parts have landed.
+**No consumer product capability is implemented.** Every entry in the capability registry is `NOT_IMPLEMENTED` and deployed nowhere, no jurisdiction is approved, no PolicyPack is approved, and no capability is reachable anywhere. The client renders that state honestly rather than hiding it: its authenticated home is an account and security surface whose services section is a stated empty state.
+
+**Nothing is deployed.** No environment is provisioned and no endpoint exists — the client's build guards refuse to produce a package for any environment other than `LOCAL`, which is what makes that claim checkable rather than asserted. The rest of this document remains largely a set of decisions; the per-document phase headers and the implemented-state notes inside them say which parts have landed.
 
 The roadmap is in `docs/roadmap.md`. **The critical path to a shippable Qatar B2C v1 is Phases 0–9.** Phases 10–21 are an architectural *option*, not a schedule — the seams are what keep that option cheap.

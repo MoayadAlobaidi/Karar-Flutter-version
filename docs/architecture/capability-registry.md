@@ -175,6 +175,16 @@ The distinction is the point. An actionable denial invites an action the subject
 
 Client channels consume `ResolveClientCapabilityView`; the full internal view with real reasons and provenance pins never leaves the server. The bootstrap surface ([`tenancy.md` §11](tenancy.md)) passes the filtered output through unenriched and never re-derives visibility, so the filter cannot drift into two implementations.
 
+### How the Flutter client consumes it, and why it is an allowlist
+
+**Landed in Phase 4.** The client keeps a compile-time set of navigable capability ids and renders only entries that are both `AVAILABLE` and in that set. It is an **allowlist, never a denylist**, and the difference is the whole point: an omitted capability is not one the client should mark unavailable, it is one the client must not know exists, so there is nothing to filter and nothing to explain. An id outside the set produces no destination, is not counted, is not summarised, and reaches no state the presentation layer can read.
+
+There is deliberately **no collection of unrecognised ids** anywhere in the client. Such a collection would itself be a channel for the names it holds — the exact disclosure this section exists to prevent — and it is the reason a "coming soon" tile for an omitted id would defeat the server-side filter entirely.
+
+The set is **empty today**, which is correct rather than incomplete: nothing is implemented. The consequence, stated so nobody reads the empty services screen as a bug, is that the resolved-and-non-empty path is exercised only against synthetic fixtures — the same discipline the resolver's own positive paths follow.
+
+**An empty resolution and a failed one are different answers to the client**, carried as a discriminated section on the bootstrap response since Phase 4: `RESOLVED` with no items renders a stated empty state inside the signed-in surface, while an unavailable resolution is a 503 that renders an outage screen naming no service, no entitlement and no dependency.
+
 ## 6. Entitlements — a gate, not a plan
 
 `tenant_capability_entitlements` (migration `0077`) holds one current row per `(tenant, capability)`: status, an opaque `source_ref`, an effective window, a version, a reason, and actor provenance. An entitlement satisfies gate 5 when its status is `ACTIVE` and the window covers the instant. Everything else denies — `REVOKED` as missing, a lapsed window or a stored `EXPIRED` as expired.

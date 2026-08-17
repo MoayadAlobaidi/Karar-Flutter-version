@@ -98,7 +98,8 @@ Node, pnpm, Docker, and the Flutter SDK — versions pinned in `.tool-versions` 
 | An HTTP endpoint | `modules/<m>/presentation/http/` |
 | A financial calculation | `packages/financial-engine/` |
 | A jurisdictional rule | `packages/jurisdiction-policy/` |
-| Client UI | `apps/mobile/lib/features/<f>/` |
+| Client UI | `apps/mobile/lib/features/<f>/` — and its own rules, in [`flutter.md`](flutter.md) |
+| A user-facing string | `apps/mobile/lib/l10n/arb/app_en.arb` **and** `app_ar.arb` — never a Dart file |
 
 ### 9. What may import what?
 
@@ -250,6 +251,8 @@ Added in Phase 1, when the repository became executable.
 
 `make verify` — the same suite CI runs, minus the scans that only make sense in CI. `make help` lists every target. The CI-enforced rules themselves are tabulated in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) and specified in [`../testing/architecture-tests.md`](../testing/architecture-tests.md).
 
+Since Phase 4 that includes the Flutter suite, and **`make test` runs it exactly as CI does** — `flutter test --exclude-tags golden` — so the local gate and CI never disagree about which tests exist. Golden baselines are run deliberately with `make test-golden`; they are not CI-enforced, and [`../architecture/flutter.md` §5](../architecture/flutter.md) explains why. Two things `make verify` does **not** cover, because they need a real build: the Android merged-manifest and APK assertions and the iOS packaged-bundle assertions, which run on the CI lanes that produce an artifact and fail rather than skip when one is missing. Client-specific commands are in [`flutter.md`](flutter.md).
+
 ### 33. How do I add an app, package, or module?
 
 - **App:** a new entrypoint under `apps/` — composition and startup only, no business logic (`apps/README.md`).
@@ -274,11 +277,11 @@ Not a new adapter — the one `PostgresPersistenceAdapter` serves every approved
 
 ### 38. What is the current phase?
 
-Phase 3.5 — the jurisdiction and capability foundation. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-03-5.md`](../phases/phase-03-5.md).
+Phase 4 — the Flutter and mobile security foundation — is complete; Phase 5 has not started. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-04.md`](../phases/phase-04.md). **"Complete" means the deliverables exist and the phase's own gates passed — not deployed, not production ready, not store ready, not certified** ([`../phases/README.md`](../phases/README.md)).
 
 ### 39. What is explicitly out of scope right now?
 
-Consumer product capabilities. Phase 3.5 delivers the policy and capability machinery — Country/Jurisdiction, typed PolicyPacks, `EffectivePolicy`, `SubjectPolicySelection`, the capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the client bootstrap surface — but **no capability is implemented or reachable**: every registry entry is `NOT_IMPLEMENTED` and deployed nowhere. Still out: budgets, transactions, Zakat, AI, Amanat, subscriptions, the Flutter consumer UI, the Super Admin surfaces, and any cloud infrastructure. The full list is in [`../phases/phase-03-5.md`](../phases/phase-03-5.md).
+Consumer product capabilities. Phase 3.5 delivered the policy and capability machinery and Phase 4 delivered a client that consumes it, but **no capability is implemented or reachable**: every registry entry is `NOT_IMPLEMENTED` and deployed nowhere, and the client's navigable-capability set is correspondingly empty. Still out: budgets, transactions, financial accounts and connectors, Zakat, AI, Amanat, subscriptions, white-label flavours, the Super Admin surfaces, and any cloud infrastructure. Also out on the client specifically: any offline cache, any signed or store-distributed build, and any deployed endpoint — a build for anything other than `LOCAL` is refused because none exists. The full list is in [`../phases/phase-04.md`](../phases/phase-04.md).
 
 ---
 
@@ -459,3 +462,41 @@ That creates the first-party tenant row named by `KARAR_FIRST_PARTY_TENANT_ID` �
 The seed writes as the bootstrap superuser and creates the tenant **only**. Membership is deliberately not seeded there — `GrantFirstPartyMembership` is an audited use case in `modules/tenancy`, and burying a grant inside a seed script would put authority where nobody reviews it. Tenant provisioning has no runtime path at all this phase (`karar_app` holds `SELECT` only on `public.tenants`), which is why the seed needs the superuser and why real environments provision through the control plane.
 
 With a membership in place, `GET /platform/bootstrap` reports the binding state and auto-binds a session that has exactly one usable membership; `POST /platform/tenant-binding` binds or switches explicitly. A switch issues a **new session and refresh family** and kills the old tokens, so re-read the response rather than reusing what you had. ([`../architecture/tenancy.md` §6](../architecture/tenancy.md))
+
+---
+
+## The Flutter client
+
+Added in Phase 4, when the client became real. Day-to-day client work has its own guide: [`flutter.md`](flutter.md). These three answer the questions a backend engineer asks before opening it.
+
+### 60. How do I run and test the client?
+
+```bash
+make bootstrap                                    # workspace + Flutter dependencies
+cd apps/mobile && flutter run                     # LOCAL profile, against your local API
+cd apps/mobile && flutter analyze
+cd apps/mobile && flutter test --exclude-tags golden   # exactly what CI runs
+```
+
+The API must be running for anything past sign-in ([Q59](#59-how-do-i-get-a-working-tenant-locally) for the tenant, and `node scripts/db/seed-local-consent.mjs` for the consent prerequisites — it refuses any environment but `local` and `test`). `LOCAL` is the only profile that builds without an explicit endpoint; a `DEV`, `STAGING` or `PRODUCTION` build is **refused at configuration time** unless given an HTTPS endpoint that is not a developer-machine address, which is why no deployed-environment package can be produced today. ([`flutter.md`](flutter.md))
+
+### 61. I changed an endpoint. What do I have to do in the client?
+
+Change the contract in `packages/api-contracts/openapi/`, then regenerate:
+
+```bash
+cd apps/mobile && dart run tool/generate_api_client.dart          # regenerate
+cd apps/mobile && dart run tool/generate_api_client.dart --check  # what CI runs
+```
+
+**Never edit `lib/core/networking/generated/`.** The drift check regenerates in memory and fails the build on any difference, so a hand edit is caught whether or not it was committed. If generation *fails*, read the message rather than working around it: the generator refuses only where guessing would be worse than stopping — an operation with no response schema, two schema-carrying 2xx responses, a union with no declared discriminator, or a wire value that cannot become a distinct Dart identifier. Each names the contract text at fault, and each is fixed in the contract.
+
+One thing this does **not** give you: nothing checks that the responses your NestJS code actually emits match the contract. The drift gate binds contract to client only ([`../phases/phase-04.md`](../phases/phase-04.md)).
+
+### 62. My new capability is implemented. Why is it not in the app?
+
+Because the client renders an **allowlist**, and it is empty. A capability becomes reachable by being `IMPLEMENTED`, deployed for the environment, cleared by the jurisdiction pack, entitled, and *then* added to `navigableCapabilityIds` in `apps/mobile/lib/features/platform_bootstrap/domain/platform_capability.dart` with a registered destination.
+
+The order matters and the last step is deliberately last. An id the server omitted is not a capability the client should mark unavailable — it is one the client **must not know exists** ([`../architecture/capability-registry.md` §5](../architecture/capability-registry.md)). That is also why there is no list of unrecognised ids anywhere in the client: such a list would itself disclose the names it holds.
+
+Debug against the internal resolver, never against the bootstrap response ([Q57](#57-how-do-i-read-an-availability-denial)).

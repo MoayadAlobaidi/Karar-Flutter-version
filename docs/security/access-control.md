@@ -117,6 +117,18 @@ across registry, pack, settings, availability, and entitlement is restrict-only,
 asserted as a property over randomized inputs in
 `modules/capability/__tests__/restrict-only.property.test.ts`.
 
+### Phase 4 additions — the client edge
+
+Three surfaces arrived with the Flutter client. None of them widens anything; each narrows what a caller can ask for.
+
+| Point | Enforces |
+|---|---|
+| The tenantless self surface | `GET /tenancy/memberships` answers only from the caller's own principal, and is mounted through a module whose principal source **drops the tenant id** — so it cannot be handed a tenant-bound principal by a wiring mistake. It exists because a session must be able to present a choice before it is bound to anything |
+| Resolution-scoped entity read | The operating-entity summary is derived from the caller's own binding. A caller **cannot name an entity id** and cannot enumerate the register, and the reader selects four columns so licence, contract and administrative detail never enter the process |
+| Self-declaration, which grants nothing | A subject may declare a jurisdiction. The record is `USER_DECLARED` / `UNVERIFIED` by module constant and by schema CHECK, it cannot supersede a verified assignment, and an unverified state is itself a denial at the capability ceiling — so declaring **changes which denial the subject sees and nothing else** |
+
+Two client-side properties belong here rather than in the client's own documentation, because they are access-control facts. **The client decides no availability**: it renders an allowlisted subset of what the server returned and holds no notion of a capability the server omitted ([`../architecture/capability-registry.md` §5](../architecture/capability-registry.md)). And **the client asserts no tenant**: binding always comes from a server-side membership read, and the client sends a selection, never a claim ([`../architecture/tenancy.md` §6](../architecture/tenancy.md)).
+
 Records with legal consequence pin the policy that produced them at creation
 (data-model.md §5): jurisdiction, operating entity, PolicyPack version, and —
 where the capability has elective options — the subject-selection version. The

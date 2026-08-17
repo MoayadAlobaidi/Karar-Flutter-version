@@ -127,6 +127,20 @@ Three properties, as landed in Phase 3.5:
 - **No effective entity denies.** An unresolvable entity, or an entity not permitted in the effective jurisdiction, denies the same way a missing licence does.
 - **The gate cannot widen anything.** It runs after the descriptor, environment, jurisdiction/pack, availability, entitlement, and consent gates, so a held licence satisfies its own condition and nothing else — an entity holding every licence in the world reaches a capability that has no code or no clearance exactly never.
 
+## 8a. What a client may be told about the entity
+
+**Added in Phase 4**, because the bootstrap response previously carried no entity summary at all and the client had nothing honest to render.
+
+Four fields cross the boundary: the entity id, the **registered legal name**, an optional jurisdiction reference, and an optional published role mailbox. There is deliberately no separate display or trading name, and none is constructed.
+
+**The projection is enforced by the query, not by a mapper.** The reader selects exactly those four columns, so registration internals, contracting capacity, status, timestamps, licence records and their evidence references, jurisdiction permissions and their bases, role assignments, and migration history are never read into the process — they cannot leak from memory they never occupied. Authorization is **resolution-scoped**: the id comes from the caller's own binding, never from a request parameter, so the register can be neither named into nor enumerated.
+
+Three properties the client side then holds:
+
+- **State is explicit, never inferred.** `ASSIGNED`, `UNASSIGNED`, or `UNAVAILABLE`. Unassigned renders as information, not as an error — a person with no entity binding is in a legitimate state.
+- **A contradiction is refused rather than papered over.** A response claiming *assigned* with no summary attached is mapped to *unavailable*, not to an assigned entity with a blank name.
+- **Nothing is derived from the four fields.** The presentation states in its own source that it does not state or imply a controller or processor role, a legal obligation, a licence, a regulatory approval, a supervisory relationship, or a lawful basis for processing — and none of those may be inferred from what is shown either. §11 is the rule; this is its client-side edge.
+
 ## 9. White-label — the inversion in practice
 
 For a UAE bank white-label tenant:

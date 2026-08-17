@@ -1,8 +1,12 @@
 # Domain and DNS Ownership and Renewal
 
-**Status:** ACTIVE runbook · **Owner:** Operations Owner · **Version:** 0.2 · **Date:** 2026-08-16 · **Review:** every phase gate
+**Status:** ACTIVE runbook · **Owner:** Operations Owner · **Version:** 0.3 · **Date:** 2026-08-17 · **Review:** every phase gate
 
-**v0.2 (2026-08-16, Phase 3.5 close):** re-checked at the Phase 3.5 gate. **Nothing changed, and nothing was verified** — all seven §3 hardening rows remain **TO_VERIFY**, because no repository-verifiable evidence of any registrar or DNS setting exists and none was obtained. **Exactly three things are confirmed facts: the domain is registered, Cloudflare is the registrar, and Cloudflare is the authoritative DNS provider.** Everything else in §1 is `NOT_CONFIGURED` and everything in §3 is unverified. EV-427 therefore stays `PENDING` at the gate rather than being recorded against this file — **a self-written document is not evidence of a registrar setting**, which is the whole reason this row exists. Owner: Security Owner; target the Phase 4 gate, or immediately on any DNS record creation or proxy enablement. **Phase 3.5 is COMPLETE; Phase 4 is NOT STARTED**, and no DNS or hosting change is scheduled or made.
+**v0.3 (2026-08-17, Phase 4 close):** re-read at the Phase 4 gate. **Nothing about DNS or hosting changed in Phase 4, and nothing was verified.** All seven §3 hardening rows remain **TO_VERIFY**; the three confirmed facts are unchanged — the domain is registered, Cloudflare is the registrar, and Cloudflare is the authoritative DNS provider. Everything else in §1 stays `NOT_CONFIGURED`. EV-427 therefore stays `PENDING` for a second consecutive gate rather than being recorded against this file: **a self-written document is not evidence of a registrar setting**, which is the whole reason the row exists, and a second gate passing without evidence is a fact worth stating rather than a formality. Owner: Security Owner; the target moves to the Phase 5 gate, or immediately on any DNS record creation or proxy enablement.
+
+Phase 4 built a Flutter client, and a reader could reasonably assume a client implies an endpoint. It does not. **No environment was provisioned, no record was created, and no API host exists.** The client's build guard *refuses* to produce a DEV, STAGING or PRODUCTION package without an explicit HTTPS endpoint that is not a developer-machine address, which is the opposite of a deployment: the only packages this repository can currently build are LOCAL ones ([`../architecture/flutter.md` §8a](../architecture/flutter.md)).
+
+**Phase 4 is COMPLETE; Phase 5 is NOT STARTED.** "Complete" here means implementation and the phase's own gates — not merged, not deployed, not production ready, and not store ready ([`../phases/phase-04.md`](../phases/phase-04.md)).
 
 The operational companion to the `kararfinance.com` row in the
 [asset inventory](../compliance/asset-inventory.md) and the Cloudflare row in
