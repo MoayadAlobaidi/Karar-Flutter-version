@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **4 — COMPLETE** ([phase report](docs/phases/phase-04.md)); Phase 5 **NOT STARTED** |
-| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) |
+| Current phase | **4 — IN PROGRESS** ([phase report](docs/phases/phase-04.md)); Phase 5 **NOT STARTED** |
+| Last completed phase | 3.5 (jurisdiction and capability foundation, [report](docs/phases/phase-03-5.md)) |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, and a Flutter client covering account, identity and platform state — **no consumer product capability is implemented or reachable** |
 | Mobile | Builds and tests for Android and iOS. **No signed build, no store submission, no deployed endpoint** — a build for any environment other than `LOCAL` is refused because no endpoint exists |

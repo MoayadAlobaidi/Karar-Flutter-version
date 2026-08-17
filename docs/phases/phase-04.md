@@ -1,9 +1,11 @@
 # Phase 4 — Flutter and mobile security foundation
 
-**Branch:** `claude/karar-v2-phase-4-flutter-foundation` · **Started:** 16 August 2026 · **Status:** COMPLETE (closed <<LEAD-FILLS>>)
+**Branch:** `claude/karar-v2-phase-4-flutter-foundation` · **Started:** 16 August 2026 · **Status:** IN PROGRESS
 **Base:** Phase 3.5 merge commit `e23bbc8` on `main`.
 
-**What "COMPLETE" means here, stated before anything else is read.** It means the phase's deliverables exist in this repository, its own gates passed, and its verification commands were executed. It does **not** mean merged, deployed, production ready, app-store ready, signed, certified, or legally reviewed. No environment is provisioned, no endpoint exists, no signed build has been produced, and no capability is available to anyone. Where a claim rests on static or artifact inspection rather than on a device, this report says so.
+**This phase is NOT complete, and this report is not a closeout record.** The body below describes what has been built and verified so far; every closeout field is still an unfilled `<<LEAD-FILLS>>` placeholder, the compliance and evidence records do not exist, no clean-clone verification has been run, no pull request has been opened, no CI run exists against a Phase 4 PR head, the independent review is not final, and release-blocking defects were still being corrected when this line was written. Do not read any statement here as a completion claim.
+
+**What "COMPLETE" will mean when it is eventually claimed.** It will mean the phase's deliverables exist in this repository, its own gates passed, and its verification commands were executed. It does **not** mean merged, deployed, production ready, app-store ready, signed, certified, or legally reviewed. No environment is provisioned, no endpoint exists, no signed build has been produced, and no capability is available to anyone. Where a claim rests on static or artifact inspection rather than on a device, this report says so.
 
 Verification sections are filled by the phase lead after running the commands — they record executed results, never intentions.
 
@@ -42,7 +44,7 @@ No screen is built for a later capability, and no fabricated balance, account, t
 
 ## Branch and base
 
-Eighteen commits on `claude/karar-v2-phase-4-flutter-foundation` from `e23bbc8`. Three are backend (`3383b2f`, `22df3fe`, `6ddf7c0`); one opens the phase; one is a `.gitignore` correction; the remaining thirteen are the client, its platform configuration, and the fixes that review and execution forced. **No database migration was added, and no permission was declared or seeded** — the phase is read, projection, and presentation work over the Phase 3.5 schema, and every new operation is self-scoped.
+Twenty-one commits on `claude/karar-v2-phase-4-flutter-foundation` from `e23bbc8`, counted with `git rev-list --count`. Three are backend (`3383b2f`, `22df3fe`, `6ddf7c0`); one opens the phase; one is a `.gitignore` correction; the remainder are the client, its platform configuration, and the fixes that review and execution forced. The count moves with every remediation round, so it is recalculated from Git rather than carried forward. **No database migration was added, and no permission was declared or seeded** — the phase is read, projection, and presentation work over the Phase 3.5 schema, and every new operation is self-scoped.
 
 ## Agent/workstream ownership
 
