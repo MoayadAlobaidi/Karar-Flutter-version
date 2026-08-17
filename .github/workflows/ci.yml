@@ -203,9 +203,16 @@ jobs:
   # assertion cannot catch a manifest merger conflict or a resource that fails
   # to link.
   #
-  # Debug only. No signing material is used, needed, or available: the release
-  # build type has no signing configuration unless one is supplied externally,
-  # and no CI job supplies one.
+  # Debug AND release are assembled. The comment here used to say "Debug only",
+  # and that was the whole defect: `lintVitalRelease` runs only on a release
+  # assembly, so a resource that made the release build impossible sat on the
+  # branch for several commits with every check green.
+  #
+  # Neither artifact is signed. No signing material is used, needed, or
+  # available: the release build type gets no signing configuration unless one
+  # is supplied externally, and no CI job supplies one. The release artifact is
+  # asserted to be UNSIGNED rather than merely built, because a signature would
+  # mean the debug key had been substituted.
   mobile-android:
     name: mobile-android
     runs-on: ubuntu-latest
@@ -263,19 +270,91 @@ jobs:
             -Pkarar.env=LOCAL \
             --dart-define=KARAR_ENV=LOCAL
 
-      - name: The release artifact is unsigned, not debug-signed
+      # THE RELEASE ARTIFACT IS THE THING UNDER TEST, NOT THE SOURCE XML.
+      #
+      # Source assertions live in the Dart security suite and are worth having,
+      # but they cannot see what the merger, the resource compiler and the
+      # shrinker actually produced. Everything below reads the packaged APK.
+      # A missing artifact FAILS here; it never skips.
+      - name: Verify the packaged release artifact
         run: |
           set -euo pipefail
           apk=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$apk" || { echo "FAIL: no release APK was produced"; exit 1; }
+
+          aapt2="$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -1)"
           apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)"
+          manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
+
+          # Unsigned, and specifically not debug-signed.
           if "$apksigner" verify --print-certs "$apk" 2>/dev/null; then
             echo "FAIL: the release artifact carries a signature. No signing"
-            echo "material exists in this repository, so a signature here means"
-            echo "the debug key was substituted — which would make an unsigned"
+            echo "material exists in this repository, so a signature means the"
+            echo "debug key was substituted, which would make an unsigned"
             echo "release silently installable."
             exit 1
           fi
-          echo "OK: release artifact is unsigned, as intended."
+
+          require() {
+            echo "$manifest" | grep -q "$1" \
+              || { echo "FAIL: $2"; exit 1; }
+          }
+          refuse() {
+            echo "$manifest" | grep -q "$1" \
+              && { echo "FAIL: $2"; exit 1; }
+            return 0
+          }
+
+          refuse 'debuggable'                       "the release manifest is debuggable"
+          require 'usesCleartextTraffic.*=false'    "cleartext traffic is not disabled"
+          require 'allowBackup.*=false'             "auto-backup is not disabled"
+          require 'fullBackupContent.*=false'       "the pre-API-31 backup policy is absent; devices below 31 are not covered by the data-extraction resource"
+          require 'dataExtractionRules'             "the API 31+ data-extraction resource is not referenced"
+
+          # The packaged transfer rules, under whatever name the shrinker gave
+          # them. Resolved through the manifest reference rather than guessed.
+          rules="$("$aapt2" dump resources "$apk" | grep -A2 data_extraction_rules \
+            | grep -oE 'res/[A-Za-z0-9_.-]+\.xml' | head -1)"
+          test -n "$rules" || { echo "FAIL: no data-extraction resource is packaged"; exit 1; }
+          tree="$("$aapt2" dump xmltree --file "$rules" "$apk")"
+          echo "$tree"
+
+          for section in cloud-backup device-transfer cross-platform-transfer; do
+            echo "$tree" | grep -q "E: $section" \
+              || { echo "FAIL: the packaged rules declare no <$section>; a missing section is documented as fully enabled, not off"; exit 1; }
+          done
+          echo "$tree" | grep -q 'A: platform="ios"' \
+            || { echo "FAIL: cross-platform-transfer does not name platform=\"ios\". Any other value is accepted silently and addresses a platform nobody transfers to."; exit 1; }
+          echo "$tree" | grep -q 'apple_icloud' \
+            && { echo "FAIL: apple_icloud is not a real platform value"; exit 1; }
+          echo "$tree" | grep -q 'E: include' \
+            && { echo "FAIL: an include rule re-admits content these sections exist to empty"; exit 1; }
+
+          excludes="$(echo "$tree" | grep -c 'E: exclude')"
+          test "$excludes" -eq 27 \
+            || { echo "FAIL: $excludes exclusions packaged, expected 27 (9 domains x 3 modes)"; exit 1; }
+
+          # Exactly the reviewed permission set, no more and no fewer.
+          #
+          # The fourth is app-defined and carries the applicationId, which
+          # differs per environment (`.local` here), so it is derived from the
+          # artifact's own package name rather than hardcoded — otherwise this
+          # check would only ever hold for one build profile.
+          pkg="$("$aapt2" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
+          test -n "$pkg" || { echo "FAIL: could not read the package name"; exit 1; }
+          actual="$("$aapt2" dump badging "$apk" | sed -n "s/^uses-permission: name='\([^']*\)'.*/\1/p" | sort)"
+          expected="$(printf '%s\n' \
+            'android.permission.INTERNET' \
+            'android.permission.USE_BIOMETRIC' \
+            'android.permission.USE_FINGERPRINT' \
+            "${pkg}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" | sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "FAIL: the packaged permission set is not the reviewed one."
+            diff <(echo "$expected") <(echo "$actual") || true
+            exit 1
+          fi
+
+          echo "OK: packaged release artifact verified."
 
       # THE ENVIRONMENT GUARD, PROVEN BY INVOCATION RATHER THAN BY INSPECTION.
       #

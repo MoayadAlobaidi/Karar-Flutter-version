@@ -63,22 +63,64 @@
         <exclude domain="device_sharedpref" />
     </device-transfer>
     <!--
-      `platform` is REQUIRED on this element and on neither of the two above.
+      CROSS-PLATFORM TRANSFER IS THE WEAKEST OF THE THREE SECTIONS, AND THIS
+      COMMENT SAYS SO RATHER THAN IMPLYING OTHERWISE.
+
+      `platform` is required on this element and on neither of the two above.
       Omitting it does not make the section permissive; it makes the resource
       invalid, and lintVitalRelease then fails with "Missing required attribute
-      platform".
+      platform". That asymmetry hid a broken release build for several commits:
+      a debug assembly parses this file happily and lintVitalRelease runs only
+      on a release assembly, so the debug APK CI built passed throughout while
+      a release APK could not be produced at all. CI now assembles a release
+      artifact for exactly that reason.
 
-      That asymmetry hid a broken release build for several commits. A debug
-      assembly parses this file happily and lintVitalRelease runs only on a
-      release assembly, so the debug APK CI builds passed throughout while a
-      release APK could not be produced at all. The CI job now assembles a
-      release artifact for exactly this reason.
+      WHAT THE VALUE IS, AND HOW FAR THAT IS EVIDENCED. `ios` is used because
+      it is the only cross-platform target the framework names anywhere:
+      `BackupAgent.FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS`, documented as "a
+      cross-platform transfer to or from iOS" (AOSP sources for android-37,
+      `android/app/backup/BackupAgent.java:201`). An earlier revision of this
+      file said `apple_icloud`, which was invented here and appears in no AOSP
+      source and in no lint rule.
 
-      `apple_icloud` names the transfer this section governs: an Android to iOS
-      migration, where the data leaves the Android security model altogether.
-      It is the only platform the framework defines here.
+      The correction matters more than it looks, because NEITHER value is
+      rejected. `FullBackup.java:735` reads this attribute as an opaque string
+      and `:853` uses it directly as a map key; no enumeration of valid values
+      exists in the installed platform sources or in
+      `FullBackupContentDetector`. A wrong value therefore does not fail the
+      build and does not fail at runtime — it silently addresses a platform
+      nobody transfers to, and the section becomes inert while still looking
+      correct. That is exactly the failure a green build cannot detect, so the
+      value is asserted exactly rather than by pattern in
+      platform_hardening_test.dart.
+
+      NO `<platform-specific-params>` IS DECLARED, DELIBERATELY. That element
+      carries `bundleId`, `teamId` and `contentVersion`
+      (`FullBackup.java:108-110`), which identify the iOS counterpart an
+      Android app's data may be matched TO. They exist to enable a match. No
+      Apple Team ID is configured for this project, no iOS counterpart is
+      published, and inventing one would put a fabricated identity into a
+      shipping artifact. Their absence cannot widen anything: with no
+      counterpart identified there is nothing for the subsystem to match, and
+      every domain below is excluded regardless.
+
+      WHAT IS THEREFORE NOT PROVEN. That this section actually closes an
+      Android-to-iOS transfer on a device running the feature. The whole path
+      is behind `Flags.enableCrossPlatformTransfer()`, no such device was
+      available, and the exact attribute value could not be confirmed against
+      an enumerated list because the platform publishes none. Cross-platform
+      transfer is NOT claimed closed; it is a HIGH pre-release gate recorded in
+      the phase report. `allowBackup="false"`, the cloud-backup section and the
+      device-transfer section are not affected by any of this and are what
+      actually holds today.
+
+      No `path` attribute appears on any exclusion, and that is the documented
+      whole-domain form rather than an omission: `FullBackup.java:1099-1102`
+      handles a null path with the comment "Allow things like
+      <include domain="sharedpref"/>", substituting the empty string, which
+      resolves to the domain root.
     -->
-    <cross-platform-transfer platform="apple_icloud">
+    <cross-platform-transfer platform="ios">
         <exclude domain="root" />
         <exclude domain="file" />
         <exclude domain="database" />

@@ -135,6 +135,32 @@ void main() {
       expect(manifest, contains('android:allowBackup="false"'));
     });
 
+    test('devices below API 31 are covered by their own mechanism', () {
+      // TWO ERAS, TWO MECHANISMS, AND minSdk IS 24.
+      //
+      // `dataExtractionRules` is honoured only from API 31. Everything from
+      // API 24 to 30 reads `fullBackupContent` instead, and would ignore the
+      // resource entirely — so asserting the API 31+ resource says nothing
+      // about most of the supported range.
+      //
+      // `android:fullBackupContent="false"` is the pre-31 answer and is
+      // stronger than the 31+ one: below 31 it disables the transfer path as
+      // well as cloud backup, which is precisely the coupling that stops
+      // holding at 31 and forced the data-extraction resource to exist.
+      expect(
+        manifest,
+        contains('android:fullBackupContent="false"'),
+        reason: 'without this, devices from API 24 to 30 fall back to default '
+            'backup behaviour: the data-extraction resource does not apply to '
+            'them, and allowBackup alone is not the whole control there',
+      );
+      expect(
+        manifest,
+        contains('android:allowBackup="false"'),
+        reason: 'the one attribute both eras honour',
+      );
+    });
+
     test('a data-extraction rules resource is declared, because allowBackup does not '
         'cover device transfer', () {
       // Android's documented limit: for an application running on and targeting
@@ -191,26 +217,97 @@ void main() {
       );
     });
 
-    test('cross-platform-transfer names the platform it governs', () {
-      // This resource shipped INVALID for several commits and nothing caught
-      // it. `platform` is required on this section and on neither of the other
-      // two; without it `lintVitalRelease` fails, so the Android release build
-      // could not be produced at all — while `flutter build apk --debug`, the
-      // only Android build CI performed, parsed the same file happily.
+    test('cross-platform-transfer names exactly the platform it governs', () {
+      // AN EXACT VALUE, NOT A PATTERN. The previous version of this test
+      // accepted `platform="[a-z_]+"`, and so happily certified
+      // `platform="apple_icloud"` — a value invented in this repository that
+      // appears in no AOSP source and in no lint rule.
       //
-      // The security consequence is not that the section became permissive. It
-      // is that a resource whose entire job is closing the device-transfer path
-      // made the shippable artifact unbuildable, and the gap between "debug
-      // builds" and "release builds" hid it. CI now assembles a release too.
+      // A pattern is the wrong shape of assertion here because nothing else
+      // rejects a wrong value either. `FullBackup.java:735` reads the
+      // attribute as an opaque string and uses it as a map key; the platform
+      // publishes no enumeration, and `FullBackupContentDetector` checks only
+      // that the attribute is PRESENT. So a misspelled platform builds
+      // cleanly, passes lint, ships, and silently addresses a target nobody
+      // transfers to — the section looks correct and does nothing.
+      //
+      // `ios` is the only cross-platform target the framework names:
+      // BackupAgent.FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS, "a cross-platform
+      // transfer to or from iOS".
       final rules = _declarations(_dataExtractionRules);
+
       expect(
-        RegExp(r'<cross-platform-transfer\s+platform="[a-z_]+"\s*>')
-            .hasMatch(rules),
-        isTrue,
-        reason: 'cross-platform-transfer must declare the platform attribute. '
-            'Without it the resource does not parse for lint and no release '
-            'artifact can be built.',
+        rules,
+        contains('<cross-platform-transfer platform="ios">'),
+        reason: 'the section must name exactly platform="ios"',
       );
+      expect(
+        rules,
+        isNot(contains('apple_icloud')),
+        reason: 'apple_icloud was invented here and names no real platform; a '
+            'wrong value makes the section inert without failing anything',
+      );
+
+      // Exactly one such section. Two would let a reviewer read the correct
+      // one while the framework parsed the other.
+      final sections =
+          RegExp('<cross-platform-transfer').allMatches(rules).length;
+      expect(
+        sections,
+        1,
+        reason: 'found $sections cross-platform-transfer sections; the '
+            'framework iterates every matching element, so a duplicate is a '
+            'second policy nobody reviewed',
+      );
+
+      // And no other value can appear on it, however spelled.
+      for (final RegExpMatch match
+          in RegExp(r'<cross-platform-transfer[^>]*>').allMatches(rules)) {
+        final String opening = match.group(0)!;
+        final String? platform =
+            RegExp(r'platform="([^"]*)"').firstMatch(opening)?.group(1);
+        expect(
+          platform,
+          'ios',
+          reason: 'cross-platform-transfer declares platform="$platform". '
+              'Only "ios" is a target the framework names, and a value it does '
+              'not recognise is accepted silently rather than refused.',
+        );
+      }
+    });
+
+    test('no platform-specific-params carries a fabricated Apple identity', () {
+      // The element carries bundleId, teamId and contentVersion, which
+      // identify the iOS counterpart this app's data may be matched TO. They
+      // exist to ENABLE a match. No Apple Team ID is configured for this
+      // project and no iOS counterpart is published, so declaring one would
+      // put an invented identity into a shipping artifact.
+      //
+      // Their absence cannot widen anything — with no counterpart identified
+      // there is nothing to match, and every domain is excluded regardless.
+      // If they are ever added, they must carry a real, configured, evidenced
+      // Team ID, and this test is where that decision gets made deliberately.
+      final rules = _declarations(_dataExtractionRules);
+      if (!rules.contains('<platform-specific-params')) {
+        return;
+      }
+      for (final String placeholder in <String>[
+        'TEAMID',
+        'XXXXXXXXXX',
+        'teamId=""',
+        'ABCDE12345',
+        'TODO',
+        'PLACEHOLDER',
+        'example',
+      ]) {
+        expect(
+          rules,
+          isNot(contains(placeholder)),
+          reason: 'platform-specific-params carries the placeholder '
+              '"$placeholder". A fabricated Apple identity in a shipping '
+              'artifact is worse than no element at all.',
+        );
+      }
     });
 
     test('INTERNET is declared, and the app itself requests nothing else', () {
