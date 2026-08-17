@@ -307,9 +307,7 @@ function checkPhaseStatusConsistency(files) {
   if (!fs.existsSync(readmePath)) return ['README.md missing'];
   const readme = fs.readFileSync(readmePath, 'utf8');
 
-  const status = readme.match(
-    /\|\s*Current phase\s*\|\s*\*\*([0-9.]+)\s*[—-]\s*([A-Z ]+?)\*\*/,
-  );
+  const status = readme.match(/\|\s*Current phase\s*\|\s*\*\*([0-9.]+)\s*[—-]\s*([A-Z ]+?)\*\*/);
   if (!status) {
     return ['README.md has no parseable "Current phase" row; every other check here depends on it'];
   }
@@ -345,9 +343,7 @@ function checkPhaseStatusConsistency(files) {
       // exact shape the canonical roadmap table uses, and the exact shape that
       // survived the correction it was supposed to receive.
       const cells = line.startsWith('|') ? line.split('|').map((c) => c.trim()) : null;
-      const isPhaseRow =
-        cells !== null &&
-        cells.some((c) => c.replace(/\*/g, '').trim() === phase);
+      const isPhaseRow = cells !== null && cells.some((c) => c.replace(/\*/g, '').trim() === phase);
       if (isPhaseRow && /\bCOMPLETE\b/.test(line)) {
         problems.push(
           `${relative}:${index + 1} is a table row for phase ${phase} marked COMPLETE, ` +
