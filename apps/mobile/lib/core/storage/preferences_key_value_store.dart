@@ -4,6 +4,8 @@
 // so that routing decisions (locale, theme, lock choice) never await I/O.
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../errors/failure.dart';
+import '../errors/result.dart';
 import '../logging/app_logger.dart';
 import 'key_value_store.dart';
 
@@ -67,6 +69,30 @@ final class PreferencesKeyValueStore implements KeyValueStore {
   bool? readBool(PreferenceKey key) {
     final value = _snapshot[_qualify(key)];
     return value is bool ? value : null;
+  }
+
+  @override
+  Future<Result<void>> writeBoolChecked(
+    PreferenceKey key, {
+    required bool value,
+  }) async {
+    final qualified = _qualify(key);
+    _snapshot[qualified] = value;
+    try {
+      await _preferences.setBool(qualified, value);
+      return const Success<void>(null);
+    } on Object catch (error) {
+      // Reported, not swallowed. The caller asked whether this reached disk
+      // because its own correctness depends on the answer.
+      _logger.warning(
+        'Preference operation failed.',
+        fields: <String, Object?>{'operation': 'write-checked'},
+        error: error,
+      );
+      return Failed<void>(
+        const LocalStorageUnavailableFailure(operation: LocalStorageOperation.write),
+      );
+    }
   }
 
   @override

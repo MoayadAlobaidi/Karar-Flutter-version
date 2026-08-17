@@ -292,6 +292,79 @@ void main() {
       );
     });
   });
+
+  // THE COMPOUND FAILURE, WHICH IS THE ONLY ONE THAT LOSES THE CREDENTIAL.
+  //
+  // A failed erase alone is survivable: the invalidation marker stands and the
+  // next launch refuses to restore what is still on disk. What is NOT
+  // survivable is a failed erase whose MARKER ALSO FAILED TO PERSIST — nothing
+  // then records that the credential was given up, so the next launch reads it
+  // back and signs the user into the session they abandoned.
+  //
+  // An independent review proved that case was indistinguishable from success:
+  // `KeyValueStore.writeBool` swallows a platform failure, so `raise()`
+  // returned normally and `isRaised` answered true from the in-memory snapshot
+  // for the rest of the process. `writeBoolChecked` exists so the difference is
+  // visible, and `abandonmentIsRecorded` is how a caller reads it.
+  group('a failed erase reports whether the abandonment was recorded', () {
+    test('marker persisted: the abandonment IS recorded', () async {
+      final backing = InMemorySecureStore()
+        ..failingOperations.add(SecureStorageOperation.delete);
+      final store = SecureTokenStore(
+        backing,
+        invalidation: PersistedSessionInvalidation(InMemoryKeyValueStore()),
+      );
+
+      final cleared = await store.clear();
+
+      expect(cleared.isFailure, isTrue, reason: 'the erase must have failed');
+      expect(
+        store.abandonmentIsRecorded,
+        isTrue,
+        reason: 'the marker write succeeded, so a later launch refuses to '
+            'restore the credential that survived',
+      );
+    });
+
+    test('marker NOT persisted: reported as unrecorded', () async {
+      final backing = InMemorySecureStore()
+        ..failingOperations.add(SecureStorageOperation.delete);
+      final preferences = InMemoryKeyValueStore()..refuseCheckedWrites = true;
+      final store = SecureTokenStore(
+        backing,
+        invalidation: PersistedSessionInvalidation(preferences),
+      );
+
+      final cleared = await store.clear();
+
+      expect(cleared.isFailure, isTrue);
+      expect(
+        store.abandonmentIsRecorded,
+        isFalse,
+        reason: 'the erase failed AND the marker did not reach the platform. '
+            'Reporting that as recorded is the exact overstatement that made '
+            'this mechanism look stronger than it was.',
+      );
+    });
+
+    test('a successful erase is recorded whatever the marker did', () async {
+      final preferences = InMemoryKeyValueStore()..refuseCheckedWrites = true;
+      final store = SecureTokenStore(
+        InMemorySecureStore(),
+        invalidation: PersistedSessionInvalidation(preferences),
+      );
+
+      final cleared = await store.clear();
+
+      expect(cleared.isFailure, isFalse);
+      expect(
+        store.abandonmentIsRecorded,
+        isTrue,
+        reason: 'nothing survived the erase, so there is nothing for a marker '
+            'to guard and a failed marker write is irrelevant',
+      );
+    });
+  });
 }
 
 

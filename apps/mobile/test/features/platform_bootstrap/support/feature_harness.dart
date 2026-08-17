@@ -180,6 +180,10 @@ final class InMemoryTokenStore implements TokenStore {
     _tokens = null;
     return const Success<void>(null);
   }
+
+  /// This fake always succeeds, so the abandonment is trivially recorded.
+  @override
+  bool get abandonmentIsRecorded => true;
 }
 
 /// A real startup coordinator wired to in-memory doubles.

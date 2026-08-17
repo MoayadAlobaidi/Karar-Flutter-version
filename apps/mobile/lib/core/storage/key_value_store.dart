@@ -10,6 +10,8 @@
 // name looks sensitive, so the mistake fails at the call site rather than in
 // production.
 import 'package:meta/meta.dart';
+import '../errors/failure.dart';
+import '../errors/result.dart';
 
 /// A validated preference key.
 @immutable
@@ -72,6 +74,21 @@ abstract interface class KeyValueStore {
 
   Future<void> writeBool(PreferenceKey key, {required bool value});
 
+  /// Writes a boolean and REPORTS whether the platform accepted it.
+  ///
+  /// [writeBool] deliberately swallows a platform failure: for an ordinary
+  /// preference — a theme choice, a dismissed hint — the in-memory value is
+  /// the caller's intent and a failed disk write is not worth propagating.
+  ///
+  /// That is wrong for one caller. The persisted-session invalidation marker
+  /// exists so a credential the user gave up is not restored after a relaunch,
+  /// and a marker that silently did not reach disk provides exactly nothing
+  /// while reporting success. An independent review demonstrated it: the write
+  /// fails, `raise()` returns normally, the in-memory snapshot answers true for
+  /// the rest of the process, and nothing survives. Only a caller that can SEE
+  /// the failure can fail closed on it.
+  Future<Result<void>> writeBoolChecked(PreferenceKey key, {required bool value});
+
   Future<void> remove(PreferenceKey key);
 
   /// Removes every value this application wrote. Called on sign-out alongside
@@ -84,6 +101,13 @@ abstract interface class KeyValueStore {
 /// blocking startup for one is not.
 final class InMemoryKeyValueStore implements KeyValueStore {
   final Map<String, Object> _values = <String, Object>{};
+
+  /// When true, [writeBoolChecked] reports failure while still updating the
+  /// in-memory value — which is exactly how the real preference store behaves
+  /// when the platform refuses the write and the snapshot has already moved.
+  /// Without this, the compound failure that the invalidation marker exists to
+  /// survive cannot be reproduced in a test.
+  bool refuseCheckedWrites = false;
 
   @override
   String? readString(PreferenceKey key) {
@@ -100,6 +124,17 @@ final class InMemoryKeyValueStore implements KeyValueStore {
   bool? readBool(PreferenceKey key) {
     final value = _values[key.name];
     return value is bool ? value : null;
+  }
+
+  @override
+  Future<Result<void>> writeBoolChecked(PreferenceKey key, {required bool value}) async {
+    await writeBool(key, value: value);
+    if (refuseCheckedWrites) {
+      return const Failed<void>(
+        LocalStorageUnavailableFailure(operation: LocalStorageOperation.write),
+      );
+    }
+    return const Success<void>(null);
   }
 
   @override

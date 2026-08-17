@@ -265,6 +265,25 @@ final class SecureStorageUnavailableFailure extends Failure {
 /// Which secure-storage operation failed.
 enum SecureStorageOperation { read, write, delete }
 
+/// The ordinary (non-secure) preference store refused a write.
+///
+/// Distinct from [SecureStorageUnavailableFailure] on purpose: that names the
+/// platform keystore, and a reader who sees it assumes credential material was
+/// involved. This one names the preference store, which holds no credential —
+/// only decisions ABOUT credentials, such as the persisted-session
+/// invalidation marker, whose whole value depends on the write having landed.
+final class LocalStorageUnavailableFailure extends Failure {
+  const LocalStorageUnavailableFailure({super.code, super.correlationId, required this.operation});
+
+  final LocalStorageOperation operation;
+
+  @override
+  String get diagnosticLabel => 'local_storage_unavailable_${operation.name}';
+}
+
+/// Which preference-store operation failed.
+enum LocalStorageOperation { write, remove }
+
 /// Required build configuration is absent or invalid. A production build in
 /// this state must not start.
 final class ConfigurationInvalidFailure extends Failure {

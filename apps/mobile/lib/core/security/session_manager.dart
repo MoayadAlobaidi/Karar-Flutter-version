@@ -159,10 +159,30 @@ final class SessionManager {
     _state = const NoSession();
     final cleared = await _store.clear();
     if (cleared is Failed<void>) {
+      // THE COMPOUND FAILURE IS THE ONE THAT MATTERS.
+      //
+      // A failed erase alone is survivable: the invalidation marker stands, so
+      // the next launch refuses to restore what is still on disk. What is NOT
+      // survivable is a failed erase whose marker also failed to persist —
+      // then nothing records that the credential was given up, the next launch
+      // reads it back, and the user is signed into the session they abandoned.
+      //
+      // `_store.clear()` reports that state distinctly (see `TokenStore`), and
+      // it is logged as such rather than folded into the ordinary failure,
+      // because the two have different consequences and the same log line
+      // would hide it.
+      final bool markerHolds = _store.abandonmentIsRecorded;
       _logger.error(
-        'Persisted session abandoned; the secure erase failed and the '
-        'credential may still be on disk. The in-memory one was dropped.',
-        fields: <String, Object?>{'outcome': 'erase_failed'},
+        markerHolds
+            ? 'Persisted session abandoned; the secure erase failed and the '
+                  'credential may still be on disk. It is marked abandoned, so '
+                  'a later launch will refuse to restore it.'
+            : 'Persisted session abandoned; the secure erase failed AND the '
+                  'abandonment could not be recorded. A later launch may '
+                  'restore this credential.',
+        fields: <String, Object?>{
+          'outcome': markerHolds ? 'erase_failed' : 'erase_failed_unrecorded',
+        },
       );
     } else {
       _logger.info(

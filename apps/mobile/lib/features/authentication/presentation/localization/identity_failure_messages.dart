@@ -37,6 +37,11 @@ String identityFailureMessage(AppLocalizations l10n, Failure failure) =>
       RequestCancelledFailure() => l10n.failureCancelled,
       UnsafeRequestNotReplayedFailure() => l10n.failureRetrySafe,
       SecureStorageUnavailableFailure() => l10n.failureSecureStorage,
+      // The preference store, not the keystore. The user-facing consequence is
+      // the same — local state could not be written — and the existing notice
+      // already says the device could not save something, so it is reused
+      // rather than adding a message that says the same thing differently.
+      LocalStorageUnavailableFailure() => l10n.failureSecureStorage,
       ConfigurationInvalidFailure() => l10n.failureConfiguration,
       // A contract violation is a client/server mismatch. The user is told
       // something went wrong and nothing about the shape of the payload.

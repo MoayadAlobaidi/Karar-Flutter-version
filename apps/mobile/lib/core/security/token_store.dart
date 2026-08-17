@@ -38,27 +38,32 @@
 // that just refused a delete would be unavailable at precisely the moment it
 // is needed.
 //
-// THE MARKER WRITE IS NOT GUARANTEED TO REACH DISK, AND THIS IS THE SHARPEST
-// LIMIT OF THE MECHANISM. `KeyValueStore.writeBool` updates an in-memory
-// snapshot and then swallows any platform failure (see
-// `preferences_key_value_store.dart`, `_guard`), and the preference store
-// falls back to a purely in-memory implementation when the platform store
-// cannot be opened at all. So `raise()` returns normally, `isRaised` reads the
-// snapshot and answers true for the rest of the process, and NOTHING SURVIVES
-// A RELAUNCH.
+// THE MARKER WRITE CAN FAIL, AND THE FAILURE IS NOW VISIBLE.
 //
-// The failure that defeats this is therefore a compound one: the preference
-// write fails silently AND the secure delete fails AND the process restarts
-// AND the keystore recovers. In that sequence the abandoned credential is
-// restored. The single-failure cases the marker was written for — a delete
-// that fails while preferences work, which is the realistic keystore fault —
-// are covered, and that is the whole of what it covers.
+// `KeyValueStore.writeBool` updates an in-memory snapshot and swallows any
+// platform failure, which is right for an ordinary preference and wrong for
+// this one: `raise()` returned normally when nothing reached disk, `isRaised`
+// answered true from the snapshot for the rest of the process, and nothing
+// survived a relaunch. An independent review demonstrated it. The header used
+// to call the write-first ordering "crash-safe"; the ordering was right and
+// the claim was not.
 //
-// Closing this needs a preference write that can report failure, which the
-// port cannot do today; widening `KeyValueStore` for it is a change with a
-// far larger blast radius than this file and is recorded as a follow-up
-// rather than smuggled in here. Until then, do not describe this as
-// crash-safe without the qualifier above.
+// `writeBoolChecked` reports what the platform did, so `clear()` now knows
+// whether the marker landed and exposes it as [TokenStore.abandonmentIsRecorded].
+// A caller can therefore distinguish the two failed-erase outcomes:
+//
+//   erase failed, marker held      — survivable. The credential is still on
+//                                    disk and the next launch refuses it.
+//   erase failed, marker also lost — NOT survivable on its own. Nothing
+//                                    records the abandonment, and a later
+//                                    launch can restore the credential.
+//
+// The second is logged distinctly rather than folded into the first, because
+// the consequences differ and one log line for both would hide it. What this
+// does NOT do is make the marker durable — no client-side record survives a
+// platform store that refuses to write. It makes the failure honest, which is
+// the most this layer can offer; server-side revocation on abandonment is the
+// only real remedy and belongs elsewhere.
 //
 // WHAT THIS STILL DOES NOT DO. The credential is physically still in the
 // platform keystore until some later erase succeeds. Preferences are plain and
@@ -93,6 +98,14 @@ abstract interface class TokenStore {
   /// must not report a clean removal; see the file header for the fail-closed
   /// behaviour that stops the survivor being restored.
   Future<Result<void>> clear();
+
+  /// Whether a failed [clear] is durably recorded as abandoned.
+  ///
+  /// Only meaningful after a `Failed` clear. `true` means the next launch will
+  /// refuse to restore whatever survived; `false` means the erase failed AND
+  /// the record of that failure did not persist, which is the one combination
+  /// under which an abandoned credential can come back.
+  bool get abandonmentIsRecorded;
 }
 
 /// A durable record that the persisted credential must not be restored.
@@ -114,7 +127,16 @@ final class PersistedSessionInvalidation {
   /// True while a credential that nobody wants may still be on disk.
   bool get isRaised => _preferences.readBool(_key) ?? false;
 
-  Future<void> raise() => _preferences.writeBool(_key, value: true);
+  /// Records the intent, and REPORTS whether it reached the platform.
+  ///
+  /// The reporting form is used deliberately. `writeBool` swallows a platform
+  /// failure and returns normally, so a marker that never reached disk was
+  /// indistinguishable from one that did: `isRaised` reads the in-memory
+  /// snapshot and answers true for the rest of the process, and nothing
+  /// survives a relaunch. The caller that needs this marker needs to know when
+  /// it does not exist.
+  Future<Result<void>> raise() =>
+      _preferences.writeBoolChecked(_key, value: true);
 
   Future<void> lower() => _preferences.remove(_key);
 }
@@ -128,13 +150,16 @@ final class SecureTokenStore implements TokenStore {
   /// cold-launch suite in `test/app/routing` reads the real
   /// `tokenStoreProvider` and fails if the composition root ever stops
   /// supplying one.
-  const SecureTokenStore(this._store, {PersistedSessionInvalidation? invalidation})
+  SecureTokenStore(this._store, {PersistedSessionInvalidation? invalidation})
       : _invalidation = invalidation;
 
   static const SecureKey _key = SecureKey('session_tokens.v1');
 
   final SecureStore _store;
   final PersistedSessionInvalidation? _invalidation;
+
+  /// Set by [clear]; see [abandonmentIsRecorded].
+  bool _abandonmentRecorded = true;
 
   @override
   Future<Result<SessionTokens?>> read() async {
@@ -187,13 +212,23 @@ final class SecureTokenStore implements TokenStore {
     // Raised BEFORE the delete is attempted. The window between "the delete
     // failed" and "the marker was written" is where a killed process would
     // otherwise lose the fact that this credential is unwanted.
-    await _invalidation?.raise();
+    //
+    // The RESULT of raising is kept, because a marker that did not reach the
+    // platform protects nothing while reporting success. `writeBoolChecked`
+    // exists so this line can tell the difference.
+    final raised = await _invalidation?.raise();
+    _abandonmentRecorded = _invalidation == null || raised is Success<void>;
+
     final erased = await _store.delete(_key);
     if (erased is Success<void>) {
       await _invalidation?.lower();
+      _abandonmentRecorded = true;
     }
     return erased;
   }
+
+  @override
+  bool get abandonmentIsRecorded => _abandonmentRecorded;
 
   Result<SessionTokens?> _decode(String? raw) {
     if (raw == null) {
