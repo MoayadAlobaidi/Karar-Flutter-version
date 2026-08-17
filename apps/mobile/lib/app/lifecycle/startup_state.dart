@@ -151,10 +151,14 @@ final class SessionRestoring extends StartupState {
 final class Unauthenticated extends StartupState {
   const Unauthenticated({this.secureStorageUnavailable = false});
 
-  /// True when the keystore refused to answer and the client is therefore
-  /// TREATING the user as signed out. Distinguished so the sign-in screen can
-  /// explain why a previously working session vanished; the behaviour is
-  /// identical either way, which is the fail-closed part.
+  /// True when the keystore would not do as it was asked and the client is
+  /// therefore TREATING the user as signed out. Distinguished so the sign-in
+  /// screen can explain why a previously working session vanished; the
+  /// behaviour is identical either way, which is the fail-closed part.
+  ///
+  /// Set for a read that failed, and also for an ERASE that failed — the
+  /// second case is the one where the credential may still be on disk, so this
+  /// flag is what stops the client claiming a clean removal it cannot prove.
   final bool secureStorageUnavailable;
 
   @override

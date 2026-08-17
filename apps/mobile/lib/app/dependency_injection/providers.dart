@@ -146,8 +146,18 @@ final Provider<SecureStore> secureStoreProvider = Provider<SecureStore>(
   (Ref ref) => FlutterSecureStore(logger: ref.watch(loggerProvider)),
 );
 
+/// The credential store, with the durable invalidation marker attached.
+///
+/// The marker is not optional in production: it is the only thing that stops a
+/// credential whose erase FAILED from being restored on the next cold launch.
+/// It is kept in the preference store rather than the secure one on purpose —
+/// see `core/security/token_store.dart` for the semantics and for what the
+/// arrangement still does not protect against.
 final Provider<TokenStore> tokenStoreProvider = Provider<TokenStore>(
-  (Ref ref) => SecureTokenStore(ref.watch(secureStoreProvider)),
+  (Ref ref) => SecureTokenStore(
+    ref.watch(secureStoreProvider),
+    invalidation: PersistedSessionInvalidation(ref.watch(keyValueStoreProvider)),
+  ),
 );
 
 final Provider<SessionManager> sessionManagerProvider = Provider<SessionManager>((Ref ref) {

@@ -7,6 +7,16 @@
 // Ending a session ALWAYS drops the in-memory credential, even when the
 // secure-storage wipe reports a failure. A credential that cannot be erased
 // from disk must at least stop being used.
+//
+// There are TWO ways a session stops, and they are not the same operation:
+//
+//   * [SessionManager.end] — a session that was LIVE has stopped. It
+//     short-circuits when nothing is held, so it cannot double-signal.
+//   * [SessionManager.abandonPersistedSession] — the credential ON DISK is
+//     given up, whether or not one was ever read into memory. Startup checks
+//     the application lock before it restores, so on a cold locked launch
+//     there is a credential to destroy and no session to end; `end` is a
+//     no-op there and would leave the tokens exactly where they were.
 import 'dart:async';
 
 import '../errors/failure.dart';
@@ -116,6 +126,51 @@ final class SessionManager {
     if (!_ended.isClosed) {
       _ended.add(reason);
     }
+  }
+
+  /// Destroys the PERSISTED credential whether or not one was ever adopted.
+  ///
+  /// [end] cannot do this job. It short-circuits on `NoSession`, which is
+  /// correct for its own purpose — a failed refresh and a 401 arriving
+  /// together must not double-signal — but it makes [end] a no-op on a COLD
+  /// LAUNCH, where the credential is on disk and nothing has been read into
+  /// memory yet. Startup evaluates the application lock BEFORE it restores, so
+  /// a user staring at a lock they cannot open is in exactly that state: the
+  /// tokens exist, `_state` is `NoSession`, and asking to sign out instead
+  /// does nothing at all.
+  ///
+  /// It deliberately does NOT read the store first. "Restore, then end" would
+  /// have worked and is wrong: it materialises, for a few microseconds, the
+  /// authenticated session the lock exists to keep out of memory, and it turns
+  /// a keystore read failure into a reason not to erase.
+  ///
+  /// It does NOT emit on [onSessionEnded] either. Nothing ended — there was
+  /// possibly never a live session — and the caller that asked for this owns
+  /// the state that follows. Routing it through the end stream as well would
+  /// produce two transitions for one press.
+  ///
+  /// Idempotent: a second call re-clears an already-empty store and reports
+  /// the same answer. The result is the erase outcome, and a `Failed` means
+  /// the credential MAY STILL BE PERSISTED — the caller must not tell the user
+  /// otherwise.
+  Future<Result<void>> abandonPersistedSession() async {
+    // In-memory first, unconditionally. A credential that cannot be erased
+    // from disk must at least stop being used by this process.
+    _state = const NoSession();
+    final cleared = await _store.clear();
+    if (cleared is Failed<void>) {
+      _logger.error(
+        'Persisted session abandoned; the secure erase failed and the '
+        'credential may still be on disk. The in-memory one was dropped.',
+        fields: <String, Object?>{'outcome': 'erase_failed'},
+      );
+    } else {
+      _logger.info(
+        'Persisted session abandoned at the application lock.',
+        fields: <String, Object?>{'outcome': 'erased'},
+      );
+    }
+    return cleared;
   }
 
   Future<void> dispose() => _ended.close();

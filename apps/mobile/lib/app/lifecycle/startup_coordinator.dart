@@ -14,6 +14,12 @@
 //   3. session restore — from platform secure storage only;
 //   4. bootstrap fetch — the server's answer decides the rest.
 //
+// Step 2 comes before step 3, which is why a locked launch holds a credential
+// it has never read. There are exactly TWO ways past it: [unlock], after the
+// platform has authenticated the user, and [abandonLockedSession], which
+// destroys the stored credential rather than stepping around it. Neither one
+// skips a step; the second removes the thing the later steps would have found.
+//
 // FAIL CLOSED at every step. A keystore that will not answer is treated as no
 // credential. A bootstrap that will not resolve blocks protected content. An
 // operating-entity or capability state this build does not recognise blocks
@@ -150,6 +156,59 @@ final class StartupCoordinator {
   /// The user signed out. Ends the session; the session-end listener produces
   /// the resulting state.
   Future<void> signOut() => _sessions.end(SessionEndReason.signedOut);
+
+  /// The user could not satisfy the application lock and gave up the stored
+  /// session so they can authenticate with a password instead.
+  ///
+  /// WHY THIS IS NOT [signOut]. Look at the evaluation order at the top of
+  /// this file: the lock is checked at step 2, the credential is restored at
+  /// step 3. On a cold locked launch the tokens are on disk and
+  /// [SessionManager] still holds `NoSession`, so `end` short-circuits, wipes
+  /// nothing, and emits nothing — the button renders, responds, and leaves the
+  /// user on the lock with their credential intact. A warm process (locked
+  /// after backgrounding, session already adopted) hid it, because there `end`
+  /// has something to end. The state the fix has to survive is the one nobody
+  /// had modelled.
+  ///
+  /// WHAT IT DOES NOT DO, on purpose:
+  ///   * it does not restore first. Reading the credential in to end it would
+  ///     create the authenticated session the lock exists to prevent;
+  ///   * it does not mark the lock unlocked. Nothing here proves presence, and
+  ///     [AppLockGate] must go on reporting locked for this process;
+  ///   * it does not turn the lock preference off. That is the user's setting,
+  ///     and standing it down when the device can no longer satisfy it is
+  ///     already handled where availability is known;
+  ///   * it does not grant protected access. The destination is
+  ///     [Unauthenticated], which routes to sign-in and nowhere else.
+  ///
+  /// Idempotent — a second press re-clears an empty store and re-emits the
+  /// same state.
+  Future<void> abandonLockedSession() async {
+    final generation = ++_generation;
+    final abandoned = await _sessions.abandonPersistedSession();
+    if (generation != _generation) {
+      return;
+    }
+    final erased = abandoned is Success<void>;
+    if (!erased) {
+      // FAIL CLOSED, and say so. The credential may still be in the keystore,
+      // so the user is not told it was removed: the state carries the storage
+      // flag, the sign-in screen explains it, and the store itself refuses to
+      // restore what it could not erase.
+      _logger.error(
+        'Locked session abandoned but the credential could not be erased.',
+        fields: <String, Object?>{
+          'failure': abandoned.failureOrNull?.diagnosticLabel,
+        },
+      );
+    } else {
+      _logger.info(
+        'Locked session abandoned; the stored credential was erased.',
+        fields: <String, Object?>{'outcome': 'erased'},
+      );
+    }
+    _emit(Unauthenticated(secureStorageUnavailable: !erased), generation);
+  }
 
   Future<void> _restoreAndBootstrap(int generation) async {
     _emit(const SessionRestoring(), generation);

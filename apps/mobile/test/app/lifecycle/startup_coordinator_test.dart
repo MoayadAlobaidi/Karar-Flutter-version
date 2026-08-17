@@ -164,6 +164,111 @@ void main() {
     });
   });
 
+  group('abandoning a lock that cannot be opened', () {
+    /// A COLD locked launch: the credential is on disk and nothing has been
+    /// adopted, because the lock is evaluated before the restore step.
+    ///
+    /// `storeSession` deliberately is NOT used here — it adopts and restores,
+    /// which produces the warm state where `end` has something to end and the
+    /// defect this group covers is invisible.
+    Future<_Harness> coldLockedLaunch() async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      await SecureTokenStore(harness.secureStore).write(_liveTokens());
+      await harness.appLock.setEnabled(enabled: true);
+      await harness.coordinator.start();
+      expect(harness.coordinator.state, isA<AppLocked>());
+      expect(
+        harness.sessions.state,
+        isA<NoSession>(),
+        reason: 'the launch must be cold, or this group proves nothing',
+      );
+      return harness;
+    }
+
+    test('signing out cannot do it, which is why the operation exists', () async {
+      final harness = await coldLockedLaunch();
+
+      await harness.coordinator.signOut();
+      await Future<void>.delayed(Duration.zero);
+
+      // Documenting the trap rather than the fix: `end` short-circuits on
+      // `NoSession`, so this wipes nothing and emits nothing. If this ever
+      // starts failing, `end` has grown a cold-launch path and
+      // `abandonLockedSession` should be re-examined rather than the assertion
+      // relaxed.
+      expect(harness.coordinator.state, isA<AppLocked>());
+      expect(harness.secureStore.entries, isNotEmpty);
+    });
+
+    test('abandoning erases the credential and leaves APP_LOCKED', () async {
+      final harness = await coldLockedLaunch();
+
+      await harness.coordinator.abandonLockedSession();
+
+      final state = harness.coordinator.state;
+      expect(state, isA<Unauthenticated>());
+      expect((state as Unauthenticated).secureStorageUnavailable, isFalse);
+      expect(harness.secureStore.entries, isEmpty);
+      expect(harness.gateway.callCount, 0, reason: 'nothing protected may be fetched');
+    });
+
+    test('the lock gate is never marked unlocked', () async {
+      final harness = await coldLockedLaunch();
+
+      await harness.coordinator.abandonLockedSession();
+
+      expect(
+        harness.appLock.isLocked,
+        isTrue,
+        reason: 'giving up a session proves nothing to the device',
+      );
+      expect(harness.appLock.isEnabled, isTrue);
+    });
+
+    test('it is idempotent', () async {
+      final harness = await coldLockedLaunch();
+
+      await harness.coordinator.abandonLockedSession();
+      await harness.coordinator.abandonLockedSession();
+
+      expect(harness.coordinator.state, isA<Unauthenticated>());
+      expect(harness.secureStore.entries, isEmpty);
+    });
+
+    test('it also works when a session WAS adopted', () async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      await harness.storeSession(_liveTokens());
+      await harness.appLock.setEnabled(enabled: true);
+      await harness.coordinator.start();
+      expect(harness.sessions.state, isA<ActiveSession>());
+
+      await harness.coordinator.abandonLockedSession();
+
+      expect(harness.coordinator.state, isA<Unauthenticated>());
+      expect(harness.sessions.state, isA<NoSession>());
+      expect(harness.secureStore.entries, isEmpty);
+    });
+
+    test('an erase that fails is reported rather than dressed up', () async {
+      final harness = await coldLockedLaunch();
+      harness.secureStore.failingOperations.add(SecureStorageOperation.delete);
+
+      await harness.coordinator.abandonLockedSession();
+
+      final state = harness.coordinator.state;
+      expect(state, isA<Unauthenticated>());
+      expect(
+        (state as Unauthenticated).secureStorageUnavailable,
+        isTrue,
+        reason: 'the credential is still on disk; a plain Unauthenticated would '
+            'claim a removal that did not happen',
+      );
+      expect(harness.secureStore.entries, isNotEmpty);
+    });
+  });
+
   group('SESSION_RESTORING and UNAUTHENTICATED', () {
     test('no stored credential produces UNAUTHENTICATED', () async {
       final harness = _Harness();

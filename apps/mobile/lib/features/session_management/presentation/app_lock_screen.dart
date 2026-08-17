@@ -77,7 +77,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         // working must not be trapped behind a lock they cannot open; the
         // password is the fallback, and it is real authentication.
         //
-        // THIS ENDS THE SESSION RATHER THAN NAVIGATING.
+        // THIS DESTROYS THE STORED SESSION RATHER THAN NAVIGATING.
         //
         // `context.go(RoutePaths.signIn)` was the obvious implementation and it
         // did nothing at all: the startup state is still AppLocked, the single
@@ -88,18 +88,29 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         // `routeFor(AppLocked()) == /lock`, which is correct, and the trap
         // lived in the gap between that and the screen.
         //
-        // Ending the session moves the state to Unauthenticated, and the same
-        // redirect then routes to sign-in on its own. That is also the honest
-        // behaviour: the lock is not something a user may step around into an
-        // authenticated session, so the way past it is to stop being signed in
-        // and prove it again with a password.
+        // `signOut()` was the second attempt and was still wrong for the launch
+        // that matters. Startup evaluates the lock BEFORE it restores, so on a
+        // COLD locked launch the credential is on disk and `SessionManager`
+        // holds no session at all; `end` short-circuits on that, wipes nothing,
+        // and emits nothing. Only a warm process — locked after backgrounding,
+        // session already adopted — had anything for it to end, and that is the
+        // process the test happened to model.
+        //
+        // `abandonLockedSession()` erases what is PERSISTED whether or not a
+        // session was ever read into memory, and moves the state to
+        // Unauthenticated, which the same redirect then routes to sign-in on
+        // its own. That is also the honest behaviour: the lock is not something
+        // a user may step around into an authenticated session, so the way past
+        // it is to give up the stored session and prove who you are again.
         KararButton(
           label: l10n.appLockSignInInstead,
           variant: KararButtonVariant.secondary,
           isFullWidth: true,
           onPressed: state.isBusy
               ? null
-              : () => unawaited(ref.read(startupCoordinatorProvider).signOut()),
+              : () => unawaited(
+                    ref.read(startupCoordinatorProvider).abandonLockedSession(),
+                  ),
         ),
       ],
     );
