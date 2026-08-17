@@ -181,5 +181,62 @@ void main() {
       expect(contents, contains('sha256:'));
       expect(contents, contains('url: "https://pub.dev"'));
     });
+
+    test('every hosted package comes from pub.dev, and only from pub.dev', () {
+      // THIS IS AN EXCLUSIVITY CHECK, AND THE TEST ABOVE IS NOT.
+      //
+      // `contains('url: "https://pub.dev"')` passes as long as ONE entry names
+      // pub.dev. An audit proved the gap by redirecting a single package to a
+      // private mirror: 105 entries still said pub.dev, one did not, and the
+      // whole suite stayed green. `--enforce-lockfile` would then faithfully
+      // enforce the mirror, because the lockfile is the thing it trusts — a
+      // substituted dependency would be pinned, checksummed, reproducible, and
+      // not from the source anybody reviewed.
+      final List<String> lines = File('pubspec.lock').readAsLinesSync();
+
+      final List<String> foreign = <String>[];
+      var hostedUrls = 0;
+      for (final String rawLine in lines) {
+        final String line = rawLine.trim();
+        if (!line.startsWith('url:')) continue;
+        hostedUrls++;
+        final String url = line.substring('url:'.length).trim().replaceAll('"', '');
+        if (url != 'https://pub.dev') foreign.add(url);
+      }
+
+      // A lockfile with no `url:` lines at all would make the loop vacuous.
+      expect(
+        hostedUrls,
+        greaterThan(50),
+        reason: 'almost no hosted source was found in the lockfile, which means '
+            'this test is parsing nothing rather than that the lockfile is clean',
+      );
+      expect(
+        foreign.toSet(),
+        isEmpty,
+        reason: 'these hosted sources are not pub.dev:\n${foreign.toSet().join('\n')}\n'
+            'A package resolved from another host is reviewed by nobody here, '
+            'and the lockfile makes it reproducible rather than making it safe.',
+      );
+    });
+
+    test('every hosted package carries a checksum', () {
+      // A `sha256:` somewhere is not the same as one on every package. An entry
+      // without a digest is an entry whose bytes nothing pins.
+      final List<String> lines = File('pubspec.lock').readAsLinesSync();
+      final int hosted = lines
+          .where((String line) => line.trim() == 'source: hosted')
+          .length;
+      final int digests = lines
+          .where((String line) => line.trim().startsWith('sha256:'))
+          .length;
+      expect(hosted, greaterThan(50), reason: 'the lockfile was not parsed');
+      expect(
+        digests,
+        hosted,
+        reason: 'there are $hosted hosted packages but $digests checksums. '
+            'Every hosted package must pin its bytes, not most of them.',
+      );
+    });
   });
 }

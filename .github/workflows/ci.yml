@@ -245,6 +245,38 @@ jobs:
             -Pkarar.env=LOCAL \
             --dart-define=KARAR_ENV=LOCAL
 
+      # A RELEASE ASSEMBLY, BECAUSE DEBUG DOES NOT RUN THE SAME CHECKS.
+      #
+      # `lintVitalRelease` runs only on a release assembly. Building debug
+      # alone left a release build BROKEN across several commits without a
+      # single red check: `data_extraction_rules.xml` was missing an attribute
+      # that a debug parse accepts and lint rejects, so the security resource
+      # closing the device-transfer path made the shippable artifact
+      # unbuildable, and nothing here noticed.
+      #
+      # LOCAL is used because it needs no endpoint and no secret. The artifact
+      # is unsigned by construction — see the signing check below, which is the
+      # assertion that no debug key was substituted.
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            -Pkarar.env=LOCAL \
+            --dart-define=KARAR_ENV=LOCAL
+
+      - name: The release artifact is unsigned, not debug-signed
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)"
+          if "$apksigner" verify --print-certs "$apk" 2>/dev/null; then
+            echo "FAIL: the release artifact carries a signature. No signing"
+            echo "material exists in this repository, so a signature here means"
+            echo "the debug key was substituted — which would make an unsigned"
+            echo "release silently installable."
+            exit 1
+          fi
+          echo "OK: release artifact is unsigned, as intended."
+
       # THE ENVIRONMENT GUARD, PROVEN BY INVOCATION RATHER THAN BY INSPECTION.
       #
       # The Dart suite asserts each guard rule is PRESENT in the build script.

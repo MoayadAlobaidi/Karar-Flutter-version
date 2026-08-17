@@ -337,6 +337,49 @@ void main() {
 
       expect(find.text(l10n.appLockLockedOut), findsOneWidget);
     });
+
+    testWidgets('the password fallback actually ends the session', (
+      WidgetTester tester,
+    ) async {
+      // THE TEST ABOVE ASSERTS THE BUTTON EXISTS. THAT WAS NOT ENOUGH.
+      //
+      // It rendered, it was enabled, it responded to a tap — and it did
+      // nothing. The handler called `context.go(RoutePaths.signIn)` while the
+      // startup state was still AppLocked, and the single router redirect maps
+      // AppLocked to /lock and returns any other location to it. A user whose
+      // authenticator had stopped working was trapped, which is the precise
+      // outcome the screen's comment promises cannot happen. It was found by
+      // running the application; every unit test in this file passed
+      // throughout, including one asserting `routeFor(AppLocked()) == /lock`,
+      // which is correct and was never the problem.
+      //
+      // So this presses the button and asserts a CONSEQUENCE rather than a
+      // destination: the stored session is gone. That is what makes the
+      // password a real fallback — the user is signed out and must
+      // authenticate again, rather than stepping around the lock.
+      final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
+      await harness.signInFixture();
+      expect(
+        harness.secureEntries,
+        isNotEmpty,
+        reason: 'the fixture must establish a session, or this test proves '
+            'nothing by finding none afterwards',
+      );
+
+      await pumpIdentity(tester, const AppLockScreen(), harness: harness);
+      await tester.pumpAndSettle();
+      await tapIdentityButton(tester, _english.appLockSignInInstead);
+      await tester.pumpAndSettle();
+
+      expect(
+        harness.secureEntries,
+        isEmpty,
+        reason: 'pressing the password fallback must end the session, so the '
+            'startup state leaves AppLocked and routing reaches sign-in on its '
+            'own. Tokens still in the store mean the button did nothing again.',
+      );
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('lock setting', () {

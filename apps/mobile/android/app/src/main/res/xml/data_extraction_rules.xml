@@ -62,7 +62,23 @@
         <exclude domain="device_database" />
         <exclude domain="device_sharedpref" />
     </device-transfer>
-    <cross-platform-transfer>
+    <!--
+      `platform` is REQUIRED on this element and on neither of the two above.
+      Omitting it does not make the section permissive; it makes the resource
+      invalid, and lintVitalRelease then fails with "Missing required attribute
+      platform".
+
+      That asymmetry hid a broken release build for several commits. A debug
+      assembly parses this file happily and lintVitalRelease runs only on a
+      release assembly, so the debug APK CI builds passed throughout while a
+      release APK could not be produced at all. The CI job now assembles a
+      release artifact for exactly this reason.
+
+      `apple_icloud` names the transfer this section governs: an Android to iOS
+      migration, where the data leaves the Android security model altogether.
+      It is the only platform the framework defines here.
+    -->
+    <cross-platform-transfer platform="apple_icloud">
         <exclude domain="root" />
         <exclude domain="file" />
         <exclude domain="database" />

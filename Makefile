@@ -8,7 +8,7 @@ SHELL := /bin/bash
 # CI set the variable explicitly.
 export KARAR_ENV ?= local
 
-.PHONY: prisma-generate prisma-drift help doctor bootstrap dev down reset-local generate lint test architecture-test security-scan docs-check verify db-create db-migrate db-verify db-reset-local
+.PHONY: prisma-generate prisma-drift help doctor bootstrap dev down reset-local generate lint test test-golden architecture-test security-scan docs-check verify db-create db-migrate db-verify db-reset-local
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -44,9 +44,17 @@ lint: ## ESLint and Prettier check
 	pnpm lint
 	pnpm format:check
 
-test: ## Vitest workspace suites and Flutter tests
+test: ## Vitest workspace suites and Flutter tests (golden baselines excluded, as in CI)
 	pnpm test
-	cd apps/mobile && flutter test
+	# --exclude-tags golden matches what CI runs. Without it, `make test` and CI
+	# disagree about which tests exist: the golden baselines were rasterised on
+	# one machine and the default comparator is zero-tolerance, so they pass or
+	# fail on where they run rather than on whether anything regressed. Run them
+	# deliberately with `make test-golden`.
+	cd apps/mobile && flutter test --exclude-tags golden
+
+test-golden: ## Golden baselines only (see docs/architecture/flutter.md on their platform limits)
+	cd apps/mobile && flutter test --tags golden
 
 architecture-test: ## Architecture rules (scripts/checks/architecture.mjs)
 	pnpm arch:test

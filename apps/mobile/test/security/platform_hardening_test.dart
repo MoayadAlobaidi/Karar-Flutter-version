@@ -154,16 +154,24 @@ void main() {
       final rules = _declarations(_dataExtractionRules);
 
       for (final mode in _dataExtractionModes) {
+        // The opening tag may carry attributes — `<cross-platform-transfer>`
+        // REQUIRES `platform`, and omitting it does not make the section
+        // permissive, it makes the whole resource invalid and fails
+        // lintVitalRelease. Matching the bare `<mode>` form would therefore
+        // fail on a correct file and pass on one missing the attribute
+        // entirely, which is backwards.
+        final RegExp opening = RegExp('<$mode(\\s[^>]*)?>');
         expect(
-          rules,
-          contains('<$mode>'),
+          opening.hasMatch(rules),
+          isTrue,
           reason: 'an undeclared <$mode> section is fully enabled for all content, '
               'not off',
         );
 
-        final section = RegExp('<$mode>(.*?)</$mode>', dotAll: true)
-            .firstMatch(rules)
-            ?.group(1);
+        final section =
+            RegExp('<$mode(?:\\s[^>]*)?>(.*?)</$mode>', dotAll: true)
+                .firstMatch(rules)
+                ?.group(1);
         expect(section, isNotNull);
         for (final domain in _backupDomains) {
           expect(
@@ -180,6 +188,28 @@ void main() {
         isNot(contains('<include')),
         reason: 'an include element would re-admit content to a mode this file exists '
             'to empty',
+      );
+    });
+
+    test('cross-platform-transfer names the platform it governs', () {
+      // This resource shipped INVALID for several commits and nothing caught
+      // it. `platform` is required on this section and on neither of the other
+      // two; without it `lintVitalRelease` fails, so the Android release build
+      // could not be produced at all — while `flutter build apk --debug`, the
+      // only Android build CI performed, parsed the same file happily.
+      //
+      // The security consequence is not that the section became permissive. It
+      // is that a resource whose entire job is closing the device-transfer path
+      // made the shippable artifact unbuildable, and the gap between "debug
+      // builds" and "release builds" hid it. CI now assembles a release too.
+      final rules = _declarations(_dataExtractionRules);
+      expect(
+        RegExp(r'<cross-platform-transfer\s+platform="[a-z_]+"\s*>')
+            .hasMatch(rules),
+        isTrue,
+        reason: 'cross-platform-transfer must declare the platform attribute. '
+            'Without it the resource does not parse for lint and no release '
+            'artifact can be built.',
       );
     });
 

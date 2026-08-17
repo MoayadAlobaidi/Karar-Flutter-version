@@ -6,11 +6,13 @@
 // checks — which may still end at sign-in, if the session expired while the
 // application was away. That is correct, and the copy does not pretend
 // otherwise.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app/routing/route_paths.dart';
+import '../../../app/dependency_injection/providers.dart';
 import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
@@ -74,11 +76,30 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         // Always available. A user whose device authenticator has stopped
         // working must not be trapped behind a lock they cannot open; the
         // password is the fallback, and it is real authentication.
+        //
+        // THIS ENDS THE SESSION RATHER THAN NAVIGATING.
+        //
+        // `context.go(RoutePaths.signIn)` was the obvious implementation and it
+        // did nothing at all: the startup state is still AppLocked, the single
+        // router redirect maps AppLocked to /lock, and any location that is not
+        // /lock is sent back to it. The button rendered, responded, and
+        // returned the user to the screen they pressed it on. It was found by
+        // running the app, not by reading it — the unit test asserted
+        // `routeFor(AppLocked()) == /lock`, which is correct, and the trap
+        // lived in the gap between that and the screen.
+        //
+        // Ending the session moves the state to Unauthenticated, and the same
+        // redirect then routes to sign-in on its own. That is also the honest
+        // behaviour: the lock is not something a user may step around into an
+        // authenticated session, so the way past it is to stop being signed in
+        // and prove it again with a password.
         KararButton(
           label: l10n.appLockSignInInstead,
           variant: KararButtonVariant.secondary,
           isFullWidth: true,
-          onPressed: state.isBusy ? null : () => context.go(RoutePaths.signIn),
+          onPressed: state.isBusy
+              ? null
+              : () => unawaited(ref.read(startupCoordinatorProvider).signOut()),
         ),
       ],
     );
