@@ -187,11 +187,15 @@ class _KararTextFieldState extends State<KararTextField> {
         _Assistive(
           errorText: widget.errorText,
           helperText: widget.helperText,
+          // The count is a quantity, so its digits follow the formatter rather
+          // than whichever locale the generated bundle was loaded for.
           counter: widget.maxLength == null
               ? null
-              : context.l10n.fieldCharacterCount(
-                  _controller.text.characters.length,
-                  widget.maxLength!,
+              : context.formatter.applyNumerals(
+                  context.l10n.fieldCharacterCount(
+                    _controller.text.characters.length,
+                    widget.maxLength!,
+                  ),
                 ),
         ),
       ],

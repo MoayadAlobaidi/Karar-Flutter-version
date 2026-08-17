@@ -102,8 +102,11 @@ class _Destination extends StatelessWidget {
       selected: isSelected,
       label: destination.label,
       // Position is spoken so a user who cannot see the bar knows where they
-      // are in it.
-      hint: context.l10n.a11yTabPosition(position, total),
+      // are in it. It is read out as a number, so it takes the same digits as
+      // every other number in the interface.
+      hint: context.formatter.applyNumerals(
+        context.l10n.a11yTabPosition(position, total),
+      ),
       onTap: onPressed,
       excludeSemantics: true,
       child: InkResponse(

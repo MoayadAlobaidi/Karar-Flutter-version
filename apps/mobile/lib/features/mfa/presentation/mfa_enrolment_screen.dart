@@ -179,7 +179,11 @@ class _MfaEnrolmentScreenState extends ConsumerState<MfaEnrolmentScreen> {
           padding: EdgeInsetsDirectional.only(bottom: context.spacing.sm),
           child: _RecoveryCodeRow(
             code: codes.codes[index],
-            semanticLabel: l10n.a11yRecoveryCodePosition(index + 1, codes.count),
+            // Position and total are spoken as numbers, so they take the
+            // interface's digits rather than the generated bundle's.
+            semanticLabel: context.formatter.applyNumerals(
+              l10n.a11yRecoveryCodePosition(index + 1, codes.count),
+            ),
           ),
         ),
       const IdentityGap(),

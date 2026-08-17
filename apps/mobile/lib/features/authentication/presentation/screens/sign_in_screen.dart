@@ -111,6 +111,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   l10n,
                   state.passwordViolation!,
                   policy: policy,
+                  formatter: context.formatter,
                 ),
           onSubmitted: (_) => _submit(),
         ),

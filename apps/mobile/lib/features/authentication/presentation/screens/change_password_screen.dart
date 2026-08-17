@@ -106,6 +106,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     l10n,
                     state.passwordViolation!,
                     policy: policy,
+                    formatter: context.formatter,
                   ),
           ),
           const IdentityGap(),

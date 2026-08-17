@@ -115,7 +115,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           helperText: l10n.registerPasswordHelp,
           errorText: state.passwordViolation == null
               ? null
-              : passwordViolationMessage(l10n, state.passwordViolation!, policy: policy),
+              : passwordViolationMessage(
+                  l10n,
+                  state.passwordViolation!,
+                  policy: policy,
+                  formatter: context.formatter,
+                ),
         ),
         const IdentityGap(),
         KararTextField(

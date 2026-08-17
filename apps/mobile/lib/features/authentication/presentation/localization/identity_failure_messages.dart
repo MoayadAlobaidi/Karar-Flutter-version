@@ -12,6 +12,7 @@
 // `stateErrorReference` string.
 import '../../../../core/errors/failure.dart';
 import '../../../../l10n/karar_localization.dart';
+import '../../../../shared/shared.dart';
 import '../../domain/value_objects/email_address.dart';
 import '../../domain/value_objects/password.dart';
 
@@ -120,15 +121,23 @@ String emailViolationMessage(AppLocalizations l10n, EmailViolation violation) =>
     };
 
 /// The message for a broken password field.
+///
+/// Two arms carry a length, and the field's own helper text carries the same
+/// number, so [formatter] is required rather than optional: a message whose
+/// digits are shaped by the generated bundle and a helper line whose digits are
+/// shaped by the formatter would show one policy in two alphabets.
 String passwordViolationMessage(
   AppLocalizations l10n,
   PasswordViolation violation, {
   required PasswordPolicy policy,
+  required KararFormatter formatter,
 }) =>
     switch (violation) {
       PasswordViolation.empty => l10n.passwordEmpty,
-      PasswordViolation.tooShort => l10n.passwordTooShort(policy.minimumLength),
-      PasswordViolation.tooLong => l10n.passwordTooLong(policy.maximumLength),
+      PasswordViolation.tooShort =>
+        formatter.applyNumerals(l10n.passwordTooShort(policy.minimumLength)),
+      PasswordViolation.tooLong =>
+        formatter.applyNumerals(l10n.passwordTooLong(policy.maximumLength)),
     };
 
 /// Whether the server's field list names [field].

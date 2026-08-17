@@ -120,6 +120,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     l10n,
                     state.passwordViolation!,
                     policy: policy,
+                    formatter: context.formatter,
                   ),
           ),
           const IdentityGap(),

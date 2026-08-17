@@ -351,7 +351,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get registerConfirmPasswordLabel => 'تأكيد كلمة المرور';
 
   @override
-  String get registerPasswordHelp => '٨ أحرف على الأقل.';
+  String get registerPasswordHelp => '8 أحرف على الأقل.';
 
   @override
   String get registerAcknowledgementTitle => 'تحقّق من بريدك الإلكتروني';
@@ -368,13 +368,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get verifyEmailSubtitle =>
-      'أدخل الرمز المكوّن من ٨ خانات الذي أرسلناه إليك. لا يظهر هذا الرمز في أي مكان آخر.';
+      'أدخل الرمز المكوّن من 8 خانات الذي أرسلناه إليك. لا يظهر هذا الرمز في أي مكان آخر.';
 
   @override
   String get verifyEmailCodeLabel => 'رمز التحقق';
 
   @override
-  String get verifyEmailCodeHint => '٨ خانات';
+  String get verifyEmailCodeHint => '8 خانات';
 
   @override
   String get verifyEmailAction => 'تأكيد';
@@ -408,7 +408,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get forgotPasswordAcknowledgementMessage =>
-      'إذا كان بإمكان هذا العنوان استقبال إعادة تعيين، فالتعليمات في طريقها إليك. تنتهي صلاحية الرابط بعد ٣٠ دقيقة من إرساله.';
+      'إذا كان بإمكان هذا العنوان استقبال إعادة تعيين، فالتعليمات في طريقها إليك. تنتهي صلاحية الرابط بعد 30 دقيقة من إرساله.';
 
   @override
   String get resetPasswordTitle => 'تعيين كلمة مرور جديدة';
@@ -519,7 +519,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mfaEnrolStepConfirm =>
-      'أدخل الرمز المكوّن من ٦ أرقام الذي يعرضه تطبيقك الآن.';
+      'أدخل الرمز المكوّن من 6 أرقام الذي يعرضه تطبيقك الآن.';
 
   @override
   String get mfaEnrolSecretLabel => 'مفتاح الإعداد';
@@ -535,7 +535,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get mfaCodeLabel => 'رمز التحقق';
 
   @override
-  String get mfaCodeHint => '٦ أرقام';
+  String get mfaCodeHint => '6 أرقام';
 
   @override
   String get mfaConfirmAction => 'تفعيل التحقق بخطوتين';
@@ -567,7 +567,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mfaChallengeSubtitle =>
-      'افتح تطبيق المصادقة وأدخل الرمز المكوّن من ٦ أرقام.';
+      'افتح تطبيق المصادقة وأدخل الرمز المكوّن من 6 أرقام.';
 
   @override
   String get mfaChallengeUseRecovery => 'استخدام رمز استرجاع بدلًا من ذلك';

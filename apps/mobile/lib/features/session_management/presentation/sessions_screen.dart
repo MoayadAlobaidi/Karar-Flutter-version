@@ -81,14 +81,18 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
         title: l10n.sessionsTitle,
         onBack: () => context.pop(),
         children: <Widget>[
-          ..._notices(l10n, state),
+          ..._notices(context, l10n, state),
           ..._content(context, l10n, state),
         ],
       ),
     );
   }
 
-  List<Widget> _notices(AppLocalizations l10n, SessionsViewState state) {
+  List<Widget> _notices(
+    BuildContext context,
+    AppLocalizations l10n,
+    SessionsViewState state,
+  ) {
     final Failure? revocationFailure = state.revocationFailure;
     final int? revokedOthers = state.revokedOthersCount;
     return <Widget>[
@@ -103,7 +107,12 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen> {
         ),
       if (revokedOthers != null)
         IdentityFailureNotice(
-          message: l10n.sessionsRevokedOthersNotice(revokedOthers),
+          // The count takes the same digits as the timestamps below it; the
+          // generated message formats against the bundle's locale, not the
+          // formatter's, so it cannot be trusted to agree on its own.
+          message: context.formatter.applyNumerals(
+            l10n.sessionsRevokedOthersNotice(revokedOthers),
+          ),
           tone: KararStatusTone.success,
         ),
     ];

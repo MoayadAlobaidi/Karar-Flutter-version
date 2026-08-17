@@ -105,6 +105,55 @@ class KararFormatter {
     );
   }
 
+  // ------------------------------------------------- generated ICU messages
+
+  /// Applies this formatter's numeral system to a string that was localized
+  /// and formatted somewhere else — in practice the return value of a
+  /// generated `AppLocalizations` method carrying an ICU numeric placeholder.
+  ///
+  /// The placeholder has to stay an `int` on the way in. `{count, plural, …}`
+  /// picks its arm from the number itself, and Arabic uses six plural
+  /// categories, so handing the message a pre-formatted string would silently
+  /// collapse them to `other`. The value therefore cannot go through [integer]
+  /// before the message; the message goes through the formatter after it
+  /// instead. `intl` inside the generated method still does the grouping and
+  /// the separators, and this rewrites only the digit shapes — the same pass
+  /// [integer] and [date] already apply to their own `intl` output. That is
+  /// what stops a count and the timestamp beside it from disagreeing.
+  ///
+  /// NOT for a string carrying an identifier. Every ASCII digit is rewritten,
+  /// which is right for a quantity and wrong for a support reference a user
+  /// reads back over the phone or pastes into a search box.
+  String applyNumerals(String formatted) {
+    return ArabicNumerals.applySystem(formatted, _effectiveNumerals);
+  }
+
+  /// [numerals] with [KararNumeralSystem.locale] resolved against this
+  /// formatter's own CLDR data.
+  ///
+  /// The generated localizations format their placeholders against the
+  /// language subtag alone — `lookupAppLocalizations` answers `ar_EG` with the
+  /// `ar` bundle, whose `localeName` is `ar` — while this formatter uses the
+  /// whole locale. Under any locale whose CLDR numbering system is `arab` that
+  /// difference on its own is enough to put Western digits in a count and
+  /// Arabic-Indic digits in the date beside it. Resolving the passthrough arm
+  /// here removes the difference: the digits follow the formatter, never
+  /// whichever bundle the generator happened to load.
+  ///
+  /// The methods above do not need this. They format against [_localeName]
+  /// themselves, so CLDR has already given them the locale's own digits and
+  /// resolving would be a no-op.
+  KararNumeralSystem get _effectiveNumerals {
+    if (numerals != KararNumeralSystem.locale) {
+      return numerals;
+    }
+    return ArabicNumerals.containsArabicIndicDigits(
+          NumberFormat.decimalPattern(_localeName).symbols.ZERO_DIGIT,
+        )
+        ? KararNumeralSystem.arabicIndic
+        : KararNumeralSystem.western;
+  }
+
   // ----------------------------------------------------------------- money
 
   /// Formats a monetary value carried as minor units plus an ISO 4217 code.
