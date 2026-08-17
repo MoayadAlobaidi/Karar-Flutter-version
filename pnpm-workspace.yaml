@@ -1,3 +1,16 @@
+overrides:
+  # deepmerge-ts < 8.0.0 exhausts the stack when merging recursive object
+  # graphs (GHSA-ggr8-5vv4-36mx, high). It reaches this repository only
+  # transitively, through @prisma/config -> prisma, where it merges the
+  # Prisma configuration file this repository authors — not attacker-supplied
+  # input — so the reachable severity here is far below the advisory's. The
+  # override is applied anyway: an unpatched high advisory against the
+  # lockfile is a standing supply-chain finding that every future reviewer has
+  # to re-triage, and forcing the patched line costs nothing if the resolution
+  # holds. If it ever conflicts with a Prisma upgrade, remove it and record
+  # the reachability argument instead of pinning around the conflict.
+  deepmerge-ts: '>=8.0.0'
+
 # apps/mobile is a Flutter project, not a pnpm package — excluded explicitly.
 packages:
   - 'apps/*'
