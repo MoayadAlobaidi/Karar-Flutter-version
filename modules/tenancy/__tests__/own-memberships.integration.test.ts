@@ -154,6 +154,48 @@ describe.skipIf(unreachable !== null)('own-membership listing (live PostgreSQL)'
     }
   });
 
+  it('serializes EXACTLY the seven declared fields — the response set is closed', async () => {
+    const { statusCode, body } = await listAs({ userId: USER_A1, sessionId: 'session-a1' });
+
+    expect(statusCode).toBe(200);
+    const memberships = body.memberships ?? [];
+    // Non-empty first, as always: an empty list would satisfy a `for` loop of
+    // key assertions without ever inspecting a serialized membership.
+    expect(memberships).toHaveLength(2);
+
+    // WHY THIS IS ASSERTED AT ALL. `toMembershipResponse` is a hand-written
+    // mapper, which is exactly why it is safe today and unguarded tomorrow:
+    // one `...membership` spread — the shortest edit a future contributor
+    // could make — would widen every membership answer to the whole domain
+    // row, and no existing test would notice. Pinning the key set makes that
+    // edit a failing test rather than a silent change to what the client
+    // contract (packages/api-contracts/openapi/paths/tenancy.yaml) promises.
+    for (const row of memberships) {
+      expect(Object.keys(row).sort()).toEqual([
+        'effectiveFrom',
+        'effectiveTo',
+        'id',
+        'roleHint',
+        'state',
+        'tenantId',
+        'userId',
+      ]);
+    }
+
+    // And the mapper genuinely DROPS things — the domain membership the
+    // repository returns carries more than the response does, so the closed
+    // set above is a real narrowing rather than a restatement of the row.
+    const domainRows = await new ListOwnMemberships(
+      new PrismaMembershipRepository(handle),
+      clock,
+    ).execute({ userId: USER_A1 });
+    expect(domainRows.ok).toBe(true);
+    if (!domainRows.ok) return;
+    const domainKeys = Object.keys(domainRows.value[0] ?? {});
+    expect(domainKeys).toEqual(expect.arrayContaining(['createdAt', 'updatedAt']));
+    expect(domainKeys.length).toBeGreaterThan(7);
+  });
+
   it('never carries another user’s memberships — invisibility, not an error', async () => {
     const own = await listAs({ userId: USER_B2, sessionId: 'session-b2' });
 
