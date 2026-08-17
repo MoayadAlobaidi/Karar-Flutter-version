@@ -96,14 +96,41 @@ final class SessionAdoption {
 
   /// Wipes every local credential and ends the session.
   ///
-  /// `deleteAll` covers the session credential and any other entry this
-  /// application owns in the platform keystore. It runs even when the wipe
-  /// reports a failure, because the in-memory credential is dropped either
-  /// way — a credential that cannot be erased from disk must at least stop
-  /// being used.
+  /// THIS RUNS WHEN THERE MAY BE NO SESSION IN MEMORY, WHICH IS WHY IT DOES
+  /// NOT RELY ON `end`.
+  ///
+  /// Its main caller is password reset, which is designed to be usable from a
+  /// signed-out device — and a cold launch whose restore failed leaves
+  /// `SessionManager` in `NoSession` with the credential still on disk. `end`
+  /// short-circuits on `NoSession`, correctly for its own purpose, so on that
+  /// path it wipes nothing. `abandonPersistedSession` is the operation that
+  /// does not care whether a session was ever read into memory.
+  ///
+  /// Going through it also raises the durable invalidation marker, which a
+  /// bare `deleteAll` does not: `deleteAll` addresses the platform store
+  /// directly and bypasses `TokenStore` entirely, so a failed wipe left NO
+  /// record that the credential had been given up. On the password-reset path
+  /// that is the dangerous case — the server has already revoked the session,
+  /// and a credential that survives locally is presented on the next refresh,
+  /// which the platform treats as token theft.
+  ///
+  /// `deleteAll` still runs afterwards, because it covers every other entry
+  /// this application owns in the keystore rather than only the session
+  /// credential. A failure in either step is logged and does not stop the
+  /// other: a credential that cannot be erased must at least stop being used,
+  /// and the marker is what makes that stick across a relaunch.
   Future<void> clearLocalCredentials(SessionEndReason reason) async {
     _challenges.discard();
-    await _sessions.end(reason);
+
+    final Result<void> abandoned = await _sessions.abandonPersistedSession();
+    if (abandoned is Failed<void>) {
+      _logger.error(
+        'The persisted session could not be erased; it is marked abandoned so '
+        'a later launch will not restore it.',
+        fields: <String, Object?>{'reason': reason.name},
+      );
+    }
+
     final Result<void> wiped = await _secureStore.deleteAll();
     if (wiped is Failed<void>) {
       _logger.error(

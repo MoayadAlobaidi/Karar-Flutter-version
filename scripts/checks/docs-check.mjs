@@ -289,6 +289,84 @@ function checkLinks(files) {
   return problems;
 }
 
+// PHASE STATUS MUST AGREE ACROSS EVERY DOCUMENT THAT STATES IT.
+//
+// A commit whose entire purpose was to stop claiming Phase 4 was COMPLETE
+// updated three documents and left five others saying COMPLETE — including
+// `docs/roadmap.md`, the canonical phase table, and a prose block in the same
+// README whose status block had just been corrected. Every individual document
+// was internally coherent; nothing compared them, so nothing failed.
+//
+// This reads the current phase and its status from the README status block,
+// then requires that no other tracked document contradicts it. It deliberately
+// checks only the CURRENT phase: earlier phases are settled history and later
+// ones are not claimed yet.
+function checkPhaseStatusConsistency(files) {
+  const problems = [];
+  const readmePath = path.join(REPO_ROOT, 'README.md');
+  if (!fs.existsSync(readmePath)) return ['README.md missing'];
+  const readme = fs.readFileSync(readmePath, 'utf8');
+
+  const status = readme.match(
+    /\|\s*Current phase\s*\|\s*\*\*([0-9.]+)\s*[—-]\s*([A-Z ]+?)\*\*/,
+  );
+  if (!status) {
+    return ['README.md has no parseable "Current phase" row; every other check here depends on it'];
+  }
+  const [, phase, declared] = [status[0], status[1], status[2].trim()];
+
+  // Only a claim of completion is a contradiction. "IN PROGRESS" elsewhere is
+  // agreement, and a document may legitimately not mention the phase at all.
+  if (declared === 'COMPLETE') return problems;
+
+  const claim = new RegExp(
+    `Phase ${phase.replace('.', '\\.')}\\b[^.\n]{0,80}?\\b(?:is |was |—\\s*)?COMPLETE\\b` +
+      `|Phase ${phase.replace('.', '\\.')}\\b[^.\n]{0,80}?\\bis complete\\b` +
+      `|\\bPhase ${phase.replace('.', '\\.')} delivered\\b`,
+    'i',
+  );
+
+  for (const file of files) {
+    const relative = path.relative(REPO_ROOT, file);
+    // Phase reports for EARLIER phases are historical records and correctly
+    // describe their own phase as complete.
+    if (/docs\/phases\/phase-0(?!4)/.test(relative)) continue;
+    // The compliance corpus is a dated gate snapshot; it scopes its own claims.
+    if (relative.startsWith('docs/compliance/')) continue;
+
+    const text = fs.readFileSync(file, 'utf8');
+    text.split('\n').forEach((line, index) => {
+      // A line that states what COMPLETE would mean, or denies completion, is
+      // not a claim of it.
+      if (/does not mean|will mean|not complete|NOT a closeout|is NOT complete/i.test(line)) return;
+
+      // A TABLE ROW states the phase in one cell and its status in another, so
+      // no "Phase 4 ... COMPLETE" prose pattern can ever match it. That is the
+      // exact shape the canonical roadmap table uses, and the exact shape that
+      // survived the correction it was supposed to receive.
+      const cells = line.startsWith('|') ? line.split('|').map((c) => c.trim()) : null;
+      const isPhaseRow =
+        cells !== null &&
+        cells.some((c) => c.replace(/\*/g, '').trim() === phase);
+      if (isPhaseRow && /\bCOMPLETE\b/.test(line)) {
+        problems.push(
+          `${relative}:${index + 1} is a table row for phase ${phase} marked COMPLETE, ` +
+            `but README declares it ${declared}.`,
+        );
+        return;
+      }
+
+      if (claim.test(line)) {
+        problems.push(
+          `${relative}:${index + 1} says Phase ${phase} is COMPLETE, but README declares it ${declared}. ` +
+            'A status stated in more than one place has to agree in all of them.',
+        );
+      }
+    });
+  }
+  return problems;
+}
+
 function checkReadmePhase(registry) {
   const problems = [];
   const readmePath = path.join(REPO_ROOT, 'README.md');
@@ -822,6 +900,7 @@ function main() {
     { name: 'internal-links', problems: checkLinks(files) },
     { name: 'readme-current-phase', problems: checkReadmePhase(registry) },
     { name: 'phase-report-exists', problems: checkPhaseReport(registry) },
+    { name: 'phase-status-consistency', problems: checkPhaseStatusConsistency(files) },
     { name: 'adr-references', problems: checkAdrReferences(files) },
     { name: 'module-docs', problems: checkModuleDocs() },
     { name: 'mermaid-sanity', problems: checkMermaid(files) },

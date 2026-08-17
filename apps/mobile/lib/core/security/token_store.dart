@@ -15,9 +15,11 @@
 // The semantics are therefore FAIL CLOSED, in this order:
 //
 //   1. An invalidation marker is recorded BEFORE the erase is attempted.
-//      Recording the intent first is what makes it crash-safe: a process that
+//      Recording the intent first is what ORDERS it correctly: a process that
 //      dies between a failed delete and a marker written afterwards would
-//      leave an abandoned credential sitting there, restorable.
+//      leave an abandoned credential sitting there, restorable. See the
+//      durability limit below — the ordering is right, the write is not
+//      guaranteed.
 //   2. The marker is lowered only on a CONFIRMED successful erase, or on a
 //      CONFIRMED successful write of a replacement credential. A write that
 //      did not happen therefore cannot resurrect the credential it was meant
@@ -35,6 +37,28 @@
 // than in secure storage deliberately: a marker written through the very port
 // that just refused a delete would be unavailable at precisely the moment it
 // is needed.
+//
+// THE MARKER WRITE IS NOT GUARANTEED TO REACH DISK, AND THIS IS THE SHARPEST
+// LIMIT OF THE MECHANISM. `KeyValueStore.writeBool` updates an in-memory
+// snapshot and then swallows any platform failure (see
+// `preferences_key_value_store.dart`, `_guard`), and the preference store
+// falls back to a purely in-memory implementation when the platform store
+// cannot be opened at all. So `raise()` returns normally, `isRaised` reads the
+// snapshot and answers true for the rest of the process, and NOTHING SURVIVES
+// A RELAUNCH.
+//
+// The failure that defeats this is therefore a compound one: the preference
+// write fails silently AND the secure delete fails AND the process restarts
+// AND the keystore recovers. In that sequence the abandoned credential is
+// restored. The single-failure cases the marker was written for — a delete
+// that fails while preferences work, which is the realistic keystore fault —
+// are covered, and that is the whole of what it covers.
+//
+// Closing this needs a preference write that can report failure, which the
+// port cannot do today; widening `KeyValueStore` for it is a change with a
+// far larger blast radius than this file and is recorded as a follow-up
+// rather than smuggled in here. Until then, do not describe this as
+// crash-safe without the qualifier above.
 //
 // WHAT THIS STILL DOES NOT DO. The credential is physically still in the
 // platform keystore until some later erase succeeds. Preferences are plain and

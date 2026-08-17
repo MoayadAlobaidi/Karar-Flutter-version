@@ -44,7 +44,7 @@ No screen is built for a later capability, and no fabricated balance, account, t
 
 ## Branch and base
 
-Twenty-one commits on `claude/karar-v2-phase-4-flutter-foundation` from `e23bbc8`, counted with `git rev-list --count`. Three are backend (`3383b2f`, `22df3fe`, `6ddf7c0`); one opens the phase; one is a `.gitignore` correction; the remainder are the client, its platform configuration, and the fixes that review and execution forced. The count moves with every remediation round, so it is recalculated from Git rather than carried forward. **No database migration was added, and no permission was declared or seeded** — the phase is read, projection, and presentation work over the Phase 3.5 schema, and every new operation is self-scoped.
+The branch history is counted with `git rev-list --count e23bbc8..HEAD` rather than written down, because every remediation round adds to it and a number recorded in prose is stale the moment the commit recording it lands — which has now happened twice, at eighteen and again at twenty-one. The composition is stable even as the count moves: three backend commits (`3383b2f`, `22df3fe`, `6ddf7c0`), one opening the phase, one `.gitignore` correction, and the remainder client work and the fixes that review and execution forced. **No database migration was added, and no permission was declared or seeded** — the phase is read, projection, and presentation work over the Phase 3.5 schema, and every new operation is self-scoped.
 
 ## Agent/workstream ownership
 

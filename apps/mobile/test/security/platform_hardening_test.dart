@@ -276,38 +276,37 @@ void main() {
       }
     });
 
-    test('no platform-specific-params carries a fabricated Apple identity', () {
-      // The element carries bundleId, teamId and contentVersion, which
-      // identify the iOS counterpart this app's data may be matched TO. They
-      // exist to ENABLE a match. No Apple Team ID is configured for this
-      // project and no iOS counterpart is published, so declaring one would
-      // put an invented identity into a shipping artifact.
+    test('no platform-specific-params element is declared at all', () {
+      // ABSENCE IS THE ASSERTION, NOT PLAUSIBILITY.
       //
-      // Their absence cannot widen anything — with no counterpart identified
-      // there is nothing to match, and every domain is excluded regardless.
-      // If they are ever added, they must carry a real, configured, evidenced
-      // Team ID, and this test is where that decision gets made deliberately.
+      // The previous version rejected a list of literal placeholders — TEAMID,
+      // XXXXXXXXXX, TODO. An independent review inserted
+      // `teamId="9ZX7Q4KD22"`, an entirely invented but syntactically valid
+      // Team ID, and the whole suite passed. A test that can only recognise
+      // obviously-fake identities cannot distinguish a real one from a
+      // convincing fabrication, which is the only distinction that matters.
+      //
+      // So the rule is categorical: the element must not appear. It carries
+      // bundleId, teamId and contentVersion, which identify the iOS
+      // counterpart data may be matched TO — they exist to ENABLE a match, and
+      // the framework reads the presence of an entry as "export to and import
+      // from that platform is supported" (FullBackup.java:486-488). Absence
+      // leaves the map empty, which the framework reads as NOT supported.
+      //
+      // Adding it is therefore a deliberate decision requiring a real,
+      // configured, evidenced Apple Team ID and a published counterpart app.
+      // When that happens, this test is the place the decision is recorded —
+      // by being changed, on purpose, with the evidence in the commit.
       final rules = _declarations(_dataExtractionRules);
-      if (!rules.contains('<platform-specific-params')) {
-        return;
-      }
-      for (final String placeholder in <String>[
-        'TEAMID',
-        'XXXXXXXXXX',
-        'teamId=""',
-        'ABCDE12345',
-        'TODO',
-        'PLACEHOLDER',
-        'example',
-      ]) {
-        expect(
-          rules,
-          isNot(contains(placeholder)),
-          reason: 'platform-specific-params carries the placeholder '
-              '"$placeholder". A fabricated Apple identity in a shipping '
-              'artifact is worse than no element at all.',
-        );
-      }
+      expect(
+        rules,
+        isNot(contains('platform-specific-params')),
+        reason: 'a platform-specific-params element appeared. No Apple Team ID '
+            'is configured for this project and no iOS counterpart is '
+            'published, so any value here is fabricated. Absence is what the '
+            'framework reads as unsupported; a fabricated identity is what it '
+            'reads as supported.',
+      );
     });
 
     test('INTERNET is declared, and the app itself requests nothing else', () {

@@ -277,11 +277,11 @@ Not a new adapter — the one `PostgresPersistenceAdapter` serves every approved
 
 ### 38. What is the current phase?
 
-Phase 4 — the Flutter and mobile security foundation — is complete; Phase 5 has not started. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-04.md`](../phases/phase-04.md). **"Complete" means the deliverables exist and the phase's own gates passed — not deployed, not production ready, not store ready, not certified** ([`../phases/README.md`](../phases/README.md)).
+Phase 4 — the Flutter and mobile security foundation — is IN PROGRESS; the last completed phase is 3.5, and Phase 5 has not started. The live status is the [root README status block](../../README.md#status); the detail is [`../phases/phase-04.md`](../phases/phase-04.md). **"Complete" means the deliverables exist and the phase's own gates passed — not deployed, not production ready, not store ready, not certified** ([`../phases/README.md`](../phases/README.md)).
 
 ### 39. What is explicitly out of scope right now?
 
-Consumer product capabilities. Phase 3.5 delivered the policy and capability machinery and Phase 4 delivered a client that consumes it, but **no capability is implemented or reachable**: every registry entry is `NOT_IMPLEMENTED` and deployed nowhere, and the client's navigable-capability set is correspondingly empty. Still out: budgets, transactions, financial accounts and connectors, Zakat, AI, Amanat, subscriptions, white-label flavours, the Super Admin surfaces, and any cloud infrastructure. Also out on the client specifically: any offline cache, any signed or store-distributed build, and any deployed endpoint — a build for anything other than `LOCAL` is refused because none exists. The full list is in [`../phases/phase-04.md`](../phases/phase-04.md).
+Consumer product capabilities. Phase 3.5 delivered the policy and capability machinery and Phase 4 is building a client that consumes it, but **no capability is implemented or reachable**: every registry entry is `NOT_IMPLEMENTED` and deployed nowhere, and the client's navigable-capability set is correspondingly empty. Still out: budgets, transactions, financial accounts and connectors, Zakat, AI, Amanat, subscriptions, white-label flavours, the Super Admin surfaces, and any cloud infrastructure. Also out on the client specifically: any offline cache, any signed or store-distributed build, and any deployed endpoint — a build for anything other than `LOCAL` is refused because none exists. The full list is in [`../phases/phase-04.md`](../phases/phase-04.md).
 
 ---
 

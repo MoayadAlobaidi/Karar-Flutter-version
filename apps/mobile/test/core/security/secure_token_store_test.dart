@@ -6,6 +6,7 @@
 // tampered device, so every failure is returned as a failure.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
+import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/logging/app_logger.dart';
 import 'package:karar_mobile/core/security/secure_store.dart';
 import 'package:karar_mobile/core/security/session_manager.dart';
@@ -233,4 +234,87 @@ void main() {
       expect(PreferenceKey('security.app_lock_enabled').name, 'security.app_lock_enabled');
     });
   });
+
+  // THE PROPERTY THAT SEPARATES THIS FIX FROM THE OBVIOUS WRONG ONE.
+  //
+  // `abandonPersistedSession` must erase what is on disk WITHOUT reading it
+  // first. The tempting implementation is restore-then-end: read the
+  // credential, adopt it, end the session. It reuses machinery that already
+  // exists and reaches exactly the right observable outcome — empty store,
+  // NoSession — so every cold-launch test passes.
+  //
+  // It is still wrong. For the duration of that read the process holds the
+  // authenticated session the application lock exists to prevent, so a user
+  // who could not pass the device authenticator briefly has a live credential
+  // in memory. An independent review injected precisely that implementation
+  // and found nothing held the property, which is why counting reads is the
+  // assertion rather than checking the end state again.
+  group('abandonPersistedSession never materialises a session', () {
+    test('it does not read the credential it is erasing', () async {
+      final counting = _ReadCountingStore(InMemorySecureStore());
+      final manager = SessionManager(
+        store: SecureTokenStore(counting),
+        logger: AppLogger.silent,
+      );
+      addTearDown(manager.dispose);
+
+      await manager.adopt(_tokens());
+      counting.reads = 0;
+
+      await manager.abandonPersistedSession();
+
+      expect(
+        counting.reads,
+        0,
+        reason: 'the store was read ${counting.reads} time(s) while abandoning. '
+            'A restore-then-end implementation reaches the same final state '
+            'while briefly holding the session the lock exists to prevent.',
+      );
+      expect(manager.state, isA<NoSession>());
+    });
+
+    test('the read counter is live, so a zero above means something', () async {
+      // Without this, `reads == 0` could mean the counter is broken rather
+      // than that the operation is clean — and the assertion above would pass
+      // for the wrong reason forever.
+      final counting = _ReadCountingStore(InMemorySecureStore());
+      final store = SecureTokenStore(counting);
+      await store.write(_tokens());
+      counting.reads = 0;
+
+      await store.read();
+
+      expect(
+        counting.reads,
+        greaterThan(0),
+        reason: 'a genuine read must register, or the zero asserted above is '
+            'measuring nothing',
+      );
+    });
+  });
+}
+
+
+/// Counts reads of the underlying store, so a test can assert that an
+/// operation did NOT consult it.
+final class _ReadCountingStore implements SecureStore {
+  _ReadCountingStore(this._inner);
+
+  final InMemorySecureStore _inner;
+  int reads = 0;
+
+  @override
+  Future<Result<String?>> read(SecureKey key) {
+    reads += 1;
+    return _inner.read(key);
+  }
+
+  @override
+  Future<Result<void>> write(SecureKey key, String value) => _inner.write(key, value);
+
+  @override
+  Future<Result<void>> delete(SecureKey key) => _inner.delete(key);
+
+  @override
+  Future<Result<void>> deleteAll() => _inner.deleteAll();
 }
