@@ -61,7 +61,7 @@ import { PrismaMembershipRepository } from '@karar/tenancy';
 import { ConsentDocumentContentApiModule, GetLegalDocumentContent } from '@karar/consent';
 import { PrismaLegalDocumentRepository } from '@karar/consent/dist/infrastructure/persistence/prisma-legal-document-repository.js';
 import { OperatingEntityDirectoryAdapter } from '@karar/consent/dist/infrastructure/operating-entity/operating-entity-directory-adapter.js';
-import { NoContentSourceConfigured } from '@karar/consent/dist/infrastructure/content/no-content-source-configured.js';
+import { legalDocumentContentSourceFor } from '@karar/consent/dist/infrastructure/content/local-seed-content-source.js';
 import { Sha256ContentDigest } from '@karar/consent/dist/infrastructure/providers/sha256-content-digest.js';
 
 import { BootstrapApiModule, GetBootstrap, SetTenantBinding } from '@karar/bootstrap';
@@ -157,15 +157,26 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
   const listOwnMemberships = new ListOwnMemberships(new PrismaMembershipRepository(prisma), clock);
 
   // Consent, document CONTENT: the text a subject must read before accepting,
-  // with its language. The source is the one this phase honestly has — there
-  // is no document store, so it retrieves nothing and the endpoint reports
-  // that absence rather than substituting prose. The digest holds any future
-  // source to the hash the published version pinned.
+  // with its language.
+  //
+  // The source is chosen by ENVIRONMENT, and only `local` gets one that
+  // returns bytes — a synthetic fixture that says so in its own first line.
+  // Every deployed environment gets `NoContentSourceConfigured`, which
+  // retrieves nothing, so the endpoint reports that absence rather than
+  // substituting prose. There is still no document store and no reviewed legal
+  // text; the fixture exists so a developer can exercise the read-and-accept
+  // path locally, not so the product has wording.
+  //
+  // The selector is not the only gate: the local source also refuses to
+  // construct outside local/test, so reaching past this line cannot serve
+  // synthetic text into a deployed environment. The digest holds whatever a
+  // source returns to the hash the published version pinned, so the fixture
+  // has to match the database rather than assert its own integrity.
   const legalDocuments = new PrismaLegalDocumentRepository(prisma.client);
   const getLegalDocumentContent = new GetLegalDocumentContent(
     legalDocuments,
     new OperatingEntityDirectoryAdapter(input.resolveEntity),
-    new NoContentSourceConfigured(),
+    legalDocumentContentSourceFor(environment),
     new Sha256ContentDigest(),
   );
 

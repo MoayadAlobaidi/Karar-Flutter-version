@@ -31,6 +31,13 @@
 //   * It creates NO regulator approval, NO counsel approval, and NO licence
 //     evidence. The legal document it creates is a synthetic placeholder that
 //     says so in its own text, storage reference, and review reason.
+//   * It writes NO document bytes into the catalogue and adds no column that
+//     could hold any. The version pins sha256 of the text the LOCAL content
+//     source serves (LocalSeedContentSource, imported below rather than
+//     restated), so `GET /consent/documents/{id}/content` retrieves that text,
+//     hashes what it retrieved, and finds it equal to what this row pinned.
+//     The integrity check is SATISFIED, never skipped: change either side
+//     alone and the route refuses to serve, which is the point of the check.
 //   * It makes NO capability implemented, deployed, or available. qa/v1 clears
 //     nothing; all seven capabilities stay NOT_IMPLEMENTED.
 //   * It writes NO consent grant. It makes acceptance POSSIBLE; the subject
@@ -55,6 +62,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const platformDist = join(root, 'packages', 'platform', 'dist');
 const policyDist = join(root, 'packages', 'jurisdiction-policy', 'dist');
+const consentDist = join(root, 'modules', 'consent', 'dist');
 
 // THE ENVIRONMENT GATE, first and unconditional. An unset KARAR_ENV is
 // REFUSED, not defaulted: a missing value must never widen what a script may
@@ -77,6 +85,13 @@ const { LocalPostgresConnectionProfile, PostgresPersistenceAdapter } = await imp
   join(platformDist, 'db', 'index.js')
 );
 const { QA_V1 } = await import(join(policyDist, 'index.js'));
+// The fixture the LOCAL content source serves, read from the code that serves
+// it — the same reason QA_V1 is read from the pack above rather than retyped.
+// A restated copy would drift silently, and drift here means a version whose
+// pinned hash no longer describes the bytes a subject reads.
+const { LOCAL_SEED_CONTENT, LOCAL_SEED_STORAGE_REF } = await import(
+  join(consentDist, 'infrastructure', 'content', 'local-seed-content-source.js')
+);
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -110,11 +125,11 @@ const PACK_LIFECYCLE = String(QA_V1.lifecycle);
 const PURPOSE_REF = 'purpose:ai-processing';
 const SUBJECT_EMAIL = 'local-seed-subject@karar.invalid';
 const SEED_ACTOR = 'system:seed-local-consent';
-const SYNTHETIC_NOTICE_TEXT =
-  'SYNTHETIC LOCAL FIXTURE. This is not a legal document, has not been reviewed by counsel or ' +
-  'any regulator, and has no legal effect. It exists so the consent acceptance path can be ' +
-  'exercised against a local database.';
-const CONTENT_HASH = createHash('sha256').update(SYNTHETIC_NOTICE_TEXT, 'utf8').digest('hex');
+// Hashed HERE, from the served bytes, so this script pins a fact it can prove
+// rather than a value copied from somewhere. `content_hash` is immutable once
+// the version is published (migration 0064's trigger), so this is the one
+// moment the two sides are bound together.
+const CONTENT_HASH = createHash('sha256').update(LOCAL_SEED_CONTENT.content, 'utf8').digest('hex');
 const EFFECTIVE_AT = '2026-01-01T00:00:00.000Z';
 
 const adapter = new PostgresPersistenceAdapter(
@@ -423,8 +438,14 @@ try {
       notes.push('synthetic legal document already present');
     }
 
+    // `storage_ref` is the fixture reference the LOCAL content source resolves,
+    // and `content_hash` is sha256 of the bytes it returns for that reference.
+    // Both come from the source's own constants, so the row cannot claim a
+    // locator the source does not answer for, or a hash for text it never
+    // serves. Both columns are immutable after publication (0064's trigger).
     const version = await tx.query(
-      `SELECT content_hash, published_at FROM public.legal_document_versions WHERE id = $1`,
+      `SELECT content_hash, storage_ref, published_at
+         FROM public.legal_document_versions WHERE id = $1`,
       [SYNTHETIC.documentVersion],
     );
     const versionRow = version.rows[0];
@@ -433,12 +454,13 @@ try {
         `INSERT INTO public.legal_document_versions
            (id, document_id, version, content_hash, storage_ref, classification,
             author, reviewer, reason, effective_at, published_at, prior_version_id)
-         VALUES ($1, $2, 'local-seed/v1', $3, 'local-seed://synthetic-notice',
-                 'MATERIAL_REACCEPTANCE_REQUIRED', $4, $5, $6, $7, $7, NULL)`,
+         VALUES ($1, $2, 'local-seed/v1', $3, $4,
+                 'MATERIAL_REACCEPTANCE_REQUIRED', $5, $6, $7, $8, $8, NULL)`,
         [
           SYNTHETIC.documentVersion,
           SYNTHETIC.document,
           CONTENT_HASH,
+          LOCAL_SEED_STORAGE_REF,
           SEED_ACTOR,
           SEED_ACTOR,
           'Synthetic local fixture. No legal review has taken place; the classification is the ' +
@@ -447,13 +469,27 @@ try {
           EFFECTIVE_AT,
         ],
       );
-      notes.push(`published the synthetic version ${SYNTHETIC.documentVersion}`);
-    } else if (versionRow.content_hash !== CONTENT_HASH || versionRow.published_at === null) {
+      notes.push(
+        `published the synthetic version ${SYNTHETIC.documentVersion} ` +
+          `(${LOCAL_SEED_CONTENT.language}/${LOCAL_SEED_CONTENT.format}, hash ${CONTENT_HASH})`,
+      );
+    } else if (
+      versionRow.content_hash !== CONTENT_HASH ||
+      versionRow.storage_ref !== LOCAL_SEED_STORAGE_REF ||
+      versionRow.published_at === null
+    ) {
+      // A hash mismatch here is the fixture text having changed under an
+      // already-seeded database. Refusing is right: the published row cannot be
+      // rewritten (nor should it be — a grant may already pin it), and serving
+      // the new text against the old hash is exactly what the content route
+      // refuses. Drop the local database and reseed, or leave both alone.
       conflict(
         `legal document version ${SYNTHETIC.documentVersion}`,
         versionRow.published_at === null
           ? 'it is not published'
-          : 'its content hash does not match this seed',
+          : versionRow.storage_ref !== LOCAL_SEED_STORAGE_REF
+            ? `its storage reference is ${versionRow.storage_ref}, which the local content source does not resolve`
+            : 'its content hash does not match the bytes the local content source now serves',
       );
     } else {
       notes.push('synthetic legal document version already published');
@@ -464,9 +500,19 @@ try {
     console.log(`seed-local-consent: ${note}`);
   }
   console.log('');
-  console.log(`seed-local-consent: subject ${SYNTHETIC.user} in tenant ${tenantId} can now record`);
-  console.log(`seed-local-consent: an acceptance of version ${SYNTHETIC.documentVersion}`);
+  console.log(`seed-local-consent: subject ${SYNTHETIC.user} in tenant ${tenantId} can now READ`);
+  console.log(`seed-local-consent: document ${SYNTHETIC.document} via`);
+  console.log(`seed-local-consent:   GET /consent/documents/${SYNTHETIC.document}/content`);
+  console.log(
+    `seed-local-consent: and then record an acceptance of version ${SYNTHETIC.documentVersion}`,
+  );
   console.log(`seed-local-consent: for purpose ${PURPOSE_REF}. No grant was written by this seed.`);
+  console.log(
+    'seed-local-consent: the content route serves the synthetic text only where the composition ' +
+      'binds the LOCAL source (legalDocumentContentSourceFor); a deployed environment keeps ' +
+      'answering 409 DOCUMENT_CONTENT_UNAVAILABLE, and the text it would serve here says on its ' +
+      'own face that it is not a legal document.',
+  );
   console.log(
     'seed-local-consent: nothing was approved — qa/v1 stays DRAFT, the QA register entry stays ' +
       'unapproved, no capability was made available, and the synthetic account has no credential.',

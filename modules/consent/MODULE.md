@@ -104,13 +104,34 @@ more often than the text is read; and the bytes are verified against the version
 The caller names a document, never a version — the server chooses the one in force — and a
 document outside the caller's effective entity answers exactly as an unknown id does.
 
-**The bytes do not exist yet, and the module says so.** `LegalDocumentContentSource` is
-declared inward; the only shipped implementation (`NoContentSourceConfigured`) retrieves
-nothing, because no document store exists this phase and no legal text has been drafted or
-reviewed to place in one. The endpoint reports that absence as a typed
+**No real bytes exist yet, and the module says so.** `LegalDocumentContentSource` is declared
+inward. For every deployed environment the bound implementation is `NoContentSourceConfigured`,
+which retrieves nothing: no document store exists this phase and no legal text has been drafted
+or reviewed to place in one. The endpoint reports that absence as a typed
 `DOCUMENT_CONTENT_UNAVAILABLE`; it never approximates, substitutes, or generates legal prose,
 and neither may a client. A real source arrives with the document store and a reviewed
 publication path that records content alongside the version it belongs to.
+
+**LOCAL and TEST get one synthetic fixture, so the path can be walked.** With nothing
+retrievable anywhere, the read-then-accept sequence the whole design is built around could not
+be exercised by a developer, and a path nobody can exercise is a path nobody can find defects
+in. `LocalSeedContentSource` supplies the bytes for the single version
+`scripts/db/seed-local-consent.mjs` publishes — one paragraph that states on its own face that
+it is not a legal document, has been reviewed by nobody, and has no legal effect.
+`legalDocumentContentSourceFor(environment)` is the composition decision: `local` and `test`
+get that source, everything else gets `NoContentSourceConfigured` unchanged, and the source's
+own constructor throws outside `local`/`test` so reaching past the selector still cannot serve
+synthetic text to a real subject (an unstated environment is refused, never defaulted). The
+source resolves ONE storage reference by equality and answers null for every other version: a
+source that answered for anything would show one document's text under another's identity.
+
+**The fixture satisfies the integrity check rather than avoiding it.** The seed hashes the
+same constant the source serves and pins that sha256 into `legal_document_versions.content_hash`,
+which is immutable once published (migration 0064's trigger). `GetLegalDocumentContent` then
+hashes whatever the source returned and compares. The two agree because they are the same
+bytes, not because anything is skipped — change either side alone and the route answers 503
+with nothing served, which the integration suite proves by publishing a version that names the
+fixture's locator while pinning different text.
 
 ## Dependencies
 
