@@ -42,8 +42,8 @@ model Transaction {
   originalAmountMinor  BigInt?   @map("original_amount_minor")
   originalCurrencyCode String?   @map("original_currency_code") @db.Char(3)
 
-  bookingDate          DateTime  @map("booking_date") @db.Timestamptz(6)
-  valueDate            DateTime? @map("value_date") @db.Timestamptz(6)
+  bookingDate          DateTime  @map("booking_date") @db.Date
+  valueDate            DateTime? @map("value_date") @db.Date
 
   hsfAlgorithm         String    @map("hsf_algorithm")
   hsfKeyVersion        String    @map("hsf_key_version")
@@ -87,8 +87,8 @@ model TransactionRevision {
 
   amountMinor           BigInt    @map("amount_minor")
   currencyCode          String    @map("currency_code") @db.Char(3)
-  bookingDate           DateTime  @map("booking_date") @db.Timestamptz(6)
-  valueDate             DateTime? @map("value_date") @db.Timestamptz(6)
+  bookingDate           DateTime  @map("booking_date") @db.Date
+  valueDate             DateTime? @map("value_date") @db.Date
   status                String
 
   hsfAlgorithm          String    @map("hsf_algorithm")

@@ -196,10 +196,10 @@ CREATE TABLE public.transactions (
   CONSTRAINT transactions_original_currency_differs
     CHECK (original_currency_code IS NULL OR original_currency_code <> currency_code),
 
-  booking_date           timestamptz NOT NULL,
+  booking_date           date        NOT NULL,
   -- Optional and never inferred: a value date copied from the booking date
   -- would assert a fact the source did not state.
-  value_date             timestamptz     NULL,
+  value_date             date            NULL,
 
   -- Encryption context for this row's HSF fields (ADR-0017 provenance).
   hsf_algorithm          text        NOT NULL CHECK (hsf_algorithm <> ''),
@@ -324,6 +324,22 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.transactions TO karar_app;
 -- lookup runs under the caller's own RLS policy — the only rows that may
 -- inform the answer are the principal's own, which is exactly the scope the
 -- content identity is defined over.
+-- Custom SQLSTATEs, so a caller can tell these apart structurally instead of by
+-- reading the message text.
+--
+--   KAR01  the occurrence ordinal is not the next unused one for this content
+--          identity. Under concurrency this is the arm that fires: the writer's
+--          own pre-check passed because it read max(ordinal) before the winner
+--          committed, and this trigger is what catches it. A caller that cannot
+--          distinguish it from a generic failure cannot tell "this row is a
+--          duplicate, skip it" from "the store is broken, stop" — which is the
+--          distinction a bulk statement import is built on.
+--   KAR02  the dedup identity of an existing row was rewritten.
+--
+-- PostgreSQL reserves class 'P0' for PL/pgSQL (P0001 is the generic
+-- raise_exception both of these used to raise). 'KAR' is outside every class
+-- the standard and PostgreSQL assign, so it cannot collide with a server error.
+
 CREATE FUNCTION public.transactions_occurrence_guard() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -341,7 +357,7 @@ BEGIN
       OR NEW.occurrence_ordinal IS DISTINCT FROM OLD.occurrence_ordinal
     THEN
       RAISE EXCEPTION 'transaction % may not have its dedup identity rewritten: tenant, user, account, fingerprint, fingerprint version and occurrence ordinal are what say which content and which occurrence this row IS. A different movement is a different transaction (modules/transactions/MODULE.md)',
-        OLD.id USING ERRCODE = 'raise_exception';
+        OLD.id USING ERRCODE = 'KAR02';
     END IF;
     RETURN NEW;
   END IF;
@@ -357,7 +373,7 @@ BEGIN
 
   IF NEW.occurrence_ordinal <> next_ordinal THEN
     RAISE EXCEPTION 'occurrence_ordinal % is not the next occurrence of this content identity (the next unused ordinal is %). An occurrence ordinal claims that identical content genuinely happened again; choosing an arbitrary higher number would commit a duplicate without any review having taken place (modules/transactions/MODULE.md)',
-      NEW.occurrence_ordinal, next_ordinal USING ERRCODE = 'raise_exception';
+      NEW.occurrence_ordinal, next_ordinal USING ERRCODE = 'KAR01';
   END IF;
   RETURN NEW;
 END;

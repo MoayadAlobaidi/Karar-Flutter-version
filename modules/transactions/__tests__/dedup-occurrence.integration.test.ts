@@ -345,7 +345,10 @@ describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', 
       (error: unknown) => error,
     );
     expect(forged).toBeInstanceOf(PgError);
-    expect((forged as PgError).sqlState).toBe('P0001');
+    // KAR01, not the generic raise_exception these guards used to share: a
+    // caller has to be able to tell "you claimed the wrong occurrence" apart
+    // from every other server-side failure WITHOUT reading the message.
+    expect((forged as PgError).sqlState).toBe('KAR01');
     expect((forged as PgError).message).toContain('not the next occurrence');
     expect(await storedOrdinals(alice, aliceAccount)).toEqual([1, 2, 3]);
   });
@@ -362,7 +365,7 @@ describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', 
       (error: unknown) => error,
     );
     expect(rewritten).toBeInstanceOf(PgError);
-    expect((rewritten as PgError).sqlState).toBe('P0001');
+    expect((rewritten as PgError).sqlState).toBe('KAR02');
 
     const relabelled = await rawAsPrincipal(
       alice,
@@ -372,7 +375,7 @@ describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', 
       () => null,
       (error: unknown) => error,
     );
-    expect((relabelled as PgError).sqlState).toBe('P0001');
+    expect((relabelled as PgError).sqlState).toBe('KAR02');
     expect(await storedOrdinals(alice, aliceAccount)).toEqual([1, 2, 3]);
   });
 

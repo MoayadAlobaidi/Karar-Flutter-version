@@ -55,12 +55,81 @@ import {
 /** PostgreSQL unique-violation, as Prisma reports it. */
 const PRISMA_UNIQUE_VIOLATION = 'P2002';
 
+/**
+ * SQLSTATEs raised by this module's own triggers (migration 0090).
+ *
+ * The occurrence rule is enforced TWICE on purpose: once here, before the
+ * insert, and once by a database trigger. Under concurrency the pre-check is
+ * the one that misses — it reads `max(occurrence_ordinal)` before the winner
+ * commits, so it computes the same next ordinal the winner is about to take —
+ * and the trigger is what actually catches it.
+ *
+ * That made the loser of a race arrive as a generic store failure while the
+ * same rule broken serially arrived as a typed refusal. The data was never
+ * wrong; the ERROR was, and a caller cannot act on "something went wrong". A
+ * bulk statement import is built on exactly this distinction: a duplicate row
+ * is expected and skipped, a store failure stops the import.
+ */
+const ORDINAL_GUARD_SQLSTATE = 'KAR01';
+const DEDUP_IDENTITY_SQLSTATE = 'KAR02';
+
+/**
+ * The SQLSTATE a driver error carries, or null.
+ *
+ * Read structurally out of the driver-adapter cause Prisma attaches, never by
+ * matching the message: a message is prose that a later edit rewrites, and a
+ * mapping that depends on it fails silently the day someone improves the
+ * wording.
+ */
+function sqlStateOf(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const meta = (error as { meta?: unknown }).meta;
+  if (typeof meta !== 'object' || meta === null) return null;
+  const adapterError = (meta as { driverAdapterError?: unknown }).driverAdapterError;
+  if (typeof adapterError !== 'object' || adapterError === null) return null;
+  const cause = (adapterError as { cause?: unknown }).cause;
+  if (typeof cause !== 'object' || cause === null) return null;
+  const code = (cause as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION
+    (typeof error === 'object' &&
+      error !== null &&
+      (error as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION) ||
+    // 23505 reaching us through the driver adapter rather than as P2002.
+    sqlStateOf(error) === '23505'
   );
+}
+
+/**
+ * Re-raises a trigger refusal as the typed error the same rule produces when
+ * the pre-check catches it, so a caller sees one contract whether it lost a
+ * race or broke the rule outright.
+ */
+function rethrowTriggerRefusal(
+  error: unknown,
+  context: { readonly attemptedOrdinal: number; readonly fingerprintVersion: string },
+): never {
+  switch (sqlStateOf(error)) {
+    case ORDINAL_GUARD_SQLSTATE:
+      throw new OccurrenceOrdinalNotNextError(
+        context.attemptedOrdinal,
+        // The winner took the ordinal this writer wanted, so the next unused
+        // one is the one after it. Reported as a hint, not as a value to
+        // retry blindly: another writer may take it first too.
+        context.attemptedOrdinal + 1,
+        'another writer recorded this occurrence first; the ordinal claimed is no longer the next unused one',
+      );
+    case DEDUP_IDENTITY_SQLSTATE:
+      throw new DuplicateTransactionError(
+        context.fingerprintVersion,
+        'the dedup identity of an existing transaction may not be rewritten',
+      );
+    default:
+      throw error;
+  }
 }
 
 export class PrismaTransactionRepository implements TransactionRepository {
@@ -175,7 +244,13 @@ export class PrismaTransactionRepository implements TransactionRepository {
           'this occurrence of this content is already recorded for this principal on this account',
         );
       }
-      throw error;
+      // The trigger arm. Under concurrency the pre-check above passed and this
+      // is what refused the write, so it must reach the caller as the same
+      // typed refusal the pre-check produces — not as a generic store failure.
+      rethrowTriggerRefusal(error, {
+        attemptedOrdinal: commit.occurrenceOrdinal,
+        fingerprintVersion: fingerprint.version,
+      });
     }
   }
 

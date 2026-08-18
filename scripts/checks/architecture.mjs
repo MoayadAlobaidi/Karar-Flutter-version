@@ -52,6 +52,9 @@ const REGISTRY_REL = path.join('docs', 'testing', 'architecture-test-registry.js
 const PURE_PACKAGES = ['shared-kernel', 'financial-engine', 'jurisdiction-policy', 'state-machine'];
 const KERNEL_EXPORTS = [
   'Money',
+  // Tenth universal, ADR-0027: a calendar day is not an instant. Added once,
+  // with a decision record; the cap is not "whatever is useful next".
+  'CalendarDay',
   'Currency',
   'Percentage',
   'ExchangeRate',

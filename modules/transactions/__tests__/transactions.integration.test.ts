@@ -560,7 +560,20 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     expect(succeeded).toHaveLength(1);
     expect(refused).toHaveLength(1);
     const denial = refused[0];
-    if (denial && !denial.ok) expect(denial.error.kind).toBe('DUPLICATE_TRANSACTION');
+    if (denial && !denial.ok) {
+      // BOTH shapes are correct refusals, and which one fires is a property of
+      // the race rather than of the input. The loser either hits the unique
+      // index (DUPLICATE_TRANSACTION) or reaches the occurrence trigger first
+      // (OCCURRENCE_ORDINAL_NOT_NEXT), because its own pre-check read
+      // max(ordinal) before the winner committed. Pinning one arm made this
+      // test fail roughly twice in fifty runs while the system was behaving
+      // exactly as designed. What must never appear is an untyped
+      // STORE_FAILURE, which is asserted directly below.
+      expect(['DUPLICATE_TRANSACTION', 'OCCURRENCE_ORDINAL_NOT_NEXT']).toContain(
+        denial.error.kind,
+      );
+      expect(denial.error.kind).not.toBe('STORE_FAILURE');
+    }
 
     const stored = await rawAsPrincipal(
       alice,

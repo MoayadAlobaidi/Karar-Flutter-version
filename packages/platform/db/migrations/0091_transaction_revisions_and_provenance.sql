@@ -115,8 +115,8 @@ CREATE TABLE public.transaction_revisions (
   -- reading one row answers "what did it say then" without replaying a chain.
   amount_minor           bigint      NOT NULL,
   currency_code          char(3)     NOT NULL CHECK (currency_code ~ '^[A-Z]{3}$'),
-  booking_date           timestamptz NOT NULL,
-  value_date             timestamptz     NULL,
+  booking_date           date        NOT NULL,
+  value_date             date            NULL,
   status                 text        NOT NULL CHECK (status IN ('POSTED', 'VOIDED')),
 
   -- Same encryption discipline as 0090: ciphertext, nonce, tag, with the
