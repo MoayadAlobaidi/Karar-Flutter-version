@@ -68,29 +68,42 @@ jobs:
       # The Phase 2 platform suites (migrations, audit immutability, outbox,
       # jobs) run against a real local PostgreSQL. Compose is used instead of a
       # GitHub service container so the same stack runs locally and in CI, and
-      # so suites that stop/start postgres (readiness recovery tests) work.
-      - name: Start local PostgreSQL (compose)
-        run: docker compose up -d postgres --wait
+      # so suites that stop/start a container (readiness recovery tests) work.
+      #
+      # REDIS IS STARTED HERE TOO, AND IT WAS NOT BEFORE.
+      #
+      # The rate-limiter suites do not fail when Redis is absent — they print a
+      # banner and SKIP, and the banner says why that is unacceptable: "a
+      # skipped run proves nothing". Because this job only ever started
+      # postgres, every distributed rate-limiter test and every rate-limit
+      # store readiness test has been skipped in CI since it was written. The
+      # startup-race regression test is the one that matters most: it exists to
+      # prove the first fail-closed request after /readyz turns 200 is not
+      # answered 503, and a skipped assertion cannot prove that.
+      - name: Start local PostgreSQL and Redis (compose)
+        run: docker compose up -d postgres redis --wait
 
       - name: Test
         env:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
+          REDIS_PORT: '6379'
         run: pnpm test
 
-      # The readiness suite STOPS AND RESTARTS the compose postgres container
-      # to prove recovery (EV-216). It must own the container alone: run
+      # The readiness suite STOPS AND RESTARTS the compose postgres and redis
+      # containers to prove recovery (EV-216). It must own them alone: run
       # concurrently with the other 80+ database suites it kills their
       # connections mid-test (observed on the Phase 3 PR), so it runs as its
       # own step after the main suite, gated by KARAR_INTEGRATION as before.
-      - name: Readiness recovery suite (restarts postgres)
+      - name: Readiness recovery suite (restarts postgres and redis)
         env:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
+          REDIS_PORT: '6379'
           KARAR_INTEGRATION: '1'
         run: pnpm --filter @karar/api exec vitest run src/readiness.integration.test.ts
 
-      - name: Stop local PostgreSQL
+      - name: Stop local PostgreSQL and Redis
         if: always()
         run: docker compose down -v
 
@@ -585,6 +598,23 @@ jobs:
             | grep -q "package: name='com.kararfinance.app.local'" \
             || { echo "FAIL: unexpected application id for a LOCAL build"; exit 1; }
 
+      # THE CROSS-PLATFORM COMPARISON NEEDS BOTH ARTIFACTS ON ONE RUNNER.
+      #
+      # The Android data-extraction rules NAME the iOS counterpart by bundle
+      # identifier. Whether that element identifies the application it claims
+      # to is a property of two artifacts, and the two are built on different
+      # runners, so neither lane can check it alone. Publishing the merged
+      # manifest is the cheap half of the fix: it carries the Android package
+      # name, which is the only thing the iOS lane needs from this one.
+      # Building an APK on the macOS runner would also work and costs far more.
+      - name: Publish the merged manifest for the iOS lane
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-merged-manifest
+          path: apps/mobile/build/app/intermediates/merged_manifest/**/AndroidManifest.xml
+          if-no-files-found: error
+          retention-days: 1
+
   # iOS builds need macOS. GitHub-hosted macOS runners are free for public
   # repositories, which this one is; if the repository is ever made private
   # this job starts consuming minutes at the macOS multiplier and should be
@@ -596,7 +626,16 @@ jobs:
   mobile-ios:
     name: mobile-ios
     runs-on: macos-latest
-    # Three builds: LOCAL and STAGING for the simulator, PRODUCTION for device.
+    # Four builds: LOCAL, DEV and STAGING for the simulator, PRODUCTION for
+    # device. DEV is built because the environment matrix has four entries and
+    # a matrix with an unobserved row is a matrix nobody checked — every iOS
+    # build produced the production identifier until this phase, and a lane
+    # that skips DEV would not have caught it.
+    #
+    # Serialised behind mobile-android, which is the cost of comparing two
+    # artifacts that are built on different runners. The Android lane is the
+    # fast one, so this adds its duration rather than doubling the slow one.
+    needs: mobile-android
     timeout-minutes: 60
     defaults:
       run:
@@ -615,6 +654,15 @@ jobs:
 
       - name: Resolve packages
         run: flutter pub get --enforce-lockfile
+
+      # Restored to the exact path the suite reads, so the comparison runs
+      # against the manifest the Android lane actually produced rather than a
+      # value re-derived on this runner.
+      - name: Fetch the merged manifest from the Android lane
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b # v6.0.0
+        with:
+          name: android-merged-manifest
+          path: apps/mobile/build/app/intermediates/merged_manifest
 
       - name: Build for the simulator (no code signing)
         run: |
@@ -712,6 +760,25 @@ jobs:
           KARAR_VERIFY_IOS_ARTIFACT: '1'
         run: flutter test test/security/ios_packaged_bundle_test.dart
 
+      # DEV IS BUILT BECAUSE THE MATRIX HAS FOUR ROWS.
+      #
+      # An environment matrix with a row nobody builds is a row nobody checks.
+      # Every iOS build produced `com.kararfinance.app` regardless of the
+      # environment it was compiled for until this phase, and a lane that
+      # observed only LOCAL, STAGING and PRODUCTION would not have caught it —
+      # PRODUCTION is the one row where the wrong answer and the right answer
+      # are the same string.
+      - name: Build the simulator app for DEV
+        run: |
+          flutter build ios --simulator --debug \
+            --dart-define=KARAR_ENV=DEV \
+            --dart-define=KARAR_API_BASE_URL=https://api.invalid-for-ci.example
+
+      - name: Verify the packaged DEV bundle carries no exception
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
       # The artifact that would actually ship. Unsigned, because no identity
       # exists in CI and none is needed to read the packaged plist.
       - name: Build the device app for PRODUCTION (no code signing)
@@ -724,3 +791,18 @@ jobs:
         env:
           KARAR_VERIFY_IOS_ARTIFACT: '1'
         run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # THE ONLY PLACE THE TWO PLATFORMS MEET.
+      #
+      # The cross-platform group in this suite compares the identifier the
+      # Android data-extraction rules NAME as the iOS counterpart against the
+      # identifier an iOS artifact actually carries. On the Linux lane it skips:
+      # there is no iOS bundle there and no plutil to read one. Here both halves
+      # exist — the iOS bundles were just built, and the Android merged manifest
+      # was fetched from the Android lane above — so the comparison is between
+      # two real artifacts rather than between a rule and itself.
+      - name: Verify the Android and iOS identities agree
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+          KARAR_VERIFY_ANDROID_ARTIFACT: '1'
+        run: flutter test test/security/platform_hardening_test.dart
