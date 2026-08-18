@@ -35,11 +35,14 @@ import type {
   TransactionRetentionDecisionPort,
 } from '../application/ports/transaction-retention-decision.js';
 import { LocalKeyedDedupFingerprintProvider } from '../infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
+import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
+// The synthetic VALUES come from the fixture package, which is a devDependency
+// held outside this module so no production closure can contain them.
 import {
   FIXTURE_ENVIRONMENT,
-  LocalSyntheticRetentionDecisionProvider,
-  SYNTHETIC_RETENTION_BASIS,
-} from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
+  TRANSACTION_SYNTHETIC_BASIS,
+  TRANSACTION_SYNTHETIC_PERIOD,
+} from '@karar/financial-retention-local-fixtures';
 import {
   FixedAccountDirectory,
   FixedPrincipalContext,
@@ -91,7 +94,7 @@ class CountingFingerprintPort implements DedupFingerprintPort {
 
 const DECIDED: TransactionRetentionDecision = {
   state: 'DECIDED',
-  retentionPeriod: 'P7D',
+  retentionPeriod: TRANSACTION_SYNTHETIC_PERIOD,
   basis: 'test fixture — no legal effect',
   effect: 'SYNTHETIC_NO_LEGAL_EFFECT',
 };
@@ -296,7 +299,7 @@ describe('the LOCAL/TEST retention fixture', () => {
       expect(decision.effect).toBe('SYNTHETIC_NO_LEGAL_EFFECT');
       // The label survives a copy into a log line or a ticket, because it is
       // in the basis string as well as in the typed field.
-      expect(decision.basis).toBe(SYNTHETIC_RETENTION_BASIS);
+      expect(decision.basis).toBe(TRANSACTION_SYNTHETIC_BASIS);
       expect(decision.basis).toContain('NO LEGAL EFFECT');
       // It disclaims the three things a reader might otherwise assume a
       // basis string carries, in the string itself.

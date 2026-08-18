@@ -410,6 +410,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared-kernel
     devDependencies:
+      '@karar/financial-retention-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/financial-retention-local-fixtures
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
@@ -608,6 +611,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared-kernel
     devDependencies:
+      '@karar/financial-retention-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/financial-retention-local-fixtures
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
@@ -681,6 +687,8 @@ importers:
       '@karar/shared-kernel':
         specifier: workspace:*
         version: link:../shared-kernel
+
+  packages/financial-retention-local-fixtures: {}
 
   packages/jurisdiction-policy:
     dependencies:

@@ -214,7 +214,7 @@ export {
 } from './infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 export {
   LocalRetentionFixtureEnvironmentError,
+  LocalRetentionFixtureMissingError,
   LocalSyntheticRetentionDecisionProvider,
-  SYNTHETIC_RETENTION_MARKER,
   resolveRetentionDecisionPort,
 } from './infrastructure/providers/local-synthetic-retention-decision-provider.js';

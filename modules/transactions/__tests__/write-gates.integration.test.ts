@@ -50,6 +50,7 @@ import {
   StubRetentionDecisionPort,
 } from './fakes/in-memory-repositories.js';
 import { BOOKED, NOW, fixedClock, kwd, principal, qar, syntheticMerchant } from './fakes/synthetic-fixtures.js';
+import { TRANSACTION_SYNTHETIC_PERIOD } from '@karar/financial-retention-local-fixtures';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -96,7 +97,7 @@ const database = `karar_test_${process.pid}_txn_gates`;
 
 const DECIDED: TransactionRetentionDecision = {
   state: 'DECIDED',
-  retentionPeriod: 'P7D',
+  retentionPeriod: TRANSACTION_SYNTHETIC_PERIOD,
   basis: 'test fixture — no legal effect',
   effect: 'SYNTHETIC_NO_LEGAL_EFFECT',
 };

@@ -62,6 +62,11 @@ import type {
   InstitutionRef,
   SourceReference,
 } from '../domain/refs.js';
+import {
+  ACCOUNT_SYNTHETIC_APPROVAL_REFERENCE,
+  ACCOUNT_SYNTHETIC_PERIOD,
+  SYNTHETIC_RETENTION_MARKER,
+} from '@karar/financial-retention-local-fixtures';
 
 const TENANT_A = TenantId.of('aaaaaaaa-0000-4000-8000-00000000000a');
 const TENANT_B = TenantId.of('bbbbbbbb-0000-4000-8000-00000000000b');
@@ -236,10 +241,10 @@ class ScriptedRetentionDecisionPort implements FinancialAccountRetentionDecision
     this.#decision = (dataset) => ({
       state: 'DECIDED',
       dataset,
-      retentionPeriod: 'P0D',
-      basis: 'SYNTHETIC-NO-LEGAL-EFFECT: test fixture, not a legal opinion',
-      approvalReference: 'karar-ref:approval:SYNTHETIC-NO-LEGAL-EFFECT/test@v1',
-      packVersion: 'synthetic-test/SYNTHETIC-NO-LEGAL-EFFECT',
+      retentionPeriod: ACCOUNT_SYNTHETIC_PERIOD,
+      basis: `${SYNTHETIC_RETENTION_MARKER}: test fixture, not a legal opinion`,
+      approvalReference: ACCOUNT_SYNTHETIC_APPROVAL_REFERENCE,
+      packVersion: `synthetic-test/${SYNTHETIC_RETENTION_MARKER}`,
     });
   }
 
@@ -1098,8 +1103,8 @@ describe('financial-accounts use cases: durable creation fails closed on retenti
     const decision = await retention.decideFor(actorA1, 'financial_accounts');
     expect(decision.state).toBe('DECIDED');
     if (decision.state === 'DECIDED') {
-      expect(decision.basis).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
-      expect(decision.approvalReference).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
+      expect(decision.basis).toContain(SYNTHETIC_RETENTION_MARKER);
+      expect(decision.approvalReference).toContain(SYNTHETIC_RETENTION_MARKER);
     }
   });
 });

@@ -43,6 +43,7 @@ import {
   qar,
   syntheticMerchant,
 } from './fakes/synthetic-fixtures.js';
+import { TRANSACTION_SYNTHETIC_PERIOD } from '@karar/financial-retention-local-fixtures';
 
 const USE_CASE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -70,7 +71,7 @@ function harness(options: { readonly at?: Date } = {}) {
   ]);
   const retention = new StubRetentionDecisionPort({
     state: 'DECIDED',
-    retentionPeriod: 'P7D',
+    retentionPeriod: TRANSACTION_SYNTHETIC_PERIOD,
     basis: 'test fixture — no legal effect',
     effect: 'SYNTHETIC_NO_LEGAL_EFFECT',
   });

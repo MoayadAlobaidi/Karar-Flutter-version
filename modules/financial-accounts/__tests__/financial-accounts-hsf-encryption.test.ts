@@ -39,6 +39,7 @@ import {
   LocalSyntheticRetentionDecisionProvider,
   resolveRetentionDecisionPort,
 } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
+import { ACCOUNT_SYNTHETIC_PERIOD, SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
 
 const TENANT_A = TenantId.of('aaaaaaaa-0000-4000-8000-00000000000a');
 const TENANT_B = TenantId.of('bbbbbbbb-0000-4000-8000-00000000000b');
@@ -429,10 +430,10 @@ describe('local providers refuse to exist outside local development', () => {
     if (decision.state === 'DECIDED') {
       // Every field a reader could mistake for evidence says what it is, and
       // the period is zero rather than a plausible number.
-      expect(decision.basis).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
-      expect(decision.approvalReference).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
-      expect(decision.packVersion).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
-      expect(decision.retentionPeriod).toBe('P0D');
+      expect(decision.basis).toContain(SYNTHETIC_RETENTION_MARKER);
+      expect(decision.approvalReference).toContain(SYNTHETIC_RETENTION_MARKER);
+      expect(decision.packVersion).toContain(SYNTHETIC_RETENTION_MARKER);
+      expect(decision.retentionPeriod).toBe(ACCOUNT_SYNTHETIC_PERIOD);
       // And it is not the real Qatar pack, which decides nothing and is not
       // touched by anything in this module.
       expect(decision.packVersion).not.toBe('qa/v1');

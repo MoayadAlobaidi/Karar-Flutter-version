@@ -291,8 +291,6 @@ export {
 // able to govern real data. A deployed environment binds the retention port
 // to the PolicyPack slot, which today answers PENDING_LEGAL_REVIEW.
 export {
-  FIXTURE_ENVIRONMENT,
+  LocalRetentionFixtureMissingError,
   LocalSyntheticRetentionDecisionProvider,
-  SYNTHETIC_RETENTION_BASIS,
-  SYNTHETIC_RETENTION_PERIOD,
 } from './infrastructure/providers/local-synthetic-retention-decision-provider.js';

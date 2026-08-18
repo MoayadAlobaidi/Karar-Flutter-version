@@ -9,7 +9,7 @@
  * might see it as having **no legal effect whatsoever**. The strings below
  * are not a period, a basis, or an approval: they are placeholders shaped
  * like the real thing so the gate can be exercised, and they say so in their
- * own text. `SYNTHETIC-NO-LEGAL-EFFECT` appears inside the basis and inside
+ * own text. The fixture marker appears inside the basis and inside
  * the approval reference, so a value that ever escaped into a record, a log,
  * or an export announces what it is instead of passing for evidence.
  *
@@ -34,7 +34,7 @@
  *
  * - **No hardcoded duration for a deployed environment.** Writing "P7Y" into
  *   a non-local branch would be engineering taking a legal decision, which is
- *   not engineering's to take. The local period is `P0D` — zero, meaningless,
+ *   not engineering's to take. The local period is zero — meaningless,
  *   and impossible to mistake for a considered answer.
  * - **No change to `qa/v1`.** The real Qatar pack is DRAFT and
  *   PENDING_LEGAL_REVIEW and decides nothing
@@ -48,6 +48,8 @@
  *   data here at all beyond the labels.
  */
 
+import { createRequire } from 'node:module';
+
 import type {
   FinancialAccountRetentionDecisionPort,
   FinancialRetentionDecision,
@@ -56,24 +58,82 @@ import type {
 import type { AccountsPrincipal } from '../../application/principal.js';
 
 /** The marker that makes an escaped value self-identifying. */
-export const SYNTHETIC_RETENTION_MARKER = 'SYNTHETIC-NO-LEGAL-EFFECT';
+/**
+ * The fixture package holds the synthetic VALUES; this file holds only the
+ * machinery that refuses them outside local development.
+ *
+ * They are resolved rather than imported. A static import would put the
+ * specifier in this module's own import graph, and a production install — which
+ * does not have the package — would fail to boot. `createRequire` resolves from
+ * THIS file, so the lookup walks this module's own `node_modules`, where the
+ * devDependency is linked in a development install and where nothing is linked
+ * in a production one. `modules/consent` established the pattern and its
+ * `production-closure.test.ts` records why a same-file environment check was
+ * not enough on its own: the values shipped regardless of the guard.
+ */
+export const LOCAL_FIXTURE_PACKAGE = '@karar/financial-retention-local-fixtures';
 
-const SYNTHETIC_BASIS =
-  `${SYNTHETIC_RETENTION_MARKER}: local development fixture. This is NOT a legal opinion, NOT a ` +
-  'reviewed retention determination, and NOT evidence of one. The financial-data retention ' +
-  'decision has not been taken; this value exists so local runs and tests can exercise the gate ' +
-  'that refuses when it has not been taken.';
+interface RetentionFixtureModule {
+  readonly SYNTHETIC_RETENTION_MARKER: string;
+  readonly ACCOUNT_SYNTHETIC_BASIS: string;
+  readonly ACCOUNT_SYNTHETIC_APPROVAL_REFERENCE: string;
+  readonly ACCOUNT_SYNTHETIC_PACK_VERSION: string;
+  readonly ACCOUNT_SYNTHETIC_PERIOD: string;
+}
 
-const SYNTHETIC_APPROVAL_REFERENCE =
-  `karar-ref:approval:${SYNTHETIC_RETENTION_MARKER}/local-fixture@v1`;
-
-const SYNTHETIC_PACK_VERSION = `synthetic-local/${SYNTHETIC_RETENTION_MARKER}`;
+function isRetentionFixtureModule(value: unknown): value is RetentionFixtureModule {
+  if (typeof value !== 'object' || value === null) return false;
+  const m = value as Record<string, unknown>;
+  return (
+    typeof m['SYNTHETIC_RETENTION_MARKER'] === 'string' &&
+    typeof m['ACCOUNT_SYNTHETIC_BASIS'] === 'string' &&
+    typeof m['ACCOUNT_SYNTHETIC_APPROVAL_REFERENCE'] === 'string' &&
+    typeof m['ACCOUNT_SYNTHETIC_PACK_VERSION'] === 'string' &&
+    typeof m['ACCOUNT_SYNTHETIC_PERIOD'] === 'string'
+  );
+}
 
 /**
- * Zero, deliberately. A plausible-looking period would be the one value in
- * this file someone could copy into a deployment and believe.
+ * Loaded on demand, and never cached as "absent": a fixture that is missing is
+ * the production case and must stay an error at the point of use, not a value
+ * this module quietly carries.
  */
-const SYNTHETIC_PERIOD = 'P0D';
+function loadRetentionFixture(): RetentionFixtureModule {
+  const requireFrom = createRequire(import.meta.url);
+  let loaded: unknown;
+  try {
+    loaded = requireFrom(LOCAL_FIXTURE_PACKAGE);
+  } catch (error) {
+    const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
+    const notFound = code === 'MODULE_NOT_FOUND' || code === 'ERR_MODULE_NOT_FOUND';
+    // The specifier must be OURS. A fixture package that is installed but whose
+    // own imports do not resolve is broken, not absent, and fails loudly.
+    if (notFound && typeof message === 'string' && message.includes(LOCAL_FIXTURE_PACKAGE)) {
+      throw new LocalRetentionFixtureMissingError();
+    }
+    throw error;
+  }
+  if (!isRetentionFixtureModule(loaded)) {
+    throw new Error(
+      `${LOCAL_FIXTURE_PACKAGE} is installed but does not export the synthetic retention values — ` +
+        'a fixture package that cannot be read is a defect, not an absence, and is refused rather ' +
+        'than silently degraded to a decision nobody took.',
+    );
+  }
+  return loaded;
+}
+
+export class LocalRetentionFixtureMissingError extends Error {
+  override readonly name = 'LocalRetentionFixtureMissingError';
+
+  constructor() {
+    super(
+      `${LOCAL_FIXTURE_PACKAGE} is not installed. It is a devDependency held outside this module ` +
+        'so that no production closure contains a fabricated approval reference. If this appears ' +
+        'in local development, install workspace devDependencies; it must never appear anywhere else.',
+    );
+  }
+}
 
 export class LocalRetentionFixtureEnvironmentError extends Error {
   override readonly name = 'LocalRetentionFixtureEnvironmentError';
@@ -114,9 +174,10 @@ export class LocalSyntheticRetentionDecisionProvider
         reason:
           'the local retention fixture has no legal effect and does not answer outside local ' +
           'development; the financial-data retention decision remains with legal review',
-        packVersion: SYNTHETIC_PACK_VERSION,
+        packVersion: loadRetentionFixture().ACCOUNT_SYNTHETIC_PACK_VERSION,
       });
     }
+    const fixture = loadRetentionFixture();
     // The principal is ignored, and that is honest rather than lazy: a real
     // provider resolves the subject's jurisdiction and reads the pack bound to
     // it, and this fixture has no pack and no jurisdiction to resolve. It
@@ -124,10 +185,10 @@ export class LocalSyntheticRetentionDecisionProvider
     return Promise.resolve({
       state: 'DECIDED',
       dataset,
-      retentionPeriod: SYNTHETIC_PERIOD,
-      basis: SYNTHETIC_BASIS,
-      approvalReference: SYNTHETIC_APPROVAL_REFERENCE,
-      packVersion: SYNTHETIC_PACK_VERSION,
+      retentionPeriod: fixture.ACCOUNT_SYNTHETIC_PERIOD,
+      basis: fixture.ACCOUNT_SYNTHETIC_BASIS,
+      approvalReference: fixture.ACCOUNT_SYNTHETIC_APPROVAL_REFERENCE,
+      packVersion: fixture.ACCOUNT_SYNTHETIC_PACK_VERSION,
     });
   }
 }

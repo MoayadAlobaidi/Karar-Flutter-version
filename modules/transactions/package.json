@@ -17,6 +17,7 @@
     "@karar/shared-kernel": "workspace:*"
   },
   "devDependencies": {
+    "@karar/financial-retention-local-fixtures": "workspace:*",
     "@types/node": "^25.9.5",
     "@types/pg": "^8.15.0",
     "pg": "^8.16.0"

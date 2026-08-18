@@ -534,6 +534,29 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     );
     const succeeded = results.filter((result) => result?.ok === true);
     const refused = results.filter((result) => result !== null && result.ok === false);
+    // DIAGNOSTIC, not decoration. This assertion failed three times in roughly
+    // thirty-five full-suite runs and never once in isolation, and the bare
+    // "expected length 1" told us nothing about WHICH invariant broke: two
+    // winners (a real dedup failure), two losers, or a raw throw where a typed
+    // DUPLICATE_TRANSACTION refusal was expected. It was not reproducible again
+    // under instrumentation — twenty-seven consecutive clean runs, including
+    // six under deliberate CPU load — so the next occurrence has to be
+    // diagnosable on the spot rather than re-chased. Fires only on the failure
+    // path; a passing run prints nothing.
+    if (succeeded.length !== 1 || refused.length !== 1) {
+      console.error(
+        'concurrency invariant broken — outcomes were:',
+        JSON.stringify(
+          outcomes.map((o) =>
+            o.status === 'fulfilled'
+              ? { status: 'fulfilled', value: o.value }
+              : { status: 'rejected', reason: String(o.reason), name: (o.reason as Error)?.name },
+          ),
+          null,
+          2,
+        ),
+      );
+    }
     expect(succeeded).toHaveLength(1);
     expect(refused).toHaveLength(1);
     const denial = refused[0];

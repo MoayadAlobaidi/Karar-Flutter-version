@@ -96,16 +96,20 @@ Deferred to the [control matrix](../compliance/control-matrix.md) and the [state
 None recorded yet. Phase 5 evidence rows begin at EV-469; the Phase 4 range ended at EV-468. Evidence is written at the phase's compliance gate, not at a mid-phase checkpoint, and this foundation has not reached one.
 ## Tests executed
 
-Executed on this branch at commit `095b3e8`, against a PostgreSQL 17 database created from zero (`db:create` → `db:migrate` → `db:verify` reports `status: clean`, 93 migrations applied):
+Executed on this branch at the remediation checkpoint, against a **PostgreSQL 16.14** database created from zero (`db:create` → `db:migrate` → `db:verify` reports `status: clean`, 93 migrations applied). CI builds on `postgres:17-alpine`, so the local run is one major version behind what CI validates — stated because it is a real gap in this evidence, not a footnote.
+
+The workspace figure below is from a **sequential** run (`--no-file-parallelism`) started from a clean database state, which is the reliable invocation on this machine:
 
 | Suite | Result |
 |---|---|
-| Workspace (`pnpm test`) | 1696 passed / 12 skipped (1708 total) |
+| Workspace, sequential | 1703 passed / 12 skipped / **0 failed** (1715 total) |
 | — of which `modules/financial-accounts` | 139 passed |
 | — of which `modules/transactions` | 232 passed |
 | Architecture | 24 passed / 0 failed / 4 phase-deferred; self-test 57 cases |
 | Documentation | 13/13 |
 | Format, lint, typecheck, build | all pass |
+
+**The default parallel invocation is NOT reliably green on this machine, and that is reported rather than smoothed over.** At 12 workers it fails intermittently for two reasons that are now separated: F4 above (a real defect, reproducible with parallelism disabled) and local connection exhaustion (an environment limit, described under the environment note). A clean sequential run isolates the first from the second. CI runs on a smaller runner against its own container and is the arbiter.
 
 The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, which requires Redis and deliberately stops and restarts its compose containers; CI runs it as a separate step that owns those containers, and running it against a Homebrew PostgreSQL would not have been the same test.
 
@@ -122,6 +126,58 @@ The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, wh
 - **No ingestion path exists**, so architecture test 24 (resource limits declared) remains phase-deferred and the declared limit policies are unenforced by anything.
 
 **Carried forward from Phase 4, unfixed by this work:** no build has run on a device, so the biometric prompt has never been shown to appear; no build is signed and no signing material exists; no Apple Team ID exists; the compound credential-abandonment guarantee is local-only; golden baselines are not CI-enforced; runtime conformance covers 82 of 128 declared pairs; **EV-427 is `PENDING` and overdue**, with no DNS record and all seven registrar hardening rows still `TO_VERIFY`; and one maintainer holds every role.
+## Review findings and their disposition
+
+An independent review pass was run over the remediated foundation. It implemented nothing; every fix below was made afterwards and re-verified.
+
+### Fixed
+
+**F1 (HIGH) — the synthetic retention values shipped in every build.** The values were constants inside each module's `infrastructure/providers/`, guarded by an environment check in the same file. The guard was real, but the values were in both modules' emitted JavaScript, declaration files and source maps, in every environment that installed either module. A fabricated approval reference is shaped exactly like the real thing and names an approval nobody gave; shipping one is worse than shipping fixture prose.
+
+Fixed by the pattern `modules/consent` already established: the values moved to `@karar/financial-retention-local-fixtures`, a private package that is a **devDependency only** and is resolved at runtime inside the local-only branch, so a production install simply does not have it. `modules/financial-accounts/__tests__/retention-fixture-closure.test.ts` asserts the property against the artefacts — production closure walked through `dependencies` only, every `dist/` scanned including compiled test output and source maps, a positive control against the fixture package's own build, and no static import edge.
+
+Two things that fix found on the way, both of which would have made it fake:
+
+- The first attempt still leaked, through four test files that had typed the values out and one doc comment that quoted the marker — `tsc` emits comments and compiled tests into the same `dist/` a deployment ships. The needles are now imported, never typed, and the comments describe the values instead of reproducing them.
+- The fixture values were initially composed by interpolating the marker. That emits a runtime expression, so no value would have appeared contiguously in any build and the scanner would have searched for strings that exist nowhere while passing. They are contiguous literals now, with the marker relation asserted separately. The positive control is what caught this.
+
+The test was mutation-checked: a probe constant added to an unrelated module source fails it and names the exact file.
+
+**F2 (MEDIUM) — architecture test 5 rejected the collapsed lifecycle ports.** Collapsing the duplicated presence/eraser ports left `modules/transactions` re-exporting them, and the rule requires an adapter's port to be *declared* under its own module's `application/ports/`. Fixed in the code rather than by relaxing the rule: the module now declares the ports as aliases of the accounts-side declarations, so its application layer names what its infrastructure implements while the single definition stays in the module that owns it.
+
+### Deferred, with reasons
+
+**F3 (HIGH, pre-existing, outside this change set) — Prisma misreports `timestamptz` when the PostgreSQL session timezone is not UTC.** Reading the same row in one transaction, the `pg` driver returns the correct instant and Prisma returns it shifted by the server's UTC offset. Every Prisma time-window predicate is then wrong by that offset: on a UTC+3 server a fresh grant reads as not-yet-effective, and — the direction that matters — a time-bounded window reads as still open for `offset` hours after it should have closed. Explicit revocation is unaffected, because it is caught by `status` and `revoked_at` rather than by time.
+
+- **Evidence:** eleven integration tests across `authorization`, `control-plane` and `subject-policy` fail on a server set to `Asia/Qatar` and all 116 pass with the session set to UTC. **Reproduced identically on `main` at `2b0dfca`**, so it is not introduced by Phase 5. It is invisible in CI because the `postgres:17-alpine` container runs UTC.
+- **Why deferred rather than fixed here:** the fix is a one-line pin of the session timezone in the platform connection layer, but it changes time semantics for all 57 tables and 15 modules at once, including `::date` casts and `date_trunc`. That belongs in its own change with its own review, not as a ride-along in a financial-foundation checkpoint that was explicitly scoped for external review.
+- **Owner:** Platform. **Target:** before any environment other than a developer's machine exists. **Residual risk until then:** a developer machine on a non-UTC server sees wrong time-window results and may chase them as product bugs, as happened here. **Closure condition:** the connection layer pins `TimeZone=UTC`, a startup assertion fails loudly if the session reports anything else, and the eleven tests above pass on a deliberately non-UTC server.
+
+**F4 (MEDIUM, root-caused, not fixed) — a concurrent dedup loser is refused with an untyped `STORE_FAILURE`.**
+
+Two commits of identical content, in flight at once, are correctly resolved to exactly one winner and exactly one stored row — that invariant held in every observed failure and is not in question. What is wrong is the SHAPE of the loser's refusal.
+
+The mechanism is deliberately two-layered: the repository checks the occurrence rule before it inserts, and a database trigger enforces the same rule as defence in depth. Under a race the repository's pre-check passes (it reads `max(occurrence_ordinal)` before the winner commits, so it computes the same next ordinal the winner is about to take) and the TRIGGER is what fires. The repository maps its own pre-check to `OCCURRENCE_ORDINAL_NOT_NEXT` and maps Prisma's `P2002` to `DUPLICATE_TRANSACTION`, but it does not map the trigger's `P0001` to anything — so the braces fire and the caller is handed a generic `STORE_FAILURE`.
+
+Captured from a reproduction:
+
+```
+kind: STORE_FAILURE
+Database error. Code: `P0001`.
+Message: `occurrence_ordinal 1 is not the next occurrence of this content identity
+          (the next unused ordinal is 2). ...`
+```
+
+- **Why it matters even though the data is correct:** the next thing built on this is CSV import, where duplicates are expected in bulk and must be skippable. A caller cannot distinguish "this row is a duplicate, skip it" from "the store is broken, stop" if both arrive as `STORE_FAILURE`.
+- **Frequency:** three failures in roughly thirty-five full-suite runs, and reproduced deterministically enough with a targeted loop (one in six). It is NOT file-parallelism — it reproduces with `--no-file-parallelism`, because the race is inside the test, between two concurrent commits.
+- **Why deferred rather than fixed here:** the honest fix changes the trigger's error contract — giving the ordinal guard its own SQLSTATE so the repository can match it structurally rather than by prose — which means editing migration `0090` again and reworking the repository's error translation. That is a change to the dedup mechanism itself, which is the part of this foundation most in need of the external review this checkpoint was frozen for. Matching on the message text instead would be a fix shaped like a defect.
+- **Owner:** Financial. **Target:** with the first ingestion path, before any bulk import can hit it. **Residual risk until then:** an intermittently red suite, which is corrosive on its own — a tolerated flake teaches a reader to ignore a real failure. **Closure condition:** the ordinal guard raises a distinct SQLSTATE, the repository maps it to `OCCURRENCE_ORDINAL_NOT_NEXT` structurally, and the concurrent test passes 50 consecutive runs.
+- **Action taken now:** `transactions.integration.test.ts` carries a diagnostic that fires only on the failure path and prints which invariant broke, so the next occurrence is diagnosable rather than re-chased from zero.
+
+### An environment note that is not a finding
+
+The verification runs below were slowed and occasionally disrupted by two things local to this machine, neither of which is a repository defect, both recorded so a reader does not mistake them for one. First, the local PostgreSQL server ran with `TimeZone=Asia/Qatar`, which is F3 above. Second, on a 12-core machine the suite provisions enough concurrent databases and pools to exhaust a default `max_connections = 100`; when it does, whole suites SKIP rather than fail (the fixtures probe the server and skip when it is unreachable), and the skip count rises from 12 to 25. A run whose skip count is not 12 has not verified what it appears to have verified.
+
 ## Accepted risks
 
 None accepted by this phase yet; the register carries 41 rows at the Phase 4 close. Phase 5 risk rows are written at the phase's gate, once the surface they describe exists.

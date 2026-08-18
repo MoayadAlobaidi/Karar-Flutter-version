@@ -48,6 +48,8 @@
  * fact, not as a gap this module can close.
  */
 
+import { createRequire } from 'node:module';
+
 import type {
   TransactionRetentionDecision,
   TransactionRetentionDecisionPort,
@@ -62,17 +64,66 @@ export const FIXTURE_ENVIRONMENT = 'local';
  * log line, an error message, or a support ticket still says what it is to
  * somebody who never opens this file.
  */
-export const SYNTHETIC_RETENTION_BASIS =
-  'karar-ref:fixture:transactions-retention-local-synthetic@v1 — SYNTHETIC FIXTURE, NO LEGAL EFFECT, ' +
-  'not a legal determination, not a PolicyPack decision, and not an approval reference';
-
 /**
- * A period short enough that nobody could mistake it for a considered legal
- * answer, and long enough for a local run. It exists so a developer's machine
- * has something to work against — it is not a proposal, and no deployed
- * environment ever sees it.
+ * The fixture package holds the synthetic VALUES; this file holds only the
+ * machinery that refuses them outside local development.
+ *
+ * Resolved rather than imported: a static import would put the specifier in
+ * this module's own import graph, and a production install — which does not
+ * have the package — would fail to boot. See
+ * `modules/consent/__tests__/production-closure.test.ts` for why a same-file
+ * environment check was not enough on its own.
  */
-export const SYNTHETIC_RETENTION_PERIOD = 'P7D';
+export const LOCAL_FIXTURE_PACKAGE = '@karar/financial-retention-local-fixtures';
+
+interface RetentionFixtureModule {
+  readonly TRANSACTION_SYNTHETIC_BASIS: string;
+  readonly TRANSACTION_SYNTHETIC_PERIOD: string;
+}
+
+function isRetentionFixtureModule(value: unknown): value is RetentionFixtureModule {
+  if (typeof value !== 'object' || value === null) return false;
+  const m = value as Record<string, unknown>;
+  return (
+    typeof m['TRANSACTION_SYNTHETIC_BASIS'] === 'string' &&
+    typeof m['TRANSACTION_SYNTHETIC_PERIOD'] === 'string'
+  );
+}
+
+export class LocalRetentionFixtureMissingError extends Error {
+  override readonly name = 'LocalRetentionFixtureMissingError';
+
+  constructor() {
+    super(
+      `${LOCAL_FIXTURE_PACKAGE} is not installed. It is a devDependency held outside this module ` +
+        'so that no production closure contains a synthetic retention answer. If this appears in ' +
+        'local development, install workspace devDependencies; it must never appear anywhere else.',
+    );
+  }
+}
+
+function loadRetentionFixture(): RetentionFixtureModule {
+  const requireFrom = createRequire(import.meta.url);
+  let loaded: unknown;
+  try {
+    loaded = requireFrom(LOCAL_FIXTURE_PACKAGE);
+  } catch (error) {
+    const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
+    const notFound = code === 'MODULE_NOT_FOUND' || code === 'ERR_MODULE_NOT_FOUND';
+    if (notFound && typeof message === 'string' && message.includes(LOCAL_FIXTURE_PACKAGE)) {
+      throw new LocalRetentionFixtureMissingError();
+    }
+    throw error;
+  }
+  if (!isRetentionFixtureModule(loaded)) {
+    throw new Error(
+      `${LOCAL_FIXTURE_PACKAGE} is installed but does not export the synthetic retention values — ` +
+        'a fixture package that cannot be read is a defect, not an absence, and is refused rather ' +
+        'than silently degraded to a decision nobody took.',
+    );
+  }
+  return loaded;
+}
 
 export class LocalSyntheticRetentionDecisionProvider implements TransactionRetentionDecisionPort {
   constructor(options: { readonly environment: string }) {
@@ -96,8 +147,8 @@ export class LocalSyntheticRetentionDecisionProvider implements TransactionReten
   decide(): Promise<TransactionRetentionDecision> {
     return Promise.resolve({
       state: 'DECIDED',
-      retentionPeriod: SYNTHETIC_RETENTION_PERIOD,
-      basis: SYNTHETIC_RETENTION_BASIS,
+      retentionPeriod: loadRetentionFixture().TRANSACTION_SYNTHETIC_PERIOD,
+      basis: loadRetentionFixture().TRANSACTION_SYNTHETIC_BASIS,
       effect: 'SYNTHETIC_NO_LEGAL_EFFECT',
     });
   }
