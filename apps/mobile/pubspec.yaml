@@ -47,7 +47,6 @@ dependencies:
   # Flutter SDK upgrade that moves it is a visible diff here.
   intl: 0.20.3
 
-  cupertino_icons: 1.0.8
 
   # Transport. Chosen for interceptor composition, typed timeouts and
   # cancellation tokens; TLS validation is delegated to the platform stack.
