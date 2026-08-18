@@ -4,12 +4,18 @@
  * nothing about making that possible reaches a deployed environment.
  *
  * The gap this closes: the catalogue stores a `storage_ref` and no bytes, and
- * the only shipped content source retrieves nothing, so
+ * the deployed content source retrieves nothing, so
  * `GET /consent/documents/{id}/content` answered 409 NOT_RETRIEVABLE for every
- * document and the read-then-accept path could not be exercised at all.
- * `LocalSeedContentSource` supplies the bytes for the ONE version
- * `scripts/db/seed-local-consent.mjs` publishes, and refuses to exist anywhere
- * but local/test.
+ * document and the read-then-accept path could not be exercised at all. The
+ * fixture in `@karar/consent-local-fixtures` supplies the bytes for the ONE
+ * version `scripts/db/seed-local-consent.mjs` publishes, and refuses to be
+ * supplied anywhere but local/test.
+ *
+ * WHERE THE FIXTURE LIVES IS PART OF THE PROPERTY. It is not in this module:
+ * it is in a package no production dependency closure contains, so a deployed
+ * build has no copy of the text to serve. That is asserted separately, against
+ * the built output, by `production-closure.test.ts`. This suite asserts the
+ * other half — that moving it out cost the local path nothing.
  *
  * Everything here is real: the real seed script runs against a migrated scratch
  * database, the real repository reads it, the real use case chooses the version
@@ -22,8 +28,8 @@
  *      version rather than being trusted;
  *   2. content that is not what the version pinned is refused, with none of it
  *      served;
- *   3. the local source cannot be constructed outside local/test, and a
- *      deployed selection still gets the honest absence for the SAME document;
+ *   3. the fixture cannot be supplied outside local/test, and a deployed
+ *      selection still gets the honest absence for the SAME document;
  *   4. an acceptance recorded against the served version is pinned to exactly
  *      that version — reading and accepting name one thing.
  */
@@ -51,6 +57,18 @@ import { ResolveEffectiveOperatingEntity } from '@karar/operating-entity';
 import { PrismaEntityAssignmentRepository } from '@karar/operating-entity/dist/infrastructure/persistence/prisma-repositories.js';
 import { TenantId, UserId } from '@karar/shared-kernel';
 
+import {
+  LOCAL_FIXTURE_ENVIRONMENTS,
+  LOCAL_SEED_CONTENT,
+  LOCAL_SEED_DOCUMENT_ID,
+  LOCAL_SEED_FIXTURE_MARKER,
+  LOCAL_SEED_STORAGE_REF,
+  LOCAL_SEED_STORAGE_SCHEME,
+  LOCAL_SEED_VERSION,
+  LOCAL_SEED_VERSION_ID,
+  localSeedContentSpec,
+} from '@karar/consent-local-fixtures';
+
 import { ConsentAuditTrail } from '../application/audit-trail.js';
 import type { ConsentPrincipal } from '../application/ports/consent-grant-repository.js';
 import type { LegalDocumentContentSource } from '../application/ports/legal-document-content-source.js';
@@ -63,12 +81,11 @@ import {
   PublishDocumentVersion,
 } from '../application/use-cases/legal-documents.js';
 import {
-  LOCAL_SEED_CONTENT,
-  LOCAL_SEED_STORAGE_REF,
-  LocalSeedContentSource,
+  LOCAL_CONTENT_ENVIRONMENTS,
   legalDocumentContentSourceFor,
 } from '../infrastructure/content/local-seed-content-source.js';
 import { NoContentSourceConfigured } from '../infrastructure/content/no-content-source-configured.js';
+import { StaticLegalDocumentContentSource } from '../infrastructure/content/static-legal-document-content-source.js';
 import { OperatingEntityDirectoryAdapter } from '../infrastructure/operating-entity/operating-entity-directory-adapter.js';
 import { PrismaConsentGrantRepository } from '../infrastructure/persistence/prisma-consent-grant-repository.js';
 import { PrismaLegalDocumentRepository } from '../infrastructure/persistence/prisma-legal-document-repository.js';
@@ -124,11 +141,20 @@ const SEED_SCRIPT = path.join(REPO_ROOT, 'scripts', 'db', 'seed-local-consent.mj
 const NOW = new Date('2026-08-16T12:00:00.000Z');
 const PURPOSE = 'purpose:ai-processing';
 
-/** The ids the seed pins, restated so a silent rename fails the suite. */
+/**
+ * The ids the seed pins. The subject and entity are restated here so a silent
+ * rename fails the suite; the DOCUMENT and VERSION are read from the fixture
+ * package instead, because those two are exactly the values
+ * `production-closure.test.ts` proves absent from every production build — and
+ * a copy of them typed out in a test would be compiled into this module's
+ * `dist/` and make that proof false. The binding they used to provide is
+ * stronger here anyway: the assertions below compare them against the row the
+ * REAL seed wrote and the REAL route returned.
+ */
 const SYNTHETIC_USER = '00000000-0000-4000-8000-534545445531';
 const SYNTHETIC_ENTITY = '00000000-0000-4000-8000-534545444531';
-const SYNTHETIC_DOCUMENT = '00000000-0000-4000-8000-534545444431';
-const SYNTHETIC_VERSION = '00000000-0000-4000-8000-534545445631';
+const SYNTHETIC_DOCUMENT = LOCAL_SEED_DOCUMENT_ID;
+const SYNTHETIC_VERSION = LOCAL_SEED_VERSION_ID;
 
 /**
  * The hash the seed pins, computed here from the served constant by the same
@@ -194,7 +220,24 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
     const request = {
       principal: { userId: String(principal.userId), tenantId: String(principal.tenantId) },
     };
-    await controller.readContent(request, documentId, reply);
+    try {
+      await controller.readContent(request, documentId, reply);
+    } catch (error) {
+      // NestJS HTTP exceptions are the controller's other answer channel: the
+      // reply object carries successes, and every refusal travels as the body
+      // of an HttpException for the entrypoint's error boundary to write. The
+      // leak assertions below still inspect a SERIALIZED body either way.
+      const status = (error as { getStatus?: () => number }).getStatus?.();
+      if (status === undefined) throw error;
+      const response = (error as { getResponse: () => unknown }).getResponse();
+      return {
+        statusCode: status,
+        raw: JSON.stringify(response),
+        body: (typeof response === 'object' && response !== null
+          ? (response as Record<string, unknown>)
+          : { message: response }) as Record<string, unknown>,
+      };
+    }
     return { statusCode, raw: JSON.stringify(sent), body: (sent ?? {}) as Record<string, unknown> };
   }
 
@@ -324,21 +367,35 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
   });
 
   describe('the environment gate', () => {
-    it('refuses to construct in any deployed environment', () => {
+    it('refuses to supply the fixture in any deployed environment', () => {
+      // The gate lives in the fixture package, next to the bytes, so a caller
+      // that reaches the fixture WITHOUT coming through the module's selector
+      // still meets it. It is the second control, not the first: the first is
+      // that a production install has no copy of this package to call.
       for (const environment of DEPLOYED_ENVIRONMENTS) {
-        expect(() => new LocalSeedContentSource(environment)).toThrow(
-          /refusing to construct in environment/,
+        expect(() => localSeedContentSpec(environment)).toThrow(
+          /refusing to supply the synthetic fixture/,
         );
       }
-      expect(() => new LocalSeedContentSource('local')).not.toThrow();
-      expect(() => new LocalSeedContentSource('test')).not.toThrow();
+      expect(() => localSeedContentSpec('local')).not.toThrow();
+      expect(() => localSeedContentSpec('test')).not.toThrow();
     });
 
     it('refuses an UNSTATED environment rather than defaulting to local', () => {
       // The seed refuses an unset KARAR_ENV for the same reason: a missing
       // value must never widen what may be written, or served.
-      expect(() => new LocalSeedContentSource(undefined)).toThrow(/\(unstated\)/);
-      expect(() => new LocalSeedContentSource('')).toThrow(/refusing to construct/);
+      expect(() => localSeedContentSpec(undefined)).toThrow(/\(unstated\)/);
+      expect(() => localSeedContentSpec('')).toThrow(/refusing to supply/);
+    });
+
+    it('states the SAME permitted environments on both sides of the boundary', () => {
+      // The consent module and the fixture package each declare the set, and
+      // neither imports the other's. A widening on one side alone is the
+      // failure this catches.
+      expect([...LOCAL_CONTENT_ENVIRONMENTS]).toStrictEqual([...LOCAL_FIXTURE_ENVIRONMENTS]);
+      for (const environment of DEPLOYED_ENVIRONMENTS) {
+        expect(LOCAL_CONTENT_ENVIRONMENTS as readonly string[]).not.toContain(environment);
+      }
     });
 
     it('hands every deployed environment the source that honestly has nothing', () => {
@@ -348,8 +405,10 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
         );
       }
       expect(legalDocumentContentSourceFor(undefined)).toBeInstanceOf(NoContentSourceConfigured);
-      expect(legalDocumentContentSourceFor('local')).toBeInstanceOf(LocalSeedContentSource);
-      expect(legalDocumentContentSourceFor('test')).toBeInstanceOf(LocalSeedContentSource);
+      // local/test get a source over content supplied at construction — the
+      // class itself carries no bytes; the fixture package supplied them.
+      expect(legalDocumentContentSourceFor('local')).toBeInstanceOf(StaticLegalDocumentContentSource);
+      expect(legalDocumentContentSourceFor('test')).toBeInstanceOf(StaticLegalDocumentContentSource);
     });
 
     it('answers the SEEDED document with an honest absence when deployed', async () => {
@@ -368,9 +427,27 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
           reason: 'NOT_RETRIEVABLE',
         });
         // Not one byte of the synthetic notice, and no locator either.
-        expect(raw).not.toContain('SYNTHETIC LOCAL FIXTURE');
+        expect(raw).not.toContain(LOCAL_SEED_FIXTURE_MARKER);
         expect(raw).not.toContain(LOCAL_SEED_STORAGE_REF);
       }
+    });
+  });
+
+  describe('what the fixture package publishes', () => {
+    it('is one identifiable document, one version, and text that names itself', () => {
+      // The closure test greps production output for exactly these values, so
+      // they have to be distinctive enough to be evidence. Two synthetic uuids
+      // and a marker the text opens with are.
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+      expect(LOCAL_SEED_DOCUMENT_ID).toMatch(uuid);
+      expect(LOCAL_SEED_VERSION_ID).toMatch(uuid);
+      expect(LOCAL_SEED_DOCUMENT_ID).not.toBe(LOCAL_SEED_VERSION_ID);
+      expect(LOCAL_SEED_VERSION.length).toBeGreaterThan(0);
+      expect(LOCAL_SEED_STORAGE_REF.startsWith(LOCAL_SEED_STORAGE_SCHEME)).toBe(true);
+      // The text says what it is in its first words, so a reader — or a
+      // screenshot of one — cannot be mistaken for a reviewed disclosure.
+      expect(LOCAL_SEED_CONTENT.content.startsWith(LOCAL_SEED_FIXTURE_MARKER)).toBe(true);
+      expect(LOCAL_SEED_CONTENT.content).toContain('has no legal effect');
     });
   });
 
@@ -385,7 +462,7 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
       expect(body).toMatchObject({
         documentId: SYNTHETIC_DOCUMENT,
         versionId: SYNTHETIC_VERSION,
-        version: 'local-seed/v1',
+        version: LOCAL_SEED_VERSION,
         contentHash: EXPECTED_HASH,
         language: 'en',
         format: 'text/plain',
@@ -393,12 +470,12 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
       });
       // The text says what it is. A reader — or a screenshot of one — cannot be
       // mistaken for a reviewed disclosure.
-      expect(String(body.content)).toContain('SYNTHETIC LOCAL FIXTURE');
-      expect(String(body.content)).toContain('has not been reviewed by counsel');
+      expect(String(body.content)).toContain(LOCAL_SEED_FIXTURE_MARKER);
+      expect(String(body.content)).toContain('has not been reviewed by');
       // The internal locator stays inside, exactly as it does for every source.
       expect(Object.keys(body)).not.toContain('storageRef');
       expect(raw).not.toContain(LOCAL_SEED_STORAGE_REF);
-      expect(raw).not.toContain('local-seed://');
+      expect(raw).not.toContain(LOCAL_SEED_STORAGE_SCHEME);
     });
 
     it('served the hash the DATABASE pinned, not one the source asserted', async () => {
@@ -432,7 +509,7 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
       // a platform fault. Nothing of the unverified text is served.
       expect(statusCode).toBe(503);
       expect(body).toMatchObject({ code: 'DOCUMENT_CONTENT_UNVERIFIABLE' });
-      expect(raw).not.toContain('SYNTHETIC LOCAL FIXTURE');
+      expect(raw).not.toContain(LOCAL_SEED_FIXTURE_MARKER);
     });
 
     it('holds ONE version’s bytes and answers nothing for any other', async () => {
@@ -449,7 +526,16 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
         code: 'DOCUMENT_CONTENT_UNAVAILABLE',
         reason: 'NOT_RETRIEVABLE',
       });
-      expect(raw).not.toContain('SYNTHETIC LOCAL FIXTURE');
+      expect(raw).not.toContain(LOCAL_SEED_FIXTURE_MARKER);
+    });
+
+    it('refuses a source constructed with no locator to match on', () => {
+      // The generic class is the half of the old fixture source that ships. It
+      // must not be constructible into something that answers for versions
+      // naming no location at all.
+      expect(() => new StaticLegalDocumentContentSource('', LOCAL_SEED_CONTENT)).toThrow(
+        /refusing an empty storage reference/,
+      );
     });
   });
 
@@ -523,7 +609,7 @@ describe.skipIf(unreachable !== null)('local seed document content (live Postgre
         jurisdiction_ref: 'QA',
         purpose_ref: PURPOSE,
         legal_document_version_id: versionId,
-        consent_version: 'local-seed/v1',
+        consent_version: LOCAL_SEED_VERSION,
         status: 'ACTIVE',
         policy_pack_version: 'qa/v1',
         policy_pack_pin_state: 'PINNED',

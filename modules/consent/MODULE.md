@@ -115,19 +115,38 @@ publication path that records content alongside the version it belongs to.
 **LOCAL and TEST get one synthetic fixture, so the path can be walked.** With nothing
 retrievable anywhere, the read-then-accept sequence the whole design is built around could not
 be exercised by a developer, and a path nobody can exercise is a path nobody can find defects
-in. `LocalSeedContentSource` supplies the bytes for the single version
-`scripts/db/seed-local-consent.mjs` publishes — one paragraph that states on its own face that
-it is not a legal document, has been reviewed by nobody, and has no legal effect.
-`legalDocumentContentSourceFor(environment)` is the composition decision: `local` and `test`
-get that source, everything else gets `NoContentSourceConfigured` unchanged, and the source's
-own constructor throws outside `local`/`test` so reaching past the selector still cannot serve
-synthetic text to a real subject (an unstated environment is refused, never defaulted). The
-source resolves ONE storage reference by equality and answers null for every other version: a
-source that answered for anything would show one document's text under another's identity.
+in. The fixture supplies the bytes for the single version `scripts/db/seed-local-consent.mjs`
+publishes — one paragraph that states on its own face that it is not a legal document, has been
+reviewed by nobody, and has no legal effect.
 
-**The fixture satisfies the integrity check rather than avoiding it.** The seed hashes the
-same constant the source serves and pins that sha256 into `legal_document_versions.content_hash`,
-which is immutable once published (migration 0064's trigger). `GetLegalDocumentContent` then
+**The fixture is not in this module, and that is the control.** Its bytes, its storage
+reference and its ids live in `@karar/consent-local-fixtures`, a private package that appears
+in no package's `dependencies` — only as a devDependency — and therefore in no production
+dependency closure and no production `dist/`. It used to live here, guarded by an environment
+check in the same file; the check was real, but the text shipped anyway, in the emitted
+JavaScript and declaration files of a package production installs. Protection that consists
+only of a deployed process declining to read bytes it is holding is one composition change away
+from being none. A deployed environment now cannot serve synthetic text because it does not
+have synthetic text.
+
+What stays in this module is the decision and the generic behaviour.
+`legalDocumentContentSourceFor(environment)` hands every environment but `local` and `test`
+`NoContentSourceConfigured`, without naming, resolving or loading the fixture package at all;
+`local` and `test` get a `StaticLegalDocumentContentSource` over whatever the fixture package
+supplies, resolved optionally at runtime so an installation without it reports the same honest
+absence rather than failing to boot. That class holds no content of its own: it serves exactly
+what it was constructed with, resolving ONE storage reference by equality and answering null
+for every other version — a source that answered for anything would show one document's text
+under another's identity. The fixture package applies its own environment gate next to the
+bytes (an unstated environment is refused, never defaulted), so a caller that reaches the
+fixture without coming through the selector still meets a refusal. Two independent controls:
+one physical, one behavioural, and `__tests__/production-closure.test.ts` asserts the physical
+one against the built output and the manifests rather than against the intention.
+
+**The fixture satisfies the integrity check rather than avoiding it.** The seed hashes the same
+constant the fixture package holds and pins that sha256 into
+`legal_document_versions.content_hash`, which is immutable once published (migration 0064's
+trigger). `GetLegalDocumentContent` then
 hashes whatever the source returned and compares. The two agree because they are the same
 bytes, not because anything is skipped — change either side alone and the route answers 503
 with nothing served, which the integration suite proves by publishing a version that names the

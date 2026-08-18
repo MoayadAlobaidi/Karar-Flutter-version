@@ -40,6 +40,8 @@ import { ResolveEffectiveOperatingEntity } from '@karar/operating-entity';
 import { PrismaEntityAssignmentRepository } from '@karar/operating-entity/dist/infrastructure/persistence/prisma-repositories.js';
 import { TenantId, UserId } from '@karar/shared-kernel';
 
+import { LOCAL_SEED_VERSION, LOCAL_SEED_VERSION_ID } from '@karar/consent-local-fixtures';
+
 import { ConsentAuditTrail } from '../application/audit-trail.js';
 import type { ConsentPrincipal } from '../application/ports/consent-grant-repository.js';
 import { RecordOwnAcceptance } from '../application/use-cases/consent.js';
@@ -94,10 +96,17 @@ const SEED_SCRIPT = path.join(REPO_ROOT, 'scripts', 'db', 'seed-local-consent.mj
 const NOW = new Date('2026-08-16T12:00:00.000Z');
 const PURPOSE = 'purpose:ai-processing';
 
-/** The ids the seed pins, restated here so a silent rename fails the suite. */
+/**
+ * The ids the seed pins. The subject and entity are restated here so a silent
+ * rename fails the suite; the VERSION comes from the fixture package the seed
+ * itself reads, because a copy of it typed out here would be compiled into
+ * this module's `dist/` and would break the absence `production-closure.test.ts`
+ * proves. What the restatement used to catch is caught below anyway — the row
+ * this suite reads back is the one the REAL seed wrote.
+ */
 const SYNTHETIC_USER = '00000000-0000-4000-8000-534545445531';
 const SYNTHETIC_ENTITY = '00000000-0000-4000-8000-534545444531';
-const SYNTHETIC_VERSION = '00000000-0000-4000-8000-534545445631';
+const SYNTHETIC_VERSION = LOCAL_SEED_VERSION_ID;
 
 interface SeedRun {
   readonly ok: boolean;
@@ -380,7 +389,7 @@ describe.skipIf(unreachable !== null)('seed-local-consent (live PostgreSQL)', ()
         subject_policy_selection_pin_state: 'NOT_APPLICABLE',
       });
       expect(row?.evidence_reference).not.toBe('');
-      expect(row?.consent_version).toBe('local-seed/v1');
+      expect(row?.consent_version).toBe(LOCAL_SEED_VERSION);
     }, 60_000);
   });
 });

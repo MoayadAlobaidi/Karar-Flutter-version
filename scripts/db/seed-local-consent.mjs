@@ -33,7 +33,7 @@
 //     says so in its own text, storage reference, and review reason.
 //   * It writes NO document bytes into the catalogue and adds no column that
 //     could hold any. The version pins sha256 of the text the LOCAL content
-//     source serves (LocalSeedContentSource, imported below rather than
+//     source serves (@karar/consent-local-fixtures, imported below rather than
 //     restated), so `GET /consent/documents/{id}/content` retrieves that text,
 //     hashes what it retrieved, and finds it equal to what this row pinned.
 //     The integrity check is SATISFIED, never skipped: change either side
@@ -62,7 +62,11 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const platformDist = join(root, 'packages', 'platform', 'dist');
 const policyDist = join(root, 'packages', 'jurisdiction-policy', 'dist');
-const consentDist = join(root, 'modules', 'consent', 'dist');
+// The fixture lives in its own LOCAL/TEST-only package, deliberately NOT in
+// modules/consent: keeping it out of the module keeps it out of every
+// production build and dependency closure. This seed is a local/test script
+// gated above, so reaching into that package is exactly what it is for.
+const fixturesDist = join(root, 'packages', 'consent-local-fixtures', 'dist');
 
 // THE ENVIRONMENT GATE, first and unconditional. An unset KARAR_ENV is
 // REFUSED, not defaulted: a missing value must never widen what a script may
@@ -85,13 +89,25 @@ const { LocalPostgresConnectionProfile, PostgresPersistenceAdapter } = await imp
   join(platformDist, 'db', 'index.js')
 );
 const { QA_V1 } = await import(join(policyDist, 'index.js'));
-// The fixture the LOCAL content source serves, read from the code that serves
-// it — the same reason QA_V1 is read from the pack above rather than retyped.
-// A restated copy would drift silently, and drift here means a version whose
-// pinned hash no longer describes the bytes a subject reads.
-const { LOCAL_SEED_CONTENT, LOCAL_SEED_STORAGE_REF } = await import(
-  join(consentDist, 'infrastructure', 'content', 'local-seed-content-source.js')
-);
+// The fixture itself, read from the ONE package that holds it — the same
+// reason QA_V1 is read from the pack above rather than retyped. A restated
+// copy would drift silently, and drift here means a version whose pinned hash
+// no longer describes the bytes a subject reads. The ids come from the same
+// place for the same reason: the document this seed publishes and the document
+// the content route serves must be one row, named once.
+//
+// `localSeedContentSpec` re-applies the fixture's own environment gate against
+// the KARAR_ENV this script already validated — the refusal exists on both
+// sides of the boundary, so neither can be the only one holding.
+const {
+  LOCAL_SEED_CONTENT,
+  LOCAL_SEED_DOCUMENT_ID,
+  LOCAL_SEED_STORAGE_REF,
+  LOCAL_SEED_VERSION,
+  LOCAL_SEED_VERSION_ID,
+  localSeedContentSpec,
+} = await import(join(fixturesDist, 'index.js'));
+localSeedContentSpec(env);
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -111,8 +127,8 @@ const SYNTHETIC = {
   userJurisdiction: '00000000-0000-4000-8000-534545444a31',
   tenantJurisdiction: '00000000-0000-4000-8000-534545445431',
   packActivation: '00000000-0000-4000-8000-534545445031',
-  document: '00000000-0000-4000-8000-534545444431',
-  documentVersion: '00000000-0000-4000-8000-534545445631',
+  document: LOCAL_SEED_DOCUMENT_ID,
+  documentVersion: LOCAL_SEED_VERSION_ID,
 };
 
 // The pack's OWN jurisdiction and version — read from the code-resident pack
@@ -440,9 +456,10 @@ try {
 
     // `storage_ref` is the fixture reference the LOCAL content source resolves,
     // and `content_hash` is sha256 of the bytes it returns for that reference.
-    // Both come from the source's own constants, so the row cannot claim a
-    // locator the source does not answer for, or a hash for text it never
-    // serves. Both columns are immutable after publication (0064's trigger).
+    // Both come from the fixture package's own constants — the single place
+    // either is written down — so the row cannot claim a locator the source
+    // does not answer for, or a hash for text it never serves. Both columns
+    // are immutable after publication (0064's trigger).
     const version = await tx.query(
       `SELECT content_hash, storage_ref, published_at
          FROM public.legal_document_versions WHERE id = $1`,
@@ -454,7 +471,7 @@ try {
         `INSERT INTO public.legal_document_versions
            (id, document_id, version, content_hash, storage_ref, classification,
             author, reviewer, reason, effective_at, published_at, prior_version_id)
-         VALUES ($1, $2, 'local-seed/v1', $3, $4,
+         VALUES ($1, $2, $9, $3, $4,
                  'MATERIAL_REACCEPTANCE_REQUIRED', $5, $6, $7, $8, $8, NULL)`,
         [
           SYNTHETIC.documentVersion,
@@ -467,6 +484,7 @@ try {
             'fail-closed value so this placeholder can never be mistaken for a reviewed ' +
             'no-action-required decision.',
           EFFECTIVE_AT,
+          LOCAL_SEED_VERSION,
         ],
       );
       notes.push(
@@ -508,10 +526,12 @@ try {
   );
   console.log(`seed-local-consent: for purpose ${PURPOSE_REF}. No grant was written by this seed.`);
   console.log(
-    'seed-local-consent: the content route serves the synthetic text only where the composition ' +
-      'binds the LOCAL source (legalDocumentContentSourceFor); a deployed environment keeps ' +
-      'answering 409 DOCUMENT_CONTENT_UNAVAILABLE, and the text it would serve here says on its ' +
-      'own face that it is not a legal document.',
+    'seed-local-consent: the content route serves the synthetic text only where ' +
+      '@karar/consent-local-fixtures is installed AND the environment is local/test ' +
+      '(legalDocumentContentSourceFor); that package is a devDependency of no production ' +
+      'closure, so a deployed environment has no copy of this text at all and keeps answering ' +
+      '409 DOCUMENT_CONTENT_UNAVAILABLE. The text it serves here says on its own face that it ' +
+      'is not a legal document.',
   );
   console.log(
     'seed-local-consent: nothing was approved — qa/v1 stays DRAFT, the QA register entry stays ' +

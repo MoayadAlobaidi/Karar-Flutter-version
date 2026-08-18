@@ -1,63 +1,71 @@
 /**
- * The LOCAL/TEST LegalDocumentContentSource: the bytes of the one synthetic
- * document `scripts/db/seed-local-consent.mjs` publishes, and nothing else.
+ * WHERE the local seed's document content comes from — and, for every deployed
+ * environment, the statement that it comes from nowhere.
  *
- * WHY IT EXISTS. `NoContentSourceConfigured` is the honest answer for a
- * deployment with no document store, but it is a dead end for a developer:
- * with no retrievable text, `GET /consent/documents/{id}/content` answers 409
- * `NOT_RETRIEVABLE` for every document, so the read-then-accept sequence the
- * consent design is built around cannot be walked end to end on a local stack.
- * A path nobody can exercise is a path nobody can find defects in. This source
- * closes that gap for local/test WITHOUT inventing legal wording: it serves one
- * fixed synthetic string that states on its own face that it is not a legal
- * document, and it serves that string ONLY for the version the local seed
- * published.
+ * THIS FILE HOLDS NO FIXTURE. It used to. It carried the synthetic paragraph,
+ * its locator, and an environment check, and all three were compiled into
+ * `@karar/consent`'s `dist/` and shipped to every environment that installs the
+ * module. The check refused at runtime, but the TEXT was still there — in the
+ * emitted JavaScript, the declaration files and the source maps of a package
+ * production installs. A runtime check inside a file that is already in the
+ * production artifact is a decision, not a boundary: any future composition
+ * that reaches past the selector re-opens it, and nothing stops the bytes being
+ * read straight out of the shipped package.
  *
- * WHAT IT IS NOT. It is not a document store and not a step toward one. It
- * resolves exactly one storage reference — the local seed's — by equality, and
- * answers null for every other version, including other versions of the same
- * document. That matters: a source that returned its fixture for ANY version
- * would hand a subject one document's text under another document's identity,
- * which is the failure the content path exists to prevent. Absence stays
- * absence; the endpoint reports it, and no client composes prose of its own.
+ * The bytes now live in `@karar/consent-local-fixtures`, a package that appears
+ * in no package's `dependencies` — only as a devDependency — and is therefore
+ * absent from the production dependency closure and from every production
+ * `dist/`. A deployed environment cannot serve synthetic text because it does
+ * not have synthetic text. `__tests__/production-closure.test.ts` asserts that
+ * against the built output and the manifests, using the fixture's own constants
+ * so the assertion cannot drift.
  *
- * THE INTEGRITY CHECK IS NOT BYPASSED, IT IS SATISFIED. `GetLegalDocumentContent`
- * hashes whatever a source returns and compares it against the `content_hash`
- * the published version pinned; a mismatch is refused with nothing served. This
- * source has no way to influence that comparison — it returns bytes, and the
- * seed independently pins sha256 of THE SAME constant into the database. The
- * check passes because the two genuinely agree, and it fails the moment they
- * stop agreeing (an edited constant against an already-seeded database, or a
- * version pinning some other text). Neither side can be adjusted to force a
- * pass: the seed refuses a conflicting row instead of repairing it, and
- * published versions are immutable by trigger (migration 0064).
+ * WHAT IS LEFT HERE IS THE DECISION, IN ONE PLACE:
  *
- * THE ENVIRONMENT GATE. Constructing this source outside local/test throws, and
- * `legalDocumentContentSourceFor` hands deployed environments
- * `NoContentSourceConfigured` unchanged. Both guards exist deliberately: the
- * selector expresses the composition decision, and the constructor makes the
- * decision unbypassable, so a future composition that reaches past the selector
- * still cannot serve a synthetic notice to a real subject. An UNSTATED
- * environment is refused rather than defaulted, exactly as the seed refuses an
- * unset `KARAR_ENV` — a missing value must never widen what may be served.
+ *   * a deployed environment — and an UNSTATED one — gets
+ *     `NoContentSourceConfigured` and nothing else is even attempted. The
+ *     fixture package is never named on this path, never resolved, never
+ *     loaded. An unstated environment is refused rather than defaulted,
+ *     exactly as `scripts/db/seed-local-consent.mjs` refuses an unset
+ *     `KARAR_ENV`: a missing value must never widen what may be served.
+ *
+ *   * `local` and `test` get a `StaticLegalDocumentContentSource` over the
+ *     fixture IF the fixture package is installed. On a developer machine and
+ *     in CI it is (devDependency of this module); in a production install it is
+ *     not, and the absence is reported as `NoContentSourceConfigured` rather
+ *     than crashing the boot. The load is optional by design — this module
+ *     declares WHERE local content may come from and holds none of it.
+ *
+ * TWO INDEPENDENT CONTROLS, NEITHER OF THEM SUFFICIENT ALONE. The physical one
+ * is that a production closure has no copy of the fixture to load. The
+ * behavioural one is `localSeedContentSpec`'s own environment gate, which lives
+ * inside the fixture package next to the bytes, so a caller that reaches the
+ * fixture without coming through this selector still meets a refusal. The
+ * environment test below decides which branch runs; it is not what makes the
+ * text unreachable in production.
  *
  * A real source arrives with the document store and a reviewed publication path
  * that records content alongside the version it belongs to. It replaces this
- * one at composition; the hash check that holds this one to the catalogue holds
- * that one identically.
+ * selection at composition, and the hash check the use case applies holds it to
+ * the catalogue exactly as it holds the fixture.
  */
 
-import type {
-  LegalDocumentContent,
-  LegalDocumentContentSource,
+import { createRequire } from 'node:module';
+
+import {
+  LEGAL_DOCUMENT_CONTENT_FORMATS,
+  type LegalDocumentContent,
+  type LegalDocumentContentSource,
 } from '../../application/ports/legal-document-content-source.js';
-import type { LegalDocumentVersion } from '../../domain/legal-document.js';
 import { NoContentSourceConfigured } from './no-content-source-configured.js';
+import { StaticLegalDocumentContentSource } from './static-legal-document-content-source.js';
 
 /**
  * The only environments whose subjects may be shown synthetic text. `dev`,
  * `staging`, and `production` are deployed environments with real people
- * behind them, and they are absent on purpose.
+ * behind them, and they are absent on purpose. The fixture package declares
+ * the same set independently — the two are asserted equal by the suite, so a
+ * widening on one side cannot pass unnoticed.
  */
 export const LOCAL_CONTENT_ENVIRONMENTS = ['local', 'test'] as const;
 
@@ -69,66 +77,132 @@ export function isLocalContentEnvironment(environment: string | undefined): bool
 }
 
 /**
- * The storage reference the local seed writes, and the ONLY one this source
- * resolves. The `local-seed://` scheme names a fixture rather than a store, so
- * a row carrying it can never be mistaken for one whose bytes a real document
- * store holds.
+ * The ONE specifier this module will ever load content from, written as a
+ * literal rather than read from configuration. A configurable module name is a
+ * code-execution surface: anyone who could set it could have this process load
+ * anything. One hard-coded name, reachable only from local/test, cannot be
+ * pointed anywhere else.
  */
-export const LOCAL_SEED_STORAGE_REF = 'local-seed://synthetic-notice';
+export const LOCAL_FIXTURE_PACKAGE = '@karar/consent-local-fixtures';
 
-/**
- * The bytes themselves, and the single place they are written down. The seed
- * hashes THIS constant, so the pinned hash and the served bytes cannot drift
- * apart without the integrity check catching it.
- *
- * The wording is deliberately not legal wording. It is one declarative
- * paragraph that says what it is, states that no counsel and no regulator has
- * seen it, and disclaims legal effect — so no reader, and no screenshot of a
- * reader, can be mistaken for a reviewed disclosure. Drafting real text is a
- * legal activity that has not happened; nothing here anticipates its outcome.
- */
-export const LOCAL_SEED_CONTENT: LegalDocumentContent = {
-  /** BCP-47, stated rather than inferred: the paragraph below is English. */
-  language: 'en',
-  format: 'text/plain',
-  content:
-    'SYNTHETIC LOCAL FIXTURE. This is not a legal document, has not been reviewed by counsel or ' +
-    'any regulator, and has no legal effect. It exists so the consent acceptance path can be ' +
-    'exercised against a local database.',
-};
+/** The fixture package's surface, as this module needs it. */
+interface LocalFixtureModule {
+  localSeedContentSpec(environment: string | undefined): unknown;
+}
 
-export class LocalSeedContentSource implements LegalDocumentContentSource {
-  constructor(environment: string | undefined) {
-    if (!isLocalContentEnvironment(environment)) {
-      throw new Error(
-        'LocalSeedContentSource: refusing to construct in environment ' +
-          `${environment ?? '(unstated)'} — permitted values are ` +
-          `${LOCAL_CONTENT_ENVIRONMENTS.join(', ')}. This source serves a synthetic fixture that ` +
-          'is not a legal document and has never been reviewed; a deployed environment must get ' +
-          'the honest absence (NoContentSourceConfigured) instead, and show no text at all.',
-      );
-    }
-  }
+function hasSpecFactory(value: unknown): value is LocalFixtureModule {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { localSeedContentSpec?: unknown }).localSeedContentSpec === 'function'
+  );
+}
 
-  fetch(version: LegalDocumentVersion): Promise<LegalDocumentContent | null> {
-    // Equality on the seed's own reference, not a prefix or a scheme test: this
-    // source holds ONE document's bytes and must not answer for a second.
-    return Promise.resolve(
-      version.storageRef === LOCAL_SEED_STORAGE_REF ? LOCAL_SEED_CONTENT : null,
-    );
-  }
+/** A missing OPTIONAL package, distinguished from a package that is broken. */
+function isPackageNotInstalled(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  const notFound = code === 'MODULE_NOT_FOUND' || code === 'ERR_MODULE_NOT_FOUND';
+  // The specifier must be OURS. A fixture package that is installed but whose
+  // own imports do not resolve is broken, not absent, and must fail loudly
+  // instead of degrading to "no content configured".
+  return notFound && typeof message === 'string' && message.includes(LOCAL_FIXTURE_PACKAGE);
 }
 
 /**
- * The composition decision, in one place: local and test get the seeded
- * fixture, every other environment gets the source that honestly has nothing.
- * Written as a function so the choice is testable and cannot be made twice in
- * different ways.
+ * The fixture module, or null when this installation does not have it.
+ *
+ * Resolved rather than imported: a static import would put the specifier in
+ * this module's own import graph, which is what a production install must not
+ * contain. `createRequire` resolves from THIS file, so the lookup walks the
+ * consent module's own `node_modules` — where the devDependency is linked in a
+ * development install and where nothing is linked in a production one.
+ */
+function loadLocalFixtureModule(): LocalFixtureModule | null {
+  const requireFrom = createRequire(import.meta.url);
+  let loaded: unknown;
+  try {
+    loaded = requireFrom(LOCAL_FIXTURE_PACKAGE);
+  } catch (error) {
+    if (isPackageNotInstalled(error)) return null;
+    throw error;
+  }
+  if (!hasSpecFactory(loaded)) {
+    throw new Error(
+      `${LOCAL_FIXTURE_PACKAGE} is installed but does not export localSeedContentSpec() — a ` +
+        'fixture package that cannot be read is a defect, not an absence, and is refused rather ' +
+        'than silently degraded to "no content configured".',
+    );
+  }
+  return loaded;
+}
+
+function isLegalDocumentContent(value: unknown): value is LegalDocumentContent {
+  if (typeof value !== 'object' || value === null) return false;
+  const { language, format, content } = value as {
+    language?: unknown;
+    format?: unknown;
+    content?: unknown;
+  };
+  return (
+    typeof language === 'string' &&
+    language !== '' &&
+    typeof format === 'string' &&
+    (LEGAL_DOCUMENT_CONTENT_FORMATS as readonly string[]).includes(format) &&
+    typeof content === 'string' &&
+    content !== ''
+  );
+}
+
+/**
+ * The fixture as this module's port describes it. Validated at the boundary
+ * because the fixture package deliberately does not depend on this module —
+ * it mirrors `LegalDocumentContent` structurally, so the two agreeing is a
+ * fact to check, not one the compiler establishes.
+ */
+function contentSourceFrom(spec: unknown): LegalDocumentContentSource {
+  if (typeof spec !== 'object' || spec === null) {
+    throw new Error(`${LOCAL_FIXTURE_PACKAGE}: localSeedContentSpec() returned a non-object.`);
+  }
+  const { storageRef, content } = spec as { storageRef?: unknown; content?: unknown };
+  if (typeof storageRef !== 'string' || storageRef === '') {
+    throw new Error(
+      `${LOCAL_FIXTURE_PACKAGE}: localSeedContentSpec() returned no storage reference — a source ` +
+        'with nothing to match on would answer for versions it holds no bytes for.',
+    );
+  }
+  if (!isLegalDocumentContent(content)) {
+    throw new Error(
+      `${LOCAL_FIXTURE_PACKAGE}: localSeedContentSpec() returned content that is not displayable ` +
+        `(needs a non-empty language, a format among ${LEGAL_DOCUMENT_CONTENT_FORMATS.join(
+          ', ',
+        )}, and non-empty text). Content whose language a source cannot state has not been ` +
+        'returned displayably, and the use case would refuse it anyway.',
+    );
+  }
+  return new StaticLegalDocumentContentSource(storageRef, content);
+}
+
+/**
+ * The composition decision, in one place: `local` and `test` get the seeded
+ * fixture when this installation has one, and every other environment gets the
+ * source that honestly has nothing. Written as a function so the choice is
+ * testable and cannot be made twice in different ways.
  */
 export function legalDocumentContentSourceFor(
   environment: string | undefined,
 ): LegalDocumentContentSource {
-  return isLocalContentEnvironment(environment)
-    ? new LocalSeedContentSource(environment)
-    : new NoContentSourceConfigured();
+  // The deployed path never names the fixture package, never resolves it, and
+  // never loads it. There is nothing here to reach past.
+  if (!isLocalContentEnvironment(environment)) return new NoContentSourceConfigured();
+
+  const fixtures = loadLocalFixtureModule();
+  // Not installed: local development against a production-shaped install. The
+  // endpoint reports the absence, which is the same honest answer a deployed
+  // environment gets — not a boot failure, and not substituted prose.
+  if (fixtures === null) return new NoContentSourceConfigured();
+
+  // The environment is passed on rather than assumed: the fixture package
+  // applies its own gate, so the refusal exists on both sides of the boundary.
+  return contentSourceFrom(fixtures.localSeedContentSpec(environment));
 }

@@ -167,11 +167,18 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
   // text; the fixture exists so a developer can exercise the read-and-accept
   // path locally, not so the product has wording.
   //
-  // The selector is not the only gate: the local source also refuses to
-  // construct outside local/test, so reaching past this line cannot serve
-  // synthetic text into a deployed environment. The digest holds whatever a
-  // source returns to the hash the published version pinned, so the fixture
-  // has to match the database rather than assert its own integrity.
+  // The selector is not the gate that matters. The fixture bytes live in a
+  // private fixtures package that is a devDependency of no production
+  // closure, so a deployed install has no copy of the text to serve — this
+  // line cannot be reached past into serving synthetic prose, because in a
+  // deployed artefact there is none. That package is named in exactly one
+  // place, the consent module's content-source selection, which is also where
+  // its local/test refusal sits, next to the bytes; naming it here as well
+  // would widen the set of production files that mention it, which
+  // modules/consent/__tests__/production-closure.test.ts holds to one. The
+  // digest holds whatever a source returns to the hash the published version
+  // pinned, so the fixture has to match the database rather than assert its
+  // own integrity.
   const legalDocuments = new PrismaLegalDocumentRepository(prisma.client);
   const getLegalDocumentContent = new GetLegalDocumentContent(
     legalDocuments,

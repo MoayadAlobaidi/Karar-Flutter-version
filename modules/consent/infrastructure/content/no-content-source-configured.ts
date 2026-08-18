@@ -1,6 +1,14 @@
 /**
- * The ONLY shipped LegalDocumentContentSource: this phase has no document
- * store, so no version's bytes are retrievable and every fetch answers null.
+ * The DEPLOYED LegalDocumentContentSource: this phase has no document store,
+ * so no version's bytes are retrievable and every fetch answers null.
+ *
+ * It is what `legalDocumentContentSourceFor` hands every environment but
+ * `local` and `test`, and what it hands those two as well when the local
+ * fixture package is not installed. The other shipped implementation,
+ * `StaticLegalDocumentContentSource`, holds no content of its own and serves
+ * only what a caller constructed it with; the synthetic fixture that used to
+ * live in this directory is in `@karar/consent-local-fixtures`, outside every
+ * production dependency closure.
  *
  * WHY THIS AND NOT A FALLBACK. The catalogue's `storage_ref` names where bytes
  * would live; nothing in the platform can resolve one (the module that owns
