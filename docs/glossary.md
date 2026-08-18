@@ -224,7 +224,17 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 ## The client (Phase 4)
 
-**Startup state** — one of twelve values the startup coordinator holds, each mapping to exactly one route and declaring one recovery action. **Protected content renders in `READY` and nowhere else**, and a feature never decides which state holds. There is exactly one router redirect, driven by these.
+**Startup state** — one of **fourteen** values the startup coordinator holds, each mapping to exactly one route and declaring one recovery action. **Protected content renders in `READY` and nowhere else**, and a feature never decides which state holds. There is exactly one router redirect, driven by these. Two of the fourteen are security states added late in Phase 4, each replacing a fail-open default: `LOCAL_SECURITY_STATE_UNAVAILABLE` (the lock choice could not be read, and an unknown lock choice is never spent as "off") and `SECURITY_RECOVERY_BLOCKED` (a session was abandoned without a confirmed credential deletion or durable invalidation).
+
+**Local security state** — the two security-relevant device flags, held in their own narrow store rather than in ordinary preferences: whether the application lock is on, and whether a persisted session was abandoned. Its key type is a closed enum, every operation returns a sealed outcome that keeps a value, a genuine absence, an unavailable store and a corrupt one apart, and **it has no in-memory fallback** — an unopenable store reports unavailability to every call rather than answering "absent". The ordinary preference store swallows a failed write and substitutes an in-memory one when the platform store will not open; correct for a theme choice, and a fail-open for a lock flag.
+
+**Application lock** — a local device gate over an already-issued session, opened by the platform authenticator. **An unlock grants no session and never substitutes for signing in.** Enabling applies only on a confirmed durable write; a disable that cannot be confirmed **retains the enabled state**, because the safe end of that failure is a lock the user must open rather than one that silently stopped existing. Never exercised on a device.
+
+**Per-environment application identifier** — the rule that each of the four environments ships under its own Android `applicationId` and iOS `CFBundleIdentifier`. Its practical consequence is that **`KARAR_ENV` has no default**: a build told nothing about its environment is refused rather than becoming a production-identified artifact, which is why `flutter run` and Xcode-IDE builds require the dart-define.
+
+**Runtime conformance** — validating real serialized responses from the *composed* application against the OpenAPI document that describes them, as opposed to the drift check, which binds the contract to the generated client. Covers 82 of 128 declared operation/status pairs. Distinct from a contract test in that nothing is mocked: real composition root, real guards, real serializer, live PostgreSQL and Redis.
+
+**Deviation ledger** — a test whose expected value is the **empty** set, replacing a list of known-and-tolerated exceptions. Phase 4 emptied two: problem documents served under the wrong media type, and operations describing their responses in prose with no schema. The point is that a new instance becomes a failing test rather than a silent addition to a list nobody re-reads.
 
 **Feature surface** — the single merge point where every feature's routes, startup screens and home builder are combined into provider overrides. It exists because a Riverpod override *replaces* a value: two workstreams overriding independently would leave only the last standing.
 

@@ -175,6 +175,20 @@ As landed in Phase 4, that first row is **one entry**: `core/security/token_stor
 
 Non-sensitive preferences live in a separate, deliberately unencrypted store, and `PreferenceKey` refuses at construction to accept a credential-shaped key name, so the wrong store cannot be chosen by habit.
 
+**There is a third store, and it exists because of a fail-open defect in the second one.** Security-relevant flags — whether the application lock is on, and whether a persisted session was abandoned — were kept in the ordinary preference store. That store swallows a failed write and logs it, and when the platform store cannot be opened at all it substitutes an in-memory one. Both behaviours are correct for a dismissed hint or a theme choice. For the lock flag they compose into a fail-open: an unopenable store reads as absent, absent reads as `false`, and `false` reads as *the user never turned the lock on*.
+
+`LocalSecurityStateStore` is the narrow port that replaces that usage, and every property of it is a reaction to that composition:
+
+| Property | Why |
+|---|---|
+| Key type is a closed enum of two flags | No credential-shaped key is expressible at all |
+| Every operation returns a sealed outcome | A read distinguishes a value, a genuine absence, an unavailable store and a corrupt one; a write distinguishes success, refusal and unavailability |
+| **No in-memory fallback** | When the platform store will not open, the port returns an implementation that reports unavailability to every call — rather than an empty one that answers "absent" |
+| Loaded as its own startup step, before the lock is evaluated | `LOCAL_SECURITY_STATE_UNAVAILABLE` stops the launch there. The lock cannot be checked against a value nobody managed to read |
+| Diagnostics carry the flag name, never the stored value | The same rule as the token store |
+
+Enabling the lock now applies **only on a confirmed durable write**; a platform refusal leaves the previous durable state alone and surfaces a typed, recoverable error. Disabling is deliberately asymmetric: a disable that cannot be confirmed **retains the enabled state**, because the safe end of that failure is a lock the user must open rather than one that silently stopped existing. `KeyValueStore.writeBoolChecked` — a narrower fix attempted earlier — was deleted along with the old usage, so the ordinary preference store now offers no way to ask whether a write landed, which is the honest shape for a store that does not guarantee one.
+
 Inherited from legacy findings MOB-03, MOB-04, MOB-06, MOB-07:
 
 - **Sign-out clears by construction**, not by a hand-maintained registry. The legacy's registry has a documented blind spot, and imported statement PDFs survive sign-out in the app cache.
@@ -236,7 +250,11 @@ Identifier naming is where this bit. Every non-alphanumeric character in a wire 
 
 **Drift detection is one-directional, and the direction matters.** `dart run tool/generate_api_client.dart --check` regenerates in memory and exits non-zero on any difference — it needs no git working tree and cannot be fooled by an uncommitted file — and it runs as its own CI step ahead of the mobile suite, because a drifted client turns every downstream failure into a red herring. A companion Dart test asserts the two generated files still declare themselves generated, still carry matching digests, and still document the `--check` command, so the CI step cannot quietly stop proving anything.
 
-What that binds is **contract to client**. **Nothing binds server to contract**: no test asserts that a response the NestJS application actually emits conforms to the OpenAPI document it was authored against. Carried as a limitation in [`../phases/phase-04.md`](../phases/phase-04.md).
+What that binds is **contract to client**, and for most of Phase 4 nothing bound **server to contract** — no test asserted that a response the NestJS application actually emits conforms to the OpenAPI document it was authored against. That gap is now partly closed, and the shape of what remains open matters more than the fact that something was added.
+
+A runtime conformance suite drives the **composed application** — the real composition root, the modules it mounts, the guards, the global exception filter, the Fastify serializer, live PostgreSQL and live Redis — sends real HTTP, and validates the status, the `Content-Type`, and the returned bytes against the contract. It covers **82 of the 128 declared operation/status pairs**. Two ledgers that used to record known deviations now assert **empty**, which is what turns each into a gate rather than a note: no response carries an RFC 7807 body under `application/json` while the contract declares `application/problem+json`, and no operation describes its response in prose without a schema. The contract's three response-side `additionalProperties: false` sites are all exercised on real bodies — including the one whose closure is the only written reason `storageRef` does not ship to every subject.
+
+**The 46 uncovered pairs are not a backlog of the same kind.** Most are simply outside the mobile-consumed surface the suite was scoped to. Three are unreachable in process rather than skipped, and the suite's own header records why: two need a verification code or reset token that is stored as a digest and delivered only by e-mail, and one would require failing the shared rate-limit store underneath every other test in the run. The validator implements a deliberate subset of JSON Schema and **throws** on any keyword it does not implement, so a schema cannot quietly pass unchecked. The suite is infrastructure-gated: it skips when PostgreSQL and Redis are unreachable, so its figures describe a run with infrastructure present. Coverage and its limits are carried in [`../phases/phase-04.md`](../phases/phase-04.md).
 
 **The capability scope narrows the surface automatically:** a tenant entitled to a subset of capabilities receives a client whose reachable endpoints are that subset. A white-label bank tenant with no Amanat entitlement gets no Amanat client code — the API surface narrows from the entitlement, not from a client-side flag. **Not built in Phase 4** — the generated client covers the whole contract today.
 
@@ -275,6 +293,25 @@ Three defects in this layer were found and fixed during Phase 4, and they are re
 - **iOS had no build-time endpoint guard at all** while Android refused the same build.
 
 **The runtime guard** is `app/configuration/configuration_loader.dart`. It reports *every* violation it finds rather than the first, so a misconfigured build is fixed in one pass, and an invalid configuration routes the launch to a configuration-error screen instead of a sign-in screen it could not serve. Its loopback rule is exact string equality over four hosts plus two suffixes, which is **narrower than the build-time rule** — see the residual recorded in [`../phases/phase-04.md`](../phases/phase-04.md).
+
+### The application identifier is per environment, on both platforms
+
+Every iOS artifact carried the **production** bundle identifier until late in Phase 4, whatever environment it was compiled for, while Android had derived a per-environment identifier from the start. They now agree:
+
+| Environment | Android `applicationId` | iOS `CFBundleIdentifier` |
+|---|---|---|
+| LOCAL | `com.kararfinance.app.local` | `com.kararfinance.app.local` |
+| DEV | `com.kararfinance.app.dev` | `com.kararfinance.app.dev` |
+| STAGING | `com.kararfinance.app.staging` | `com.kararfinance.app.staging` |
+| PRODUCTION | `com.kararfinance.app` | `com.kararfinance.app` |
+
+**Where the rule had to live was decided by a real constraint, not by preference.** The Flutter tool does forward dart-defines into the Xcode build — as a base64 CSV in `Generated.xcconfig` — but xcconfig has no string functions and cannot decode it. So the rule cannot live in an xcconfig, and it was put where a decoder already existed: the packaged-bundle build phase, which already decodes the compiled environment to gate the transport-security exception. That phase derives the expected identifier, refuses a `PRODUCT_BUNDLE_IDENTIFIER` that is not one of the four issued identifiers, narrows the packaged plist when the configuration default and the compiled environment disagree, and **re-reads the plist to confirm on every branch**. If a development team or provisioning profile is set and narrowing would be required, the **build fails** rather than producing an artifact whose identifier no longer matches its profile.
+
+The xcconfig values are per-configuration defaults — Debug to LOCAL, Release and Profile to PRODUCTION — mirroring Android's `-Pkarar.env` default.
+
+> **Consequence for everyday work: `flutter run` and Xcode-IDE builds now require `--dart-define=KARAR_ENV`.** A build told nothing about its environment is **refused**, rather than silently becoming a production-identified artifact. This is the intended failure and not a rough edge.
+
+The identifiers are verified out of **real packaged artifacts** rather than out of the rules that produce them: CI reads the effective `CFBundleIdentifier` from each packaged plist across all four environments. The direct Android-artifact-to-iOS-artifact comparison covers one environment pair rather than four, for the reason recorded in [`../phases/phase-04.md`](../phases/phase-04.md).
 
 **What this means for deployment: nothing is deployed, and the guards are why the report can say so plainly.** No endpoint exists for any environment, so the only packages this repository can build today are `LOCAL` ones. A DEV, STAGING or PRODUCTION build fails at configuration time.
 

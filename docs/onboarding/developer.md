@@ -472,11 +472,13 @@ Added in Phase 4, when the client became real. Day-to-day client work has its ow
 ### 60. How do I run and test the client?
 
 ```bash
-make bootstrap                                    # workspace + Flutter dependencies
-cd apps/mobile && flutter run                     # LOCAL profile, against your local API
+make bootstrap                                                  # workspace + Flutter dependencies
+cd apps/mobile && flutter run --dart-define=KARAR_ENV=LOCAL     # against your local API
 cd apps/mobile && flutter analyze
-cd apps/mobile && flutter test --exclude-tags golden   # exactly what CI runs
+cd apps/mobile && flutter test --exclude-tags golden            # exactly what CI runs
 ```
+
+**`--dart-define=KARAR_ENV` is required and has no default.** Since the per-environment application identifiers landed, a build told nothing about its environment is refused rather than silently becoming a production-identified artifact — and that applies to `flutter run` and to building from the Xcode IDE, not only to release assemblies.
 
 The API must be running for anything past sign-in ([Q59](#59-how-do-i-get-a-working-tenant-locally) for the tenant, and `node scripts/db/seed-local-consent.mjs` for the consent prerequisites — it refuses any environment but `local` and `test`). `LOCAL` is the only profile that builds without an explicit endpoint; a `DEV`, `STAGING` or `PRODUCTION` build is **refused at configuration time** unless given an HTTPS endpoint that is not a developer-machine address, which is why no deployed-environment package can be produced today. ([`flutter.md`](flutter.md))
 
@@ -491,7 +493,9 @@ cd apps/mobile && dart run tool/generate_api_client.dart --check  # what CI runs
 
 **Never edit `lib/core/networking/generated/`.** The drift check regenerates in memory and fails the build on any difference, so a hand edit is caught whether or not it was committed. If generation *fails*, read the message rather than working around it: the generator refuses only where guessing would be worse than stopping — an operation with no response schema, two schema-carrying 2xx responses, a union with no declared discriminator, or a wire value that cannot become a distinct Dart identifier. Each names the contract text at fault, and each is fixed in the contract.
 
-One thing this does **not** give you: nothing checks that the responses your NestJS code actually emits match the contract. The drift gate binds contract to client only ([`../phases/phase-04.md`](../phases/phase-04.md)).
+**The drift gate binds contract to client. A separate suite binds server to contract, and you are expected to extend it with your change.** `tests/conformance` drives the composed application over real HTTP against live PostgreSQL and Redis, and validates the status, the `Content-Type` and the returned bytes against the OpenAPI document. It covers 82 of the 128 declared operation/status pairs today, and two ledgers assert **empty**: no problem document may leave under `application/json` when the contract declares `application/problem+json` (throw it and let the error boundary set the media type — do not write to the reply object), and **no operation may describe its response in prose without a schema**, because a schema-less operation is one neither the generated client nor this suite can check.
+
+If your endpoint is on the mobile-consumed surface, add it to that suite as you write it rather than afterwards. The covered set is asserted explicitly at the end of the file, so a suite that quietly stopped exercising something fails loudly ([`../phases/phase-04.md`](../phases/phase-04.md)).
 
 ### 62. My new capability is implemented. Why is it not in the app?
 

@@ -9,11 +9,13 @@ For someone who has read [`developer.md`](developer.md) and is now going to chan
 ## 1. Get it running
 
 ```bash
-make bootstrap                       # workspace + Flutter dependencies
-cd apps/mobile && flutter run        # LOCAL profile, defaults to http://localhost:3000
+make bootstrap                                                  # workspace + Flutter dependencies
+cd apps/mobile && flutter run --dart-define=KARAR_ENV=LOCAL     # defaults to http://localhost:3000
 ```
 
-`LOCAL` is the only profile that needs no explicit endpoint. Every other profile refuses to build without one — see §7.
+**The `--dart-define=KARAR_ENV` is required, and leaving it off is a build failure rather than a default.** Since the per-environment application identifiers landed, a build told nothing about its environment is refused instead of silently becoming a production-identified artifact. The same applies to building from the Xcode IDE: if you press Run in Xcode without the define reaching the build, the packaged-bundle phase refuses it. That is the intended behaviour, not a rough edge — see §7.
+
+`LOCAL` is the only profile that needs no explicit endpoint. Every other profile refuses to build without one — also §7.
 
 The API must be running for anything past the sign-in screen: `make dev`, then the api entrypoint. Tenant-scoped screens additionally need the local first-party tenant (`node scripts/db/seed-local-first-party.mjs`), and the consent screen needs the local consent prerequisites (`node scripts/db/seed-local-consent.mjs`, which refuses any environment other than `local` or `test`).
 
@@ -63,19 +65,39 @@ A Riverpod override *replaces* a provider's value, so two workstreams each calli
 
 ## 6. What decides which screen a launch reaches?
 
-`app/lifecycle/startup_coordinator.dart`, and nothing else. Twelve states, each mapping to one route and one recovery action. **Protected content renders in `READY` and nowhere else, and a feature never decides any of this for itself.**
+`app/lifecycle/startup_coordinator.dart`, and nothing else. **Fourteen** states, each mapping to one route and one recovery action. **Protected content renders in `READY` and nowhere else, and a feature never decides any of this for itself.**
 
-The order matters and is deliberate: configuration, then the application lock, then session restore, then bootstrap — and within a successful bootstrap: email verification, tenant binding, capability resolution, operating-entity state. If you find yourself wanting a screen to check one of these itself, the coordinator is the place to change instead.
+The order matters and is deliberate: configuration, then the **local security state**, then the application lock, then session restore, then bootstrap — and within a successful bootstrap: email verification, tenant binding, capability resolution, operating-entity state. If you find yourself wanting a screen to check one of these itself, the coordinator is the place to change instead.
+
+Two of the fourteen are security states, and each exists because the alternative was a fail-open default:
+
+- `LOCAL_SECURITY_STATE_UNAVAILABLE` — the security-state store could not be opened or read. The lock choice is unknown, and **an unknown lock choice must never be spent as "off"**, so the launch stops here rather than further down. This is why the security state is loaded as its own step *before* the lock is evaluated: the lock cannot be checked against a value nobody managed to read.
+- `SECURITY_RECOVERY_BLOCKED` — a session was abandoned and neither the credential deletion nor the durable invalidation could be confirmed. The application refuses to present a clean signed-in *or* signed-out state and offers retry.
+
+Both sit beside the lock and sign-in routes so the single redirect converges in one hop rather than oscillating.
 
 ## 7. How do environments and endpoints work?
 
-Five dart-defines: `KARAR_ENV`, `KARAR_API_BASE_URL`, `KARAR_APP_VERSION`, `KARAR_BUILD_NUMBER`, `KARAR_BRAND_ID`. Only the first two matter day to day, and only in `LOCAL` can the second be omitted.
+Five dart-defines: `KARAR_ENV`, `KARAR_API_BASE_URL`, `KARAR_APP_VERSION`, `KARAR_BUILD_NUMBER`, `KARAR_BRAND_ID`. Only the first two matter day to day, and only in `LOCAL` can the second be omitted. **`KARAR_ENV` can never be omitted** — see §1.
 
 ```bash
 flutter build apk --debug -Pkarar.env=LOCAL --dart-define=KARAR_ENV=LOCAL
 ```
 
 On Android the Gradle property and the dart-define are cross-checked, and a mismatch fails the build. For any environment other than `LOCAL`, both platforms refuse a build with no endpoint, a non-HTTPS endpoint, an endpoint carrying credentials, or an endpoint whose host resolves only on a developer machine — including IPv6 loopback and the trailing-dot form of `localhost`. **The build fails at configuration time, before an artifact exists**, and on iOS the packaged-bundle check runs before code signing.
+
+**The environment also decides the application identifier, and that is why the define is mandatory.** Each environment ships under its own identifier on both platforms:
+
+| Environment | Android and iOS identifier |
+|---|---|
+| LOCAL | `com.kararfinance.app.local` |
+| DEV | `com.kararfinance.app.dev` |
+| STAGING | `com.kararfinance.app.staging` |
+| PRODUCTION | `com.kararfinance.app` |
+
+The iOS rule lives in the packaged-bundle build phase rather than in an xcconfig, because the Flutter tool forwards dart-defines into Xcode as a base64 CSV and xcconfig has no string functions to decode it. That phase derives the expected identifier, refuses anything outside the four, narrows the packaged plist when the configuration default and the compiled environment disagree, and re-reads the plist to confirm on every branch. If a development team or provisioning profile is set and narrowing would be required, **the build fails** rather than emitting an artifact whose identifier no longer matches its profile.
+
+**You cannot produce a deployed-environment package today**, and that is the guards working rather than a gap: no endpoint exists for `DEV`, `STAGING` or `PRODUCTION`. `LOCAL` is what builds.
 
 **The client holds no secret.** A dart-define whose *name* looks credential-shaped is a configuration violation. If you think you need one on the device, you need a server endpoint instead.
 

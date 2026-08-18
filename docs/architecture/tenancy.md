@@ -233,7 +233,7 @@ The legacy's finding, quoted because it is the clearest statement of the problem
 
 ## 11. The client bootstrap surface
 
-**Implemented in Phase 3.5** ([`modules/bootstrap`](../../modules/bootstrap/MODULE.md)). Two routes, authored OpenAPI-first in `packages/api-contracts/openapi/paths/platform.yaml`, both session-scoped self-service — the caller reads and mutates only their own session's context, and tenant selection is authorized by **membership**, not by a permission:
+**Implemented in Phase 3.5** ([`modules/bootstrap`](../../modules/bootstrap/MODULE.md)), and extended by one route in Phase 4. All three are authored OpenAPI-first — the first two in `packages/api-contracts/openapi/paths/platform.yaml`, the third in `tenancy.yaml` — and all three are session-scoped self-service: the caller reads and mutates only their own session's context, and tenant selection is authorized by **membership**, not by a permission:
 
 | Route | Does |
 |---|---|
