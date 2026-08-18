@@ -61,7 +61,7 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
 | `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
 
-**As implemented in Phases 2–3.5** — 48 tables across `platform`, `audit`, and `public` (number ranges owned per workstream, with deliberate gaps that stay gaps). Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
+**As implemented in Phases 2–5** — 57 tables across `platform`, `audit`, and `public` (number ranges owned per workstream, with deliberate gaps that stay gaps): 48 through Phase 3.5, and nine added by the Phase 5 financial data foundation. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
 
 | Table | Purpose | Classification |
 |---|---|---|
@@ -90,6 +90,15 @@ The Phase 3.5 domain tables, same convention:
 | [`jurisdiction`](../../modules/jurisdiction/MODULE.md) | `countries`, `jurisdictions`, `user_jurisdiction_assignments`, `tenant_jurisdiction_assignments`, `jurisdiction_settings`, `policy_pack_activations` (`0070`–`0075`) |
 | [`capability`](../../modules/capability/MODULE.md) | `capability_availability`, `capability_availability_history`, `tenant_capability_entitlements`, `tenant_capability_entitlement_history` (`0076`–`0077`) |
 | [`subject-policy`](../../modules/subject-policy/MODULE.md) | `subject_policy_selections` (`0083`) |
+
+The Phase 5 financial tables, same convention. **They are reachable by nothing** — no route, no use-case wiring, no client method, nothing deployed — and are listed here because they exist in the schema, not because they are in use:
+
+| Module | Tables |
+|---|---|
+| [`financial-accounts`](../../modules/financial-accounts/MODULE.md) | `institutions`, `financial_accounts`, `financial_account_balance_snapshots` (`0087`–`0089`) |
+| [`transactions`](../../modules/transactions/MODULE.md) | `transactions`, `transaction_revisions`, `transaction_provenance`, `financial_categories`, `merchant_rules`, `transaction_category_assignments` (`0090`–`0093`) |
+
+Three of them — `institutions`, `financial_categories`, `merchant_rules` — are catalogue tables owned by no tenant, and are allow-listed with a written reason rather than given a no-op policy (§12). On `financial_accounts`, the holder-sensitive fields are stored only as ciphertext with a nonce, an auth tag, an algorithm and a key version; there is no plaintext column for a display name, an institution label or a mask.
 
 Two Phase 3.5 migrations create no table: `0080` and `0081` add the self- and member-arm policies that make tenant *selection* possible before a session is bound ([`tenancy.md` §6](tenancy.md)). [`modules/bootstrap`](../../modules/bootstrap/MODULE.md) owns no persistent data at all — it composes views over the modules above.
 
