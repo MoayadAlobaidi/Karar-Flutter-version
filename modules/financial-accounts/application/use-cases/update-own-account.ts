@@ -42,9 +42,11 @@ import {
   applyAccountEdit,
   resolveSupportedCurrency,
   type AccountEdit,
+  type AccountNature,
   type AccountStatus,
   type AccountType,
   type FinancialAccount,
+  type WalletKind,
 } from '../../domain/financial-account.js';
 import { isSelectableForNewAccount } from '../../domain/institution.js';
 import type { FinancialAccountId, InstitutionRef } from '../../domain/refs.js';
@@ -63,14 +65,27 @@ import { requirePrincipal, type AccountsPrincipal } from '../principal.js';
 
 /**
  * An absent key leaves a field alone; an explicit `null` clears it. No owner
- * identifier appears, and `sourceKind` is absent by design — the origin of a
- * record is immutable (the store's guard trigger refuses to change it).
+ * identifier appears, and `origin` is absent by design — how a record came to
+ * exist is immutable (the store's guard trigger refuses to change it).
+ *
+ * **Every other field here is editable whatever the account's origin is.** A
+ * provider-origin account is corrected through exactly this path, with no
+ * branch and no extra permission: an account created one way and corrected many
+ * times afterwards is still one account (ADR-0028).
  */
 export interface UpdateOwnAccountInput {
   readonly accountId: FinancialAccountId;
   readonly expectedVersion: number;
   readonly displayName?: string;
   readonly accountType?: AccountType;
+  /**
+   * Sent together with `accountType` when the type stops or starts being
+   * `WALLET`. A change that would leave the two disagreeing is refused rather
+   * than repaired, because guessing which the person meant is how an account
+   * quietly becomes something else.
+   */
+  readonly walletKind?: WalletKind | null;
+  readonly nature?: AccountNature;
   readonly status?: AccountStatus;
   readonly mask?: string | null;
   readonly currencyCode?: string;
@@ -132,6 +147,8 @@ export class UpdateOwnAccount {
     const edit: { -readonly [K in keyof AccountEdit]: AccountEdit[K] } = {};
     if (input.displayName !== undefined) edit.displayName = input.displayName;
     if (input.accountType !== undefined) edit.accountType = input.accountType;
+    if (input.walletKind !== undefined) edit.walletKind = input.walletKind;
+    if (input.nature !== undefined) edit.nature = input.nature;
     if (input.status !== undefined) edit.status = input.status;
     if (input.mask !== undefined) edit.mask = input.mask;
     if (input.institutionRef !== undefined) edit.institutionRef = input.institutionRef;

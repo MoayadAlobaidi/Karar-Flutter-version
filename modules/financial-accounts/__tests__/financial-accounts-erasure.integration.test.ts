@@ -343,6 +343,7 @@ describe.skipIf(unreachable !== null)(
           accountId,
           amount: Money.of(100_00n, (await accounts.findOwnById(ACTOR_A1, accountId))!.currency),
           asOf: clock.now(),
+          balanceKind: 'BOOKED',
           sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         },
         ACTOR_A1,

@@ -28,6 +28,12 @@
  * came to exist is a fact about its making, not a claim the caller gets to
  * assert. A statement import records its own balances through its own path,
  * with `CSV` and the import's identifier.
+ *
+ * `balanceKind` is the opposite case and IS a required input: which balance a
+ * source quoted is the SOURCE's claim, not this platform's, so it can neither
+ * be fixed here nor defaulted. Recording an AVAILABLE figure creates one
+ * AVAILABLE snapshot and nothing else — no BOOKED row is derived alongside
+ * it, and no existing kind is rewritten.
  */
 
 import { Result } from '@karar/shared-kernel';
@@ -35,6 +41,7 @@ import type { Clock, Money } from '@karar/shared-kernel';
 
 import {
   createBalanceSnapshot,
+  type BalanceKind,
   type BalanceSnapshot,
 } from '../../domain/balance-snapshot.js';
 import type { BalanceSnapshotId, FinancialAccountId } from '../../domain/refs.js';
@@ -60,6 +67,14 @@ export interface RecordReportedBalanceInput {
   readonly amount: Money;
   /** When the balance was TRUE, per the source. */
   readonly asOf: Date;
+  /**
+   * WHICH balance the source quoted. REQUIRED, and deliberately not optional:
+   * there is no default anywhere on this path, because a default would be
+   * this code guessing on the source's behalf and recording the guess as
+   * though the source had said it. A caller that does not know which balance
+   * it was given cannot record one.
+   */
+  readonly balanceKind: BalanceKind;
   /** The artefact that reported it, by UUID. Never narrative. */
   readonly sourceReference: string;
 }
@@ -111,6 +126,9 @@ export class RecordReportedBalance {
       amount: input.amount,
       asOf: input.asOf,
       sourceKind: 'MANUAL',
+      // Passed straight through. No `??`, no fallback, no inference from
+      // another kind already on file for this account.
+      balanceKind: input.balanceKind,
       sourceReference: input.sourceReference,
       capturedAt: now,
       createdAt: now,

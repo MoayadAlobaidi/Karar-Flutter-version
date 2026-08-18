@@ -238,6 +238,13 @@
     "reviewPhase": "8 (control-plane reference-data surface, if one ever exists)"
   },
   {
+    "table": "public.institution_markets",
+    "reason": "PUBLIC reviewed record of where an issuer operates, one row per (institution, country) (migration 0094). It carries no tenant_id, no user_id, no account_id and no column that can hold subject-supplied text, so there is no principal column to build a predicate from; every principal in every tenant reads the same rows, as does the pre-tenant composition that renders an institution picker before any tenant is bound. It is keyed on COUNTRY and deliberately not on Jurisdiction (jurisdiction-policy.md \u00a71), so it carries no policy dimension either. A subject whose institution is unlisted records it on their own financial_accounts row, which IS RLS ENABLEd and FORCEd. RLS with a USING (true) policy was considered and rejected for the reason recorded against public.institutions: it protects nothing while removing the table from the register of tables consciously left outside the tenant boundary.",
+    "owner": "financial-accounts module (modules/financial-accounts/MODULE.md)",
+    "compensatingGrants": "karar_app is SELECT-ONLY \u2014 no INSERT, UPDATE or DELETE grant exists, there is no runtime write path and no operator use case, and the set changes exclusively by reviewed migration as the catalogue of 0087 and the country reference set of 0070 do. Withdrawal from a market is the WITHDRAWN status, never a vanished row. The schema refuses the claims that matter: regulatory_status_evidence_ref is either the literal UNVERIFIED or a reference that names its evidence, and provider_access_status may not be AVAILABLE while its evidence reference is UNVERIFIED. The table ships with zero rows.",
+    "reviewPhase": "5 (financial data foundation) and 8 (control-plane reference-data surface, if one ever exists)"
+  },
+  {
     "table": "public.financial_categories",
     "reason": "Platform-global category catalogue (modules/transactions/MODULE.md): codes with English and Arabic labels, shared by every tenant and every subject. It carries no tenant, user, account or subject column by design \u2014 NON_PERSONAL_BY_DESIGN \u2014 so there is no principal predicate to build a policy from, and adding one would fabricate a relationship the table exists to be incapable of. Every principal resolving or rendering a category reads the same rows, and transaction_category_assignments (which IS RLS-FORCEd on both principal GUCs) is where the per-subject dimension lives (migration 0092).",
     "owner": "transactions module (modules/transactions/MODULE.md)",

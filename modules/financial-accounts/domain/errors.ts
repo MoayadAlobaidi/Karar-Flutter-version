@@ -13,6 +13,7 @@
  * are the last thing a confused engineer reads at three in the morning.
  */
 
+import type { AccountType } from './financial-account.js';
 import type { FinancialAccountId } from './refs.js';
 
 /** The requested currency is not in the platform's supported registry. */
@@ -67,14 +68,16 @@ export interface InstitutionNamedTwice {
 }
 
 /**
- * A MANUAL or CSV account claimed a provider connection, or an
- * EXTERNAL_PROVIDER account arrived without one. In Phase 5 the second arm is
- * unreachable from any code path — nothing constructs EXTERNAL_PROVIDER — and
- * the first is the invariant that keeps the legacy's fabricated Synced badge
- * out of this schema.
+ * A `WALLET` account arrived without a wallet kind, or a non-wallet account
+ * arrived carrying one. The invariant is a biconditional and both arms are
+ * reachable: the first leaves a wallet nobody can describe, and the second is a
+ * contradiction that reads as truth to any caller branching on the presence of
+ * a wallet kind rather than on the account type (ADR-0028). The account type is
+ * carried so the caller can say which half it broke without re-deriving it.
  */
-export interface ProviderConnectionMismatch {
-  readonly kind: 'provider_connection_mismatch';
+export interface WalletKindMismatch {
+  readonly kind: 'wallet_kind_mismatch';
+  readonly accountType: AccountType;
   readonly message: string;
 }
 
@@ -103,7 +106,15 @@ export interface SnapshotCurrencyMismatch {
 /** A value outside a closed vocabulary this module owns. */
 export interface UnknownVocabularyValue {
   readonly kind: 'unknown_vocabulary_value';
-  readonly vocabulary: 'accountType' | 'accountStatus' | 'sourceKind' | 'institutionStatus';
+  readonly vocabulary:
+    | 'accountType'
+    | 'accountStatus'
+    | 'accountOrigin'
+    | 'walletKind'
+    | 'accountNature'
+    | 'sourceKind'
+    | 'institutionStatus'
+    | 'institutionKind';
   readonly value: string;
   readonly message: string;
 }
@@ -115,7 +126,7 @@ export type FinancialAccountRuleViolation =
   | InvalidDisplayText
   | InvalidSourceReference
   | InstitutionNamedTwice
-  | ProviderConnectionMismatch
+  | WalletKindMismatch
   | CurrencyImmutableWithRecords
   | SnapshotCurrencyMismatch
   | UnknownVocabularyValue;

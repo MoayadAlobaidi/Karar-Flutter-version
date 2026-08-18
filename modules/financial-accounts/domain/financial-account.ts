@@ -32,6 +32,35 @@
  * `application/ports/hsf-field-encryption.ts`). Nothing in this file knows
  * about keys, nonces, or algorithms.
  *
+ * ## Identity is the id, and nothing else
+ *
+ * Institution, account type, currency and wallet kind are **attributes**. None
+ * of them, alone or combined, identifies an account. Two current accounts at
+ * one bank in one currency is ordinary; two credit cards from one issuer is
+ * ordinary; two mobile-money wallets from one issuer is ordinary. Nothing in
+ * this file, and no constraint in migration 0088, makes any combination of
+ * those unique — and none may be added (ADR-0028). A uniqueness rule there
+ * does not tidy the model, it forbids a real person's real accounts and forces
+ * them to lie about what they hold.
+ *
+ * ## Origin is not the current source
+ *
+ * `origin` records ONE fact: how this account first came to exist. It is
+ * immutable and it does **not** say where data comes from now. An account may
+ * be typed by hand, then receive CSV imports, then be linked to an API, then
+ * be corrected by hand, and remain one account throughout — so this type
+ * deliberately carries no connection reference and no current-source field.
+ * The one-source shape this file used to have (`sourceKind` plus a bound
+ * `providerConnectionRef`) was removed rather than reinterpreted, because a
+ * field that claims an account has exactly one permanent data source is wrong
+ * about accounts rather than merely imprecise. Current and historical sources
+ * are many per account and live in account-source links, which this module
+ * does not model.
+ *
+ * The corollary is enforced by absence: **a provider-origin account still
+ * accepts user corrections.** No rule in this file consults `origin` before
+ * allowing an edit.
+ *
  * ## What an account does NOT claim
  *
  * A manually created account does not imply a synced provider. The legacy
@@ -55,7 +84,7 @@ import type {
   UnsupportedCurrency,
 } from './errors.js';
 import { HSF_FIELD_MAX_LENGTH, HsfField } from './hsf-field.js';
-import type { FinancialAccountId, InstitutionRef, ProviderConnectionRef } from './refs.js';
+import type { FinancialAccountId, InstitutionRef } from './refs.js';
 
 /**
  * The kinds of account a person actually holds. EXTENSIBLE by the same
@@ -84,23 +113,73 @@ export const ACCOUNT_STATUSES = ['ACTIVE', 'ARCHIVED', 'CLOSED'] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
 /**
- * How an account came to exist. `EXTERNAL_PROVIDER` is MODELLED AND
- * UNREACHABLE in Phase 5: no provider is integrated, no credential is stored,
- * no synchronisation cursor exists, and no code path produces this value. It
- * is declared so the schema and this vocabulary do not have to be rewritten
- * when a provider arrives — see `CONSTRUCTIBLE_SOURCE_KINDS`.
+ * How an account FIRST CAME TO EXIST, and nothing else — see 'Origin is not
+ * the current source' above. `EXTERNAL_PROVIDER` is MODELLED AND UNREACHABLE
+ * in Phase 5: no provider is integrated, no credential is stored, no
+ * synchronisation cursor exists, and no code path produces this value. It is
+ * declared so the schema and this vocabulary do not have to be rewritten when
+ * a provider arrives — see `CONSTRUCTIBLE_ACCOUNT_ORIGINS`.
  */
-export const SOURCE_KINDS = ['MANUAL', 'CSV', 'EXTERNAL_PROVIDER'] as const;
-export type SourceKind = (typeof SOURCE_KINDS)[number];
+export const ACCOUNT_ORIGINS = ['MANUAL', 'CSV', 'EXTERNAL_PROVIDER'] as const;
+export type AccountOrigin = (typeof ACCOUNT_ORIGINS)[number];
 
 /**
- * The source kinds an account can actually be created with this phase. The
- * factory below accepts only these, so `EXTERNAL_PROVIDER` is unreachable by
- * TYPE rather than by discipline — a caller cannot pass it without a cast,
- * and a database CHECK refuses the row besides.
+ * The origins an account can actually be created with this phase. The factory
+ * below accepts only these, so `EXTERNAL_PROVIDER` is unreachable by TYPE
+ * rather than by discipline — a caller cannot pass it without a cast, and a
+ * database CHECK refuses the row besides.
  */
-export const CONSTRUCTIBLE_SOURCE_KINDS = ['MANUAL', 'CSV'] as const;
-export type ConstructibleSourceKind = (typeof CONSTRUCTIBLE_SOURCE_KINDS)[number];
+export const CONSTRUCTIBLE_ACCOUNT_ORIGINS = ['MANUAL', 'CSV'] as const;
+export type ConstructibleAccountOrigin = (typeof CONSTRUCTIBLE_ACCOUNT_ORIGINS)[number];
+
+/**
+ * Which kind of wallet, for `WALLET` accounts only.
+ *
+ * A wallet holds a balance, so it is an account rather than a separate kind of
+ * thing; what it needs beyond a bank account is this one attribute, because a
+ * payroll wallet and a prepaid wallet behave differently, and a reader should
+ * not have to infer which one from a display name.
+ *
+ * **Categories, never a provider.** No value names a telco, a bank, or a
+ * fintech, and no code path may branch on which issuer a wallet belongs to
+ * (ADR-0028). **Crypto is out of scope and `WALLET` does not model it:** no
+ * value here means a crypto or custodial-token wallet and none may be added —
+ * such a holding has no ISO 4217 minor-unit exponent, so admitting one would
+ * make every amount on the row a lie about what it measures.
+ */
+export const WALLET_KINDS = [
+  'MOBILE_MONEY',
+  'E_MONEY',
+  'PREPAID',
+  'PAYROLL',
+  'SUPER_APP',
+  'OTHER',
+] as const;
+export type WalletKind = (typeof WALLET_KINDS)[number];
+
+/**
+ * Whether this account's balance is something the subject HAS or OWES.
+ *
+ * It exists because the same signed number means opposite things on a savings
+ * account and on a credit card, and every naive treatment of that number —
+ * adding it to a total, calling it available, showing it in green — is wrong
+ * for one of the two. `UNKNOWN` is an honest answer rather than a placeholder,
+ * and it is the ground state: defaulting to `ASSET` would make every unstated
+ * account silently count as money the person has, and a consumer that cannot
+ * handle `UNKNOWN` must refuse to answer rather than assume.
+ *
+ * **Nothing in this module sums, nets, or totals balances using this.** A net
+ * worth is a different concept with its own correctness problem — which
+ * accounts, at which instants, in which currency, at whose rate — and it
+ * arrives with its own name and its own honest label or not at all.
+ *
+ * Deliberately NOT derived from `accountType`: a rule that reads "CREDIT_CARD
+ * means LIABILITY" is right almost always, and the exceptions it misclassifies
+ * are invisible to the person, who cannot correct a value that was never
+ * theirs to set.
+ */
+export const ACCOUNT_NATURES = ['ASSET', 'LIABILITY', 'UNKNOWN'] as const;
+export type AccountNature = (typeof ACCOUNT_NATURES)[number];
 
 export interface FinancialAccount {
   readonly id: FinancialAccountId;
@@ -115,15 +194,22 @@ export interface FinancialAccount {
    */
   readonly userSuppliedInstitutionLabel: HsfField | null;
   readonly accountType: AccountType;
+  /** Present if and only if `accountType` is `WALLET`. See `checkWalletKind`. */
+  readonly walletKind: WalletKind | null;
+  /** Has, owes, or nobody has said. Never inferred from `accountType`. */
+  readonly nature: AccountNature;
   readonly currency: Currency;
   /** The name the subject gave the account. HSF; ciphertext at rest. */
   readonly displayName: HsfField;
   /** A masked fragment ONLY — see `isMask`. Never a full number. HSF. */
   readonly mask: HsfField | null;
   readonly status: AccountStatus;
-  readonly sourceKind: SourceKind;
-  /** Always null in Phase 5. Never a credential — see `ProviderConnectionRef`. */
-  readonly providerConnectionRef: ProviderConnectionRef | null;
+  /**
+   * How the account first came to exist. Immutable, and NOT the current data
+   * source — the account may have many sources over its life, and none of them
+   * is recorded here.
+   */
+  readonly origin: AccountOrigin;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   /** Optimistic-concurrency token; the store increments it by exactly one. */
@@ -183,8 +269,16 @@ export function isAccountStatus(value: string): value is AccountStatus {
   return (ACCOUNT_STATUSES as readonly string[]).includes(value);
 }
 
-export function isSourceKind(value: string): value is SourceKind {
-  return (SOURCE_KINDS as readonly string[]).includes(value);
+export function isAccountOrigin(value: string): value is AccountOrigin {
+  return (ACCOUNT_ORIGINS as readonly string[]).includes(value);
+}
+
+export function isWalletKind(value: string): value is WalletKind {
+  return (WALLET_KINDS as readonly string[]).includes(value);
+}
+
+export function isAccountNature(value: string): value is AccountNature {
+  return (ACCOUNT_NATURES as readonly string[]).includes(value);
 }
 
 /**
@@ -274,24 +368,35 @@ function checkInstitutionNaming(
 }
 
 /**
- * A MANUAL or CSV account must not claim a provider connection. In Phase 5
- * the only reachable arm is the refusal, because nothing constructs
- * `EXTERNAL_PROVIDER`; the rule is written in full anyway so the invariant is
- * already correct when a provider does arrive.
+ * The wallet invariant, exactly: **a wallet kind is present IF AND ONLY IF the
+ * account type is `WALLET`.**
+ *
+ * Both directions are refusals and each fails differently. A `WALLET` with no
+ * wallet kind is a wallet nobody can describe — a payroll wallet and a prepaid
+ * wallet behave differently, and admitting the row half-stated pushes the guess
+ * onto every later reader. A `CURRENT` or `CREDIT_CARD` carrying a wallet kind
+ * is worse: it is a contradiction that reads as truth, and a caller that
+ * branches on "has a wallet kind" instead of on the type will treat a bank
+ * account as a wallet without anything looking wrong. A one-directional check
+ * would catch only the first, so this is stated as an equality between two
+ * booleans, mirroring the CHECK in migration 0095.
  */
-export function checkProviderConnection(
-  sourceKind: SourceKind,
-  providerConnectionRef: ProviderConnectionRef | null,
+export function checkWalletKind(
+  accountType: AccountType,
+  walletKind: WalletKind | null,
 ): Result<void, FinancialAccountRuleViolation> {
-  const claimsConnection = providerConnectionRef !== null;
-  const isProviderSourced = sourceKind === 'EXTERNAL_PROVIDER';
-  if (claimsConnection !== isProviderSourced) {
+  const hasWalletKind = walletKind !== null;
+  const isWallet = accountType === 'WALLET';
+  if (hasWalletKind !== isWallet) {
     return Result.err({
-      kind: 'provider_connection_mismatch',
-      message: isProviderSourced
-        ? 'an EXTERNAL_PROVIDER account carries a provider connection reference by definition'
-        : `a ${sourceKind} account must not claim a provider connection — no provider is integrated, ` +
-          'and an account the user typed must never be presented as one a bank confirmed',
+      kind: 'wallet_kind_mismatch',
+      accountType,
+      message: isWallet
+        ? 'a WALLET account must state which kind of wallet it is (MOBILE_MONEY, E_MONEY, PREPAID, ' +
+          'PAYROLL, SUPER_APP, OTHER) — a payroll wallet and a prepaid wallet behave differently, ' +
+          'and a wallet nobody can describe makes every later reader guess'
+        : `a ${accountType} account must not carry a wallet kind — the contradiction reads as truth, ` +
+          'and a caller branching on the presence of a wallet kind would treat this as a wallet',
     });
   }
   return Result.ok(undefined);
@@ -334,18 +439,22 @@ export interface NewFinancialAccount {
   readonly institutionRef: InstitutionRef | null;
   readonly userSuppliedInstitutionLabel: string | null;
   readonly accountType: AccountType;
+  /** Required for `WALLET`, forbidden otherwise — see `checkWalletKind`. */
+  readonly walletKind: WalletKind | null;
+  /** Stated, never inferred. `UNKNOWN` is what a caller says when nobody knows. */
+  readonly nature: AccountNature;
   readonly currency: Currency;
   readonly displayName: string;
   readonly mask: string | null;
   /** `EXTERNAL_PROVIDER` is not accepted — it is unreachable by type. */
-  readonly sourceKind: ConstructibleSourceKind;
+  readonly origin: ConstructibleAccountOrigin;
   readonly createdAt: Date;
 }
 
 /**
- * Build an account, or say exactly why not. Every new account starts ACTIVE
- * at version 1 with no provider connection — the three facts a caller must
- * not be able to set, because each of them is a claim rather than an input.
+ * Build an account, or say exactly why not. Every new account starts ACTIVE at
+ * version 1 — the two facts a caller must not be able to set, because each of
+ * them is a claim rather than an input.
  */
 export function createFinancialAccount(
   input: NewFinancialAccount,
@@ -369,11 +478,8 @@ export function createFinancialAccount(
   const naming = checkInstitutionNaming(input.institutionRef, label);
   if (!naming.ok) return naming;
 
-  // Belt and braces: the type already forbids EXTERNAL_PROVIDER here, and the
-  // rule is evaluated anyway so a cast that smuggles one past the compiler
-  // still fails.
-  const provider = checkProviderConnection(input.sourceKind, null);
-  if (!provider.ok) return provider;
+  const wallet = checkWalletKind(input.accountType, input.walletKind);
+  if (!wallet.ok) return wallet;
 
   return Result.ok(
     Object.freeze({
@@ -383,12 +489,13 @@ export function createFinancialAccount(
       institutionRef: input.institutionRef,
       userSuppliedInstitutionLabel: label,
       accountType: input.accountType,
+      walletKind: input.walletKind,
+      nature: input.nature,
       currency: input.currency,
       displayName: displayName.value,
       mask: mask.value,
       status: 'ACTIVE' as AccountStatus,
-      sourceKind: input.sourceKind as SourceKind,
-      providerConnectionRef: null,
+      origin: input.origin as AccountOrigin,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       version: 1,
@@ -404,6 +511,14 @@ export function createFinancialAccount(
 export interface AccountEdit {
   readonly displayName?: string;
   readonly accountType?: AccountType;
+  /**
+   * Moved together with `accountType` when the two disagree: changing a wallet
+   * into a current account without clearing the wallet kind is refused rather
+   * than silently repaired, because guessing which of the two the person meant
+   * is how an account quietly becomes something else.
+   */
+  readonly walletKind?: WalletKind | null;
+  readonly nature?: AccountNature;
   readonly status?: AccountStatus;
   readonly mask?: string | null;
   readonly currency?: Currency;
@@ -454,6 +569,11 @@ export function applyAccountEdit(
   const naming = checkInstitutionNaming(institutionRef, label);
   if (!naming.ok) return naming;
 
+  const accountType = edit.accountType ?? account.accountType;
+  const walletKind = edit.walletKind !== undefined ? edit.walletKind : account.walletKind;
+  const wallet = checkWalletKind(accountType, walletKind);
+  if (!wallet.ok) return wallet;
+
   let currency = account.currency;
   if (edit.currency !== undefined) {
     const allowed = checkCurrencyChange(account, edit.currency, context.hasFinancialRecords);
@@ -466,7 +586,9 @@ export function applyAccountEdit(
       ...account,
       institutionRef,
       userSuppliedInstitutionLabel: label,
-      accountType: edit.accountType ?? account.accountType,
+      accountType,
+      walletKind,
+      nature: edit.nature ?? account.nature,
       currency,
       displayName,
       mask,

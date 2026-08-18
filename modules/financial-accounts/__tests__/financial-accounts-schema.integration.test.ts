@@ -30,6 +30,7 @@ import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
 import {
   ACTOR_A1,
+  INSTITUTION_ACTIVE,
   TENANT_A,
   USER_A1,
   asApp,
@@ -46,10 +47,14 @@ import {
 } from './fixtures.js';
 import { HsfFieldEncryptionError } from '../application/ports/hsf-field-encryption.js';
 import {
+  ACCOUNT_NATURES,
+  ACCOUNT_ORIGINS,
   ACCOUNT_STATUSES,
   ACCOUNT_TYPES,
-  SOURCE_KINDS,
+  WALLET_KINDS,
 } from '../domain/financial-account.js';
+import { INSTITUTION_KINDS } from '../domain/institution.js';
+import { BALANCE_KINDS } from '../domain/balance-snapshot.js';
 import type { BalanceSnapshotId, FinancialAccountId } from '../domain/refs.js';
 import { PrismaBalanceSnapshotRepository } from '../infrastructure/persistence/prisma-balance-snapshot-repository.js';
 import { PrismaFinancialAccountRepository } from '../infrastructure/persistence/prisma-financial-account-repository.js';
@@ -76,6 +81,7 @@ const KWD = Currency.get('KWD');
 
 const MODULE_TABLES = [
   'institutions',
+  'institution_markets',
   'financial_accounts',
   'financial_account_balance_snapshots',
 ] as const;
@@ -212,12 +218,116 @@ describe.skipIf(unreachable !== null)(
         'display_name_ar',
         'display_name_en',
         'id',
+        'kind',
         'status',
         'updated_at',
       ]);
       for (const forbidden of ['tenant_id', 'user_id', 'account_id', 'subject_id']) {
         expect(columns.has(forbidden)).toBe(false);
       }
+    });
+
+    it('market presence is keyed on COUNTRY and carries no jurisdiction and no subject', async () => {
+      // Country is WHERE, geographically (0070). Jurisdiction is WHICH LEGAL
+      // REGIME governs (0071) — usually but not always one per country. Keying
+      // market presence on a regime would multiply an issuer's rows every time
+      // a free zone was declared, and would import a legal dimension into
+      // reference data that asserts no legal fact (jurisdiction-policy.md §1).
+      const columns = await columnsOf('institution_markets');
+      expect(columns.get('country_code')).toBe('text');
+      for (const forbidden of [
+        'jurisdiction_code',
+        'jurisdiction_ref',
+        'jurisdiction',
+        'tenant_id',
+        'user_id',
+        'account_id',
+        'subject_id',
+      ]) {
+        expect({ column: forbidden, present: columns.has(forbidden) }).toEqual({
+          column: forbidden,
+          present: false,
+        });
+      }
+
+      // One issuer per country, so a global issuer is never duplicated into
+      // one catalogue row per market.
+      const unique = await asApp(database, gucA1, (tx) =>
+        tx.query<{ def: string }>(
+          `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+            WHERE conrelid = 'public.institution_markets'::regclass AND contype = 'u'`,
+        ),
+      );
+      expect(unique.rows.map((row) => row.def)).toEqual([
+        'UNIQUE (institution_ref, country_code)',
+      ]);
+    });
+
+    it('a market row cannot claim a regulatory position or provider access without evidence', async () => {
+      // UNVERIFIED is the ground state and the only claim-free value; anything
+      // else has to NAME its evidence, and AVAILABLE is refused outright while
+      // the access evidence is UNVERIFIED (ADR-0024; ADR-0028).
+      const insert = (
+        id: string,
+        regulatory: string,
+        accessStatus: string,
+        accessEvidence: string,
+      ) =>
+        withAdapter(database, 'superuser', (adapter) =>
+          adapter
+            .query(
+              `INSERT INTO public.institution_markets
+                 (id, institution_ref, country_code, market_status,
+                  regulatory_status_evidence_ref, display_review_ref,
+                  provider_access_status, provider_access_evidence_ref, updated_at)
+               VALUES ($1, $2, 'QA', 'OPERATING', $3, 'synthetic-test-review/1', $4, $5, now())`,
+              [id, INSTITUTION_ACTIVE, regulatory, accessStatus, accessEvidence],
+            )
+            .then(
+              () => null,
+              (error: unknown) => error,
+            ),
+        );
+
+      const bareClaim = await insert(
+        '99999999-0000-4000-8000-000000000090',
+        'licensed and in good standing',
+        'NOT_IMPLEMENTED',
+        'UNVERIFIED',
+      );
+      expect((bareClaim as PgError).sqlState).toBe('23514');
+
+      const unevidencedAccess = await insert(
+        '99999999-0000-4000-8000-000000000091',
+        'UNVERIFIED',
+        'AVAILABLE',
+        'UNVERIFIED',
+      );
+      expect((unevidencedAccess as PgError).sqlState).toBe('23514');
+
+      // The honest row: no regulatory claim, no provider access.
+      const honest = await insert(
+        '99999999-0000-4000-8000-000000000092',
+        'UNVERIFIED',
+        'NOT_IMPLEMENTED',
+        'UNVERIFIED',
+      );
+      expect(honest).toBeNull();
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query(`DELETE FROM public.institution_markets WHERE id = $1`, [
+          '99999999-0000-4000-8000-000000000092',
+        ]),
+      );
+    });
+
+    it('the production catalogue and its market rows ship EMPTY', async () => {
+      // Naming an issuer is a commercial and legal act, and naming where it
+      // operates is a larger one. The fixture seeds its own synthetic issuers
+      // as the superuser; the MIGRATIONS seed nothing.
+      const markets = await asApp(database, gucA1, (tx) =>
+        tx.query<{ count: string }>(`SELECT count(*)::text AS count FROM public.institution_markets`),
+      );
+      expect(markets.rows[0]?.count).toBe('0');
     });
 
     it('both subject tables carry BOTH principal columns, which is what the policy keys on', async () => {
@@ -274,9 +384,18 @@ describe.skipIf(unreachable !== null)(
       expect(literalsIn(checks.get('financial_accounts_status_check') ?? '').sort()).toEqual(
         [...ACCOUNT_STATUSES].sort(),
       );
-      expect(literalsIn(checks.get('financial_accounts_source_kind_check') ?? '').sort()).toEqual(
-        [...SOURCE_KINDS].sort(),
+      expect(literalsIn(checks.get('financial_accounts_origin_kind_check') ?? '').sort()).toEqual(
+        [...ACCOUNT_ORIGINS].sort(),
       );
+      expect(literalsIn(checks.get('financial_accounts_wallet_kind_check') ?? '').sort()).toEqual(
+        [...WALLET_KINDS].sort(),
+      );
+      expect(
+        literalsIn(checks.get('financial_accounts_account_nature_check') ?? '').sort(),
+      ).toEqual([...ACCOUNT_NATURES].sort());
+      expect(
+        literalsIn((await checkDefsOf('institutions')).get('institutions_kind_check') ?? '').sort(),
+      ).toEqual([...INSTITUTION_KINDS].sort());
       for (const status of literalsIn(checks.get('financial_accounts_status_check') ?? '')) {
         expect(/CONNECT|SYNC|LINK/i.test(status)).toBe(false);
       }
@@ -325,13 +444,14 @@ describe.skipIf(unreachable !== null)(
         .map(([column]) => column)
         .sort();
       expect(textColumns).toEqual([
+        'account_nature',
         'account_type',
         'currency_code',
         'hsf_algorithm',
         'hsf_key_version',
-        'provider_connection_ref',
-        'source_kind',
+        'origin_kind',
         'status',
+        'wallet_kind',
       ]);
     });
 
@@ -356,7 +476,7 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+               (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                 ${HSF_COLUMNS}, mask_ciphertext, mask_nonce, mask_auth_tag, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000081', $1, $2, 'CREDIT_CARD', 'QAR',
                      'ACTIVE', 'MANUAL', ${HSF_VALUES},
@@ -396,7 +516,7 @@ describe.skipIf(unreachable !== null)(
           tx
             .query(
               `INSERT INTO public.financial_accounts
-                 (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                 (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                   ${HSF_COLUMNS}, ${columns}, updated_at)
                VALUES ('99999999-0000-4000-8000-00000000008a', $1, $2, 'CURRENT', 'QAR',
                        'ACTIVE', 'MANUAL', ${HSF_VALUES}, ${values}, now())`,
@@ -414,42 +534,136 @@ describe.skipIf(unreachable !== null)(
       }
     });
 
-    it('the database refuses a manual account that claims a provider connection', async () => {
-      const failure = await asApp(database, gucA1, (tx) =>
-        tx
-          .query(
-            `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, status,
-                source_kind, provider_connection_ref, ${HSF_COLUMNS}, updated_at)
-             VALUES ('99999999-0000-4000-8000-000000000082', $1, $2, 'CURRENT', 'QAR',
-                     'ACTIVE', 'MANUAL', 'pretend-connection', ${HSF_VALUES}, now())`,
-            [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
-          )
-          .then(
-            () => null,
-            (error: unknown) => error,
-          ),
-      );
-      expect((failure as PgError).sqlState).toBe('23514');
+    it('NO COLUMN asserts that an account has one current data source', async () => {
+      // This replaces two tests that asserted the opposite, and the change is
+      // deliberate rather than a relaxation. The table used to carry
+      // provider_connection_ref bound to source_kind by a biconditional CHECK,
+      // which asserts that an account has EXACTLY ONE permanent data source.
+      // That is false about real accounts: one typed by hand, then fed by CSV,
+      // then linked, then corrected is ONE account throughout, and a model that
+      // cannot say so splits a person's history in two (ADR-0028). The column
+      // and the CHECK are gone, and this test is what keeps them gone.
+      const columns = await columnsOf('financial_accounts');
+      for (const forbidden of [
+        'provider_connection_ref',
+        'source_kind',
+        'connection_ref',
+        'connection_id',
+        'current_source_kind',
+      ]) {
+        expect({ column: forbidden, present: columns.has(forbidden) }).toEqual({
+          column: forbidden,
+          present: false,
+        });
+      }
+      const checks = await checkDefsOf('financial_accounts');
+      expect(checks.has('financial_accounts_provider_connection_check')).toBe(false);
+      expect(checks.has('financial_accounts_provider_connection_ref_check')).toBe(false);
+      for (const def of checks.values()) {
+        expect(def).not.toContain('provider_connection_ref');
+      }
+
+      // What survives is the origin, and only the origin.
+      expect(columns.get('origin_kind')).toBe('text');
     });
 
-    it('the database refuses an external-provider account with no connection reference', async () => {
-      const failure = await asApp(database, gucA1, (tx) =>
+    it('a provider-origin account is as correctable as one the person typed', async () => {
+      // The corollary of removing the one-source shape, and the one most
+      // easily lost: a fact that arrived from a provider still sits beside a
+      // user correction rather than forbidding it. Nothing on this table makes
+      // an UPDATE conditional on origin_kind, and this is the assertion.
+      const planted = '99999999-0000-4000-8000-000000000083';
+      await asApp(database, gucA1, (tx) =>
+        tx.query(
+          `INSERT INTO public.financial_accounts
+             (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
+              ${HSF_COLUMNS}, updated_at)
+           VALUES ($3, $1, $2, 'CURRENT', 'QAR', 'ACTIVE', 'EXTERNAL_PROVIDER',
+                   ${HSF_VALUES}, now())`,
+          [TenantId.toString(TENANT_A), UserId.toString(USER_A1), planted],
+        ),
+      );
+
+      const corrected = await asApp(database, gucA1, (tx) =>
+        tx.query(
+          `UPDATE public.financial_accounts
+              SET account_type = 'SAVINGS', account_nature = 'ASSET', version = version + 1
+            WHERE id = $1`,
+          [planted],
+        ),
+      );
+      expect(corrected.rowCount).toBe(1);
+
+      // Origin itself is still immutable — a different origin is a different
+      // account — so the trigger refuses only that.
+      const frozen = await asApp(database, gucA1, (tx) =>
         tx
           .query(
-            `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, status,
-                source_kind, ${HSF_COLUMNS}, updated_at)
-             VALUES ('99999999-0000-4000-8000-000000000083', $1, $2, 'CURRENT', 'QAR',
-                     'ACTIVE', 'EXTERNAL_PROVIDER', ${HSF_VALUES}, now())`,
-            [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
+            `UPDATE public.financial_accounts SET origin_kind = 'MANUAL', version = version + 1 WHERE id = $1`,
+            [planted],
           )
           .then(
             () => null,
             (error: unknown) => error,
           ),
       );
-      expect((failure as PgError).sqlState).toBe('23514');
+      expect(frozen).toBeInstanceOf(PgError);
+      expect((frozen as PgError).message).toContain('immutable');
+
+      await asApp(database, gucA1, (tx) =>
+        tx.query('DELETE FROM public.financial_accounts WHERE id = $1', [planted]),
+      );
+    });
+
+    it('the wallet invariant is a biconditional at the database, in both directions', async () => {
+      const attempt = (id: string, accountType: string, walletKind: string | null) =>
+        asApp(database, gucA1, (tx) =>
+          tx
+            .query(
+              `INSERT INTO public.financial_accounts
+                 (id, tenant_id, user_id, account_type, wallet_kind, currency_code, status,
+                  origin_kind, ${HSF_COLUMNS}, updated_at)
+               VALUES ($3, $1, $2, $4, $5, 'QAR', 'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
+              [TenantId.toString(TENANT_A), UserId.toString(USER_A1), id, accountType, walletKind],
+            )
+            .then(
+              () => null,
+              (error: unknown) => error,
+            ),
+        );
+
+      // A wallet nobody can describe.
+      const undescribed = await attempt('99999999-0000-4000-8000-0000000000a1', 'WALLET', null);
+      expect((undescribed as PgError).sqlState).toBe('23514');
+
+      // A contradiction that would otherwise read as truth.
+      for (const accountType of ['CURRENT', 'SAVINGS', 'CREDIT_CARD', 'CASH', 'OTHER']) {
+        const contradiction = await attempt(
+          '99999999-0000-4000-8000-0000000000a2',
+          accountType,
+          'E_MONEY',
+        );
+        expect({ accountType, sqlState: (contradiction as PgError).sqlState }).toEqual({
+          accountType,
+          sqlState: '23514',
+        });
+      }
+
+      // And the valid pair, for every wallet kind.
+      for (const [index, walletKind] of [...WALLET_KINDS].entries()) {
+        const id = `99999999-0000-4000-8000-0000000000b${index}`;
+        expect({ walletKind, refused: await attempt(id, 'WALLET', walletKind) }).toEqual({
+          walletKind,
+          refused: null,
+        });
+        await asApp(database, gucA1, (tx) =>
+          tx.query('DELETE FROM public.financial_accounts WHERE id = $1', [id]),
+        );
+      }
+
+      // No crypto value exists, and none may be added.
+      const crypto = await attempt('99999999-0000-4000-8000-0000000000c9', 'WALLET', 'CRYPTO');
+      expect((crypto as PgError).sqlState).toBe('23514');
     });
 
     it('the database refuses an account that names its institution both ways', async () => {
@@ -461,7 +675,7 @@ describe.skipIf(unreachable !== null)(
                 user_supplied_institution_label_ciphertext,
                 user_supplied_institution_label_nonce,
                 user_supplied_institution_label_auth_tag,
-                account_type, currency_code, status, source_kind, ${HSF_COLUMNS}, updated_at)
+                account_type, currency_code, status, origin_kind, ${HSF_COLUMNS}, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000084', $1, $2,
                      '11111111-0000-4000-8000-000000000011',
                      decode('4142', 'hex'),
@@ -488,10 +702,10 @@ describe.skipIf(unreachable !== null)(
       await withAdapter(database, 'superuser', (adapter) =>
         adapter.query(
           `INSERT INTO public.financial_accounts
-             (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+             (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
               hsf_algorithm, hsf_key_version,
               display_name_ciphertext, display_name_nonce, display_name_auth_tag, updated_at)
-           SELECT $1, tenant_id, user_id, account_type, currency_code, status, source_kind,
+           SELECT $1, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                   hsf_algorithm, hsf_key_version,
                   display_name_ciphertext, display_name_nonce, display_name_auth_tag, now()
              FROM public.financial_accounts WHERE id = $2`,
@@ -526,10 +740,10 @@ describe.skipIf(unreachable !== null)(
       await withAdapter(database, 'superuser', (adapter) =>
         adapter.query(
           `INSERT INTO public.financial_accounts
-             (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+             (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
               hsf_algorithm, hsf_key_version,
               display_name_ciphertext, display_name_nonce, display_name_auth_tag, updated_at)
-           SELECT $1, tenant_id, user_id, account_type, currency_code, status, source_kind,
+           SELECT $1, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                   hsf_algorithm, hsf_key_version,
                   -- the MASK ciphertext, written into the display-name columns
                   mask_ciphertext, mask_nonce, mask_auth_tag, now()
@@ -587,6 +801,7 @@ describe.skipIf(unreachable !== null)(
         amount: Money.of(beyondSafeInteger, QAR),
         asOf: clock.now(),
         sourceKind: 'MANUAL',
+        balanceKind: 'BOOKED',
         sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         capturedAt: clock.now(),
         createdAt: clock.now(),
@@ -604,6 +819,145 @@ describe.skipIf(unreachable !== null)(
       expect(raw.rows[0]?.amount).toBe('9007199254740993');
     });
 
+    it('balance_kind is NOT NULL with NO DEFAULT — the database refuses to guess', async () => {
+      // A DEFAULT would write a claim on the caller's behalf, invisibly: rows
+      // would say BOOKED with nobody having said so. The honest outcome is a
+      // refused INSERT, and 23502 is that refusal.
+      const meta = await asApp(database, gucA1, (tx) =>
+        tx.query<{ is_nullable: string; column_default: string | null; data_type: string }>(
+          `SELECT is_nullable, column_default, data_type FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'financial_account_balance_snapshots'
+              AND column_name = 'balance_kind'`,
+        ),
+      );
+      expect(meta.rows[0]).toEqual({
+        is_nullable: 'NO',
+        column_default: null,
+        data_type: 'text',
+      });
+
+      const vocabulary = (await checkDefsOf('financial_account_balance_snapshots')).get(
+        'financial_account_balance_snapshots_balance_kind_check',
+      );
+      expect(literalsIn(vocabulary ?? '').sort()).toEqual([...BALANCE_KINDS].sort());
+
+      const omitted = await asApp(database, gucA1, (tx) =>
+        tx
+          .query(
+            `INSERT INTO public.financial_account_balance_snapshots
+               (id, tenant_id, user_id, account_id, amount_minor_units, currency_code, as_of,
+                source_kind, source_reference, captured_at)
+             VALUES ('99999999-0000-4000-8000-0000000000d1', $1, $2, $3, 1000, 'QAR', now(),
+                     'MANUAL', $4, now())`,
+            [
+              TenantId.toString(TENANT_A),
+              UserId.toString(USER_A1),
+              accountId,
+              SYNTHETIC_SOURCE_REFERENCE,
+            ],
+          )
+          .then(
+            () => null,
+            (error: unknown) => error,
+          ),
+      );
+      expect(omitted).toBeInstanceOf(PgError);
+      expect((omitted as PgError).sqlState).toBe('23502'); // not_null_violation
+
+      // And a kind outside the vocabulary is refused rather than coerced to a
+      // neighbouring one.
+      const invented = await asApp(database, gucA1, (tx) =>
+        tx
+          .query(
+            `INSERT INTO public.financial_account_balance_snapshots
+               (id, tenant_id, user_id, account_id, amount_minor_units, currency_code, as_of,
+                source_kind, balance_kind, source_reference, captured_at)
+             VALUES ('99999999-0000-4000-8000-0000000000d2', $1, $2, $3, 1000, 'QAR', now(),
+                     'MANUAL', 'PROJECTED', $4, now())`,
+            [
+              TenantId.toString(TENANT_A),
+              UserId.toString(USER_A1),
+              accountId,
+              SYNTHETIC_SOURCE_REFERENCE,
+            ],
+          )
+          .then(
+            () => null,
+            (error: unknown) => error,
+          ),
+      );
+      expect((invented as PgError).sqlState).toBe('23514');
+    });
+
+    it('two KINDS for one account at ONE as_of are two rows, and neither derives the other', async () => {
+      // The constraint question, answered: nothing collapses an AVAILABLE and
+      // a BOOKED figure for the same instant. They are two different facts a
+      // source stated, and a unique key over (account, as_of) would force one
+      // to overwrite the other — silently answering a question about spendable
+      // money with a settled figure.
+      const asOf = new Date('2026-08-15T00:00:00.000Z');
+      for (const [id, kind, minorUnits] of [
+        ['b5000000-0000-4000-8000-0000000000e1', 'BOOKED', 500_00n],
+        ['b5000000-0000-4000-8000-0000000000e2', 'AVAILABLE', 420_00n],
+        ['b5000000-0000-4000-8000-0000000000e3', 'CREDIT_LIMIT', 10_000_00n],
+      ] as const) {
+        const stored = await snapshots.append(ACTOR_A1, {
+          id: id as BalanceSnapshotId,
+          tenantId: TENANT_A,
+          userId: USER_A1,
+          accountId,
+          amount: Money.of(minorUnits, QAR),
+          asOf,
+          sourceKind: 'MANUAL',
+          balanceKind: kind,
+          sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+          capturedAt: clock.now(),
+          createdAt: clock.now(),
+        });
+        expect(stored.balanceKind).toBe(kind);
+      }
+
+      const rows = await asApp(database, gucA1, (tx) =>
+        tx.query<{ balance_kind: string; amount: string }>(
+          `SELECT balance_kind, amount_minor_units::text AS amount
+             FROM public.financial_account_balance_snapshots
+            WHERE account_id = $1 AND as_of = $2
+            ORDER BY balance_kind`,
+          [accountId, asOf],
+        ),
+      );
+      expect(rows.rows).toEqual([
+        { balance_kind: 'AVAILABLE', amount: '42000' },
+        { balance_kind: 'BOOKED', amount: '50000' },
+        { balance_kind: 'CREDIT_LIMIT', amount: '1000000' },
+      ]);
+
+      // Each figure is exactly what was reported. Nothing derived a fourth
+      // row, and no arithmetic between them exists: 500.00 - 420.00 = 80.00
+      // and 10000.00 - 500.00 = 9500.00 are figures no source stated.
+      const derived = await asApp(database, gucA1, (tx) =>
+        tx.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM public.financial_account_balance_snapshots
+            WHERE account_id = $1 AND as_of = $2
+              AND amount_minor_units IN (8000, 950000)`,
+          [accountId, asOf],
+        ),
+      );
+      expect(derived.rows[0]?.count).toBe('0');
+
+      // No unique index on this table involves the balance kind, the as_of, or
+      // the account: an index like that is how the collapse gets reintroduced.
+      const uniques = await asApp(database, gucA1, (tx) =>
+        tx.query<{ def: string }>(
+          `SELECT pg_get_indexdef(i.indexrelid) AS def FROM pg_index i
+            WHERE i.indrelid = 'public.financial_account_balance_snapshots'::regclass
+              AND i.indisunique`,
+        ),
+      );
+      expect(uniques.rows.map((row) => row.def.slice(row.def.lastIndexOf('(')))).toEqual(['(id)']);
+    });
+
     it('a negative reported balance is storable, because a credit card owes money', async () => {
       const owed = await snapshots.append(ACTOR_A1, {
         id: 'b5000000-0000-4000-8000-0000000000c2' as BalanceSnapshotId,
@@ -613,6 +967,7 @@ describe.skipIf(unreachable !== null)(
         amount: Money.fromDecimalString('-1234.56', QAR),
         asOf: clock.now(),
         sourceKind: 'MANUAL',
+        balanceKind: 'BOOKED',
         sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         capturedAt: clock.now(),
         createdAt: clock.now(),
@@ -627,9 +982,9 @@ describe.skipIf(unreachable !== null)(
           .query(
             `INSERT INTO public.financial_account_balance_snapshots
                (id, tenant_id, user_id, account_id, amount_minor_units, currency_code, as_of,
-                source_kind, source_reference, captured_at)
+                source_kind, balance_kind, source_reference, captured_at)
              VALUES ('99999999-0000-4000-8000-000000000085', $1, $2, $3, 1000, 'KWD', now(),
-                     'MANUAL', $4, now())`,
+                     'MANUAL', 'BOOKED', $4, now())`,
             [
               TenantId.toString(TENANT_A),
               UserId.toString(USER_A1),

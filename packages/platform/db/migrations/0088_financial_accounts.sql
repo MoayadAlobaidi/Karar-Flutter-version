@@ -62,17 +62,54 @@
 -- field named for a NAME still cannot become a place to keep notes the
 -- classification does not cover.
 --
--- WHERE AN ACCOUNT COMES FROM. source_kind names the path: MANUAL (the user
--- typed it — the first-class path, and the one a cash account or an
--- unlisted institution takes), CSV (a reviewed statement import created it),
--- or EXTERNAL_PROVIDER, which is MODELLED AND UNREACHABLE. No provider is
--- integrated in Phase 5, no code path constructs that value, and the seam
--- exists so the schema does not have to be rewritten when one arrives. The
--- biconditional CHECK below is what makes "a manual account must not claim a
--- provider connection" a fact about the data rather than a comment: a row
--- carries a provider_connection_ref IF AND ONLY IF its source_kind is
--- EXTERNAL_PROVIDER. provider_connection_ref is an OPAQUE REFERENCE and is
--- never a credential — no column in this module may hold one.
+-- ORIGIN IS NOT THE CURRENT SOURCE, AND THIS TABLE USED TO CONFUSE THEM
+-- (ADR-0028). origin_kind records ONE fact and only one: how this account
+-- FIRST CAME TO EXIST. MANUAL (the user typed it — the first-class path, and
+-- the one a cash account or an unlisted institution takes), CSV (a reviewed
+-- statement import created it), or EXTERNAL_PROVIDER, which is MODELLED AND
+-- UNREACHABLE — no provider is integrated in Phase 5, no code path
+-- constructs that value, and the seam exists so the schema does not have to
+-- be rewritten when one arrives. Origin is immutable, enforced by the guard
+-- trigger below, because a different origin is a different account.
+--
+-- WHAT WAS REMOVED AND WHY IT HAD TO BE. This table carried source_kind and
+-- a provider_connection_ref bound to it by a biconditional CHECK — a shape
+-- that asserts an account has EXACTLY ONE CURRENT DATA SOURCE, permanently,
+-- for its whole life. That assertion is false about real accounts and
+-- expensive once anyone's data exists: an account typed by hand, then fed by
+-- CSV imports, then linked to an API, then corrected by hand is ONE account
+-- throughout, and a model that cannot say so forces a second account to be
+-- created and the person's history to split in two (ADR-0028). Both the
+-- column and its CHECK are therefore GONE rather than left as a rule that
+-- describes something untrue. Current and historical sources are many per
+-- account and live in an ACCOUNT-SOURCE-LINK table owned by a separate
+-- workstream; nothing here models one, and nothing here may be read as
+-- naming one.
+--
+-- The corollary is enforced by absence: a provider-origin account still
+-- accepts user corrections. No column, CHECK, trigger clause, or grant on
+-- this table makes an UPDATE conditional on origin_kind — the guard trigger
+-- freezes origin and identity, and freezes nothing else — so an account
+-- whose origin is EXTERNAL_PROVIDER is exactly as editable as one the person
+-- typed. That is asserted by test against the live database rather than
+-- claimed here.
+--
+-- MULTIPLICITY IS A HARD INVARIANT, AND IT IS ENFORCED BY WHAT IS NOT HERE.
+-- An account is identified by its id and by NOTHING ELSE. There is no UNIQUE
+-- constraint and no unique index over (institution_ref, user_id),
+-- (institution_ref, account_type), (institution_ref, currency_code),
+-- (institution_ref, account_type, currency_code), or (institution_ref,
+-- wallet_kind) — and none may be added. Every one of those forbids something
+-- a real person actually has: two current accounts at one bank in one
+-- currency is ordinary, two credit cards from one issuer is ordinary, and two
+-- mobile-money wallets from one issuer is ordinary (ADR-0028). Institution,
+-- type, currency and wallet kind are ATTRIBUTES, not identity. The ONLY
+-- UNIQUE constraint on this table is (id, currency_code), which adds no
+-- restriction whatever — id is already the primary key — and exists solely to
+-- be the target of 0089's composite foreign key. A test creates the whole
+-- awkward set against live PostgreSQL, because a missing constraint is
+-- exactly the kind of guarantee that is silently reintroduced by someone
+-- tidying up.
 --
 -- THE LEGACY SURFACE THIS REPLACES. The legacy connect-a-bank screen
 -- inserted a fabricated account row with an invented masked number and a
@@ -269,23 +306,16 @@ CREATE TABLE public.financial_accounts (
   status                         text        NOT NULL
     CONSTRAINT financial_accounts_status_check
     CHECK (status IN ('ACTIVE', 'ARCHIVED', 'CLOSED')),
-  source_kind                    text        NOT NULL
-    CONSTRAINT financial_accounts_source_kind_check
-    CHECK (source_kind IN ('MANUAL', 'CSV', 'EXTERNAL_PROVIDER')),
-  -- OPAQUE reference to a future provider connection, NEVER a credential.
-  -- Unreachable in Phase 5: no code path produces EXTERNAL_PROVIDER, and
-  -- the biconditional below means no other source_kind may carry one.
-  provider_connection_ref        text            NULL
-    CONSTRAINT financial_accounts_provider_connection_ref_check
-    CHECK (provider_connection_ref IS NULL OR btrim(provider_connection_ref) <> ''),
+  -- HOW THIS ACCOUNT FIRST CAME TO EXIST, and nothing else. Immutable. It
+  -- does not say where data comes from now, and no column here does: see the
+  -- header. There is deliberately no companion connection reference.
+  origin_kind                    text        NOT NULL
+    CONSTRAINT financial_accounts_origin_kind_check
+    CHECK (origin_kind IN ('MANUAL', 'CSV', 'EXTERNAL_PROVIDER')),
   version                        integer     NOT NULL DEFAULT 1
     CONSTRAINT financial_accounts_version_check CHECK (version >= 1),
   created_at                     timestamptz NOT NULL DEFAULT now(),
   updated_at                     timestamptz NOT NULL,
-  -- A manual (or CSV) account cannot claim a provider connection, and an
-  -- external-provider account cannot exist without one.
-  CONSTRAINT financial_accounts_provider_connection_check
-    CHECK ((source_kind = 'EXTERNAL_PROVIDER') = (provider_connection_ref IS NOT NULL)),
   -- An institution is named exactly one way, or not at all. Presence, not
   -- content: whether a label EXISTS is still visible to the database once
   -- the label itself is not.
@@ -308,10 +338,20 @@ COMMENT ON TABLE public.financial_accounts IS
   'nonce + auth tag, with the algorithm and key version per row; no '
   'plaintext column exists for any of them, and tenant, user, table, row id '
   'and field are bound as associated data so a ciphertext cannot be moved '
-  'between rows, columns, or subjects. source_kind EXTERNAL_PROVIDER is '
-  'modelled and unreachable (no provider is integrated); the biconditional '
-  'CHECK forbids any other source_kind from carrying a provider connection. '
-  'Status is the account''s own lifecycle and never means connected or '
+  'between rows, columns, or subjects. origin_kind is IMMUTABLE and says '
+  'only how the account FIRST came to exist (ADR-0028); it does not name a '
+  'current data source, and no column here does — the one-source shape '
+  '(source_kind plus a bound provider_connection_ref) was REMOVED because an '
+  'account may be typed, then imported into, then linked, then corrected and '
+  'remain one account. EXTERNAL_PROVIDER is modelled and unreachable (no '
+  'provider is integrated), and nothing makes an UPDATE conditional on '
+  'origin, so a provider-origin account still accepts user corrections. '
+  'IDENTITY IS THE ID ALONE: no UNIQUE constraint exists over institution + '
+  'user, institution + type, institution + currency, institution + type + '
+  'currency, or issuer + wallet kind, and none may be added — two current '
+  'accounts at one bank in one currency, two credit cards from one issuer, '
+  'and two wallets from one issuer are all ordinary. Status is the '
+  'account''s own lifecycle and never means connected or '
   'synced. RLS FORCEd on BOTH principal GUCs — tenant scoping alone would '
   'let one household member read another''s accounts. version is the '
   'optimistic-concurrency token, incremented by exactly one per UPDATE by '
@@ -334,9 +374,13 @@ COMMENT ON COLUMN public.financial_accounts.hsf_key_version IS
   'row, so a rotation leaves earlier rows readable instead of turning a key '
   'change into data loss a user discovers.';
 
-COMMENT ON COLUMN public.financial_accounts.provider_connection_ref IS
-  'Opaque forward reference for a future provider integration. NEVER a '
-  'credential. Unreachable in Phase 5 — nothing constructs EXTERNAL_PROVIDER.';
+COMMENT ON COLUMN public.financial_accounts.origin_kind IS
+  'How this account FIRST came to exist — MANUAL, CSV, or the modelled and '
+  'unreachable EXTERNAL_PROVIDER. Immutable by trigger. NOT the current data '
+  'source: an account may later receive imports, be linked, and be corrected '
+  'by hand while remaining one account, and the sources it has now are many '
+  'and live outside this table (ADR-0028). Carries no connection reference '
+  'and never a credential.';
 
 -- The owner listing: every read this module serves is "my accounts, newest
 -- or oldest first", inside one tenant.
@@ -367,9 +411,12 @@ CREATE POLICY financial_accounts_subject ON public.financial_accounts
     AND user_id = NULLIF(current_setting('app.user_id', true), '')::uuid
   );
 
--- Guard: identity and provenance columns immutable, version must increment
--- by exactly one per UPDATE, updated_at maintained here so no caller can
--- forge it. DELETE is deliberately NOT raised on — see the header.
+-- Guard: identity and ORIGIN immutable, version must increment by exactly one
+-- per UPDATE, updated_at maintained here so no caller can forge it. Note what
+-- it does NOT freeze: every descriptive column stays editable regardless of
+-- origin_kind, which is what keeps a provider-origin account correctable by
+-- the person it belongs to (ADR-0028). DELETE is deliberately NOT raised
+-- on — see the header.
 CREATE FUNCTION public.financial_accounts_guard() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -377,10 +424,10 @@ BEGIN
   IF NEW.id IS DISTINCT FROM OLD.id
     OR NEW.tenant_id   IS DISTINCT FROM OLD.tenant_id
     OR NEW.user_id     IS DISTINCT FROM OLD.user_id
-    OR NEW.source_kind IS DISTINCT FROM OLD.source_kind
+    OR NEW.origin_kind IS DISTINCT FROM OLD.origin_kind
     OR NEW.created_at  IS DISTINCT FROM OLD.created_at
   THEN
-    RAISE EXCEPTION 'financial_account % identity and provenance are immutable (id, tenant_id, user_id, source_kind, created_at); a different owner or origin is a different account',
+    RAISE EXCEPTION 'financial_account % identity and origin are immutable (id, tenant_id, user_id, origin_kind, created_at); a different owner or origin is a different account, and origin never means the current data source',
       OLD.id USING ERRCODE = 'raise_exception';
   END IF;
   IF NEW.version IS DISTINCT FROM OLD.version + 1 THEN

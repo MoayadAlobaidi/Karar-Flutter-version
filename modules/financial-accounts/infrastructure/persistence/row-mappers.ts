@@ -16,15 +16,19 @@
  * asynchronous for exactly this reason.
  *
  * **A row this vocabulary cannot name is a DEFECT, not a user outcome.** An
- * unknown account type, status, source kind, or currency code means the
- * database and the code have diverged — a migration applied without its code
+ * unknown account type, status, origin, wallet kind, account nature, issuer
+ * kind, source kind, or currency code means the database and the code have
+ * diverged — a migration applied without its code
  * change, or the reverse. That throws `FinancialAccountsStoreError` rather
  * than becoming a `Result` arm, because silently coercing it (to `OTHER`, to
  * `ACTIVE`, to a guessed currency) would produce a plausible-looking record
  * that is wrong, which is exactly the failure mode this module exists to
  * avoid. The closed CHECK constraints in migrations 0087-0089 make these
  * throws unreachable in a consistent database; they are the alarm for when it
- * is not. A ciphertext that fails to authenticate is the same kind of alarm,
+ * is not. The wallet biconditional is checked here for the same reason: a row
+ * with a wallet kind on a non-wallet type, or a WALLET with none, means the
+ * CHECK from migration 0095 is not where it should be, and mapping it into a
+ * plausible-looking account would hide that. A ciphertext that fails to authenticate is the same kind of alarm,
  * and is deliberately NOT caught here: the port's error carries no plaintext
  * and no oracle, and swallowing it would turn tampering into a blank field.
  *
@@ -42,21 +46,31 @@ import type {
   HsfFieldName,
 } from '../../application/ports/hsf-field-encryption.js';
 import type { AccountsPrincipal } from '../../application/principal.js';
-import type { BalanceSnapshot } from '../../domain/balance-snapshot.js';
+import {
+  isBalanceKind,
+  isSourceKind,
+  type BalanceSnapshot,
+} from '../../domain/balance-snapshot.js';
 import { FinancialAccountsStoreError } from '../../domain/errors.js';
 import {
+  checkWalletKind,
+  isAccountNature,
+  isAccountOrigin,
   isAccountStatus,
   isAccountType,
-  isSourceKind,
+  isWalletKind,
   type FinancialAccount,
 } from '../../domain/financial-account.js';
 import type { HsfField } from '../../domain/hsf-field.js';
-import { isInstitutionStatus, type Institution } from '../../domain/institution.js';
+import {
+  isInstitutionKind,
+  isInstitutionStatus,
+  type Institution,
+} from '../../domain/institution.js';
 import type {
   BalanceSnapshotId,
   FinancialAccountId,
   InstitutionRef,
-  ProviderConnectionRef,
   SourceReference,
 } from '../../domain/refs.js';
 
@@ -78,6 +92,7 @@ function currencyOf(code: string, where: string): Currency {
 export interface InstitutionRow {
   id: string;
   code: string;
+  kind: string;
   displayNameEn: string;
   displayNameAr: string;
   status: string;
@@ -91,9 +106,15 @@ export function toInstitution(row: InstitutionRow): Institution {
       `institutions.status holds unknown value '${row.status}'`,
     );
   }
+  if (!isInstitutionKind(row.kind)) {
+    throw new FinancialAccountsStoreError(
+      `institutions.kind holds unknown value '${row.kind}'`,
+    );
+  }
   return Object.freeze({
     id: row.id as InstitutionRef,
     code: row.code,
+    kind: row.kind,
     displayNameEn: row.displayNameEn,
     displayNameAr: row.displayNameAr,
     status: row.status,
@@ -124,6 +145,8 @@ export interface FinancialAccountRow {
   userId: string;
   institutionRef: string | null;
   accountType: string;
+  walletKind: string | null;
+  accountNature: string;
   currencyCode: string;
   hsfAlgorithm: string;
   hsfKeyVersion: string;
@@ -137,8 +160,7 @@ export interface FinancialAccountRow {
   maskNonce: Uint8Array | null;
   maskAuthTag: Uint8Array | null;
   status: string;
-  sourceKind: string;
-  providerConnectionRef: string | null;
+  originKind: string;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -274,9 +296,32 @@ export async function toFinancialAccount(
       `financial_accounts.status holds unknown value '${row.status}'`,
     );
   }
-  if (!isSourceKind(row.sourceKind)) {
+  if (!isAccountOrigin(row.originKind)) {
     throw new FinancialAccountsStoreError(
-      `financial_accounts.source_kind holds unknown value '${row.sourceKind}'`,
+      `financial_accounts.origin_kind holds unknown value '${row.originKind}'`,
+    );
+  }
+  if (!isAccountNature(row.accountNature)) {
+    throw new FinancialAccountsStoreError(
+      `financial_accounts.account_nature holds unknown value '${row.accountNature}'`,
+    );
+  }
+  if (row.walletKind !== null && !isWalletKind(row.walletKind)) {
+    throw new FinancialAccountsStoreError(
+      `financial_accounts.wallet_kind holds unknown value '${row.walletKind}'`,
+    );
+  }
+  const walletKind = row.walletKind;
+  // The biconditional, re-checked on the way out: migration 0095's CHECK is
+  // what normally makes a mismatch unrepresentable, so reaching this means the
+  // constraint is gone and a plausible-looking account would hide that.
+  const wallet = checkWalletKind(row.accountType, walletKind);
+  if (!wallet.ok) {
+    throw new FinancialAccountsStoreError(
+      `financial_accounts row ${row.id} breaks the wallet invariant (account_type ` +
+        `'${row.accountType}', wallet_kind ${walletKind === null ? 'NULL' : `'${walletKind}'`}) — ` +
+        'a wallet kind exists if and only if the type is WALLET, and migration 0095 has a CHECK ' +
+        'that makes this unrepresentable',
     );
   }
 
@@ -316,15 +361,13 @@ export async function toFinancialAccount(
     institutionRef: row.institutionRef === null ? null : (row.institutionRef as InstitutionRef),
     userSuppliedInstitutionLabel: label,
     accountType: row.accountType,
+    walletKind,
+    nature: row.accountNature,
     currency: currencyOf(row.currencyCode, 'financial_accounts.currency_code'),
     displayName,
     mask,
     status: row.status,
-    sourceKind: row.sourceKind,
-    providerConnectionRef:
-      row.providerConnectionRef === null
-        ? null
-        : (row.providerConnectionRef as ProviderConnectionRef),
+    origin: row.originKind,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     version: row.version,
@@ -340,6 +383,7 @@ export interface BalanceSnapshotRow {
   currencyCode: string;
   asOf: Date;
   sourceKind: string;
+  balanceKind: string;
   sourceReference: string;
   capturedAt: Date;
   createdAt: Date;
@@ -349,6 +393,14 @@ export function toBalanceSnapshot(row: BalanceSnapshotRow): BalanceSnapshot {
   if (!isSourceKind(row.sourceKind)) {
     throw new FinancialAccountsStoreError(
       `financial_account_balance_snapshots.source_kind holds unknown value '${row.sourceKind}'`,
+    );
+  }
+  // Refused rather than coerced to a nearest kind: a figure whose kind this
+  // code cannot name is a figure nobody can interpret, and substituting one
+  // would be the inference the column exists to prevent.
+  if (!isBalanceKind(row.balanceKind)) {
+    throw new FinancialAccountsStoreError(
+      `financial_account_balance_snapshots.balance_kind holds unknown value '${row.balanceKind}'`,
     );
   }
   return Object.freeze({
@@ -362,6 +414,7 @@ export function toBalanceSnapshot(row: BalanceSnapshotRow): BalanceSnapshot {
     ),
     asOf: row.asOf,
     sourceKind: row.sourceKind,
+    balanceKind: row.balanceKind,
     sourceReference: row.sourceReference as SourceReference,
     capturedAt: row.capturedAt,
     createdAt: row.createdAt,

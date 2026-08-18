@@ -336,6 +336,7 @@ const institutionRows: readonly Institution[] = [
   {
     id: ACTIVE_INSTITUTION,
     code: 'QA_SYNTHETIC_TEST_ONE',
+    kind: 'BANK',
     displayNameEn: 'Synthetic Test Institution One',
     displayNameAr: 'مؤسسة اختبار اصطناعية واحد',
     status: 'ACTIVE',
@@ -345,6 +346,7 @@ const institutionRows: readonly Institution[] = [
   {
     id: RETIRED_INSTITUTION,
     code: 'QA_SYNTHETIC_TEST_TWO',
+    kind: 'MOBILE_MONEY_OPERATOR',
     displayNameEn: 'Synthetic Test Institution Two',
     displayNameAr: 'مؤسسة اختبار اصطناعية اثنان',
     status: 'RETIRED',
@@ -480,6 +482,7 @@ describe('financial-accounts use cases: the principal is context, never input', 
           accountId: id,
           amount: Money.of(1_000n, QAR),
           asOf: NOW,
+          balanceKind: 'BOOKED',
           sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         },
         broken,
@@ -500,11 +503,46 @@ describe('financial-accounts use cases: create, read, list', () => {
     if (!created.ok) return;
     expect(created.value.tenantId).toBe(TENANT_A);
     expect(created.value.userId).toBe(USER_A1);
-    expect(created.value.sourceKind).toBe('MANUAL');
+    expect(created.value.origin).toBe('MANUAL');
     expect(created.value.status).toBe('ACTIVE');
     expect(created.value.version).toBe(1);
-    expect(created.value.providerConnectionRef).toBeNull();
     expect(created.value.currency.code).toBe('QAR');
+    // Unstated nature is UNKNOWN, deliberately not ASSET: an account nobody
+    // has classified must never be silently counted as money the person has.
+    expect(created.value.nature).toBe('UNKNOWN');
+    expect(created.value.walletKind).toBeNull();
+  });
+
+  it('a wallet must say which kind it is, and a non-wallet must not claim one', async () => {
+    const { create } = wire();
+    const undescribed = await create.execute(
+      { ...manualInput, accountType: 'WALLET', displayName: 'Synthetic Test Wallet' },
+      actorA1,
+    );
+    expect(undescribed.ok).toBe(false);
+    if (!undescribed.ok) expect(undescribed.error.kind).toBe('rule_violated');
+
+    const contradiction = await create.execute(
+      { ...manualInput, accountType: 'CURRENT', walletKind: 'E_MONEY' },
+      actorA1,
+    );
+    expect(contradiction.ok).toBe(false);
+
+    const wallet = await create.execute(
+      {
+        ...manualInput,
+        accountType: 'WALLET',
+        walletKind: 'MOBILE_MONEY',
+        nature: 'ASSET',
+        displayName: 'Synthetic Test Wallet',
+      },
+      actorA1,
+    );
+    expect(wallet.ok).toBe(true);
+    if (wallet.ok) {
+      expect(wallet.value.walletKind).toBe('MOBILE_MONEY');
+      expect(wallet.value.nature).toBe('ASSET');
+    }
   });
 
   it('NON-EMPTY FIRST: the owner sees their own accounts, and nobody else does', async () => {
@@ -715,6 +753,7 @@ describe('financial-accounts use cases: currency immutability, in every case tha
       amount: Money.of(1_000n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
+      balanceKind: 'BOOKED',
       sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
@@ -838,6 +877,7 @@ describe('financial-accounts use cases: delete is first class and cannot cross a
         amount: Money.of(12_345n, QAR),
         asOf: NOW,
         sourceKind: 'MANUAL',
+        balanceKind: 'BOOKED',
         sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         capturedAt: NOW,
         createdAt: NOW,
@@ -908,6 +948,7 @@ describe('financial-accounts use cases: balance snapshots', () => {
       amount: Money.of(-123_456n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
+      balanceKind: 'BOOKED',
       sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
@@ -1039,6 +1080,7 @@ describe('financial-accounts use cases: durable creation fails closed on retenti
         accountId: created.value.id,
         amount: Money.of(1_000n, QAR),
         asOf: NOW,
+        balanceKind: 'BOOKED',
         sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       },
       actorA1,
@@ -1128,6 +1170,7 @@ describe('financial-accounts use cases: deletion erases account-scoped records o
       amount: Money.of(1_000n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
+      balanceKind: 'BOOKED',
       sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
@@ -1266,6 +1309,7 @@ describe('financial-accounts use cases: recording a reported balance', () => {
         accountId: created.value.id,
         amount: Money.fromDecimalString('-1234.56', QAR),
         asOf,
+        balanceKind: 'BOOKED',
         sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       },
       actorA1,
@@ -1293,6 +1337,7 @@ describe('financial-accounts use cases: recording a reported balance', () => {
         accountId: created.value.id,
         amount: Money.of(1_000n, QAR),
         asOf: NOW,
+        balanceKind: 'BOOKED',
         sourceReference: 'closing balance printed on the second page of the statement',
       },
       actorA1,
@@ -1316,6 +1361,7 @@ describe('financial-accounts use cases: recording a reported balance', () => {
         accountId: created.value.id,
         amount: Money.of(1_000n, QAR),
         asOf: NOW,
+        balanceKind: 'BOOKED',
         sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       },
       actorA2,

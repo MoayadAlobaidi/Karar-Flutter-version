@@ -12,7 +12,8 @@
  * ## Every fixture here is obviously synthetic, deliberately
  *
  * The institutions are named `Synthetic Test Institution ...` with codes that
- * say so; the accounts are `Synthetic Test Account ...`; the masks are
+ * say so — no real bank, telco, wallet or exchange house is named anywhere in
+ * this module's fixtures, and none may be; the accounts are `Synthetic Test Account ...`; the masks are
  * `0000`-shaped; the identifiers are patterned UUIDs. Nothing resembles a real
  * bank, a real account, or a plausible balance — a test corpus that looks like
  * real financial data is a leak waiting for someone to copy it somewhere.
@@ -54,6 +55,9 @@ export const ACTOR_B1: AccountsPrincipal = { tenantId: TENANT_B, userId: USER_B1
 
 export const INSTITUTION_ACTIVE = '11111111-0000-4000-8000-000000000011' as InstitutionRef;
 export const INSTITUTION_RETIRED = '22222222-0000-4000-8000-000000000022' as InstitutionRef;
+/** A second selectable issuer: an issuer is an attribute, never an identity. */
+export const INSTITUTION_SECOND_ACTIVE =
+  '33333333-0000-4000-8000-000000000033' as InstitutionRef;
 
 /**
  * A UUID, because migration 0089 makes `source_reference` one — a column that
@@ -206,27 +210,39 @@ export async function provisionDatabase(database: string): Promise<void> {
     // The catalogue has no runtime writer by design (karar_app holds SELECT
     // only), so the fixture seeds it as the superuser — the same position a
     // reviewed migration would occupy.
-    const institutions: Array<[string, string, string, string, string]> = [
+    const institutions: Array<[string, string, string, string, string, string]> = [
       [
         INSTITUTION_ACTIVE,
-        'QA_SYNTHETIC_TEST_ONE',
+        'SYNTHETIC_TEST_ISSUER_ONE',
+        'BANK',
         'Synthetic Test Institution One',
         'مؤسسة اختبار اصطناعية واحد',
         'ACTIVE',
       ],
       [
         INSTITUTION_RETIRED,
-        'QA_SYNTHETIC_TEST_TWO',
+        'SYNTHETIC_TEST_ISSUER_TWO',
+        'MOBILE_MONEY_OPERATOR',
         'Synthetic Test Institution Two',
         'مؤسسة اختبار اصطناعية اثنان',
         'RETIRED',
       ],
+      // A third issuer, so a suite can prove that accounts at TWO issuers
+      // coexist without anything treating the issuer as identity.
+      [
+        INSTITUTION_SECOND_ACTIVE,
+        'SYNTHETIC_TEST_ISSUER_THREE',
+        'E_MONEY_ISSUER',
+        'Synthetic Test Institution Three',
+        'مؤسسة اختبار اصطناعية ثلاثة',
+        'ACTIVE',
+      ],
     ];
-    for (const [id, code, en, ar, status] of institutions) {
+    for (const [id, code, kind, en, ar, status] of institutions) {
       await adapter.query(
-        `INSERT INTO public.institutions (id, code, display_name_en, display_name_ar, status, updated_at)
-         VALUES ($1, $2, $3, $4, $5, now())`,
-        [id, code, en, ar, status],
+        `INSERT INTO public.institutions (id, code, kind, display_name_en, display_name_ar, status, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, now())`,
+        [id, code, kind, en, ar, status],
       );
     }
   });

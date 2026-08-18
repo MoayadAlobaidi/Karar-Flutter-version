@@ -158,6 +158,7 @@ async function seedSnapshot(
     amount: Money.of(minorUnits, QAR),
     asOf: clock.now(),
     sourceKind: 'MANUAL',
+    balanceKind: 'BOOKED',
     sourceReference: SYNTHETIC_SOURCE_REFERENCE,
     capturedAt: clock.now(),
     createdAt: clock.now(),
@@ -342,7 +343,7 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+               (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                 ${HSF_COLUMNS}, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000091', $1, $2, 'CURRENT', 'QAR',
                      'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
@@ -361,7 +362,7 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+               (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                 ${HSF_COLUMNS}, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000092', $1, $2, 'CURRENT', 'QAR',
                      'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
@@ -388,7 +389,7 @@ describe.skipIf(unreachable !== null)(
             ]);
             const inserted = await tx.query(
               `INSERT INTO public.financial_accounts
-                 (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                 (id, tenant_id, user_id, account_type, currency_code, status, origin_kind,
                   ${HSF_COLUMNS}, updated_at)
                VALUES ('99999999-0000-4000-8000-000000000093', $1, $2, 'CASH', 'QAR',
                        'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
@@ -587,7 +588,14 @@ describe.skipIf(unreachable !== null)(
       // Allow-listed reference data: the same rows for everyone, which is what
       // makes a tenant predicate meaningless here.
       const selectable = await institutions.listSelectable();
-      expect(selectable.map((row) => row.code)).toEqual(['QA_SYNTHETIC_TEST_ONE']);
+      // Two ACTIVE synthetic issuers and one RETIRED one: only ACTIVE entries
+      // are selectable for a NEW account, and the codes carry no country
+      // prefix because an issuer's countries are market rows (0094).
+      expect(selectable.map((row) => row.code)).toEqual([
+        'SYNTHETIC_TEST_ISSUER_ONE',
+        'SYNTHETIC_TEST_ISSUER_THREE',
+      ]);
+      expect(selectable.map((row) => row.kind)).toEqual(['BANK', 'E_MONEY_ISSUER']);
       const retired = await institutions.findByRef(INSTITUTION_ACTIVE);
       expect(retired?.displayNameAr).not.toBe('');
 
@@ -600,7 +608,7 @@ describe.skipIf(unreachable !== null)(
           (await tx.query<{ n: string }>('SELECT count(*)::text AS n FROM public.institutions'))
             .rows[0]?.n,
         );
-        expect(count).toBe('2');
+        expect(count).toBe('3');
       }
     });
 

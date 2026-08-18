@@ -61,7 +61,7 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
 | `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
 
-**As implemented in Phases 2–5** — 57 tables across `platform`, `audit`, and `public` (number ranges owned per workstream, with deliberate gaps that stay gaps): 48 through Phase 3.5, and nine added by the Phase 5 financial data foundation. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
+**As implemented in Phases 2–5** — 58 tables across `platform`, `audit`, and `public` (number ranges owned per workstream, with deliberate gaps that stay gaps): 48 through Phase 3.5, and ten added by the Phase 5 financial data foundation. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
 
 | Table | Purpose | Classification |
 |---|---|---|
@@ -95,8 +95,17 @@ The Phase 5 financial tables, same convention. **They are reachable by nothing**
 
 | Module | Tables |
 |---|---|
-| [`financial-accounts`](../../modules/financial-accounts/MODULE.md) | `institutions`, `financial_accounts`, `financial_account_balance_snapshots` (`0087`–`0089`) |
+| [`financial-accounts`](../../modules/financial-accounts/MODULE.md) | `institutions`, `financial_accounts`, `financial_account_balance_snapshots`, `institution_markets` (`0087`–`0089`, `0094`–`0095`) |
 | [`transactions`](../../modules/transactions/MODULE.md) | `transactions`, `transaction_revisions`, `transaction_provenance`, `financial_categories`, `merchant_rules`, `transaction_category_assignments` (`0090`–`0093`) |
+
+Four concepts the Phase 5 model keeps apart, following [ADR-0028](../adr/0028-multi-rail-financial-sources.md), because collapsing any pair produces a specific untruth:
+
+- **An issuer is not a market presence.** `institutions` holds stable global issuer identity with a kind (`BANK`, `E_MONEY_ISSUER`, `MOBILE_MONEY_OPERATOR`, `TELCO_FINANCIAL_SERVICES`, `PAYMENT_INSTITUTION`, `FINTECH_WALLET`, `CARD_ISSUER`, `EXCHANGE_HOUSE`, `OTHER`); `institution_markets` holds one row per issuer per **country**. A global issuer operating in four countries is one issuer with four market rows, not four issuers. The issuer code carries no country prefix, precisely because a code beginning `QA_` reads as a fact about where the issuer belongs and invites a second row the moment a second market appears. **Country is not Jurisdiction**: the market table keys on country and has no jurisdiction column.
+- **An account's origin is not its current source.** `origin_kind` (`MANUAL`, `CSV`, `EXTERNAL_PROVIDER`) is immutable and says only how the account first came to exist. The column asserting a single permanent provider connection is gone, along with the biconditional that enforced it — an account may be typed in, then fed by CSV, then linked to an API, and remain one account. Later sources belong to account-source links, not to the account row.
+- **A wallet is an account; a card is not.** `account_type = 'WALLET'` carries a required `wallet_kind`, enforced biconditionally: `CHECK ((wallet_kind IS NOT NULL) = (account_type = 'WALLET'))`. Crypto is not modelled here.
+- **A liability is not cash.** `account_nature` (`ASSET`, `LIABILITY`, `UNKNOWN`) is stored rather than derived from the type, and nothing in Phase 5 sums, nets or totals with it.
+
+**The account is identified by its id and nothing else.** There is deliberately no uniqueness over institution + user, institution + type, institution + currency, institution + type + currency, or issuer + wallet kind — every one of those forbids something people actually have, such as two current accounts at one bank in one currency, or two credit cards from one issuer. The absence is asserted against the live catalogue rather than merely intended: a test reads `pg_index` and requires the only unique indexes to be the primary key and the composite the currency-freeze foreign key depends on.
 
 Three of them — `institutions`, `financial_categories`, `merchant_rules` — are catalogue tables owned by no tenant, and are allow-listed with a written reason rather than given a no-op policy (§12). On `financial_accounts`, the holder-sensitive fields are stored only as ciphertext with a nonce, an auth tag, an algorithm and a key version; there is no plaintext column for a display name, an institution label or a mask.
 

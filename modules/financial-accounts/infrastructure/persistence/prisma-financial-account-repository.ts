@@ -30,6 +30,13 @@
  * visibly instead of being overwritten. The database backs this twice: the
  * guard trigger on the table refuses any UPDATE that does not increment
  * `version` by exactly one (migration 0088).
+ *
+ * **The update path does not consult the account's origin, and that is the
+ * behaviour rather than an oversight.** A provider-origin account is exactly as
+ * correctable by its owner as one the person typed: an account may be created
+ * one way and corrected many times afterwards while remaining one account, so
+ * no branch here, no column, and no database constraint makes an edit
+ * conditional on how the account first came to exist (ADR-0028).
  */
 
 import { TenantId, UserId } from '@karar/shared-kernel';
@@ -137,11 +144,12 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
           userId: UserId.toString(account.userId),
           institutionRef: account.institutionRef,
           accountType: account.accountType,
+          walletKind: account.walletKind,
+          accountNature: account.nature,
           currencyCode: account.currency.code,
           ...encrypted,
           status: account.status,
-          sourceKind: account.sourceKind,
-          providerConnectionRef: account.providerConnectionRef,
+          originKind: account.origin,
           version: account.version,
           createdAt: account.createdAt,
           updatedAt: account.updatedAt,
@@ -175,6 +183,8 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
         data: {
           institutionRef: next.institutionRef,
           accountType: next.accountType,
+          walletKind: next.walletKind,
+          accountNature: next.nature,
           currencyCode: next.currency.code,
           ...encrypted,
           status: next.status,

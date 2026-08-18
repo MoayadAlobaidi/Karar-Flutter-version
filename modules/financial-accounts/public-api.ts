@@ -9,11 +9,17 @@
  * **Deliberately NOT exported, and worth stating so nobody adds it later:**
  * no function that computes a balance from transactions (there is none to
  * export — a derived balance is a different concept from a reported one, and
- * it will arrive under its own name), no way to construct a `sourceKind` of
- * `EXTERNAL_PROVIDER` (the factory accepts only the constructible kinds), and
- * no write path into the institution catalogue (it changes by reviewed
- * migration, and a runtime writer would be the first step toward one
- * subject's typed bank name becoming global reference data).
+ * it will arrive under its own name), no function that sums or nets account
+ * balances by `AccountNature` (a net worth is a different concept again, with
+ * its own correctness problem), no function that derives one `BalanceKind`
+ * from another (`latestReported` requires the caller to name the kind, and a
+ * kind nobody reported answers null rather than substituting a neighbour), no way to construct an account `origin` of
+ * `EXTERNAL_PROVIDER` (the factory accepts only the constructible origins), no
+ * `ProviderConnectionRef` (an account has many data sources over its life and
+ * none of them is a field on the account — ADR-0028), and no write path into
+ * the institution catalogue or its market rows (both change by reviewed
+ * migration, and a runtime writer would be the first step toward one subject's
+ * typed bank name becoming global reference data).
  *
  * This module also exports no presentation layer this phase: the HTTP surface
  * and its composition belong to the API application, and nothing here assumes
@@ -37,45 +43,62 @@
 
 // domain — read shapes and rules
 export {
+  ACCOUNT_NATURES,
+  ACCOUNT_ORIGINS,
   ACCOUNT_STATUSES,
   ACCOUNT_TYPES,
-  CONSTRUCTIBLE_SOURCE_KINDS,
+  CONSTRUCTIBLE_ACCOUNT_ORIGINS,
   MAX_DISPLAY_TEXT_LENGTH,
   MAX_MASK_LENGTH,
-  SOURCE_KINDS,
+  WALLET_KINDS,
   applyAccountEdit,
   checkCurrencyChange,
-  checkProviderConnection,
+  checkWalletKind,
   createFinancialAccount,
+  isAccountNature,
+  isAccountOrigin,
   isAccountStatus,
   isAccountType,
   isMask,
-  isSourceKind,
+  isWalletKind,
   normalizeDisplayText,
   resolveSupportedCurrency,
   type AccountEdit,
+  type AccountNature,
+  type AccountOrigin,
   type AccountStatus,
   type AccountType,
-  type ConstructibleSourceKind,
+  type ConstructibleAccountOrigin,
   type FinancialAccount,
   type NewFinancialAccount,
-  type SourceKind,
+  type WalletKind,
 } from './domain/financial-account.js';
 export {
+  INSTITUTION_KINDS,
   INSTITUTION_STATUSES,
+  isInstitutionKind,
   isInstitutionStatus,
   isSelectableForNewAccount,
   isValidInstitutionCode,
   type Institution,
+  type InstitutionKind,
   type InstitutionStatus,
 } from './domain/institution.js';
 export {
+  BALANCE_KINDS,
+  CONSTRUCTIBLE_SOURCE_KINDS,
+  SOURCE_KINDS,
   byMostRecentlyTrue,
   createBalanceSnapshot,
+  isBalanceKind,
+  isSourceKind,
   isValidSourceReference,
   latestReported,
+  type BalanceKind,
   type BalanceSnapshot,
+  type ConstructibleSourceKind,
   type NewBalanceSnapshot,
+  type SourceKind,
 } from './domain/balance-snapshot.js';
 export {
   HSF_FIELD_MAX_LENGTH,
@@ -88,7 +111,6 @@ export type {
   BalanceSnapshotId,
   FinancialAccountId,
   InstitutionRef,
-  ProviderConnectionRef,
   SourceReference,
 } from './domain/refs.js';
 export {
@@ -99,10 +121,10 @@ export {
   type InvalidDisplayText,
   type InvalidSourceReference,
   type MaskNotAMask,
-  type ProviderConnectionMismatch,
   type SnapshotCurrencyMismatch,
   type UnknownVocabularyValue,
   type UnsupportedCurrency,
+  type WalletKindMismatch,
 } from './domain/errors.js';
 
 // application — principal, errors, ports

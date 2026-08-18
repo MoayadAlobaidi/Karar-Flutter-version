@@ -14,6 +14,12 @@
  * amounts together — a balance this platform computed is a different concept
  * from a balance a source reported, and conflating them is the failure this
  * module is built to prevent.
+ *
+ * `listForOwnAccount` returns EVERY kind of reported balance in one ordered
+ * list and converts none of them. Selecting which kind answers a question is
+ * the domain's `latestReported`, which requires the caller to name the kind:
+ * a repository that quietly filtered, or that returned "the latest" across
+ * kinds, would answer a question about spendable money with a settled figure.
  */
 
 import { Money, TenantId, UserId } from '@karar/shared-kernel';
@@ -95,6 +101,10 @@ export class PrismaBalanceSnapshotRepository implements BalanceSnapshotRepositor
           currencyCode: snapshot.amount.currency.code,
           asOf: snapshot.asOf,
           sourceKind: snapshot.sourceKind,
+          // Written through exactly as the source stated it. Nothing here
+          // supplies one, coalesces one, or derives a second row of another
+          // kind from this one.
+          balanceKind: snapshot.balanceKind,
           sourceReference: snapshot.sourceReference,
           capturedAt: snapshot.capturedAt,
           createdAt: snapshot.createdAt,

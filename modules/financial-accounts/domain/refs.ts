@@ -19,17 +19,18 @@ export type BalanceSnapshotId = string & { readonly __brand: 'BalanceSnapshotId'
 export type InstitutionRef = string & { readonly __brand: 'InstitutionRef' };
 
 /**
- * An opaque forward reference to a provider connection that does not exist.
+ * There is deliberately NO `ProviderConnectionRef` here, and its removal is the
+ * point rather than an omission.
  *
- * Phase 5 integrates no provider, stores no credential, and keeps no
- * synchronisation cursor. The type is declared so the shape of an account is
- * settled before a provider arrives — NOT because anything can produce one.
- * Nothing in this module constructs a value of this type, and the rule that
- * a MANUAL or CSV account may not carry one is enforced in the domain, in the
- * use cases, and by a database CHECK (migration 0088). It is never a
- * credential: no column, type, or field in this module may hold one.
+ * The account row used to carry an opaque provider-connection reference bound
+ * to its source kind, which asserted that an account has exactly one permanent
+ * data source. That is false about real accounts: one account may be typed by
+ * hand, then fed by CSV imports, then linked to an API, then corrected by hand,
+ * and it stays one account throughout (ADR-0028). The type and the column were
+ * therefore removed rather than reinterpreted. Which sources feed an account —
+ * now and historically — is many-per-account and belongs to account-source
+ * links, which this module does not model and must not grow a field for.
  */
-export type ProviderConnectionRef = string & { readonly __brand: 'ProviderConnectionRef' };
 
 /**
  * Where the figure came from, as an OPAQUE UUID — the statement import or the

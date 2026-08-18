@@ -9,11 +9,14 @@
  * cash account, a wallet, and an account at an institution the catalogue does
  * not list all arrive through here.
  *
- * **Nothing created here claims a bank connection.** `sourceKind` is fixed to
- * `MANUAL` by this use case — it is not an input, because the origin of a
- * record is a fact about how it was made and never something the caller gets
- * to assert. `EXTERNAL_PROVIDER` is unreachable: the domain factory accepts
- * only the constructible kinds, and a database CHECK refuses the row besides.
+ * **Nothing created here claims a bank connection.** `origin` is fixed to
+ * `MANUAL` by this use case — it is not an input, because how a record came to
+ * exist is a fact about its making and never something the caller gets to
+ * assert. `EXTERNAL_PROVIDER` is unreachable: the domain factory accepts only
+ * the constructible origins, and a database CHECK refuses the row besides.
+ * Origin says nothing about where this account's data comes from later
+ * (ADR-0028); a manually created account may be corrected, imported into, or
+ * linked and remain this same account.
  *
  * The input carries no `userId` and no `tenantId`. The owner is the
  * authenticated principal, and the RLS WITH CHECK arm on
@@ -40,8 +43,10 @@ import type { Clock } from '@karar/shared-kernel';
 import {
   createFinancialAccount,
   resolveSupportedCurrency,
+  type AccountNature,
   type AccountType,
   type FinancialAccount,
+  type WalletKind,
 } from '../../domain/financial-account.js';
 import { isSelectableForNewAccount } from '../../domain/institution.js';
 import type { FinancialAccountId, InstitutionRef } from '../../domain/refs.js';
@@ -60,11 +65,25 @@ import type { InstitutionCatalogueReader } from '../ports/institution-catalogue-
 import { requirePrincipal, type AccountsPrincipal } from '../principal.js';
 
 /**
- * Deliberately carries no owner identifier and no `sourceKind`: the first is
+ * Deliberately carries no owner identifier and no `origin`: the first is
  * context, the second is this use case's own answer.
  */
 export interface CreateManualAccountInput {
   readonly accountType: AccountType;
+  /**
+   * Required when `accountType` is `WALLET`, refused otherwise — the domain
+   * states the biconditional and a CHECK in migration 0095 enforces it. Absent
+   * means null, which is correct for every non-wallet account and is refused
+   * for a wallet rather than guessed at.
+   */
+  readonly walletKind?: WalletKind | null;
+  /**
+   * Has, owes, or nobody has said. Absent means `UNKNOWN`, deliberately not
+   * `ASSET`: an account whose nature the person has not stated must never be
+   * silently counted as money they have, and this module computes no total
+   * from it in any case.
+   */
+  readonly nature?: AccountNature;
   /** ISO 4217 code; validated against the platform registry, never assumed. */
   readonly currencyCode: string;
   readonly displayName: string;
@@ -142,12 +161,14 @@ export class CreateManualAccount {
       institutionRef: input.institutionRef,
       userSuppliedInstitutionLabel: input.userSuppliedInstitutionLabel,
       accountType: input.accountType,
+      walletKind: input.walletKind ?? null,
+      nature: input.nature ?? 'UNKNOWN',
       currency: currency.value,
       displayName: input.displayName,
       mask: input.mask,
       // Fixed here, never taken from input: how a record came to exist is a
       // fact about its making, not a claim the caller may assert.
-      sourceKind: 'MANUAL',
+      origin: 'MANUAL',
       createdAt: this.clock.now(),
     });
     if (!built.ok) {

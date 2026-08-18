@@ -8,14 +8,50 @@
 -- THE ONE RULE THIS TABLE EXISTS TO KEEP. A balance here is a FACT SOMEONE
 -- ELSE ASSERTED — the figure printed on a statement, or the figure the user
 -- typed — recorded with WHO said it (source_kind), WHICH artefact said it
--- (source_reference), WHEN it was true (as_of), and WHEN this platform
--- learned it (captured_at). It is never derived by summing transactions.
--- Summing transactions produces a number that looks authoritative and is
--- wrong the moment a single transaction is missing, misdated, or
--- duplicated, and the user cannot tell the difference — so a computed
--- running balance is a different concept that must arrive with its own
--- name, its own column, and its own honest label, rather than being
--- silently written into this table. Nothing in this module computes one.
+-- (source_reference), WHICH BALANCE they were quoting (balance_kind), WHEN
+-- it was true (as_of), and WHEN this platform learned it (captured_at). It
+-- is never derived by summing transactions. Summing transactions produces a
+-- number that looks authoritative and is wrong the moment a single
+-- transaction is missing, misdated, or duplicated, and the user cannot tell
+-- the difference — so a computed running balance is a different concept that
+-- must arrive with its own name, its own column, and its own honest label,
+-- rather than being silently written into this table. Nothing in this module
+-- computes one, and a test asserts that this module contains no summation
+-- over amounts at all.
+--
+-- WHICH BALANCE, AND WHY THE COLUMN IS NOT OPTIONAL. A source does not
+-- report "the balance". It reports a SPECIFIC one, and the figures differ by
+-- amounts that matter: BOOKED is what has settled, AVAILABLE is what can be
+-- spent right now, CURRENT is what a statement calls the running figure,
+-- OUTSTANDING is what is owed on a card, CREDIT_LIMIT is not a balance the
+-- person holds at all, and OTHER_SOURCE_REPORTED is the honest home for a
+-- figure that is none of these. A pending card authorisation makes BOOKED
+-- and AVAILABLE disagree for days; a card statement's OUTSTANDING and
+-- CREDIT_LIMIT are different numbers with opposite meanings. Until this
+-- column existed all of them landed in one undifferentiated set of rows, so
+-- "the latest balance" meant whichever kind happened to be reported last —
+-- which is the same defect as computing a figure, arrived at by a different
+-- route.
+--
+-- NOT NULL AND NO DEFAULT, deliberately. A DEFAULT would be a GUESS written
+-- by the schema on a caller's behalf, and the guess would be invisible: rows
+-- would claim BOOKED with nobody having said so. A snapshot whose kind
+-- nobody stated is a figure nobody can interpret, so the honest outcome is
+-- that the INSERT fails and the caller states which balance they were given.
+-- The application side matches exactly — the kind is a required field of
+-- RecordReportedBalanceInput, nothing coalesces it, and a test asserts that
+-- no balance-kind literal appears anywhere in this module's production code
+-- outside the one file that declares the vocabulary.
+--
+-- NO KIND IS EVER INFERRED FROM ANOTHER. Nothing derives AVAILABLE from
+-- BOOKED by subtracting pending amounts, derives BOOKED from AVAILABLE, or
+-- reads a CREDIT_LIMIT as though it were money the person has. Each kind is
+-- recorded only because a source stated it, and a kind nobody stated simply
+-- does not exist for that account. This is enforced by absence — there is no
+-- derivation function, no view, no generated column, and no trigger that
+-- writes a second row — and asserted by test in both the domain and the
+-- database, because an inference rule is exactly the kind of convenience
+-- someone adds later to fill a gap in a screen.
 --
 -- source_reference IS A UUID, AND THE ALTERNATIVE WAS CONSIDERED AND
 -- REJECTED. This column used to be `text` bounded at 200 characters, on a
@@ -144,6 +180,15 @@ CREATE TABLE public.financial_account_balance_snapshots (
   source_kind        text        NOT NULL
     CONSTRAINT financial_account_balance_snapshots_source_kind_check
     CHECK (source_kind IN ('MANUAL', 'CSV', 'EXTERNAL_PROVIDER')),
+  -- WHICH balance the source was quoting. NOT NULL with NO DEFAULT: a
+  -- default would be a guess the schema writes on the caller's behalf, and
+  -- a figure whose kind nobody stated cannot be interpreted. Never inferred
+  -- from another kind — see the header.
+  balance_kind       text        NOT NULL
+    CONSTRAINT financial_account_balance_snapshots_balance_kind_check
+    CHECK (balance_kind IN
+      ('BOOKED', 'AVAILABLE', 'CURRENT', 'OUTSTANDING', 'CREDIT_LIMIT',
+       'OTHER_SOURCE_REPORTED')),
   -- WHICH artefact reported it: the identifier of the statement import or
   -- the manual entry that produced the figure. Required, because a balance
   -- whose origin is unrecorded cannot be explained to the person it belongs
@@ -165,9 +210,15 @@ CREATE TABLE public.financial_account_balance_snapshots (
 
 COMMENT ON TABLE public.financial_account_balance_snapshots IS
   'HIGHLY_SENSITIVE_FINANCIAL, SUBJECT_OWNED. Balances AS A SOURCE REPORTED '
-  'THEM, with provenance (source_kind, source_reference), the instant they '
+  'THEM, with provenance (source_kind, source_reference), WHICH balance was '
+  'quoted (balance_kind), the instant they '
   'were true (as_of), and the instant this platform learned them '
-  '(captured_at). NEVER computed by summing transactions — a derived '
+  '(captured_at). balance_kind is NOT NULL with NO DEFAULT — a default would '
+  'be a guess written on the caller''s behalf — and no kind is ever inferred '
+  'from another: nothing derives AVAILABLE from BOOKED or reads a '
+  'CREDIT_LIMIT as money the person holds. Two kinds for one account at one '
+  'as_of are two legitimate rows; no unique constraint collapses them. '
+  'NEVER computed by summing transactions — a derived '
   'running balance is a different concept and has no column here. Money is '
   'BIGINT minor units plus its currency code; no NUMERIC, DOUBLE PRECISION, '
   'or FLOAT exists on any money path. The composite FK to '
@@ -182,6 +233,16 @@ COMMENT ON COLUMN public.financial_account_balance_snapshots.amount_minor_units 
   'Exact signed integer minor units; scale is 10^exponent of currency_code '
   '(ADR-0006). Never a float, never assumed to be cents.';
 
+COMMENT ON COLUMN public.financial_account_balance_snapshots.balance_kind IS
+  'WHICH balance the source quoted: BOOKED (settled), AVAILABLE (spendable '
+  'now), CURRENT (the statement''s running figure), OUTSTANDING (owed on a '
+  'card), CREDIT_LIMIT (not a balance the person holds at all), or '
+  'OTHER_SOURCE_REPORTED. NOT NULL with NO DEFAULT: a snapshot whose kind '
+  'nobody stated is a figure nobody can interpret, and a default would write '
+  'that claim invisibly. NEVER inferred from another kind — no derivation '
+  'exists in the schema or in this module, and a kind nobody reported simply '
+  'has no row.';
+
 COMMENT ON COLUMN public.financial_account_balance_snapshots.source_reference IS
   'The artefact that reported the figure, by identifier. A uuid so the '
   'column is structurally incapable of holding a statement line, an account '
@@ -190,7 +251,13 @@ COMMENT ON COLUMN public.financial_account_balance_snapshots.source_reference IS
   'artefact this identifies. Opaque; equality only.';
 
 -- The read this module serves: one owner's snapshots for one account, in
--- balance-date order.
+-- balance-date order. NOT UNIQUE, and the balance kind is deliberately not
+-- part of any unique key: an AVAILABLE and a BOOKED figure for one account
+-- at ONE as_of are two different facts a source stated, and a constraint
+-- that collapsed them would force one to overwrite the other — silently
+-- answering a question about spendable money with a settled figure, which is
+-- the inference this column exists to prevent. Two kinds at one instant are
+-- two rows.
 CREATE INDEX financial_account_balance_snapshots_owner_idx
   ON public.financial_account_balance_snapshots (tenant_id, user_id, account_id, as_of);
 

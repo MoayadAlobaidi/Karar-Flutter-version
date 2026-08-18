@@ -1,11 +1,46 @@
 -- 0087_institutions
 --
--- public.institutions — the reviewed catalogue of institutions a financial
--- account may NAME (modules/financial-accounts/MODULE.md). Reference data
+-- public.institutions — the reviewed catalogue of ISSUERS a financial account
+-- may NAME (modules/financial-accounts/MODULE.md; ADR-0028). Reference data
 -- about organisations, never about people: an identifier, a stable code, the
--- two display names the product renders (en + ar), and the code's own
--- lifecycle. Nothing here describes, references, or can be joined to a
--- subject.
+-- KIND of issuer it is, the two display names the product renders (en + ar),
+-- and the code's own lifecycle. Nothing here describes, references, or can be
+-- joined to a subject.
+--
+-- ONE ISSUER, GLOBALLY, AND WHY THE CODE STOPPED NAMING A COUNTRY. An issuer
+-- is identified once and only once. Where it operates, under what market
+-- status, and with what reviewed local display information is a SEPARATE
+-- table keyed on (institution, country) — public.institution_markets (0094).
+-- The alternative shape, one catalogue row per country, was the obvious one
+-- and is wrong: a group operating in four countries would become four
+-- issuers, every account pointing at the wrong one of them would be
+-- unfixable without a merge, and the merge is precisely the operation that
+-- silently joins two people's records (ADR-0028). So this row is the issuer
+-- and nothing about a place.
+--
+-- That is also why the code CHECK no longer forces a two-letter COUNTRY
+-- prefix. A code beginning `QA_` reads as a fact about where the issuer
+-- belongs, and the moment the same issuer appears in a second market that
+-- fact is false — and a reader resolving the contradiction would create a
+-- second row, which is the failure this table exists to prevent. The code is
+-- now a stable machine identifier and asserts nothing about geography; the
+-- constraint that mattered survives untouched, because an uppercase
+-- underscore-joined token still cannot be a sentence, so no free-text
+-- institution name can arrive through the column by accident.
+--
+-- KIND IS WHAT THE ISSUER IS, NEVER WHAT KARAR CAN REACH. A bank, an
+-- e-money institution, a mobile-money operator, a telco's financial arm, a
+-- payment institution, a fintech wallet, a card issuer, an exchange house, or
+-- OTHER. The vocabulary exists because a mobile-money wallet from a telco and
+-- a current account at a bank are different products with different rules,
+-- and a catalogue that cannot tell them apart forces the difference to be
+-- inferred from a display name. It is NOT a capability flag: no value here
+-- means integrated, connected, reachable, or supported, and none may be
+-- added — provider access is a per-market status carrying its own evidence
+-- (0094), never an issuer-level implication. NO PROVIDER-SPECIFIC VALUE
+-- EXISTS: the vocabulary names categories of issuer and never an individual
+-- one, so no code path anywhere may branch on which issuer a row is
+-- (ADR-0028).
 --
 -- WHY THE SHAPE IS THE CONTROL. The module declares this table
 -- NON_PERSONAL / NON_PERSONAL_BY_DESIGN, and that declaration is only
@@ -75,11 +110,20 @@
 
 CREATE TABLE public.institutions (
   id               uuid        PRIMARY KEY,
-  -- Stable machine code, country-prefixed. The pattern is a control, not
-  -- cosmetics: a code cannot be a sentence, so no free-text institution
-  -- name can arrive through this column by accident.
+  -- Stable machine code, deliberately WITHOUT a country prefix — see the
+  -- header: geography belongs to the market rows (0094), and a code that
+  -- names a country invites a second issuer row the moment a second market
+  -- appears. The pattern is a control, not cosmetics: a code cannot be a
+  -- sentence, so no free-text institution name can arrive through this
+  -- column by accident.
   code             text        NOT NULL
-    CONSTRAINT institutions_code_check CHECK (code ~ '^[A-Z]{2}_[A-Z0-9_]{2,32}$'),
+    CONSTRAINT institutions_code_check CHECK (code ~ '^[A-Z][A-Z0-9_]{2,47}$'),
+  -- WHAT the issuer is. Categories only; no value names an individual issuer,
+  -- and no value means reachable — see the header.
+  kind             text        NOT NULL
+    CONSTRAINT institutions_kind_check CHECK (kind IN
+      ('BANK', 'E_MONEY_ISSUER', 'MOBILE_MONEY_OPERATOR', 'TELCO_FINANCIAL_SERVICES',
+       'PAYMENT_INSTITUTION', 'FINTECH_WALLET', 'CARD_ISSUER', 'EXCHANGE_HOUSE', 'OTHER')),
   -- Both display names are required. An Arabic-first product that lets a
   -- catalogue row ship with only English display name has already decided
   -- which language is optional; this NOT NULL is that decision, inverted.
@@ -95,8 +139,11 @@ CREATE TABLE public.institutions (
 );
 
 COMMENT ON TABLE public.institutions IS
-  'PUBLIC. Reviewed catalogue of institutions an account may name: code, '
-  'en/ar display names, status. Structurally incapable of subject linkage — '
+  'PUBLIC. Reviewed catalogue of ISSUERS an account may name: code, issuer '
+  'kind, en/ar display names, status. ONE ROW PER ISSUER GLOBALLY — where it '
+  'operates is public.institution_markets (0094), keyed on (institution, '
+  'country), so a group in four countries is one issuer with four market '
+  'rows and never four issuers. Structurally incapable of subject linkage — '
   'no tenant_id, no user_id, no account_id, and no column that can hold '
   'subject-supplied text (an unlisted institution is named on the '
   'SUBJECT-OWNED financial_accounts.user_supplied_institution_label '
@@ -107,8 +154,19 @@ COMMENT ON TABLE public.institutions IS
   'Lifecycle: 0087 header + DATA_LIFECYCLE.md.';
 
 COMMENT ON COLUMN public.institutions.code IS
-  'Country-prefixed machine code (^[A-Z]{2}_[A-Z0-9_]{2,32}$). The pattern '
-  'keeps free text out of the catalogue structurally.';
+  'Stable machine code (^[A-Z][A-Z0-9_]{2,47}$), asserting nothing about '
+  'geography: an issuer''s countries are market rows (0094), and a '
+  'country-prefixed code would make one multi-market issuer look like '
+  'several. The pattern keeps free text out of the catalogue structurally.';
+
+COMMENT ON COLUMN public.institutions.kind IS
+  'What the issuer IS — BANK, E_MONEY_ISSUER, MOBILE_MONEY_OPERATOR, '
+  'TELCO_FINANCIAL_SERVICES, PAYMENT_INSTITUTION, FINTECH_WALLET, '
+  'CARD_ISSUER, EXCHANGE_HOUSE, OTHER. Categories, never an individual '
+  'issuer: no domain or application code may branch on which issuer a row is '
+  '(ADR-0028). NOT a capability flag — no value means integrated, connected '
+  'or reachable, and provider access is a per-market status with its own '
+  'evidence (0094).';
 
 -- Read-only for the application: the catalogue changes by migration, and no
 -- runtime write path exists — an unlisted institution is named on the

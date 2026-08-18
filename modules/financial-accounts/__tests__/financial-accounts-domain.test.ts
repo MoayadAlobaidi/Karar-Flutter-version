@@ -11,38 +11,44 @@ import { describe, expect, it } from 'vitest';
 import { Currency, Money, TenantId, UserId } from '@karar/shared-kernel';
 
 import {
+  ACCOUNT_NATURES,
+  ACCOUNT_ORIGINS,
   ACCOUNT_STATUSES,
   ACCOUNT_TYPES,
-  CONSTRUCTIBLE_SOURCE_KINDS,
+  CONSTRUCTIBLE_ACCOUNT_ORIGINS,
   MAX_MASK_LENGTH,
-  SOURCE_KINDS,
+  WALLET_KINDS,
   applyAccountEdit,
   checkCurrencyChange,
-  checkProviderConnection,
+  checkWalletKind,
   createFinancialAccount,
   isMask,
   resolveSupportedCurrency,
   type FinancialAccount,
 } from '../domain/financial-account.js';
 import {
+  INSTITUTION_KINDS,
   INSTITUTION_STATUSES,
   isSelectableForNewAccount,
   isValidInstitutionCode,
   type Institution,
 } from '../domain/institution.js';
 import {
+  BALANCE_KINDS,
+  CONSTRUCTIBLE_SOURCE_KINDS,
+  SOURCE_KINDS,
   byMostRecentlyTrue,
   createBalanceSnapshot,
+  isBalanceKind,
   isValidSourceReference,
   latestReported,
 } from '../domain/balance-snapshot.js';
-import type { BalanceSnapshot } from '../domain/balance-snapshot.js';
+import type { BalanceKind, BalanceSnapshot } from '../domain/balance-snapshot.js';
 import { HSF_REDACTION, HsfField } from '../domain/hsf-field.js';
 import type {
   BalanceSnapshotId,
   FinancialAccountId,
   InstitutionRef,
-  ProviderConnectionRef,
   SourceReference,
 } from '../domain/refs.js';
 
@@ -65,10 +71,12 @@ function newAccountInput(overrides: Partial<Parameters<typeof createFinancialAcc
     institutionRef: null,
     userSuppliedInstitutionLabel: null,
     accountType: 'CURRENT' as const,
+    walletKind: null,
+    nature: 'UNKNOWN' as const,
     currency: QAR,
     displayName: 'Synthetic Test Account One',
     mask: null,
-    sourceKind: 'MANUAL' as const,
+    origin: 'MANUAL' as const,
     createdAt: NOW,
     ...overrides,
   };
@@ -93,10 +101,56 @@ describe('financial-accounts domain: vocabularies', () => {
     }
   });
 
-  it('EXTERNAL_PROVIDER is modelled but is not a constructible source kind', () => {
+  it('EXTERNAL_PROVIDER is modelled but is not a constructible account origin', () => {
+    expect([...ACCOUNT_ORIGINS]).toContain('EXTERNAL_PROVIDER');
+    expect([...CONSTRUCTIBLE_ACCOUNT_ORIGINS]).toEqual(['MANUAL', 'CSV']);
+    expect([...CONSTRUCTIBLE_ACCOUNT_ORIGINS]).not.toContain('EXTERNAL_PROVIDER');
+  });
+
+  it('the snapshot reporter vocabulary is its own, and is not the account origin', () => {
+    // They currently hold the same three values and mean different things: one
+    // says who reported ONE figure, the other says how the account first came
+    // to exist. Keeping them as separate declarations is what stops a later
+    // change to one silently redefining the other (ADR-0028).
     expect([...SOURCE_KINDS]).toContain('EXTERNAL_PROVIDER');
     expect([...CONSTRUCTIBLE_SOURCE_KINDS]).toEqual(['MANUAL', 'CSV']);
-    expect([...CONSTRUCTIBLE_SOURCE_KINDS]).not.toContain('EXTERNAL_PROVIDER');
+  });
+
+  it('the wallet-kind vocabulary names categories, never a provider, and never crypto', () => {
+    expect([...WALLET_KINDS]).toEqual([
+      'MOBILE_MONEY',
+      'E_MONEY',
+      'PREPAID',
+      'PAYROLL',
+      'SUPER_APP',
+      'OTHER',
+    ]);
+    for (const kind of WALLET_KINDS) {
+      expect(/CRYPTO|TOKEN|COIN|BTC|STABLE/i.test(kind)).toBe(false);
+    }
+  });
+
+  it('account nature is has, owes, or nobody has said — and UNKNOWN is not a placeholder', () => {
+    expect([...ACCOUNT_NATURES]).toEqual(['ASSET', 'LIABILITY', 'UNKNOWN']);
+  });
+
+  it('the issuer-kind vocabulary is the nine declared categories and names no company', () => {
+    expect([...INSTITUTION_KINDS]).toEqual([
+      'BANK',
+      'E_MONEY_ISSUER',
+      'MOBILE_MONEY_OPERATOR',
+      'TELCO_FINANCIAL_SERVICES',
+      'PAYMENT_INSTITUTION',
+      'FINTECH_WALLET',
+      'CARD_ISSUER',
+      'EXCHANGE_HOUSE',
+      'OTHER',
+    ]);
+    // Nothing here may mean reachable: provider access is a per-market status
+    // with its own evidence (migration 0094), never an issuer-level claim.
+    for (const kind of INSTITUTION_KINDS) {
+      expect(/CONNECT|SYNC|LINK|INTEGRAT|SUPPORTED|AVAILABLE/i.test(kind)).toBe(false);
+    }
   });
 
   it('the account type vocabulary covers the declared kinds and stays extensible', () => {
@@ -115,6 +169,7 @@ describe('financial-accounts domain: vocabularies', () => {
     const retired: Institution = {
       id: INSTITUTION_ID,
       code: 'QA_SYNTHETIC_TEST_ONE',
+      kind: 'BANK',
       displayNameEn: 'Synthetic Test Institution One',
       displayNameAr: 'مؤسسة اختبار اصطناعية واحد',
       status: 'RETIRED',
@@ -212,34 +267,91 @@ describe('financial-accounts domain: currency', () => {
   });
 });
 
-describe('financial-accounts domain: provider connections and institution naming', () => {
-  it('a MANUAL account must not claim a provider connection', () => {
-    const refused = checkProviderConnection(
-      'MANUAL',
-      'provider-connection-that-does-not-exist' as ProviderConnectionRef,
+describe('financial-accounts domain: the wallet invariant and institution naming', () => {
+  it('a wallet kind is present if and only if the account type is WALLET', () => {
+    // Both directions, because each fails differently: an undescribed wallet
+    // makes every later reader guess, and a non-wallet carrying a wallet kind
+    // is a contradiction that reads as truth.
+    for (const walletKind of WALLET_KINDS) {
+      expect(checkWalletKind('WALLET', walletKind).ok).toBe(true);
+      for (const accountType of ACCOUNT_TYPES) {
+        if (accountType === 'WALLET') continue;
+        const refused = checkWalletKind(accountType, walletKind);
+        expect({ accountType, ok: refused.ok }).toEqual({ accountType, ok: false });
+        if (!refused.ok) expect(refused.error.kind).toBe('wallet_kind_mismatch');
+      }
+    }
+    const undescribed = checkWalletKind('WALLET', null);
+    expect(undescribed.ok).toBe(false);
+    if (!undescribed.ok) expect(undescribed.error.kind).toBe('wallet_kind_mismatch');
+    for (const accountType of ACCOUNT_TYPES) {
+      if (accountType === 'WALLET') continue;
+      expect(checkWalletKind(accountType, null).ok).toBe(true);
+    }
+  });
+
+  it('the factory refuses a WALLET with no kind and a non-wallet that carries one', () => {
+    const undescribed = createFinancialAccount(newAccountInput({ accountType: 'WALLET' }));
+    expect(undescribed.ok).toBe(false);
+    if (!undescribed.ok) expect(undescribed.error.kind).toBe('wallet_kind_mismatch');
+
+    const contradiction = createFinancialAccount(
+      newAccountInput({ accountType: 'CREDIT_CARD', walletKind: 'E_MONEY' }),
     );
-    expect(refused.ok).toBe(false);
-    if (!refused.ok) expect(refused.error.kind).toBe('provider_connection_mismatch');
+    expect(contradiction.ok).toBe(false);
+    if (!contradiction.ok) expect(contradiction.error.kind).toBe('wallet_kind_mismatch');
+
+    const wallet = builtAccount({ accountType: 'WALLET', walletKind: 'MOBILE_MONEY' });
+    expect(wallet.walletKind).toBe('MOBILE_MONEY');
   });
 
-  it('a CSV account must not claim one either', () => {
-    expect(
-      checkProviderConnection('CSV', 'provider-connection' as ProviderConnectionRef).ok,
-    ).toBe(false);
+  it('an edit that would leave type and wallet kind disagreeing is refused, not repaired', () => {
+    const wallet = builtAccount({ accountType: 'WALLET', walletKind: 'PAYROLL' });
+    const orphaned = applyAccountEdit(
+      wallet,
+      { accountType: 'CURRENT' },
+      { hasFinancialRecords: false, at: NOW },
+    );
+    expect(orphaned.ok).toBe(false);
+    if (!orphaned.ok) expect(orphaned.error.kind).toBe('wallet_kind_mismatch');
+
+    // Moving both together is the way through, and it is the only way.
+    const converted = applyAccountEdit(
+      wallet,
+      { accountType: 'CURRENT', walletKind: null },
+      { hasFinancialRecords: false, at: NOW },
+    );
+    expect(converted.ok).toBe(true);
+    if (converted.ok) expect(converted.value.walletKind).toBeNull();
   });
 
-  it('MANUAL and CSV with no connection are consistent, and EXTERNAL_PROVIDER needs one', () => {
-    expect(checkProviderConnection('MANUAL', null).ok).toBe(true);
-    expect(checkProviderConnection('CSV', null).ok).toBe(true);
-    expect(checkProviderConnection('EXTERNAL_PROVIDER', null).ok).toBe(false);
+  it('nature is what the caller stated, never inferred from the account type', () => {
+    // A CREDIT_CARD is almost always a liability, and 'almost always' is the
+    // shape of a defect: the exceptions would be misclassified invisibly by a
+    // rule the person cannot see or correct.
+    const unstated = builtAccount({ accountType: 'CREDIT_CARD' });
+    expect(unstated.nature).toBe('UNKNOWN');
+    const stated = builtAccount({ accountType: 'CREDIT_CARD', nature: 'LIABILITY' });
+    expect(stated.nature).toBe('LIABILITY');
+    const edited = applyAccountEdit(
+      unstated,
+      { nature: 'LIABILITY' },
+      { hasFinancialRecords: false, at: NOW },
+    );
+    expect(edited.ok).toBe(true);
+    if (edited.ok) expect(edited.value.nature).toBe('LIABILITY');
   });
 
-  it('every account the factory builds carries no provider connection', () => {
-    for (const sourceKind of CONSTRUCTIBLE_SOURCE_KINDS) {
-      const account = builtAccount({ sourceKind });
-      expect(account.providerConnectionRef).toBeNull();
+  it('every account the factory builds records its origin and nothing about a connection', () => {
+    for (const origin of CONSTRUCTIBLE_ACCOUNT_ORIGINS) {
+      const account = builtAccount({ origin });
+      expect(account.origin).toBe(origin);
       expect(account.status).toBe('ACTIVE');
       expect(account.version).toBe(1);
+      // The account carries no field naming a data source. Its sources over
+      // its life are many and none of them lives here (ADR-0028).
+      expect(Object.keys(account)).not.toContain('providerConnectionRef');
+      expect(Object.keys(account)).not.toContain('sourceKind');
     }
   });
 
@@ -348,6 +460,7 @@ describe('financial-accounts domain: balances are selected, never computed', () 
     minorUnits: bigint,
     asOf: string,
     capturedAt: string,
+    balanceKind: BalanceKind = 'BOOKED',
   ): BalanceSnapshot {
     return {
       id: id as BalanceSnapshotId,
@@ -357,6 +470,7 @@ describe('financial-accounts domain: balances are selected, never computed', () 
       amount: Money.of(minorUnits, QAR),
       asOf: new Date(asOf),
       sourceKind: 'MANUAL',
+      balanceKind,
       sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: new Date(capturedAt),
       createdAt: NOW,
@@ -383,7 +497,7 @@ describe('financial-accounts domain: balances are selected, never computed', () 
   );
 
   it('the latest reported balance is one of the reported rows, unchanged', () => {
-    const latest = latestReported([older, newer]);
+    const latest = latestReported([older, newer], 'BOOKED');
     expect(latest?.id).toBe(newer.id);
     // The returned amount is byte-for-byte the reported figure, not a sum:
     // 100.00 + 250.00 would be 350.00, and that number appears nowhere.
@@ -391,12 +505,91 @@ describe('financial-accounts domain: balances are selected, never computed', () 
   });
 
   it('a later capture of the same as_of wins, because it is the more recent information', () => {
-    expect(latestReported([newer, sameAsOfLaterCapture])?.id).toBe(sameAsOfLaterCapture.id);
+    expect(latestReported([newer, sameAsOfLaterCapture], 'BOOKED')?.id).toBe(
+      sameAsOfLaterCapture.id,
+    );
     expect(byMostRecentlyTrue(sameAsOfLaterCapture, newer)).toBeLessThan(0);
   });
 
   it('no reported snapshots means no balance, not a computed zero', () => {
-    expect(latestReported([])).toBeNull();
+    expect(latestReported([], 'BOOKED')).toBeNull();
+  });
+
+  it('NO KIND IS INFERRED FROM ANOTHER: a kind nobody reported answers null', () => {
+    // The failure this replaces: latestReported used to take a list and
+    // answer 'the latest balance', so a caller asking what can be SPENT got a
+    // SETTLED figure whenever a BOOKED report happened to be the most recent,
+    // with nothing in the answer saying so. Reading one kind as another is
+    // the same defect as computing the figure, by a different route.
+    const booked = snapshot(
+      'b5000000-0000-4000-8000-0000000000c1',
+      500_00n,
+      '2026-09-01T00:00:00.000Z',
+      '2026-09-01T00:00:00.000Z',
+      'BOOKED',
+    );
+    const available = snapshot(
+      'b5000000-0000-4000-8000-0000000000c2',
+      420_00n,
+      '2026-08-01T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z',
+      'AVAILABLE',
+    );
+    const mixed = [booked, available];
+
+    // Each kind answers with its OWN row, even though the BOOKED one is more
+    // recent and would win any kind-blind ordering.
+    expect(latestReported(mixed, 'BOOKED')?.id).toBe(booked.id);
+    expect(latestReported(mixed, 'AVAILABLE')?.id).toBe(available.id);
+    expect(latestReported(mixed, 'AVAILABLE')?.amount.minorUnits).toBe(420_00n);
+
+    // And a kind nobody reported is absent, not substituted from a neighbour.
+    for (const kind of ['CURRENT', 'OUTSTANDING', 'CREDIT_LIMIT', 'OTHER_SOURCE_REPORTED'] as const) {
+      expect({ kind, found: latestReported(mixed, kind) }).toEqual({ kind, found: null });
+    }
+  });
+
+  it('a CREDIT_LIMIT is never treated as a balance the person holds', () => {
+    // The most damaging single inference available here: a credit limit is a
+    // ceiling, not money. It answers only its own question.
+    const limit = snapshot(
+      'b5000000-0000-4000-8000-0000000000c3',
+      10_000_00n,
+      '2026-09-01T00:00:00.000Z',
+      '2026-09-01T00:00:00.000Z',
+      'CREDIT_LIMIT',
+    );
+    const outstanding = snapshot(
+      'b5000000-0000-4000-8000-0000000000c4',
+      -1_234_56n,
+      '2026-09-01T00:00:00.000Z',
+      '2026-09-01T00:00:00.000Z',
+      'OUTSTANDING',
+    );
+    const both = [limit, outstanding];
+    expect(latestReported(both, 'AVAILABLE')).toBeNull();
+    expect(latestReported(both, 'BOOKED')).toBeNull();
+    expect(latestReported(both, 'CREDIT_LIMIT')?.id).toBe(limit.id);
+    expect(latestReported(both, 'OUTSTANDING')?.id).toBe(outstanding.id);
+    // No arithmetic between them: 10000.00 - 1234.56 = 8765.44 is a figure
+    // no source stated, and it appears nowhere.
+    expect(
+      [limit, outstanding].some((s) => s.amount.minorUnits === 876_544n),
+    ).toBe(false);
+  });
+
+  it('the balance-kind vocabulary is the six declared values', () => {
+    expect([...BALANCE_KINDS]).toEqual([
+      'BOOKED',
+      'AVAILABLE',
+      'CURRENT',
+      'OUTSTANDING',
+      'CREDIT_LIMIT',
+      'OTHER_SOURCE_REPORTED',
+    ]);
+    expect(isBalanceKind('BOOKED')).toBe(true);
+    expect(isBalanceKind('PROJECTED')).toBe(false);
+    expect(isBalanceKind('COMPUTED')).toBe(false);
   });
 });
 
@@ -487,6 +680,7 @@ describe('financial-accounts domain: a source reference is an identifier, not na
       amount: Money.of(1_000n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
+      balanceKind: 'BOOKED',
       sourceReference: 'closing balance printed on page 2',
       capturedAt: NOW,
       createdAt: NOW,
@@ -500,6 +694,7 @@ describe('financial-accounts domain: a source reference is an identifier, not na
       amount: Money.of(1_000n, KWD),
       asOf: NOW,
       sourceKind: 'MANUAL',
+      balanceKind: 'BOOKED',
       sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
@@ -513,6 +708,7 @@ describe('financial-accounts domain: a source reference is an identifier, not na
       amount: Money.of(1_000n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
+      balanceKind: 'BOOKED',
       sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
