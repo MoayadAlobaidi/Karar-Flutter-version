@@ -6,7 +6,7 @@
 
 Phase 4 built a Flutter client, and a reader could reasonably assume a client implies an endpoint. It does not. **No environment was provisioned, no record was created, and no API host exists.** The client's build guard *refuses* to produce a DEV, STAGING or PRODUCTION package without an explicit HTTPS endpoint that is not a developer-machine address, which is the opposite of a deployment: the only packages this repository can currently build are LOCAL ones ([`../architecture/flutter.md` §8a](../architecture/flutter.md)).
 
-**Phase 4 is IN PROGRESS; the last completed phase is 3.5; Phase 5 is NOT STARTED** ([`../phases/phase-04.md`](../phases/phase-04.md)). Nothing in this runbook changed during Phase 4: no DNS record, proxy setting, or hosting configuration was created, altered, or verified.
+**Phase 4 is COMPLETE and merged; Phase 5 is NOT STARTED** ([`../phases/phase-04.md`](../phases/phase-04.md)). **Nothing in this runbook changed during Phase 4 or at its merge: no DNS record, proxy setting, WAF rule, Pages, Workers or Access configuration, or hosting configuration was created, altered, or verified.** EV-427 therefore remains `PENDING` and is now overdue — its target was the Phase 4 gate, all seven §3 hardening rows are still `TO_VERIFY`, and the Security Owner must discharge it against the registrar account itself rather than against this document.
 
 The operational companion to the `kararfinance.com` row in the
 [asset inventory](../compliance/asset-inventory.md) and the Cloudflare row in

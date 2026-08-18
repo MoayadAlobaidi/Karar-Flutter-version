@@ -17,7 +17,7 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **4 — COMPLETE** — PR open, not merged ([phase report](docs/phases/phase-04.md), [PR #7](https://github.com/MoayadAlobaidi/Karar-Flutter-version/pull/7)); Phase 5 **NOT STARTED**. COMPLETE means the implementation and its internal gates are done — **not** merged, deployed, signed, certified, app-store ready or production ready |
+| Current phase | **4 — COMPLETE** — merged to `main` ([phase report](docs/phases/phase-04.md), [PR #7](https://github.com/MoayadAlobaidi/Karar-Flutter-version/pull/7), merge commit [`457bd4e`](https://github.com/MoayadAlobaidi/Karar-Flutter-version/commit/457bd4e71b9920d348289204cf6e3b34146d2abd)); Phase 5 **NOT STARTED**. COMPLETE and merged mean the implementation, its internal gates and its merge are done — **not** deployed, signed, certified, app-store ready, production ready, or reviewed by counsel or a regulator |
 | Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — its PR is open and unmerged |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, and a Flutter client covering account, identity and platform state — **no consumer product capability is implemented or reachable** |
