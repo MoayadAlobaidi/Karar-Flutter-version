@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  deepmerge-ts: '>=8.0.0'
+  deepmerge-ts: 8.0.1
 
 importers:
 
@@ -348,6 +348,9 @@ importers:
         specifier: ^11.2.0
         version: 11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
     devDependencies:
+      '@karar/consent-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/consent-local-fixtures
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
@@ -630,6 +633,8 @@ importers:
         specifier: ^25.9.5
         version: 25.9.5
 
+  packages/consent-local-fixtures: {}
+
   packages/financial-engine:
     dependencies:
       '@karar/shared-kernel':
@@ -707,6 +712,9 @@ importers:
         specifier: ^0.2.2
         version: 0.2.2
     devDependencies:
+      '@karar/consent-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/consent-local-fixtures
       '@nestjs/testing':
         specifier: ^11.2.0
         version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
