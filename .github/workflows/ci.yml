@@ -354,6 +354,33 @@ jobs:
             exit 1
           fi
 
+          # The generated rules resource, in the artifact. Source assertions
+          # cannot see what the generator produced or what survived resource
+          # compilation.
+          echo "$tree" | grep -q 'E: platform-specific-params' \
+            || { echo "FAIL: cross-platform-transfer declares no platform-specific-params"; exit 1; }
+          for attr in bundleId teamId contentVersion; do
+            echo "$tree" | grep -q "A: $attr=" \
+              || { echo "FAIL: platform-specific-params declares no $attr"; exit 1; }
+          done
+
+          paths="$(echo "$tree" | grep -c 'A: path="\."')"
+          test "$paths" -eq 27 \
+            || { echo "FAIL: $paths exclusions carry path=\".\", expected 27"; exit 1; }
+
+          # A LOCAL artifact must carry the test-only identity, and that value
+          # is deliberately shaped so it can never satisfy the Apple Team ID
+          # form a deployed assembly is checked against.
+          team="$("$aapt2" dump xmltree --file "$rules" "$apk" | sed -n 's/.*A: teamId="\([^"]*\)".*/\1/p')"
+          case "$team" in
+            TEST-ONLY-NOT-AN-APPLE-TEAM-ID) ;;
+            *) echo "FAIL: a LOCAL artifact carries teamId='$team'. Only the test-only sentinel belongs in an unsigned local build."; exit 1 ;;
+          esac
+          if printf '%s' "$team" | grep -qE '^[A-Z0-9]{10}$'; then
+            echo "FAIL: the LOCAL teamId is shaped like a real Apple Team ID."
+            exit 1
+          fi
+
           echo "OK: packaged release artifact verified."
 
       # THE ENVIRONMENT GUARD, PROVEN BY INVOCATION RATHER THAN BY INSPECTION.
@@ -408,6 +435,43 @@ jobs:
 
       # A routable endpoint must still build, so the guard is not simply
       # refusing everything.
+      # THE TEAM ID REFUSAL, PROVEN BY INVOCATION.
+      #
+      # <platform-specific-params> is required on the cross-platform section
+      # and its teamId identifies the iOS counterpart this application's data
+      # may be matched to. No Apple Team ID is configured or committed here, so
+      # a deployed assembly must refuse rather than invent one — and the
+      # test-only sentinel LOCAL uses is shaped so it cannot satisfy the check.
+      - name: A deployed assembly without an Apple Team ID must be refused
+        working-directory: apps/mobile/android
+        run: |
+          set -uo pipefail
+          # The ENDPOINT guard runs at configuration time and fires first, so a
+          # bare `-Pkarar.env=PRODUCTION` never reaches the Team ID check. These
+          # invocations supply a compiled configuration exactly as the Flutter
+          # tool would, which is the only way to exercise the later guard.
+          defines="$(printf 'KARAR_ENV=PRODUCTION' | base64),$(printf 'KARAR_API_BASE_URL=https://api.karar.qa' | base64)"
+          gen() {
+            ./gradlew -q :app:generateReleaseDataExtractionRules \
+              -Pkarar.env=PRODUCTION -Pdart-defines="$defines" "$@" 2>&1
+          }
+
+          if out="$(gen)"; then
+            echo "FAIL: a PRODUCTION rules resource was generated with no Team ID"; exit 1
+          fi
+          echo "$out" | grep -q 'Missing Apple Team ID' \
+            || { echo "FAIL: refused for another reason:"; echo "$out" | tail -5; exit 1; }
+
+          if out="$(gen -Pkarar.ios.teamId=TEST-ONLY-NOT-AN-APPLE-TEAM-ID)"; then
+            echo "FAIL: the test-only sentinel was accepted for PRODUCTION"; exit 1
+          fi
+          echo "$out" | grep -q 'Malformed Apple Team ID' \
+            || { echo "FAIL: the sentinel was refused for another reason"; exit 1; }
+
+          gen -Pkarar.ios.teamId=ABCDE12345 >/dev/null \
+            || { echo "FAIL: a shape-valid Team ID was refused"; exit 1; }
+          echo "OK: refused without a Team ID, refused the sentinel, accepted a real shape."
+
       - name: A deployed build with a usable endpoint is accepted
         working-directory: apps/mobile/android
         run: |

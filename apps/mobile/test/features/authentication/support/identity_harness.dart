@@ -200,6 +200,12 @@ final class RecordingKeyValueStore implements KeyValueStore {
   bool? readBool(PreferenceKey key) => _delegate.readBool(key);
 
   @override
+  Future<Result<void>> writeBoolChecked(PreferenceKey key, {required bool value}) {
+    writes.add('${key.name}=$value');
+    return _delegate.writeBoolChecked(key, value: value);
+  }
+
+  @override
   Future<void> writeBool(PreferenceKey key, {required bool value}) {
     writes.add('${key.name}=$value');
     return _delegate.writeBool(key, value: value);

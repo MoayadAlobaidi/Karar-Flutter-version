@@ -21,10 +21,50 @@ const String _releaseNetworkConfig =
     'android/app/src/main/res/xml/network_security_config.xml';
 const String _debugNetworkConfig =
     'android/app/src/debug/res/xml/network_security_config.xml';
-const String _dataExtractionRules =
+const String _staticDataExtractionRules =
     'android/app/src/main/res/xml/data_extraction_rules.xml';
 const String _appGradle = 'android/app/build.gradle.kts';
 const String _infoPlist = 'ios/Runner/Info.plist';
+
+/// The rules resource is GENERATED, so it is read out of the build output.
+///
+/// It cannot be a committed file: `<platform-specific-params>` is required on
+/// `<cross-platform-transfer>` and carries an Apple Team ID, an identity this
+/// project does not have. A LOCAL artifact declares a test-only one; a deployed
+/// assembly refuses to build until a real one is supplied out of band. So the
+/// thing under test is what an assembly produced, not what someone typed.
+const String _generatedResourceName = 'data_extraction_rules.xml';
+
+/// The path every exclusion carries, naming the whole domain directory.
+///
+/// `.` and not `./`. The two are the SAME exclusion at runtime — FullBackup
+/// stores `new File(domainDirectory, path).getCanonicalPath()` and
+/// canonicalisation collapses `dir/.` and `dir/./` to `dir` — but they are not
+/// the same to lint. FullBackupContentDetector.validatePath reports
+/// "Subdirectories are not allowed for domain `sharedpref`" for any path
+/// containing `/` in the sharedpref and database domains, and FullBackupContent
+/// is FATAL, so `./` fails lintVitalRelease and no release artifact can be
+/// produced at all. sharedpref is where the session tokens live.
+const String _wholeDomainPath = '.';
+
+/// The identity a LOCAL artifact declares for an iOS counterpart that does not
+/// exist.
+///
+/// It has two jobs. It must read as fake to a person dumping the resource out
+/// of an APK, and it must be impossible for a deployed artifact to carry even
+/// if someone passes it deliberately. The second is structural, not a matter of
+/// naming: it is not shaped like an Apple Team ID, and every deployed build
+/// runs whatever it is given through that shape.
+const String _testOnlyTeamId = 'TEST-ONLY-NOT-AN-APPLE-TEAM-ID';
+
+/// An Apple Team ID, as Apple issues them: ten characters, uppercase letters
+/// and digits.
+final RegExp _appleTeamIdShape = RegExp(r'^[A-Z0-9]{10}$');
+
+/// The only cross-platform target the framework names anywhere:
+/// `BackupAgent.FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS`, documented as "a
+/// cross-platform transfer to or from iOS".
+const String _crossPlatformTarget = 'ios';
 
 /// The only hosts a debug build may reach over plain HTTP. Every one is the
 /// developer's own machine.
@@ -176,139 +216,6 @@ void main() {
       expect(manifest, contains('android:fullBackupContent="false"'));
     });
 
-    test('every extraction mode is declared and excludes every domain', () {
-      final rules = _declarations(_dataExtractionRules);
-
-      for (final mode in _dataExtractionModes) {
-        // The opening tag may carry attributes — `<cross-platform-transfer>`
-        // REQUIRES `platform`, and omitting it does not make the section
-        // permissive, it makes the whole resource invalid and fails
-        // lintVitalRelease. Matching the bare `<mode>` form would therefore
-        // fail on a correct file and pass on one missing the attribute
-        // entirely, which is backwards.
-        final RegExp opening = RegExp('<$mode(\\s[^>]*)?>');
-        expect(
-          opening.hasMatch(rules),
-          isTrue,
-          reason: 'an undeclared <$mode> section is fully enabled for all content, '
-              'not off',
-        );
-
-        final section =
-            RegExp('<$mode(?:\\s[^>]*)?>(.*?)</$mode>', dotAll: true)
-                .firstMatch(rules)
-                ?.group(1);
-        expect(section, isNotNull);
-        for (final domain in _backupDomains) {
-          expect(
-            section,
-            contains('<exclude domain="$domain" />'),
-            reason: '$mode does not exclude the $domain domain. Session tokens live '
-                'in sharedpref, and a domain left unnamed is a domain left in',
-          );
-        }
-      }
-
-      expect(
-        rules,
-        isNot(contains('<include')),
-        reason: 'an include element would re-admit content to a mode this file exists '
-            'to empty',
-      );
-    });
-
-    test('cross-platform-transfer names exactly the platform it governs', () {
-      // AN EXACT VALUE, NOT A PATTERN. The previous version of this test
-      // accepted `platform="[a-z_]+"`, and so happily certified
-      // `platform="apple_icloud"` — a value invented in this repository that
-      // appears in no AOSP source and in no lint rule.
-      //
-      // A pattern is the wrong shape of assertion here because nothing else
-      // rejects a wrong value either. `FullBackup.java:735` reads the
-      // attribute as an opaque string and uses it as a map key; the platform
-      // publishes no enumeration, and `FullBackupContentDetector` checks only
-      // that the attribute is PRESENT. So a misspelled platform builds
-      // cleanly, passes lint, ships, and silently addresses a target nobody
-      // transfers to — the section looks correct and does nothing.
-      //
-      // `ios` is the only cross-platform target the framework names:
-      // BackupAgent.FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS, "a cross-platform
-      // transfer to or from iOS".
-      final rules = _declarations(_dataExtractionRules);
-
-      expect(
-        rules,
-        contains('<cross-platform-transfer platform="ios">'),
-        reason: 'the section must name exactly platform="ios"',
-      );
-      expect(
-        rules,
-        isNot(contains('apple_icloud')),
-        reason: 'apple_icloud was invented here and names no real platform; a '
-            'wrong value makes the section inert without failing anything',
-      );
-
-      // Exactly one such section. Two would let a reviewer read the correct
-      // one while the framework parsed the other.
-      final sections =
-          RegExp('<cross-platform-transfer').allMatches(rules).length;
-      expect(
-        sections,
-        1,
-        reason: 'found $sections cross-platform-transfer sections; the '
-            'framework iterates every matching element, so a duplicate is a '
-            'second policy nobody reviewed',
-      );
-
-      // And no other value can appear on it, however spelled.
-      for (final RegExpMatch match
-          in RegExp(r'<cross-platform-transfer[^>]*>').allMatches(rules)) {
-        final String opening = match.group(0)!;
-        final String? platform =
-            RegExp(r'platform="([^"]*)"').firstMatch(opening)?.group(1);
-        expect(
-          platform,
-          'ios',
-          reason: 'cross-platform-transfer declares platform="$platform". '
-              'Only "ios" is a target the framework names, and a value it does '
-              'not recognise is accepted silently rather than refused.',
-        );
-      }
-    });
-
-    test('no platform-specific-params element is declared at all', () {
-      // ABSENCE IS THE ASSERTION, NOT PLAUSIBILITY.
-      //
-      // The previous version rejected a list of literal placeholders — TEAMID,
-      // XXXXXXXXXX, TODO. An independent review inserted
-      // `teamId="9ZX7Q4KD22"`, an entirely invented but syntactically valid
-      // Team ID, and the whole suite passed. A test that can only recognise
-      // obviously-fake identities cannot distinguish a real one from a
-      // convincing fabrication, which is the only distinction that matters.
-      //
-      // So the rule is categorical: the element must not appear. It carries
-      // bundleId, teamId and contentVersion, which identify the iOS
-      // counterpart data may be matched TO — they exist to ENABLE a match, and
-      // the framework reads the presence of an entry as "export to and import
-      // from that platform is supported" (FullBackup.java:486-488). Absence
-      // leaves the map empty, which the framework reads as NOT supported.
-      //
-      // Adding it is therefore a deliberate decision requiring a real,
-      // configured, evidenced Apple Team ID and a published counterpart app.
-      // When that happens, this test is the place the decision is recorded —
-      // by being changed, on purpose, with the evidence in the commit.
-      final rules = _declarations(_dataExtractionRules);
-      expect(
-        rules,
-        isNot(contains('platform-specific-params')),
-        reason: 'a platform-specific-params element appeared. No Apple Team ID '
-            'is configured for this project and no iOS counterpart is '
-            'published, so any value here is fabricated. Absence is what the '
-            'framework reads as unsupported; a fabricated identity is what it '
-            'reads as supported.',
-      );
-    });
-
     test('INTERNET is declared, and the app itself requests nothing else', () {
       expect(
         manifest,
@@ -424,6 +331,375 @@ void main() {
           reason: '$permission is a custom permission no review covers. It reached a '
               'built artifact from a dependency, so the decision is which '
               'dependency goes, not which line here changes.',
+        );
+      }
+    });
+  });
+
+  // THE RESOURCE IS A BUILD OUTPUT, SO TWO KINDS OF ASSERTION LIVE HERE.
+  //
+  //   Against the GENERATOR (app/build.gradle.kts, always present): what any
+  //   future assembly will produce, including for environments no lane builds.
+  //   This is the only way a PRODUCTION rule can be checked on a lane that
+  //   assembles LOCAL and nothing else.
+  //
+  //   Against the GENERATED resource (present after an assembly): what a build
+  //   actually produced, which is the only version that can be packaged. A
+  //   generator assertion cannot certify a rule that does not fire — that
+  //   mistake has already been made once in this repository, where a source
+  //   presence check certified an IPv6 rule that was unreachable.
+  //
+  // Neither substitutes for the other, and neither reads a committed XML file,
+  // because there is no longer one to read.
+  group('Android data-extraction rules', () {
+    late String gradle;
+
+    setUpAll(() {
+      gradle = stripCodeComments(readRequiredFile(_appGradle));
+    });
+
+    test('the resource is generated, and no static copy survives beside it', () {
+      // Two copies would both sit in the tree and only one would ever be
+      // packaged — and the committed one is the one a reviewer reads. AGP
+      // would also reject the duplicate outright, but "the build breaks" is
+      // not the property worth asserting; "there is one source of truth" is.
+      final File staticCopy =
+          File('${mobilePackageRoot().path}/$_staticDataExtractionRules');
+      expect(
+        staticCopy.existsSync(),
+        isFalse,
+        reason: '$_staticDataExtractionRules exists. The rules resource is '
+            'produced by GenerateDataExtractionRules in $_appGradle, because '
+            'one of its required attributes is an Apple Team ID this project '
+            'does not have. A committed copy either duplicates the resource or '
+            'is read instead of the one that ships.',
+      );
+      expect(
+        gradle,
+        contains('abstract class GenerateDataExtractionRules'),
+        reason: 'without the generator, @xml/data_extraction_rules resolves to '
+            'nothing and the backup framework falls back to its default, which '
+            'is to copy everything',
+      );
+      expect(
+        gradle,
+        contains('addGeneratedSourceDirectory'),
+        reason: 'the generated directory must be registered through the AGP '
+            'variant API, which wires the task dependency itself. Adding it to '
+            'sourceSets by hand is what produces a resource that is merged on '
+            'one invocation and missing on the next.',
+      );
+      expect(
+        gradle,
+        contains('checkGeneratedSources = true'),
+        reason: 'lint skips generated sources by default, and lintVitalRelease '
+            'is what once caught <cross-platform-transfer> with no platform '
+            'attribute. Generating the resource put it out of lint\'s reach: '
+            'with this off, a release assembly of a rules resource missing that '
+            'same attribute succeeds.',
+      );
+    });
+
+    test('the generator declares exactly the reviewed modes, domains and path', () {
+      // EXACT SETS, NOT SUBSTRING PRESENCE. A subset check passes when a
+      // domain disappears, which is the direction that changes behaviour.
+      expect(
+        _kotlinStringList(gradle, 'SECTIONS'),
+        _dataExtractionModes.toSet(),
+        reason: 'a mode with no section is not off: Android documents a missing '
+            'section as fully enabled for all content',
+      );
+      expect(
+        _kotlinStringList(gradle, 'DOMAINS'),
+        _backupDomains.toSet(),
+        reason: 'session tokens live in sharedpref, and a domain left unnamed is '
+            'a domain left in',
+      );
+      expect(
+        gradle,
+        contains('const val WHOLE_DOMAIN_PATH = "$_wholeDomainPath"'),
+        reason: 'every exclusion carries this path. "./" means the same thing at '
+            'runtime and fails lintVitalRelease at FATAL severity in the '
+            'sharedpref and database domains, so no release artifact can be '
+            'produced with it.',
+      );
+      expect(
+        gradle,
+        contains('const val CROSS_PLATFORM_TARGET = "$_crossPlatformTarget"'),
+        reason: 'nothing rejects a wrong platform value — FullBackup reads the '
+            'attribute as an opaque string and uses it as a map key — so a '
+            'misspelling builds, lints, ships, and addresses a platform nobody '
+            'transfers to',
+      );
+    });
+
+    test('every exclusion in every mode names both a domain and the whole domain', () {
+      final rules = _generatedRulesOrSkip();
+      if (rules == null) return;
+
+      for (final resource in rules) {
+        for (final mode in _dataExtractionModes) {
+          final String section = _sectionOf(resource, mode);
+          final Iterable<RegExpMatch> exclusions =
+              RegExp(r'<exclude([^>]*)/>').allMatches(section);
+          expect(
+            exclusions,
+            isNotEmpty,
+            reason: '${resource.path}: <$mode> declares no exclusion at all',
+          );
+          for (final RegExpMatch exclusion in exclusions) {
+            final String attributes = exclusion.group(1)!;
+            final String? domain =
+                RegExp(r'domain="([^"]*)"').firstMatch(attributes)?.group(1);
+            final String? path =
+                RegExp(r'path="([^"]*)"').firstMatch(attributes)?.group(1);
+            expect(
+              domain,
+              isNotNull,
+              reason: '${resource.path}: <$mode> has an exclusion with no domain '
+                  'attribute, which the framework skips entirely',
+            );
+            expect(
+              path,
+              _wholeDomainPath,
+              reason: '${resource.path}: <$mode> excludes domain "$domain" with '
+                  'path="$path". The scope of an exclusion is stated, not left '
+                  'to the parser\'s null handling, and the whole-domain form is '
+                  '"$_wholeDomainPath".',
+            );
+          }
+        }
+      }
+    });
+
+    test('every mode excludes every domain, and nothing is included back', () {
+      final rules = _generatedRulesOrSkip();
+      if (rules == null) return;
+
+      for (final resource in rules) {
+        for (final mode in _dataExtractionModes) {
+          final String section = _sectionOf(resource, mode);
+          for (final domain in _backupDomains) {
+            expect(
+              section,
+              contains('<exclude domain="$domain" path="$_wholeDomainPath" />'),
+              reason: '${resource.path}: <$mode> does not exclude the $domain '
+                  'domain. Session tokens live in sharedpref, and a domain left '
+                  'unnamed is a domain left in.',
+            );
+          }
+        }
+        expect(
+          resource.declarations,
+          isNot(contains('<include')),
+          reason: '${resource.path}: an include element re-admits content to a '
+              'mode this resource exists to empty',
+        );
+      }
+    });
+
+    test('cross-platform-transfer names exactly one platform, and it is ios', () {
+      // AN EXACT VALUE, NOT A PATTERN. An earlier revision accepted
+      // `platform="[a-z_]+"` and so certified `platform="apple_icloud"`, a
+      // value invented in this repository that appears in no AOSP source and in
+      // no lint rule. A pattern is the wrong shape of assertion because nothing
+      // else rejects a wrong value either: FullBackup reads the attribute as an
+      // opaque string, the platform publishes no enumeration, and lint checks
+      // only that the attribute is PRESENT.
+      final rules = _generatedRulesOrSkip();
+      if (rules == null) return;
+
+      for (final resource in rules) {
+        final Iterable<RegExpMatch> openings =
+            RegExp(r'<cross-platform-transfer([^>]*)>').allMatches(resource.declarations);
+        expect(
+          openings.length,
+          1,
+          reason: '${resource.path}: found ${openings.length} '
+              'cross-platform-transfer sections. The framework iterates every '
+              'matching element, so a duplicate is a second policy nobody '
+              'reviewed and a reviewer may read the wrong one.',
+        );
+        for (final RegExpMatch opening in openings) {
+          final String? platform =
+              RegExp(r'platform="([^"]*)"').firstMatch(opening.group(1)!)?.group(1);
+          expect(
+            platform,
+            _crossPlatformTarget,
+            reason: '${resource.path}: cross-platform-transfer declares '
+                'platform="$platform". Only "$_crossPlatformTarget" is a target '
+                'the framework names, and a value it does not recognise is '
+                'accepted silently rather than refused — the section then looks '
+                'correct and does nothing.',
+          );
+        }
+        expect(
+          resource.declarations,
+          isNot(contains('apple_icloud')),
+          reason: '${resource.path}: apple_icloud was invented here and names no '
+              'real platform',
+        );
+      }
+    });
+
+    test('platform-specific-params is declared once, with all three attributes', () {
+      // The element is REQUIRED by the application contract for
+      // <cross-platform-transfer>, and it carries bundleId, teamId and
+      // contentVersion. A partially filled element is not a smaller version of
+      // a complete one: it names a counterpart that cannot be identified.
+      final rules = _generatedRulesOrSkip();
+      if (rules == null) return;
+
+      for (final resource in rules) {
+        final Iterable<RegExpMatch> declared =
+            RegExp(r'<platform-specific-params([^>]*)/>')
+                .allMatches(resource.declarations);
+        expect(
+          declared.length,
+          1,
+          reason: '${resource.path}: found ${declared.length} '
+              'platform-specific-params elements, expected exactly one',
+        );
+
+        final String attributes = declared.first.group(1)!;
+        for (final attribute in <String>['bundleId', 'teamId', 'contentVersion']) {
+          final String? value =
+              RegExp('$attribute="([^"]*)"').firstMatch(attributes)?.group(1);
+          expect(
+            value,
+            isNotNull,
+            reason: '${resource.path}: platform-specific-params declares no '
+                '$attribute',
+          );
+          expect(
+            value,
+            isNotEmpty,
+            reason: '${resource.path}: platform-specific-params declares an empty '
+                '$attribute, which identifies nothing',
+          );
+        }
+
+        // Inside the section it governs, not beside it. The framework only
+        // reads it while parsing cross-platform-transfer.
+        expect(
+          _sectionOf(resource, 'cross-platform-transfer'),
+          contains('<platform-specific-params'),
+          reason: '${resource.path}: platform-specific-params is declared outside '
+              'the cross-platform-transfer section, where nothing reads it',
+        );
+      }
+    });
+
+    test('a LOCAL artifact declares the test-only identity', () {
+      final rules = _generatedRulesOrSkip();
+      if (rules == null) return;
+
+      final List<_GeneratedRules> local =
+          rules.where((_GeneratedRules resource) => resource.isLocal).toList();
+      if (local.isEmpty) {
+        _requireLocalArtifactIfExpected();
+        markTestSkipped(
+          'no LOCAL data-extraction rules were generated — run '
+          '`flutter build apk --debug -Pkarar.env=LOCAL --dart-define=KARAR_ENV=LOCAL`',
+        );
+        return;
+      }
+
+      for (final resource in local) {
+        expect(
+          _teamIdOf(resource),
+          _testOnlyTeamId,
+          reason: '${resource.path}: a LOCAL artifact must declare the test-only '
+              'Team ID. Anything else is an identity that came from somewhere, '
+              'and nowhere in this repository is a place a real one may come '
+              'from.',
+        );
+      }
+    });
+
+    test('a deployed artifact cannot carry the test-only identity', () {
+      // THIS REPLACES "the element is not declared at all".
+      //
+      // That rule existed because a test which only recognises obviously-fake
+      // identities cannot tell a real one from a convincing fabrication — an
+      // independent review inserted `teamId="9ZX7Q4KD22"` and the whole suite
+      // passed. Absence was the only thing left to assert. The application
+      // contract requires the element, so absence is no longer available, and
+      // the property that replaces it is stronger: the test-only value is not
+      // merely recognisable, it is STRUCTURALLY unable to reach a deployed
+      // artifact.
+      //
+      // Three links, and all three are checked here:
+      //
+      //   1. this file and the generator name the same test-only value, so the
+      //      assertion cannot drift away from what is generated;
+      //   2. that value is not shaped like an Apple Team ID;
+      //   3. every deployed build takes its Team ID from configuration and runs
+      //      it through that shape, with no default and no fallback — so
+      //      supplying the test-only value by hand is refused too.
+      //
+      // Link 3 is asserted against the generator AND, whenever a deployed
+      // assembly is present, against what it produced.
+      expect(
+        gradle,
+        contains('const val TEST_ONLY_TEAM_ID = "$_testOnlyTeamId"'),
+        reason: 'the generator and this file must name the same test-only value, '
+            'or every assertion below is about a string nothing emits',
+      );
+      expect(
+        _appleTeamIdShape.hasMatch(_testOnlyTeamId),
+        isFalse,
+        reason: '$_testOnlyTeamId is shaped like a real Apple Team ID. That is '
+            'the whole defence: a deployed build validates whatever it is given '
+            'against this shape, so a test-only value that satisfies it could be '
+            'passed straight through.',
+      );
+      expect(
+        gradle,
+        contains(r'val APPLE_TEAM_ID = Regex("^[A-Z0-9]{10}$")'),
+        reason: 'the shape a deployed build enforces must be the shape asserted '
+            'here',
+      );
+      expect(
+        gradle,
+        contains('if (!APPLE_TEAM_ID.matches(supplied))'),
+        reason: 'a deployed build must reject a Team ID that is not shaped like '
+            'one, which is also what refuses the test-only value when it is '
+            'supplied deliberately',
+      );
+      expect(
+        gradle,
+        contains('if (supplied.isEmpty())'),
+        reason: 'a deployed build must refuse when no Team ID was configured. '
+            'There is no default: a default would be a fabricated identity with '
+            'a friendlier name.',
+      );
+      expect(
+        gradle,
+        contains('document.contains(TEST_ONLY_TEAM_ID)'),
+        reason: 'the generator must also check its own OUTPUT before writing it, '
+            'so a future edit to the environment branch fails the build instead '
+            'of shipping',
+      );
+
+      final rules = _generatedRules();
+      final List<_GeneratedRules> deployed = rules
+          .where((_GeneratedRules resource) => resource.isDeployed)
+          .toList();
+      for (final resource in deployed) {
+        expect(
+          resource.raw,
+          isNot(contains(_testOnlyTeamId)),
+          reason: '${resource.path} was generated for ${resource.environment} and '
+              'contains the test-only Team ID. Only LOCAL may declare it.',
+        );
+        final String? teamId = _teamIdOf(resource);
+        expect(
+          teamId != null && _appleTeamIdShape.hasMatch(teamId),
+          isTrue,
+          reason: '${resource.path} was generated for ${resource.environment} and '
+              'declares teamId="$teamId", which is not an Apple Team ID. A value '
+              'nothing can match looks configured and is inert.',
         );
       }
     });
@@ -698,6 +974,154 @@ void main() {
       );
     });
   });
+}
+
+/// One generated data-extraction rules resource, and which profile made it.
+final class _GeneratedRules {
+  const _GeneratedRules({
+    required this.path,
+    required this.environment,
+    required this.raw,
+    required this.declarations,
+  });
+
+  /// Where it was found, so a failure names the file rather than a rule.
+  final String path;
+
+  /// The profile the generator recorded in the resource's own header. This is
+  /// what makes it possible to say whether the test-only identity in a given
+  /// file is expected or is a finding — the output directory is named after the
+  /// build type, which says nothing about the environment.
+  final String? environment;
+
+  /// The file as written, comments and all. The provenance header is a comment,
+  /// so the environment cannot be read off the stripped form.
+  final String raw;
+
+  /// What the resource DECLARES: comments removed, whitespace collapsed.
+  final String declarations;
+
+  bool get isLocal => environment == 'LOCAL';
+
+  /// A profile whose artifact is meant to be installed somewhere other than the
+  /// machine that built it. An unrecognised header is treated as deployed: the
+  /// safe reading of "this file does not say what it is" is not "it is LOCAL".
+  bool get isDeployed => environment != 'LOCAL';
+}
+
+/// Every generated rules resource in the build output.
+///
+/// Only the GENERATOR's own outputs are read, not the merged or packaged
+/// copies. A merged copy for a variant this session did not build can be left
+/// over from an earlier one, and a stale file is a worse assertion than none.
+/// What reaches the APK is checked on the APK itself, with aapt2, in CI.
+List<_GeneratedRules> _generatedRules() {
+  final String packageRoot = mobilePackageRoot().path;
+  final Directory generated = Directory('$packageRoot/build/app/generated');
+  final Directory fallback = Directory('$packageRoot/build');
+  final Directory root = generated.existsSync() ? generated : fallback;
+  if (!root.existsSync()) return const <_GeneratedRules>[];
+
+  final results = <_GeneratedRules>[];
+  for (final entity in root.listSync(recursive: true)) {
+    if (entity is! File) continue;
+    final String path = entity.path.replaceAll(r'\', '/');
+    if (!path.endsWith('/$_generatedResourceName')) continue;
+    if (!path.contains('/generated/')) continue;
+    final String raw = entity.readAsStringSync();
+    results.add(
+      _GeneratedRules(
+        path: path.substring(packageRoot.length + 1),
+        environment:
+            RegExp(r'karar\.env\s*=\s*([A-Z]+)').firstMatch(raw)?.group(1),
+        raw: raw,
+        declarations: collapseXmlWhitespace(stripXmlComments(raw)),
+      ),
+    );
+  }
+  return results;
+}
+
+/// The generated resources, or null when none exists and the absence is
+/// tolerated.
+///
+/// Returning null means the caller should return: the assertion has been
+/// recorded as skipped. When the gate variable is set it fails instead, because
+/// a lane that promised to build and then found nothing to read is the failure
+/// this gate exists to catch.
+List<_GeneratedRules>? _generatedRulesOrSkip() {
+  final List<_GeneratedRules> rules = _generatedRules();
+  if (rules.isNotEmpty) return rules;
+  expect(
+    _androidBuildIsExpected,
+    isFalse,
+    reason: '$_androidGateVariable is set, so an assembly must have generated a '
+        'data-extraction rules resource — but none was found under build/. The '
+        'resource is produced per assembly; nothing to read means nothing was '
+        'assembled, and passing by absence is what this gate prevents.',
+  );
+  markTestSkipped(
+    'no generated data-extraction rules present — run '
+    '`flutter build apk --debug -Pkarar.env=LOCAL --dart-define=KARAR_ENV=LOCAL` first',
+  );
+  return null;
+}
+
+/// Fails when a build was promised and produced no LOCAL resource.
+void _requireLocalArtifactIfExpected() {
+  expect(
+    _androidBuildIsExpected,
+    isFalse,
+    reason: '$_androidGateVariable is set, so a LOCAL assembly must have run — '
+        'but every generated rules resource was produced for another profile. '
+        'The test-only identity is only ever asserted against a LOCAL artifact, '
+        'so without one this assertion never runs.',
+  );
+}
+
+/// The body of one section of a generated resource.
+String _sectionOf(_GeneratedRules resource, String mode) {
+  // The opening tag may carry attributes — <cross-platform-transfer> REQUIRES
+  // `platform`, and omitting it does not make the section permissive, it makes
+  // the resource invalid. Matching the bare `<mode>` form would fail on a
+  // correct file and pass on one missing the attribute, which is backwards.
+  final RegExpMatch? match =
+      RegExp('<$mode(?:\\s[^>]*)?>(.*?)</$mode>', dotAll: true)
+          .firstMatch(resource.declarations);
+  expect(
+    match,
+    isNotNull,
+    reason: '${resource.path} declares no <$mode> section. An undeclared mode is '
+        'documented as fully enabled for all content, not off.',
+  );
+  return match!.group(1)!;
+}
+
+/// The Team ID a generated resource declares, or null when it declares none.
+String? _teamIdOf(_GeneratedRules resource) =>
+    RegExp(r'<platform-specific-params[^>]*teamId="([^"]*)"')
+        .firstMatch(resource.declarations)
+        ?.group(1);
+
+/// The string entries of a `listOf(...)` assigned to [name] in a Kotlin source.
+///
+/// Used to compare the generator's declared sets EXACTLY, rather than checking
+/// that each expected entry appears somewhere in the file — which would pass on
+/// a list that also contains something nobody reviewed.
+Set<String> _kotlinStringList(String kotlin, String name) {
+  final RegExpMatch? match =
+      RegExp('val $name =\\s*\\n?\\s*listOf\\(([^)]*)\\)', dotAll: true)
+          .firstMatch(kotlin);
+  expect(
+    match,
+    isNotNull,
+    reason: '$_appGradle declares no `val $name = listOf(...)`, so the generated '
+        'resource is built from something this assertion cannot see',
+  );
+  return RegExp(r'"([^"]*)"')
+      .allMatches(match!.group(1)!)
+      .map((RegExpMatch entry) => entry.group(1)!)
+      .toSet();
 }
 
 /// The permissions a merged manifest requests, split by who defines them.

@@ -39,9 +39,17 @@
           allowBackup="false" disables cloud backup but does not disable
           device-to-device transfer. targetSdk is 36, so that gap is live here,
           and a missing rules resource is documented to leave the transfer modes
-          fully enabled rather than off. res/xml/data_extraction_rules.xml
-          declares every mode and excludes every domain from each; its header
-          carries the reasoning and the citations.
+          fully enabled rather than off. The resource declares every mode and
+          excludes every domain from each.
+
+          @xml/data_extraction_rules resolves to a GENERATED resource, not to a
+          file in this source tree. It has to be generated: the application
+          contract requires <platform-specific-params> on the cross-platform
+          section, one of whose attributes is an Apple Team ID, and this project
+          has none. A LOCAL artifact declares an identity that is obviously and
+          structurally not one; a DEV, STAGING or PRODUCTION assembly refuses to
+          build until a real Team ID is supplied out of band. The generator in
+          app/build.gradle.kts carries the reasoning and the citations.
 
         Nothing is lost by any of this: this client holds no local state worth
         preserving — everything authoritative is server-side.
