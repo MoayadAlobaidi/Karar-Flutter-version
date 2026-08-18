@@ -48,10 +48,11 @@ final class ApiMfaRepository implements MfaRepository {
   @override
   Future<Result<MfaEnrolment>> startEnrolment() async {
     try {
-      final JsonMap payload = await _client.identityMfaEnroll(
+      final JsonMap payload = (await _client.identityMfaEnroll(
         idempotencyKey: _idempotencyKeys.next(),
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       final IdentityPayload reader =
           IdentityPayload(payload, location: 'auth.mfa.enroll');
       return Success<MfaEnrolment>(
@@ -78,11 +79,12 @@ final class ApiMfaRepository implements MfaRepository {
     required OpaqueSecret code,
   }) async {
     try {
-      final JsonMap payload = await _client.identityMfaConfirm(
+      final JsonMap payload = (await _client.identityMfaConfirm(
         body: IdentityMfaConfirmRequestDto(code: code.trimmed),
         idempotencyKey: _idempotencyKeys.next(),
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       final IdentityPayload reader =
           IdentityPayload(payload, location: 'auth.mfa.confirm');
       final List<String> codes = reader.stringList('recoveryCodes');
@@ -121,13 +123,14 @@ final class ApiMfaRepository implements MfaRepository {
       return const Failed<SessionEstablished>(AuthenticationRequiredFailure());
     }
     try {
-      final JsonMap payload = await _client.identityMfaChallenge(
+      final JsonMap payload = (await _client.identityMfaChallenge(
         body: IdentityMfaChallengeRequestDto(
           challengeToken: challengeToken,
           code: code.trimmed,
         ),
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       return await _adoption.adopt(payload, location: 'auth.mfa.challenge');
     } on ApiException catch (exception) {
       return Failed<SessionEstablished>(exception.failure);
@@ -151,13 +154,14 @@ final class ApiMfaRepository implements MfaRepository {
       return const Failed<SessionEstablished>(AuthenticationRequiredFailure());
     }
     try {
-      final JsonMap payload = await _client.identityMfaRecovery(
+      final JsonMap payload = (await _client.identityMfaRecovery(
         body: IdentityMfaRecoveryRequestDto(
           challengeToken: challengeToken,
           recoveryCode: recoveryCode.trimmed,
         ),
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       return await _adoption.adopt(payload, location: 'auth.mfa.recovery');
     } on ApiException catch (exception) {
       return Failed<SessionEstablished>(exception.failure);

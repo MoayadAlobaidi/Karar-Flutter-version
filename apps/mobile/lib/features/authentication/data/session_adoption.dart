@@ -20,6 +20,7 @@ import '../../../core/security/secure_store.dart';
 import '../../../core/security/session_manager.dart';
 import '../../../core/security/session_token_codec.dart';
 import '../../../core/security/session_tokens.dart';
+import '../../../core/security/token_store.dart';
 import '../domain/entities/authentication_outcome.dart';
 import 'pending_mfa_challenge_store.dart';
 
@@ -122,12 +123,21 @@ final class SessionAdoption {
   Future<void> clearLocalCredentials(SessionEndReason reason) async {
     _challenges.discard();
 
-    final Result<void> abandoned = await _sessions.abandonPersistedSession();
-    if (abandoned is Failed<void>) {
+    final SessionAbandonmentOutcome abandoned =
+        await _sessions.abandonPersistedSession();
+    if (!abandoned.isDurablyResolved) {
+      // Not merely "the erase failed". This branch is reached only when the
+      // erase failed AND nothing durable records that the credential was given
+      // up, which is the one combination a later launch can undo. Claiming it
+      // is marked abandoned — which the previous message did unconditionally —
+      // would be untrue exactly here.
       _logger.error(
-        'The persisted session could not be erased; it is marked abandoned so '
-        'a later launch will not restore it.',
-        fields: <String, Object?>{'reason': reason.name},
+        'The persisted session could not be erased and the abandonment could '
+        'not be recorded durably; a later launch may restore it.',
+        fields: <String, Object?>{
+          'reason': reason.name,
+          'outcome': abandoned.diagnosticLabel,
+        },
       );
     }
 

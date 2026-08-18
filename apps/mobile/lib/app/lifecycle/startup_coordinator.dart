@@ -9,12 +9,24 @@
 // bootstrap resolved, or which screen that implies.
 //
 // EVALUATION ORDER, fixed:
-//   1. configuration  — nothing can be attempted without a validated endpoint;
-//   2. application lock — a locked device does not have its keystore read;
-//   3. session restore — from platform secure storage only;
-//   4. bootstrap fetch — the server's answer decides the rest.
+//   1. configuration    — nothing can be attempted without a validated endpoint;
+//   2. security state   — LOAD the durable application-lock choice;
+//   3. application lock — a locked device does not have its keystore read;
+//   4. session restore  — from platform secure storage only;
+//   5. bootstrap fetch  — the server's answer decides the rest.
 //
-// Step 2 comes before step 3, which is why a locked launch holds a credential
+// STEP 2 IS AN EXPLICIT STEP AND IT IS NEW. The lock choice used to be read
+// inline at step 3, synchronously, out of the ordinary preference store, as
+// `readBool(key) ?? false`. That store falls back to memory when the platform
+// refuses to open it, an in-memory store holds no choice, and `?? false` turned
+// the missing answer into "the user never asked for a lock" — so a device whose
+// preference storage failed skipped the lock gate, restored the credential and
+// rendered protected content. Loading the choice as its own step, from a store
+// that reports UNAVAILABLE instead of inventing an answer, is what makes the
+// difference visible: no answer produces LOCAL_SECURITY_STATE_UNAVAILABLE, and
+// the sequence stops there having read no credential at all.
+//
+// Step 3 comes before step 4, which is why a locked launch holds a credential
 // it has never read. There are exactly TWO ways past it: [unlock], after the
 // platform has authenticated the user, and [abandonLockedSession], which
 // destroys the stored credential rather than stepping around it. Neither one
@@ -31,6 +43,7 @@ import '../../core/errors/result.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/security/app_lock.dart';
 import '../../core/security/session_manager.dart';
+import '../../core/security/token_store.dart';
 import '../../core/utilities/clock.dart';
 import '../configuration/app_configuration.dart';
 import 'bootstrap_snapshot.dart';
@@ -68,7 +81,7 @@ final class StartupCoordinator {
 
   StartupState _state = const ConfigLoading();
   AppConfiguration? _configuration;
-  StreamSubscription<SessionEndReason>? _sessionEndSubscription;
+  StreamSubscription<SessionEnded>? _sessionEndSubscription;
 
   /// Guards against two concurrent runs interleaving their emissions.
   int _generation = 0;
@@ -114,6 +127,39 @@ final class StartupCoordinator {
         );
     }
 
+    // STEP 2. Establish the durable lock choice before anything opens the
+    // keystore. A store that cannot answer stops the sequence here.
+    final AppLockChoice choice = await _appLock.load();
+    if (generation != _generation) {
+      return;
+    }
+    switch (choice) {
+      case AppLockChoiceUnavailable(:final failure):
+        _logger.error(
+          'Local security state could not be established; no security gate can '
+          'be evaluated and startup stops here.',
+          fields: <String, Object?>{'failure': failure.diagnosticLabel},
+        );
+        _emit(LocalSecurityStateUnavailable(failure), generation);
+        return;
+      case AppLockChoiceNotLoaded():
+        // `load` never returns this. Handled rather than asserted away, so a
+        // future change that forgets to load fails CLOSED instead of falling
+        // through to the restore below.
+        _emit(
+          const LocalSecurityStateUnavailable(
+            LocalSecurityStateUnavailableFailure(
+              operation: LocalSecurityStateOperation.read,
+            ),
+          ),
+          generation,
+        );
+        return;
+      case AppLockChoiceKnown():
+        break;
+    }
+
+    // STEP 3.
     if (_appLock.isLocked) {
       _emit(const AppLocked(), generation);
       return;
@@ -123,9 +169,14 @@ final class StartupCoordinator {
   }
 
   /// The platform authenticated the user against the application lock.
+  ///
+  /// Re-runs the whole sequence when configuration was never loaded, and also
+  /// when the lock CHOICE is not durably known — an unlock proves presence, it
+  /// does not establish what the security state says, and continuing straight
+  /// to the restore would skip step 2 on exactly the launch where it matters.
   Future<void> unlock() async {
     _appLock.markUnlocked();
-    if (_configuration == null) {
+    if (_configuration == null || !_appLock.isChoiceKnown) {
       await start();
       return;
     }
@@ -154,8 +205,20 @@ final class StartupCoordinator {
   Future<void> retryBootstrap() => _restoreAndBootstrap(++_generation);
 
   /// The user signed out. Ends the session; the session-end listener produces
-  /// the resulting state.
-  Future<void> signOut() => _sessions.end(SessionEndReason.signedOut);
+  /// the resulting state from the typed outcome the ending carried.
+  Future<void> signOut() async {
+    await _sessions.end(SessionEndReason.signedOut);
+  }
+
+  /// Re-attempts a credential destruction that could not be completed.
+  ///
+  /// The recovery for [SecurityRecoveryBlocked]. It repeats the same operation
+  /// rather than doing something weaker: the blocked state exists because the
+  /// erase and the abandonment record both failed, and the only thing that
+  /// resolves it is one of them succeeding. A store that has recovered
+  /// finishes the job here; one that has not leaves the state exactly where it
+  /// was, which is the honest answer and is not a loop.
+  Future<void> retrySecurityRecovery() => abandonLockedSession();
 
   /// The user could not satisfy the application lock and gave up the stored
   /// session so they can authenticate with a password instead.
@@ -185,30 +248,37 @@ final class StartupCoordinator {
   /// same state.
   Future<void> abandonLockedSession() async {
     final generation = ++_generation;
-    final abandoned = await _sessions.abandonPersistedSession();
+    final SessionAbandonmentOutcome abandoned =
+        await _sessions.abandonPersistedSession();
     if (generation != _generation) {
       return;
     }
-    final erased = abandoned is Success<void>;
-    if (!erased) {
-      // FAIL CLOSED, and say so. The credential may still be in the keystore,
-      // so the user is not told it was removed: the state carries the storage
-      // flag, the sign-in screen explains it, and the store itself refuses to
-      // restore what it could not erase.
-      _logger.error(
-        'Locked session abandoned but the credential could not be erased.',
-        fields: <String, Object?>{
-          'failure': abandoned.failureOrNull?.diagnosticLabel,
-        },
-      );
-    } else {
-      _logger.info(
-        'Locked session abandoned; the stored credential was erased.',
-        fields: <String, Object?>{'outcome': 'erased'},
-      );
-    }
-    _emit(Unauthenticated(secureStorageUnavailable: !erased), generation);
+    _emit(_stateForAbandonment(abandoned), generation);
   }
+
+  /// The destination for one abandonment outcome.
+  ///
+  /// Three destinations for five outcomes, and the grouping is the whole
+  /// fail-closed rule:
+  ///
+  ///   * the credential is GONE — an ordinary signed-out state. The claim is
+  ///     true, so it is made;
+  ///   * the credential SURVIVED but a durable marker refuses it — signed out,
+  ///     flagged. The user is not told it was removed, because it was not, and
+  ///     the store will refuse to restore it on every later launch;
+  ///   * neither could be confirmed — BLOCKED. Not a sign-in screen: offering
+  ///     one would present the abandonment as complete, and would put a
+  ///     credential-writing path one authentication away from a store that
+  ///     currently cannot record anything.
+  StartupState _stateForAbandonment(SessionAbandonmentOutcome outcome) =>
+      switch (outcome) {
+        CredentialErased() || CredentialErasedMarkerRetained() =>
+          const Unauthenticated(),
+        CredentialPersistedButDurablyInvalidated() =>
+          const Unauthenticated(secureStorageUnavailable: true),
+        AbandonmentNotDurable() || AbandonmentSecurityStateUnavailable() =>
+          SecurityRecoveryBlocked(outcome),
+      };
 
   Future<void> _restoreAndBootstrap(int generation) async {
     _emit(const SessionRestoring(), generation);
@@ -301,14 +371,20 @@ final class StartupCoordinator {
     return Ready(snapshot);
   }
 
-  void _onSessionEnded(SessionEndReason reason) {
+  void _onSessionEnded(SessionEnded event) {
     final generation = ++_generation;
-    _emit(
-      reason == SessionEndReason.signedOut
-          ? const Unauthenticated()
-          : SessionExpired(reason),
-      generation,
-    );
+    if (event.reason != SessionEndReason.signedOut) {
+      // A session that ENDED under it — expiry, revocation, refresh-token reuse
+      // — routes by reason. The credential is worthless either way, so a failed
+      // erase does not change the destination.
+      _emit(SessionExpired(event.reason), generation);
+      return;
+    }
+    // A deliberate sign-out is a claim about what happened to the credential,
+    // so it routes by OUTCOME. Emitting a clean `Unauthenticated` after an
+    // erase that failed and an abandonment that was never recorded would be the
+    // client asserting something it cannot show.
+    _emit(_stateForAbandonment(event.outcome), generation);
   }
 
   void _emit(StartupState next, int generation) {

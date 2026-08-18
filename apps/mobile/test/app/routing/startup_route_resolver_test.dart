@@ -10,12 +10,19 @@ import 'package:karar_mobile/app/lifecycle/startup_state.dart';
 import 'package:karar_mobile/app/routing/route_paths.dart';
 import 'package:karar_mobile/app/routing/startup_route_resolver.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
+import 'package:karar_mobile/core/security/token_store.dart';
 
 import '../../core/support/fakes.dart';
 
 List<StartupState> allStates() => <StartupState>[
       const ConfigLoading(),
       const ConfigInvalid(<String>['API_BASE_URL_MISSING']),
+      const LocalSecurityStateUnavailable(
+        LocalSecurityStateUnavailableFailure(
+          operation: LocalSecurityStateOperation.read,
+        ),
+      ),
+      const SecurityRecoveryBlocked(AbandonmentNotDurable()),
       const AppLocked(),
       const SessionRestoring(),
       const Unauthenticated(),
@@ -39,6 +46,20 @@ void main() {
       expect(
         resolver.routeFor(const ConfigInvalid(<String>['X'])),
         RoutePaths.configurationError,
+      );
+      expect(
+        resolver.routeFor(
+          const LocalSecurityStateUnavailable(
+            LocalSecurityStateUnavailableFailure(
+              operation: LocalSecurityStateOperation.read,
+            ),
+          ),
+        ),
+        RoutePaths.securityUnavailable,
+      );
+      expect(
+        resolver.routeFor(const SecurityRecoveryBlocked(AbandonmentNotDurable())),
+        RoutePaths.securityRecovery,
       );
       expect(resolver.routeFor(const AppLocked()), RoutePaths.lock);
       expect(resolver.routeFor(const Unauthenticated()), RoutePaths.signIn);

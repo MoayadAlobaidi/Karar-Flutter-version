@@ -21,6 +21,8 @@ final class StartupRouteResolver {
   String routeFor(StartupState state) => switch (state) {
         ConfigLoading() || SessionRestoring() || BootstrapLoading() => RoutePaths.startup,
         ConfigInvalid() => RoutePaths.configurationError,
+        LocalSecurityStateUnavailable() => RoutePaths.securityUnavailable,
+        SecurityRecoveryBlocked() => RoutePaths.securityRecovery,
         AppLocked() => RoutePaths.lock,
         Unauthenticated() => RoutePaths.signIn,
         SessionExpired() => RoutePaths.sessionExpired,

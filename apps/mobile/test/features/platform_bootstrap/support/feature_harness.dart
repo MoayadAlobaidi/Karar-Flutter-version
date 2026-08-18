@@ -11,6 +11,8 @@
 //   * the provider graph is never built from the composition root. A screen
 //     test overrides the leaf providers it needs, so no test can accidentally
 //     open a transport, a keystore or a preference store.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -22,10 +24,10 @@ import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/logging/app_logger.dart';
 import 'package:karar_mobile/core/security/app_lock.dart';
+import 'package:karar_mobile/core/security/local_security_state_store.dart';
 import 'package:karar_mobile/core/security/session_manager.dart';
 import 'package:karar_mobile/core/security/session_tokens.dart';
 import 'package:karar_mobile/core/security/token_store.dart';
-import 'package:karar_mobile/core/storage/key_value_store.dart';
 import 'package:karar_mobile/core/utilities/clock.dart';
 import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'package:karar_mobile/shared/shared.dart';
@@ -175,15 +177,13 @@ final class InMemoryTokenStore implements TokenStore {
   }
 
   @override
-  Future<Result<void>> clear() async {
+  Future<SessionAbandonmentOutcome> clear() async {
     clears++;
     _tokens = null;
-    return const Success<void>(null);
+    // This fake always succeeds, so nothing survives and there is no
+    // abandonment left to record.
+    return const CredentialErased();
   }
-
-  /// This fake always succeeds, so the abandonment is trivially recorded.
-  @override
-  bool get abandonmentIsRecorded => true;
 }
 
 /// A real startup coordinator wired to in-memory doubles.
@@ -200,12 +200,27 @@ StartupCoordinator buildTestCoordinator({
       loadConfiguration: () => const Failed<AppConfiguration>(
         ConfigurationInvalidFailure(violations: <String>[]),
       ),
-      appLock: AppLockGate(preferences: InMemoryKeyValueStore()),
+      appLock: _loadedGate(),
       sessionManager: sessionManager,
       bootstrapGateway: gateway,
       logger: AppLogger.silent,
       clock: const SystemClock(),
     );
+
+/// An application-lock gate over a working, empty security-state store, with
+/// the choice already LOADED.
+///
+/// Loading matters: an unloaded gate reports LOCKED, because a gate nobody has
+/// evaluated has certainly not been passed. These tenant and bootstrap tests
+/// are about what happens after the lock, so they start from the answer a real
+/// launch would have got from an empty store — the lock is off.
+AppLockGate _loadedGate() {
+  final AppLockGate gate = AppLockGate(
+    securityState: InMemoryLocalSecurityStateStore(),
+  );
+  unawaited(gate.load());
+  return gate;
+}
 
 /// A session credential that is valid for the whole of a test.
 SessionTokens liveTokens({String sessionId = 'session-1'}) => SessionTokens(

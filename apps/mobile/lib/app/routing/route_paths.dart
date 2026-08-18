@@ -13,6 +13,24 @@ abstract final class RoutePaths {
   /// Build configuration is invalid. Terminal for this launch.
   static const String configurationError = '/configuration-error';
 
+  /// Local security state could not be established, so no security gate can
+  /// be evaluated.
+  ///
+  /// A sibling of [lock] and [signIn] rather than a path beneath either. The
+  /// state exists precisely because the client cannot tell whether the lock
+  /// applies, so nesting it under the lock would assert the thing it cannot
+  /// assert — and prefix matching in the single redirect would let a launch
+  /// oscillate between the two.
+  static const String securityUnavailable = '/security-unavailable';
+
+  /// A credential was given up and neither its destruction nor its
+  /// abandonment could be confirmed.
+  ///
+  /// Kept apart from [signIn] on purpose: signing in here would be the client
+  /// claiming the old session was safely abandoned, which is the one thing
+  /// this state means it cannot claim.
+  static const String securityRecovery = '/security-recovery';
+
   /// The application lock is engaged.
   static const String lock = '/lock';
 
@@ -41,6 +59,8 @@ abstract final class RoutePaths {
   static const Set<String> gateRoutes = <String>{
     startup,
     configurationError,
+    securityUnavailable,
+    securityRecovery,
     lock,
     signIn,
     verifyEmail,

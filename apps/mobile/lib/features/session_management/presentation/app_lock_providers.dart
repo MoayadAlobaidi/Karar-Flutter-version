@@ -14,12 +14,21 @@
 //     than assumed by the screen;
 //   * an unavailable or unenrolled authenticator leaves the lock OFF and says
 //     so. The switch is never left on while nothing can satisfy it.
+//
+// EVERY CHANGE IS CONSUMED, NEVER ASSUMED. `AppLockGate.setEnabled` returns
+// whether the platform CONFIRMED the write, and this controller switches on it.
+// It used to await a `Future<void>` and set `isEnabled: true` immediately
+// afterwards, which is how a lock came to be enabled in memory and nowhere
+// else: the switch moved, the screen said the lock was on, and the next cold
+// start had no lock at all. The view state now carries the rejection so the
+// screen can say what actually happened.
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../core/errors/failure.dart';
 import '../../../core/security/app_lock.dart';
 import '../../../core/security/session_manager.dart';
 import '../../../core/utilities/clock.dart';
@@ -50,6 +59,7 @@ final class AppLockViewState {
     this.isPrompting = false,
     this.lastOutcome,
     this.requiresSession = false,
+    this.lastChange,
   });
 
   /// What the device can do. Read once when the screen appears, because it
@@ -67,6 +77,30 @@ final class AppLockViewState {
 
   /// Set when the user tried to change the setting with no session.
   final bool requiresSession;
+
+  /// The result of the last attempt to change the setting.
+  ///
+  /// Present so the screen renders what the DURABLE state did, not what the
+  /// user asked for. An [AppLockChangeRejected] here means [isEnabled] is the
+  /// value that survived the refusal, and the screen owes the user an
+  /// explanation for the switch not moving.
+  final AppLockChange? lastChange;
+
+  /// The typed reason the last change was refused, or null when none was.
+  Failure? get changeFailure => switch (lastChange) {
+        AppLockChangeRejected(:final failure) => failure,
+        AppLockChangeApplied() || null => null,
+      };
+
+  /// Whether the last refusal was of an attempt to turn the lock ON.
+  ///
+  /// The two directions need different copy: a failed enable leaves the user
+  /// unprotected and a failed disable leaves them locked, and telling them the
+  /// wrong one is worse than saying nothing.
+  bool get rejectedEnable => switch (lastChange) {
+        AppLockChangeRejected(:final requested) => requested,
+        AppLockChangeApplied() || null => false,
+      };
 
   /// Whether the switch may be offered at all.
   bool get canEnable => availability == LocalAuthAvailability.available;
@@ -103,14 +137,26 @@ final class AppLockController extends Notifier<AppLockViewState> {
     if (enabled && availability != LocalAuthAvailability.available) {
       // The user enabled the lock and the device can no longer satisfy it —
       // an enrolment was removed, or the hardware was disabled. Leaving the
-      // preference on would lock them out of their own application with no
-      // way through, so the choice is stood down and the screen says why.
-      await ref.read(appLockGateProvider).setEnabled(enabled: false);
+      // choice on would lock them out of their own application, so it is stood
+      // down and the screen says why.
+      //
+      // The stand-down can itself be refused, and then the lock IS still on.
+      // The process is marked unlocked either way, because this launch has
+      // already passed whatever gate there was and re-locking someone mid-visit
+      // over a storage failure helps nobody; but the switch is rendered from
+      // the durable state, so a refused stand-down shows the lock still on,
+      // with the reason.
+      final AppLockChange change =
+          await ref.read(appLockGateProvider).setEnabled(enabled: false);
       ref.read(appLockGateProvider).markUnlocked();
       if (!ref.mounted) {
         return;
       }
-      state = AppLockViewState(availability: availability);
+      state = AppLockViewState(
+        availability: availability,
+        isEnabled: ref.read(appLockGateProvider).isEnabled,
+        lastChange: change is AppLockChangeRejected ? change : null,
+      );
       return;
     }
     state = AppLockViewState(availability: availability, isEnabled: enabled);
@@ -163,14 +209,24 @@ final class AppLockController extends Notifier<AppLockViewState> {
       return;
     }
     if (!enabled) {
-      await ref.read(appLockGateProvider).setEnabled(enabled: false);
+      final AppLockChange change =
+          await ref.read(appLockGateProvider).setEnabled(enabled: false);
       // Turning the lock off leaves this process unlocked; otherwise the user
-      // would be asked to unlock immediately after switching the lock off.
+      // would be asked to unlock immediately after switching the lock off. A
+      // REFUSED disable retains the lock, which is the safer state, and this
+      // launch stays open so the user can retry rather than being shut out by
+      // the failure of the very change that was meant to let them in.
       ref.read(appLockGateProvider).markUnlocked();
       if (!ref.mounted) {
         return;
       }
-      state = AppLockViewState(availability: state.availability);
+      state = AppLockViewState(
+        availability: state.availability,
+        // Read back from the gate rather than assumed to be false. On a
+        // rejection this is still true, and the switch must show it.
+        isEnabled: ref.read(appLockGateProvider).isEnabled,
+        lastChange: change,
+      );
       return;
     }
 
@@ -187,14 +243,24 @@ final class AppLockController extends Notifier<AppLockViewState> {
       state = AppLockViewState(availability: state.availability, lastOutcome: outcome);
       return;
     }
-    await ref.read(appLockGateProvider).setEnabled(enabled: true);
-    // `setEnabled(true)` re-locks the process by design. The user is looking
-    // at the setting having just authenticated, so this launch stays open.
+    final AppLockChange change =
+        await ref.read(appLockGateProvider).setEnabled(enabled: true);
+    // `setEnabled(true)` re-locks the process by design, and only on a
+    // CONFIRMED write. The user is looking at the setting having just
+    // authenticated, so this launch stays open.
     ref.read(appLockGateProvider).markUnlocked();
     if (!ref.mounted) {
       return;
     }
-    state = AppLockViewState(availability: state.availability, isEnabled: true);
+    // FAIL CLOSED, HONESTLY. On a rejection the gate never moved, so this reads
+    // back false and the switch stays off. Setting `isEnabled: true` here — the
+    // previous behaviour — is what produced a lock that existed only in this
+    // object and vanished at the next launch.
+    state = AppLockViewState(
+      availability: state.availability,
+      isEnabled: ref.read(appLockGateProvider).isEnabled,
+      lastChange: change,
+    );
   }
 }
 
@@ -259,7 +325,10 @@ final class AppLockBackgroundWatcher with WidgetsBindingObserver {
   void handleResume() {
     final DateTime? leftAt = _leftForegroundAt;
     _leftForegroundAt = null;
-    if (leftAt == null || !_gate.isEnabled) {
+    // `isDurablyDisabled`, not `!isEnabled`. The two differ exactly when the
+    // choice has no durable answer, and there the safe reading is to re-lock
+    // and let the coordinator decide what that means.
+    if (leftAt == null || _gate.isDurablyDisabled) {
       return;
     }
     if (!_policy.shouldRelock(backgroundedAt: leftAt, now: _clock.nowUtc())) {
@@ -329,7 +398,9 @@ class _AppLockLifecycleObserverState extends ConsumerState<AppLockLifecycleObser
   void _handleResume() {
     final DateTime? leftAt = _leftForegroundAt;
     _leftForegroundAt = null;
-    if (leftAt == null || !ref.read(appLockGateProvider).isEnabled) {
+    // See [AppLockBackgroundWatcher.handleResume] for why this asks whether the
+    // lock is durably OFF rather than whether it is on.
+    if (leftAt == null || ref.read(appLockGateProvider).isDurablyDisabled) {
       return;
     }
     final bool relock = ref.read(appLockPolicyProvider).shouldRelock(

@@ -14,12 +14,15 @@
 import 'package:meta/meta.dart';
 
 import '../../core/errors/failure.dart';
+import '../../core/security/token_store.dart';
 import 'bootstrap_snapshot.dart';
 
 /// A stable identifier per state, for logging, routing tables and tests.
 enum StartupStage {
   configLoading,
   configInvalid,
+  localSecurityStateUnavailable,
+  securityRecoveryBlocked,
   appLocked,
   unauthenticated,
   sessionRestoring,
@@ -60,6 +63,12 @@ enum StartupRecovery {
 
   /// Retry the bootstrap fetch.
   retryBootstrap,
+
+  /// Re-read local security state and continue the startup sequence.
+  retrySecurityState,
+
+  /// Re-attempt the credential destruction that could not be completed.
+  retrySecurityRecovery,
 
   /// Reinstall or rebuild with correct configuration. Not recoverable at
   /// runtime, and deliberately not disguised as though it were.
@@ -123,6 +132,77 @@ final class ConfigInvalid extends StartupState {
 
   @override
   String toString() => 'configInvalid(${violations.join(', ')})';
+}
+
+/// LOCAL SECURITY STATE COULD NOT BE ESTABLISHED.
+///
+/// The store holding the application-lock choice would not answer, or answered
+/// with something that is not a choice. There is therefore no way to know
+/// whether this device is meant to be locked.
+///
+/// It is emitted BEFORE the credential is restored, and that is the whole
+/// point. The alternative — the behaviour this state replaces — was to read
+/// the choice as `?? false`, conclude the lock was off, restore the session
+/// and render protected content, on a device whose storage had just failed.
+/// A gate that cannot be evaluated has not been passed.
+///
+/// It has its OWN route. Sending the user to `/lock` would ask them to satisfy
+/// a lock nothing established they had, and sending them to `/sign-in` would
+/// invite them to authenticate into the session this state exists to withhold;
+/// either would also risk oscillating against the single redirect. The
+/// recovery is to re-read the store and re-run startup.
+final class LocalSecurityStateUnavailable extends StartupState {
+  const LocalSecurityStateUnavailable(this.failure);
+
+  /// Why the store could not be consulted. Non-sensitive by construction, and
+  /// never carries a stored value.
+  final Failure failure;
+
+  @override
+  StartupStage get stage => StartupStage.localSecurityStateUnavailable;
+
+  @override
+  StartupRecovery get recovery => StartupRecovery.retrySecurityState;
+
+  @override
+  String toString() => 'localSecurityStateUnavailable(${failure.diagnosticLabel})';
+}
+
+/// A CREDENTIAL WAS GIVEN UP AND NEITHER ITS DESTRUCTION NOR ITS ABANDONMENT
+/// COULD BE CONFIRMED.
+///
+/// Reached only for [AbandonmentNotDurable] and
+/// [AbandonmentSecurityStateUnavailable]: the secure erase failed AND nothing
+/// durable records that the user walked away. Every other outcome — including
+/// a failed erase whose marker held — is survivable and routes to
+/// [Unauthenticated].
+///
+/// It is NOT an ordinary sign-in. Presenting one would tell the user the
+/// session was safely abandoned when the client cannot show that it was, and
+/// would put a credential-restoring path one successful authentication away
+/// from a store that is currently unable to record anything. No protected
+/// content renders, no credential is restored, and the recovery is to retry
+/// the destruction.
+///
+/// THE HARD BOUNDARY. This holds for the life of the process. A restart cannot
+/// be defended against locally — nothing durable records the abandonment, by
+/// definition — so the state does not pretend otherwise; see the in-process
+/// latch in `core/security/token_store.dart`. Server-side revocation is the
+/// only real remedy and is not this layer's to perform.
+final class SecurityRecoveryBlocked extends StartupState {
+  const SecurityRecoveryBlocked(this.outcome);
+
+  /// What actually happened to the credential.
+  final SessionAbandonmentOutcome outcome;
+
+  @override
+  StartupStage get stage => StartupStage.securityRecoveryBlocked;
+
+  @override
+  StartupRecovery get recovery => StartupRecovery.retrySecurityRecovery;
+
+  @override
+  String toString() => 'securityRecoveryBlocked(${outcome.diagnosticLabel})';
 }
 
 /// The user asked for an application lock and this process is not unlocked.

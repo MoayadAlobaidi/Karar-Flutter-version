@@ -943,6 +943,30 @@
   "@appLockRequiresSession": {
     "description": "Shown when the app lock is changed without a signed-in session."
   },
+  "appLockEnableNotSaved": "Karar could not save the app lock on this device, so it is still off. Nothing changed. Try again.",
+  "@appLockEnableNotSaved": {
+    "description": "Shown when turning the app lock on failed because the device would not store the choice. It states plainly that the lock is still off, because showing the switch as on would promise a protection that would not survive a restart."
+  },
+  "appLockDisableNotSaved": "Karar could not save that change on this device, so the app lock is still on. Try again, or use your password on the lock screen if you cannot unlock.",
+  "@appLockDisableNotSaved": {
+    "description": "Shown when turning the app lock off failed because the device would not store the choice. It states that the lock remains on, and points at the password fallback so the user is not trapped."
+  },
+  "securityStateUnavailableTitle": "Karar cannot check its security settings",
+  "@securityStateUnavailableTitle": {
+    "description": "Heading for the startup screen shown when the device would not report whether the app lock is on, so no security gate can be evaluated."
+  },
+  "securityStateUnavailableMessage": "This device did not report whether your app lock is on. Karar will not open your account until it can tell, so nothing is shown for now. Try again, and restart the device if it keeps happening.",
+  "@securityStateUnavailableMessage": {
+    "description": "Body for the startup screen shown when local security state could not be read. It explains that the app is failing closed on purpose and offers the retry."
+  },
+  "securityRecoveryBlockedTitle": "That session could not be removed",
+  "@securityRecoveryBlockedTitle": {
+    "description": "Heading for the startup screen shown when a stored session was given up but could neither be erased nor durably recorded as abandoned."
+  },
+  "securityRecoveryBlockedMessage": "Karar could not delete the stored session on this device, and could not record that you gave it up. Signing in now would not make it safe, so Karar is waiting instead. Try again. If it keeps failing, sign out of this device from another one.",
+  "@securityRecoveryBlockedMessage": {
+    "description": "Body for the blocked security-recovery screen. It says why an ordinary sign-in is not offered, and points at server-side session revocation from another device, which is the only real remedy."
+  },
 
   "sessionEndedTitle": "You have been signed out",
   "@sessionEndedTitle": {
@@ -1008,6 +1032,10 @@
   "failureSecureStorage": "This device could not open its secure storage, so Karar stopped rather than continue without protecting your credentials. Try again.",
   "@failureSecureStorage": {
     "description": "Failure message when the device could not open its secure storage, so the request was abandoned rather than run without protecting credentials."
+  },
+  "failureLocalSecurityState": "This device could not confirm its security settings, so Karar stopped rather than continue without them. Try again.",
+  "@failureLocalSecurityState": {
+    "description": "Failure message when the local security-state store could not be read or written, so a security decision could not be established and the operation was abandoned."
   },
   "failureCancelled": "That request was cancelled.",
   "@failureCancelled": {

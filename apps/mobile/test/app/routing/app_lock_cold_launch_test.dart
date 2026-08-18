@@ -46,6 +46,7 @@ import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/logging/app_logger.dart';
 import 'package:karar_mobile/core/security/app_lock.dart';
+import 'package:karar_mobile/core/security/local_security_state_store.dart';
 import 'package:karar_mobile/core/security/secure_store.dart';
 import 'package:karar_mobile/core/security/session_manager.dart';
 import 'package:karar_mobile/core/security/session_tokens.dart';
@@ -84,7 +85,11 @@ SessionTokens _tokens({String access = _accessToken, String refresh = _refreshTo
 /// brand-new coordinator reading the disk the first one left behind. Nothing
 /// in-memory survives, which is exactly the property a cold-launch claim needs.
 final class _Launch {
-  _Launch({required this.secureStore, required this.preferences}) {
+  _Launch({
+    required this.secureStore,
+    required this.preferences,
+    required this.securityState,
+  }) {
     container = ProviderContainer(
       overrides: <Override>[
         ...featureSurfaceOverrides(),
@@ -102,6 +107,7 @@ final class _Launch {
           ),
         ),
         keyValueStoreProvider.overrideWithValue(preferences),
+        localSecurityStateStoreProvider.overrideWithValue(securityState),
         secureStoreProvider.overrideWithValue(secureStore),
         loggerProvider.overrideWithValue(
           AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
@@ -133,6 +139,11 @@ final class _Launch {
 
   final InMemorySecureStore secureStore;
   final RecordingKeyValueStore preferences;
+
+  /// Durable local security state: the lock choice and the abandonment marker.
+  /// It outlives a `_Launch` exactly as the on-device store outlives a process.
+  final InMemoryLocalSecurityStateStore securityState;
+
   final RecordingLogSink logSink = RecordingLogSink();
 
   late final ProviderContainer container;
@@ -168,7 +179,7 @@ final class _Launch {
   }
 
   Future<void> enableLock() =>
-      preferences.writeBool(appLockEnabledKey, value: true);
+      securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
 
   /// Mounts the real router over this container and runs startup.
   ///
@@ -210,17 +221,23 @@ void main() {
   group('a COLD locked launch can still reach sign-in', () {
     late InMemorySecureStore secureStore;
     late RecordingKeyValueStore preferences;
+    late InMemoryLocalSecurityStateStore securityState;
     late _Launch launch;
 
     setUp(() {
       secureStore = InMemorySecureStore();
       preferences = RecordingKeyValueStore();
+      securityState = InMemoryLocalSecurityStateStore();
     });
 
     /// Brings the application up as a locked cold launch does: material on
     /// disk, the lock preference on, nothing in memory.
     Future<void> coldLaunch(WidgetTester tester) async {
-      launch = _Launch(secureStore: secureStore, preferences: preferences);
+      launch = _Launch(
+        secureStore: secureStore,
+        preferences: preferences,
+        securityState: securityState,
+      );
       await launch.persistSessionMaterial();
       await launch.enableLock();
       await launch.boot(tester);
@@ -361,6 +378,7 @@ void main() {
       final _Launch relaunched = _Launch(
         secureStore: secureStore,
         preferences: preferences,
+        securityState: securityState,
       );
       await relaunched.boot(tester);
 
@@ -411,11 +429,13 @@ void main() {
   group('a keystore that will not ERASE fails closed', () {
     late InMemorySecureStore secureStore;
     late RecordingKeyValueStore preferences;
+    late InMemoryLocalSecurityStateStore securityState;
     late _Launch launch;
 
     setUp(() {
       secureStore = InMemorySecureStore();
       preferences = RecordingKeyValueStore();
+      securityState = InMemoryLocalSecurityStateStore();
     });
 
     /// A cold locked launch on a store that reads and writes normally but
@@ -425,7 +445,11 @@ void main() {
     /// would hide the surviving credential and the test would prove nothing
     /// about what happens to it.
     Future<void> coldLaunchWithUneraseableStore(WidgetTester tester) async {
-      launch = _Launch(secureStore: secureStore, preferences: preferences);
+      launch = _Launch(
+        secureStore: secureStore,
+        preferences: preferences,
+        securityState: securityState,
+      );
       await launch.persistSessionMaterial();
       await launch.enableLock();
       secureStore.failingOperations.add(SecureStorageOperation.delete);
@@ -492,6 +516,7 @@ void main() {
       final _Launch relaunched = _Launch(
         secureStore: secureStore,
         preferences: preferences,
+        securityState: securityState,
       );
       await relaunched.boot(tester);
       await relaunched.coordinator.unlock();
@@ -525,6 +550,7 @@ void main() {
       final _Launch relaunched = _Launch(
         secureStore: secureStore,
         preferences: preferences,
+        securityState: securityState,
       );
       await relaunched.boot(tester);
       await relaunched.coordinator.unlock();

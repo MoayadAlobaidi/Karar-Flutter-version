@@ -1229,6 +1229,42 @@ abstract class AppLocalizations {
   /// **'Sign in before changing the app lock.'**
   String get appLockRequiresSession;
 
+  /// Shown when turning the app lock on failed because the device would not store the choice. It states plainly that the lock is still off, because showing the switch as on would promise a protection that would not survive a restart.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not save the app lock on this device, so it is still off. Nothing changed. Try again.'**
+  String get appLockEnableNotSaved;
+
+  /// Shown when turning the app lock off failed because the device would not store the choice. It states that the lock remains on, and points at the password fallback so the user is not trapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not save that change on this device, so the app lock is still on. Try again, or use your password on the lock screen if you cannot unlock.'**
+  String get appLockDisableNotSaved;
+
+  /// Heading for the startup screen shown when the device would not report whether the app lock is on, so no security gate can be evaluated.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar cannot check its security settings'**
+  String get securityStateUnavailableTitle;
+
+  /// Body for the startup screen shown when local security state could not be read. It explains that the app is failing closed on purpose and offers the retry.
+  ///
+  /// In en, this message translates to:
+  /// **'This device did not report whether your app lock is on. Karar will not open your account until it can tell, so nothing is shown for now. Try again, and restart the device if it keeps happening.'**
+  String get securityStateUnavailableMessage;
+
+  /// Heading for the startup screen shown when a stored session was given up but could neither be erased nor durably recorded as abandoned.
+  ///
+  /// In en, this message translates to:
+  /// **'That session could not be removed'**
+  String get securityRecoveryBlockedTitle;
+
+  /// Body for the blocked security-recovery screen. It says why an ordinary sign-in is not offered, and points at server-side session revocation from another device, which is the only real remedy.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not delete the stored session on this device, and could not record that you gave it up. Signing in now would not make it safe, so Karar is waiting instead. Try again. If it keeps failing, sign out of this device from another one.'**
+  String get securityRecoveryBlockedMessage;
+
   /// Heading of the screen shown after a session ended without the reader asking.
   ///
   /// In en, this message translates to:
@@ -1324,6 +1360,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This device could not open its secure storage, so Karar stopped rather than continue without protecting your credentials. Try again.'**
   String get failureSecureStorage;
+
+  /// Failure message when the local security-state store could not be read or written, so a security decision could not be established and the operation was abandoned.
+  ///
+  /// In en, this message translates to:
+  /// **'This device could not confirm its security settings, so Karar stopped rather than continue without them. Try again.'**
+  String get failureLocalSecurityState;
 
   /// Failure message when the request was cancelled before it finished.
   ///

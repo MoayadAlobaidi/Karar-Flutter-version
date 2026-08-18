@@ -25,9 +25,10 @@ final class ApiSessionDirectoryRepository implements SessionDirectoryRepository 
   @override
   Future<Result<SessionDirectory>> list() async {
     try {
-      final JsonMap payload = await _client.identityListSessions(
+      final JsonMap payload = (await _client.identityListSessions(
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       final IdentityPayload reader =
           IdentityPayload(payload, location: 'auth.sessions');
       return Success<SessionDirectory>(
@@ -84,10 +85,11 @@ final class ApiSessionDirectoryRepository implements SessionDirectoryRepository 
   @override
   Future<Result<int>> revokeOthers() async {
     try {
-      final JsonMap payload = await _client.identityRevokeOtherSessions(
+      final JsonMap payload = (await _client.identityRevokeOtherSessions(
         idempotencyKey: _idempotencyKeys.next(),
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       final IdentityPayload reader =
           IdentityPayload(payload, location: 'auth.sessions.revokeOthers');
       // The count is stated by the server. Absent means the server did not

@@ -86,9 +86,13 @@ void main() {
           <String, Object?>{
             'sessionId': 'a',
             'createdAt': '2026-01-01T09:00:00Z',
+            'lastSeenAt': '2026-01-02T09:00:00Z',
+            'absoluteExpiresAt': '2026-02-01T09:00:00Z',
             'current': true,
-            // lastSeenAt, absoluteExpiresAt and userAgentSummary absent: the
-            // server minimises at the edge and may send none of them.
+            // `userAgentSummary` absent. It is the one field the contract
+            // declares nullable, and the server omits it when the client sent
+            // no user agent — so the mapping must produce null rather than a
+            // fabricated description of a device it knows nothing about.
           },
         ],
       });
@@ -99,8 +103,30 @@ void main() {
       final UserSession session = outcome.valueOrNull!.sessions.single;
       expect(session.sessionId, 'a');
       expect(session.isCurrent, isTrue);
-      expect(session.lastSeenAt, isNull);
       expect(session.userAgentSummary, isNull);
+    });
+
+    test('a response missing a REQUIRED field is a contract violation', () async {
+      // The schema declares `lastSeenAt` and `absoluteExpiresAt` required, so a
+      // response without them is not a minimised answer — it is one this client
+      // cannot classify, and guessing at a session's expiry is not a decision a
+      // client may make on the server's behalf.
+      final IdentityHarness harness = IdentityHarness();
+      await harness.signInFixture();
+      harness.transport.onGet('/auth/sessions', <String, Object?>{
+        'sessions': <Object?>[
+          <String, Object?>{
+            'sessionId': 'a',
+            'createdAt': '2026-01-01T09:00:00Z',
+            'current': true,
+          },
+        ],
+      });
+
+      final Result<SessionDirectory> outcome =
+          await harness.container.read(sessionDirectoryRepositoryProvider).list();
+
+      expect(outcome.failureOrNull, isA<ContractViolationFailure>());
     });
 
     test('a field of the wrong type degrades to a contract violation', () async {

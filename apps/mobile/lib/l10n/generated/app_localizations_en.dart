@@ -732,6 +732,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appLockRequiresSession => 'Sign in before changing the app lock.';
 
   @override
+  String get appLockEnableNotSaved =>
+      'Karar could not save the app lock on this device, so it is still off. Nothing changed. Try again.';
+
+  @override
+  String get appLockDisableNotSaved =>
+      'Karar could not save that change on this device, so the app lock is still on. Try again, or use your password on the lock screen if you cannot unlock.';
+
+  @override
+  String get securityStateUnavailableTitle =>
+      'Karar cannot check its security settings';
+
+  @override
+  String get securityStateUnavailableMessage =>
+      'This device did not report whether your app lock is on. Karar will not open your account until it can tell, so nothing is shown for now. Try again, and restart the device if it keeps happening.';
+
+  @override
+  String get securityRecoveryBlockedTitle =>
+      'That session could not be removed';
+
+  @override
+  String get securityRecoveryBlockedMessage =>
+      'Karar could not delete the stored session on this device, and could not record that you gave it up. Signing in now would not make it safe, so Karar is waiting instead. Try again. If it keeps failing, sign out of this device from another one.';
+
+  @override
   String get sessionEndedTitle => 'You have been signed out';
 
   @override
@@ -789,6 +813,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get failureSecureStorage =>
       'This device could not open its secure storage, so Karar stopped rather than continue without protecting your credentials. Try again.';
+
+  @override
+  String get failureLocalSecurityState =>
+      'This device could not confirm its security settings, so Karar stopped rather than continue without them. Try again.';
 
   @override
   String get failureCancelled => 'That request was cancelled.';

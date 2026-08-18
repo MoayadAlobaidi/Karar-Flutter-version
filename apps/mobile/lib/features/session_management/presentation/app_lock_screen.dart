@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../core/security/app_lock.dart';
 import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
 import '../../authentication/presentation/widgets/identity_scaffold.dart';
@@ -148,6 +149,21 @@ class _AppLockSettingsScreenState extends ConsumerState<AppLockSettingsScreen> {
         if (state.requiresSession)
           IdentityFailureNotice(
             message: l10n.appLockRequiresSession,
+            tone: KararStatusTone.warning,
+          ),
+        // THE CHANGE THAT DID NOT PERSIST.
+        //
+        // Rendered from the typed result rather than inferred from the switch,
+        // and it says which direction failed, because the consequences are
+        // opposite: a refused enable leaves the user unprotected, a refused
+        // disable leaves them locked. The switch beneath shows the DURABLE
+        // state, so it has not moved — this notice is the only thing that
+        // explains why.
+        if (state.lastChange case final AppLockChangeRejected _)
+          IdentityFailureNotice(
+            message: state.rejectedEnable
+                ? l10n.appLockEnableNotSaved
+                : l10n.appLockDisableNotSaved,
             tone: KararStatusTone.warning,
           ),
         if (state.lastOutcome != null && state.lastOutcome is! LocalAuthSucceeded)

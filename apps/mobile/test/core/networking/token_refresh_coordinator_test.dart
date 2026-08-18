@@ -46,7 +46,9 @@ final class _Harness {
       clock: clock,
       logger: AppLogger.silent,
     );
-    sessions.onSessionEnded.listen(endReasons.add);
+    sessions.onSessionEnded.listen(
+      (SessionEnded ended) => endReasons.add(ended.reason),
+    );
   }
 
   final FixedClock clock;

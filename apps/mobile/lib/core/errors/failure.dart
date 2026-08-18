@@ -284,6 +284,48 @@ final class LocalStorageUnavailableFailure extends Failure {
 /// Which preference-store operation failed.
 enum LocalStorageOperation { write, remove }
 
+/// The dedicated local SECURITY-STATE store could not be consulted.
+///
+/// Distinct from both storage failures above, and the distinction is the point.
+/// [SecureStorageUnavailableFailure] names the platform keystore, so a reader
+/// assumes credential material was involved. [LocalStorageUnavailableFailure]
+/// names the ordinary preference store, whose contents are a theme and a
+/// locale and whose loss costs a tap. THIS one names the store that holds the
+/// application-lock choice and the persisted-session abandonment marker: no
+/// credential, but the two answers that decide whether protected content
+/// renders at all. Losing it is not a degraded preference, it is a gate that
+/// cannot be evaluated, and the only safe reading of an unevaluable gate is
+/// closed.
+final class LocalSecurityStateUnavailableFailure extends Failure {
+  const LocalSecurityStateUnavailableFailure({
+    super.code,
+    super.correlationId,
+    required this.operation,
+  });
+
+  final LocalSecurityStateOperation operation;
+
+  @override
+  String get diagnosticLabel => 'local_security_state_unavailable_${operation.name}';
+}
+
+/// Which security-state operation could not be performed. `open` means the
+/// store was never available at all, so nothing was even attempted.
+enum LocalSecurityStateOperation { open, read, write, remove }
+
+/// A local security flag exists and is not the shape it must be.
+///
+/// Reported rather than folded into "absent", because the two mean opposite
+/// things: absent is a user who never made the choice, corrupt is a value that
+/// was written and has since been damaged or tampered with. Fails closed, and
+/// the offending value is never read out or logged.
+final class LocalSecurityStateCorruptFailure extends Failure {
+  const LocalSecurityStateCorruptFailure({super.code, super.correlationId});
+
+  @override
+  String get diagnosticLabel => 'local_security_state_corrupt';
+}
+
 /// Required build configuration is absent or invalid. A production build in
 /// this state must not start.
 final class ConfigurationInvalidFailure extends Failure {

@@ -8,6 +8,13 @@
 // secure-storage wipe reports a failure. A credential that cannot be erased
 // from disk must at least stop being used.
 //
+// BOTH ENDINGS REPORT THE SAME TYPED OUTCOME. `TokenStore.clear` answers with a
+// single [SessionAbandonmentOutcome] naming what became of the credential, and
+// this class passes it straight through — on the return value, and on the end
+// stream, which carries the outcome alongside the reason. A listener that only
+// wanted the reason cannot accidentally miss the fact that the erase failed,
+// because there is no second value to forget to read.
+//
 // There are TWO ways a session stops, and they are not the same operation:
 //
 //   * [SessionManager.end] — a session that was LIVE has stopped. It
@@ -50,14 +57,14 @@ final class SessionManager {
 
   final TokenStore _store;
   final CategoryLogger _logger;
-  final StreamController<SessionEndReason> _ended =
-      StreamController<SessionEndReason>.broadcast();
+  final StreamController<SessionEnded> _ended =
+      StreamController<SessionEnded>.broadcast();
 
   SessionState _state = const NoSession();
 
-  /// Emits once each time a session ends. Listeners route to the sign-in
-  /// destination; they must not attempt recovery.
-  Stream<SessionEndReason> get onSessionEnded => _ended.stream;
+  /// Emits once each time a session ends. Listeners route to the destination
+  /// the event's outcome permits; they must not attempt recovery.
+  Stream<SessionEnded> get onSessionEnded => _ended.stream;
 
   SessionState get state => _state;
 
@@ -110,22 +117,20 @@ final class SessionManager {
   /// Ends the session: wipes the credential and notifies listeners.
   ///
   /// Idempotent — calling it for an already-ended session emits nothing, so a
-  /// failed refresh and a 401 arriving together cannot double-signal.
-  Future<void> end(SessionEndReason reason) async {
+  /// failed refresh and a 401 arriving together cannot double-signal. The
+  /// second call answers [CredentialErased], because there is nothing left to
+  /// destroy and saying otherwise would invent a failure.
+  Future<SessionAbandonmentOutcome> end(SessionEndReason reason) async {
     if (_state is NoSession) {
-      return;
+      return const CredentialErased();
     }
     _state = const NoSession();
-    final cleared = await _store.clear();
-    if (cleared is Failed<void>) {
-      _logger.error(
-        'Secure credential wipe failed; the in-memory credential was dropped regardless.',
-        fields: <String, Object?>{'reason': reason.name},
-      );
-    }
+    final SessionAbandonmentOutcome cleared = await _store.clear();
+    _report(cleared, reason: reason);
     if (!_ended.isClosed) {
-      _ended.add(reason);
+      _ended.add(SessionEnded(reason: reason, outcome: cleared));
     }
+    return cleared;
   }
 
   /// Destroys the PERSISTED credential whether or not one was ever adopted.
@@ -150,48 +155,82 @@ final class SessionManager {
   /// produce two transitions for one press.
   ///
   /// Idempotent: a second call re-clears an already-empty store and reports
-  /// the same answer. The result is the erase outcome, and a `Failed` means
-  /// the credential MAY STILL BE PERSISTED — the caller must not tell the user
-  /// otherwise.
-  Future<Result<void>> abandonPersistedSession() async {
+  /// the same answer. The result is the compound outcome, and anything other
+  /// than [CredentialErased] means the caller must not describe this as a
+  /// clean removal — the credential may still be persisted, the abandonment
+  /// may not be recorded, or both.
+  Future<SessionAbandonmentOutcome> abandonPersistedSession() async {
     // In-memory first, unconditionally. A credential that cannot be erased
     // from disk must at least stop being used by this process.
     _state = const NoSession();
-    final cleared = await _store.clear();
-    if (cleared is Failed<void>) {
-      // THE COMPOUND FAILURE IS THE ONE THAT MATTERS.
-      //
-      // A failed erase alone is survivable: the invalidation marker stands, so
-      // the next launch refuses to restore what is still on disk. What is NOT
-      // survivable is a failed erase whose marker also failed to persist —
-      // then nothing records that the credential was given up, the next launch
-      // reads it back, and the user is signed into the session they abandoned.
-      //
-      // `_store.clear()` reports that state distinctly (see `TokenStore`), and
-      // it is logged as such rather than folded into the ordinary failure,
-      // because the two have different consequences and the same log line
-      // would hide it.
-      final bool markerHolds = _store.abandonmentIsRecorded;
-      _logger.error(
-        markerHolds
-            ? 'Persisted session abandoned; the secure erase failed and the '
-                  'credential may still be on disk. It is marked abandoned, so '
-                  'a later launch will refuse to restore it.'
-            : 'Persisted session abandoned; the secure erase failed AND the '
-                  'abandonment could not be recorded. A later launch may '
-                  'restore this credential.',
-        fields: <String, Object?>{
-          'outcome': markerHolds ? 'erase_failed' : 'erase_failed_unrecorded',
-        },
-      );
-    } else {
-      _logger.info(
-        'Persisted session abandoned at the application lock.',
-        fields: <String, Object?>{'outcome': 'erased'},
-      );
-    }
+    final SessionAbandonmentOutcome cleared = await _store.clear();
+    _report(cleared);
     return cleared;
   }
 
+  /// Logs the compound outcome, at the level its consequences deserve.
+  ///
+  /// THE COMPOUND FAILURE IS THE ONE THAT MATTERS. A failed erase alone is
+  /// survivable: the invalidation marker stands, so the next launch refuses to
+  /// restore what is still on disk. What is NOT survivable is a failed erase
+  /// whose marker also failed to persist — then nothing records that the
+  /// credential was given up, the next launch reads it back, and the user is
+  /// signed into the session they abandoned.
+  ///
+  /// Each case gets its own line rather than one line for all of them, because
+  /// the consequences differ and a shared message would hide the difference
+  /// exactly where somebody reading logs needs to see it. No line carries
+  /// credential material: the outcome label and the reason are the whole
+  /// payload.
+  void _report(SessionAbandonmentOutcome outcome, {SessionEndReason? reason}) {
+    final Map<String, Object?> fields = <String, Object?>{
+      'outcome': outcome.diagnosticLabel,
+      if (reason != null) 'reason': reason.name,
+    };
+    switch (outcome) {
+      case CredentialErased():
+        _logger.info('Persisted credential destroyed.', fields: fields);
+      case CredentialErasedMarkerRetained():
+        _logger.warning(
+          'Persisted credential destroyed; the abandonment marker could not be '
+          'stood down and will be retried.',
+          fields: fields,
+        );
+      case CredentialPersistedButDurablyInvalidated():
+        _logger.error(
+          'The secure erase failed and the credential may still be on disk. It '
+          'is durably marked abandoned, so a later launch will refuse to '
+          'restore it.',
+          fields: fields,
+        );
+      case AbandonmentNotDurable():
+      case AbandonmentSecurityStateUnavailable():
+        _logger.error(
+          'The secure erase failed AND the abandonment could not be recorded '
+          'durably. Local recovery is blocked; only server-side revocation can '
+          'settle this session.',
+          fields: fields,
+        );
+    }
+  }
+
   Future<void> dispose() => _ended.close();
+}
+
+/// One session ending, with what became of the credential behind it.
+///
+/// The outcome travels WITH the reason so that a listener deciding where to
+/// send the user cannot route a compound storage failure to the same ordinary
+/// sign-in screen as a clean sign-out. Previously the reason was the whole
+/// event and the outcome had to be fetched separately, which meant it usually
+/// was not.
+final class SessionEnded {
+  const SessionEnded({required this.reason, required this.outcome});
+
+  final SessionEndReason reason;
+
+  final SessionAbandonmentOutcome outcome;
+
+  @override
+  String toString() => 'SessionEnded(${reason.name}, ${outcome.diagnosticLabel})';
 }

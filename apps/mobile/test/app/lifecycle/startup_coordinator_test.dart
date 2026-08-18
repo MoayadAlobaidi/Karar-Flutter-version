@@ -14,11 +14,11 @@ import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/logging/app_logger.dart';
 import 'package:karar_mobile/core/security/app_lock.dart';
+import 'package:karar_mobile/core/security/local_security_state_store.dart';
 import 'package:karar_mobile/core/security/secure_store.dart';
 import 'package:karar_mobile/core/security/session_manager.dart';
 import 'package:karar_mobile/core/security/session_tokens.dart';
 import 'package:karar_mobile/core/security/token_store.dart';
-import 'package:karar_mobile/core/storage/key_value_store.dart';
 import 'package:karar_mobile/core/utilities/clock.dart';
 
 import '../../core/support/fakes.dart';
@@ -55,15 +55,18 @@ final class _Harness {
     List<Result<BootstrapSnapshot>>? bootstrapAnswers,
   })  : clock = FixedClock(_now),
         secureStore = InMemorySecureStore(),
-        preferences = InMemoryKeyValueStore(),
+        securityState = InMemoryLocalSecurityStateStore(),
         gateway = FakeBootstrapGateway(
           bootstrapAnswers ?? <Result<BootstrapSnapshot>>[Success<BootstrapSnapshot>(readySnapshot())],
         ) {
     sessions = SessionManager(
-      store: SecureTokenStore(secureStore),
+      store: SecureTokenStore(
+        secureStore,
+        invalidation: PersistedSessionInvalidation(securityState),
+      ),
       logger: AppLogger.silent,
     );
-    appLock = AppLockGate(preferences: preferences);
+    appLock = AppLockGate(securityState: securityState);
     coordinator = StartupCoordinator(
       loadConfiguration: () =>
           configuration ?? Success<AppConfiguration>(_configuration()),
@@ -78,7 +81,7 @@ final class _Harness {
 
   final FixedClock clock;
   final InMemorySecureStore secureStore;
-  final InMemoryKeyValueStore preferences;
+  final InMemoryLocalSecurityStateStore securityState;
   final FakeBootstrapGateway gateway;
   final List<StartupState> observed = <StartupState>[];
 
@@ -644,6 +647,12 @@ void main() {
       final states = <StartupState>[
         const ConfigLoading(),
         const ConfigInvalid(<String>['X']),
+        const LocalSecurityStateUnavailable(
+          LocalSecurityStateUnavailableFailure(
+            operation: LocalSecurityStateOperation.read,
+          ),
+        ),
+        const SecurityRecoveryBlocked(AbandonmentNotDurable()),
         const AppLocked(),
         const SessionRestoring(),
         const Unauthenticated(),
@@ -665,6 +674,12 @@ void main() {
       final states = <StartupState>[
         const ConfigLoading(),
         const ConfigInvalid(<String>['X']),
+        const LocalSecurityStateUnavailable(
+          LocalSecurityStateUnavailableFailure(
+            operation: LocalSecurityStateOperation.read,
+          ),
+        ),
+        const SecurityRecoveryBlocked(AbandonmentNotDurable()),
         const AppLocked(),
         const SessionRestoring(),
         const Unauthenticated(),

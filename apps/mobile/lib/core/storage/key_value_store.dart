@@ -1,17 +1,29 @@
 // PURE DART ONLY — the port. Implementations live beside it.
 //
 // This store is for NON-SENSITIVE preferences only: locale, theme, the
-// biometric-lock choice, the last-seen onboarding step. It is backed by
-// platform shared preferences, which is plain, unencrypted, and readable on a
-// rooted or jailbroken device.
+// last-seen onboarding step, a dismissed hint. It is backed by platform shared
+// preferences, which is plain, unencrypted, and readable on a rooted or
+// jailbroken device.
 //
 // Tokens, refresh tokens, MFA secrets, recovery codes and consent evidence
 // MUST NOT be written here. `PreferenceKey` refuses to construct a key whose
 // name looks sensitive, so the mistake fails at the call site rather than in
 // production.
+//
+// NEITHER MAY A SECURITY DECISION. This store swallows platform failures and
+// falls back to memory when it cannot be opened, and both are deliberate: the
+// in-memory value is the caller's intent, a failed disk write costs the user a
+// tap, and no preference is worth blocking startup for. Those same two
+// behaviours are how the application-lock choice came to be read as "off" on a
+// device whose preference storage had failed, and how the persisted-session
+// abandonment marker came to report success without reaching disk.
+//
+// Both values have moved to `core/security/local_security_state_store.dart`,
+// which swallows nothing and has no fallback. Nothing that decides whether
+// protected content renders belongs in this file again — the write path here
+// deliberately offers no way to find out whether a write landed, so an author
+// tempted to gate on a preference has to notice that they cannot.
 import 'package:meta/meta.dart';
-import '../errors/failure.dart';
-import '../errors/result.dart';
 
 /// A validated preference key.
 @immutable
@@ -72,22 +84,14 @@ abstract interface class KeyValueStore {
 
   bool? readBool(PreferenceKey key);
 
+  /// Writes a boolean. The platform outcome is deliberately NOT reported.
+  ///
+  /// For an ordinary preference — a theme choice, a dismissed hint — the
+  /// in-memory value is the caller's intent and a failed disk write is not
+  /// worth propagating. For anything whose correctness depends on the write
+  /// having landed, this signature is the wrong tool and there is no checked
+  /// variant here to reach for: use `LocalSecurityStateStore`.
   Future<void> writeBool(PreferenceKey key, {required bool value});
-
-  /// Writes a boolean and REPORTS whether the platform accepted it.
-  ///
-  /// [writeBool] deliberately swallows a platform failure: for an ordinary
-  /// preference — a theme choice, a dismissed hint — the in-memory value is
-  /// the caller's intent and a failed disk write is not worth propagating.
-  ///
-  /// That is wrong for one caller. The persisted-session invalidation marker
-  /// exists so a credential the user gave up is not restored after a relaunch,
-  /// and a marker that silently did not reach disk provides exactly nothing
-  /// while reporting success. An independent review demonstrated it: the write
-  /// fails, `raise()` returns normally, the in-memory snapshot answers true for
-  /// the rest of the process, and nothing survives. Only a caller that can SEE
-  /// the failure can fail closed on it.
-  Future<Result<void>> writeBoolChecked(PreferenceKey key, {required bool value});
 
   Future<void> remove(PreferenceKey key);
 
@@ -99,15 +103,13 @@ abstract interface class KeyValueStore {
 /// An in-memory store. Used by tests and as the fallback when the platform
 /// preference store cannot be opened — losing a theme choice is acceptable,
 /// blocking startup for one is not.
+///
+/// This fallback is exactly why no security decision may be read through this
+/// port: an in-memory store holds no application-lock choice, and a caller that
+/// defaults a missing choice to "off" has just disabled the lock because the
+/// platform had a bad day.
 final class InMemoryKeyValueStore implements KeyValueStore {
   final Map<String, Object> _values = <String, Object>{};
-
-  /// When true, [writeBoolChecked] reports failure while still updating the
-  /// in-memory value — which is exactly how the real preference store behaves
-  /// when the platform refuses the write and the snapshot has already moved.
-  /// Without this, the compound failure that the invalidation marker exists to
-  /// survive cannot be reproduced in a test.
-  bool refuseCheckedWrites = false;
 
   @override
   String? readString(PreferenceKey key) {
@@ -124,17 +126,6 @@ final class InMemoryKeyValueStore implements KeyValueStore {
   bool? readBool(PreferenceKey key) {
     final value = _values[key.name];
     return value is bool ? value : null;
-  }
-
-  @override
-  Future<Result<void>> writeBoolChecked(PreferenceKey key, {required bool value}) async {
-    await writeBool(key, value: value);
-    if (refuseCheckedWrites) {
-      return const Failed<void>(
-        LocalStorageUnavailableFailure(operation: LocalStorageOperation.write),
-      );
-    }
-    return const Success<void>(null);
   }
 
   @override

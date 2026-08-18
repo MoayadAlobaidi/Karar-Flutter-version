@@ -4,8 +4,6 @@
 // so that routing decisions (locale, theme, lock choice) never await I/O.
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../errors/failure.dart';
-import '../errors/result.dart';
 import '../logging/app_logger.dart';
 import 'key_value_store.dart';
 
@@ -23,6 +21,13 @@ final class PreferencesKeyValueStore implements KeyValueStore {
   /// Opens the platform store. On failure the caller receives an in-memory
   /// store instead: a preference is never important enough to fail startup,
   /// and nothing sensitive is kept here.
+  ///
+  /// THIS FALLBACK IS SAFE ONLY BECAUSE NO SECURITY DECISION LIVES HERE. It
+  /// used to hold the application-lock choice, and then the fallback WAS the
+  /// vulnerability: an in-memory store holds no choice, the caller read the
+  /// missing choice as "off", and a device whose preference storage failed
+  /// skipped the lock. `LocalSecurityStateStore` exists so the two cases can
+  /// have opposite policies, and it has no fallback at all.
   static Future<KeyValueStore> open({required AppLogger logger}) async {
     final log = logger.forCategory('storage');
     try {
@@ -69,30 +74,6 @@ final class PreferencesKeyValueStore implements KeyValueStore {
   bool? readBool(PreferenceKey key) {
     final value = _snapshot[_qualify(key)];
     return value is bool ? value : null;
-  }
-
-  @override
-  Future<Result<void>> writeBoolChecked(
-    PreferenceKey key, {
-    required bool value,
-  }) async {
-    final qualified = _qualify(key);
-    _snapshot[qualified] = value;
-    try {
-      await _preferences.setBool(qualified, value);
-      return const Success<void>(null);
-    } on Object catch (error) {
-      // Reported, not swallowed. The caller asked whether this reached disk
-      // because its own correctness depends on the answer.
-      _logger.warning(
-        'Preference operation failed.',
-        fields: <String, Object?>{'operation': 'write-checked'},
-        error: error,
-      );
-      return Failed<void>(
-        const LocalStorageUnavailableFailure(operation: LocalStorageOperation.write),
-      );
-    }
   }
 
   @override

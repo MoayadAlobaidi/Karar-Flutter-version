@@ -29,7 +29,6 @@ import 'package:karar_mobile/app/composition/feature_surface.dart';
 import 'package:karar_mobile/app/dependency_injection/providers.dart';
 import 'package:karar_mobile/app/lifecycle/startup_state.dart';
 import 'package:karar_mobile/app/routing/route_paths.dart';
-import 'package:karar_mobile/core/security/app_lock.dart';
 import 'package:karar_mobile/features/session_management/data/platform_local_authenticator.dart';
 import 'package:karar_mobile/features/session_management/domain/app_lock.dart';
 import 'package:karar_mobile/features/session_management/presentation/app_lock_providers.dart';
@@ -68,7 +67,7 @@ void main() {
         ],
       );
 
-      await harness.preferences.writeBool(appLockEnabledKey, value: true);
+      await harness.enableAppLock();
       await harness.signInFixture();
 
       // No tear-down here: `routerProvider` registers its own `onDispose`, and

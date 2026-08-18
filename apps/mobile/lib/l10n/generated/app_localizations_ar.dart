@@ -735,6 +735,29 @@ class AppLocalizationsAr extends AppLocalizations {
   String get appLockRequiresSession => 'سجّل الدخول قبل تغيير قفل التطبيق.';
 
   @override
+  String get appLockEnableNotSaved =>
+      'تعذّر على كرار حفظ قفل التطبيق على هذا الجهاز، لذا ما زال معطّلًا. لم يتغيّر شيء. حاول مرة أخرى.';
+
+  @override
+  String get appLockDisableNotSaved =>
+      'تعذّر على كرار حفظ هذا التغيير على هذا الجهاز، لذا ما زال قفل التطبيق مفعّلًا. حاول مرة أخرى، أو استخدم كلمة المرور في شاشة القفل إذا تعذّر عليك فتحه.';
+
+  @override
+  String get securityStateUnavailableTitle =>
+      'لا يستطيع كرار التحقق من إعدادات الأمان';
+
+  @override
+  String get securityStateUnavailableMessage =>
+      'لم يُبلّغ هذا الجهاز عمّا إذا كان قفل التطبيق مفعّلًا. لن يفتح كرار حسابك قبل أن يتأكد، لذا لا يُعرض شيء الآن. حاول مرة أخرى، وأعد تشغيل الجهاز إذا تكرّر ذلك.';
+
+  @override
+  String get securityRecoveryBlockedTitle => 'تعذّرت إزالة تلك الجلسة';
+
+  @override
+  String get securityRecoveryBlockedMessage =>
+      'تعذّر على كرار حذف الجلسة المخزّنة على هذا الجهاز، وتعذّر عليه تسجيل أنك تخليت عنها. تسجيل الدخول الآن لن يجعلها آمنة، لذا ينتظر كرار بدلًا من ذلك. حاول مرة أخرى. وإذا استمر الفشل، سجّل الخروج من هذا الجهاز عبر جهاز آخر.';
+
+  @override
   String get sessionEndedTitle => 'تم تسجيل خروجك';
 
   @override
@@ -791,6 +814,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get failureSecureStorage =>
       'تعذّر على هذا الجهاز فتح مخزنه الآمن، لذا توقّف كرار بدلًا من المتابعة دون حماية بياناتك. حاول مرة أخرى.';
+
+  @override
+  String get failureLocalSecurityState =>
+      'تعذّر على هذا الجهاز تأكيد إعدادات الأمان، لذا توقّف كرار بدلًا من المتابعة دونها. حاول مرة أخرى.';
 
   @override
   String get failureCancelled => 'تم إلغاء ذلك الطلب.';

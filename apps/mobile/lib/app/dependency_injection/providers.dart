@@ -46,6 +46,7 @@ import '../../core/networking/timeouts.dart';
 import '../../core/networking/token_refresh_coordinator.dart';
 import '../../core/security/app_lock.dart';
 import '../../core/security/flutter_secure_store.dart';
+import '../../core/security/local_security_state_store.dart';
 import '../../core/security/secure_store.dart';
 import '../../core/security/session_manager.dart';
 import '../../core/security/session_token_codec.dart';
@@ -88,8 +89,25 @@ final Provider<Result<AppConfiguration>> configurationResultProvider =
 );
 
 /// Non-sensitive preference storage, opened asynchronously at bootstrap.
+///
+/// Locale, theme, dismissed hints. NOT the application-lock choice and NOT the
+/// persisted-session abandonment marker: those are security state and live in
+/// [localSecurityStateStoreProvider], which reports a storage failure instead
+/// of falling back to memory. See `core/storage/key_value_store.dart`.
 final Provider<KeyValueStore> keyValueStoreProvider = Provider<KeyValueStore>(
   (Ref ref) => throw MissingOverrideError('keyValueStoreProvider'),
+);
+
+/// Durable local SECURITY state, opened asynchronously at bootstrap.
+///
+/// Two booleans that decide whether protected content renders. Required rather
+/// than defaulted: a default would have to be either an in-memory store, which
+/// answers "the lock is off" on a device whose storage failed, or an
+/// unavailable one, which would block a shell that simply forgot to wire it.
+/// Failing loudly at composition time is better than either.
+final Provider<LocalSecurityStateStore> localSecurityStateStoreProvider =
+    Provider<LocalSecurityStateStore>(
+  (Ref ref) => throw MissingOverrideError('localSecurityStateStoreProvider'),
 );
 
 /// Diagnostics sink. Silent by default so a test that forgets to override it
@@ -135,7 +153,7 @@ final Provider<LocalePreferences> localePreferencesProvider = Provider<LocalePre
 );
 
 final Provider<AppLockGate> appLockGateProvider = Provider<AppLockGate>(
-  (Ref ref) => AppLockGate(preferences: ref.watch(keyValueStoreProvider)),
+  (Ref ref) => AppLockGate(securityState: ref.watch(localSecurityStateStoreProvider)),
 );
 
 // ---------------------------------------------------------------------------
@@ -150,13 +168,16 @@ final Provider<SecureStore> secureStoreProvider = Provider<SecureStore>(
 ///
 /// The marker is not optional in production: it is the only thing that stops a
 /// credential whose erase FAILED from being restored on the next cold launch.
-/// It is kept in the preference store rather than the secure one on purpose —
-/// see `core/security/token_store.dart` for the semantics and for what the
+/// It is kept in local security state rather than in the secure store on
+/// purpose — a marker written through the very port that just refused a delete
+/// would be unavailable at precisely the moment it is needed. See
+/// `core/security/token_store.dart` for the semantics and for what the
 /// arrangement still does not protect against.
 final Provider<TokenStore> tokenStoreProvider = Provider<TokenStore>(
   (Ref ref) => SecureTokenStore(
     ref.watch(secureStoreProvider),
-    invalidation: PersistedSessionInvalidation(ref.watch(keyValueStoreProvider)),
+    invalidation:
+        PersistedSessionInvalidation(ref.watch(localSecurityStateStoreProvider)),
   ),
 );
 
@@ -233,7 +254,15 @@ final Provider<TokenRefreshCoordinator> tokenRefreshCoordinatorProvider =
           body: IdentityRefreshRequestDto(refreshToken: refreshToken),
           timeouts: TimeoutProfile.startup,
         );
-        return codec.decode(payload, fallbackSessionId: sessions.tokens?.sessionId);
+        // The generated client now returns a typed DTO. `SessionTokenCodec` is
+        // the one place a refresh payload is validated and mapped, including
+        // the fallback session id the response does not repeat, so the DTO is
+        // handed back as JSON rather than the codec being bypassed. Two
+        // parsers for one payload is how the two drift apart.
+        return codec.decode(
+          payload.toJson(),
+          fallbackSessionId: sessions.tokens?.sessionId,
+        );
       } on ApiException catch (exception) {
         return Failed<SessionTokens>(exception.failure);
       }

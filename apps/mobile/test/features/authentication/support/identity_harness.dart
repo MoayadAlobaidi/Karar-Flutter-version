@@ -23,6 +23,7 @@ import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/logging/app_logger.dart';
 import 'package:karar_mobile/core/networking/api_transport.dart';
 import 'package:karar_mobile/core/networking/http_method.dart';
+import 'package:karar_mobile/core/security/local_security_state_store.dart';
 import 'package:karar_mobile/core/security/secure_store.dart';
 import 'package:karar_mobile/core/security/session_tokens.dart';
 import 'package:karar_mobile/core/storage/key_value_store.dart';
@@ -150,6 +151,11 @@ JsonMap mfaChallengePayload({
     };
 
 /// A session-list payload. Carries device metadata only.
+///
+/// Every field the contract declares REQUIRED is present, including
+/// `absoluteExpiresAt` and `lastSeenAt`. `userAgentSummary` is the one the
+/// schema declares nullable, so it is the only one a fixture may omit — see
+/// the repository suite, which covers exactly that case.
 JsonMap sessionListPayload({int others = 1}) => <String, Object?>{
       'sessions': <Object?>[
         <String, Object?>{
@@ -165,6 +171,7 @@ JsonMap sessionListPayload({int others = 1}) => <String, Object?>{
             'sessionId': '9f1d0f6a-0000-4000-8000-00000000000${index + 2}',
             'createdAt': DateTime.utc(2025, 12, 20, 9).toIso8601String(),
             'lastSeenAt': DateTime.utc(2025, 12, 28, 9).toIso8601String(),
+            'absoluteExpiresAt': DateTime.utc(2026, 1, 20, 9).toIso8601String(),
             'current': false,
             'userAgentSummary': 'Android phone, Karar app',
           },
@@ -200,12 +207,6 @@ final class RecordingKeyValueStore implements KeyValueStore {
   bool? readBool(PreferenceKey key) => _delegate.readBool(key);
 
   @override
-  Future<Result<void>> writeBoolChecked(PreferenceKey key, {required bool value}) {
-    writes.add('${key.name}=$value');
-    return _delegate.writeBoolChecked(key, value: value);
-  }
-
-  @override
   Future<void> writeBool(PreferenceKey key, {required bool value}) {
     writes.add('${key.name}=$value');
     return _delegate.writeBool(key, value: value);
@@ -218,6 +219,15 @@ final class RecordingKeyValueStore implements KeyValueStore {
   Future<void> clear() => _delegate.clear();
 }
 
+/// Durable local security state, wired for a test.
+///
+/// A thin alias over the production in-memory implementation, which already
+/// records every write and can be told to refuse a read, a write or a removal
+/// per flag. Nothing here is a mock: `AppLockGate` and `SecureTokenStore` are
+/// the real ones, so a test that says "the lock choice never reached storage"
+/// is asserting production behaviour.
+typedef HarnessSecurityState = InMemoryLocalSecurityStateStore;
+
 /// The composition root, wired for a test.
 final class IdentityHarness {
   IdentityHarness({
@@ -228,6 +238,7 @@ final class IdentityHarness {
         refreshTransport = ScriptedIdentityTransport(),
         secureStore = InMemorySecureStore(),
         preferences = RecordingKeyValueStore(),
+        securityState = HarnessSecurityState(),
         logSink = RecordingLogSink() {
     container = ProviderContainer(
       overrides: <Override>[
@@ -245,6 +256,7 @@ final class IdentityHarness {
           ),
         ),
         keyValueStoreProvider.overrideWithValue(preferences),
+        localSecurityStateStoreProvider.overrideWithValue(securityState),
         loggerProvider.overrideWithValue(
           AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
         ),
@@ -275,7 +287,18 @@ final class IdentityHarness {
 
   final InMemorySecureStore secureStore;
   final RecordingKeyValueStore preferences;
+
+  /// The application-lock choice and the abandonment marker.
+  final HarnessSecurityState securityState;
+
   final RecordingLogSink logSink;
+
+  /// Everything written to durable local security state, for assertions.
+  String get securityStateText => securityState.writes.join('\n');
+
+  /// Turns the application lock on, durably, as a user would have.
+  Future<void> enableAppLock() =>
+      securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
 
   /// Everything written to platform secure storage, for assertions.
   Map<String, String> get secureEntries => secureStore.entries;

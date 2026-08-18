@@ -90,10 +90,17 @@ final class ApiAuthenticationRepository implements AuthenticationRepository {
     required Password password,
   }) async {
     try {
-      final JsonMap payload = await _client.identityLogin(
+      // `IdentityLoginResponseDto` is a sealed union over the authenticated and
+      // mfa_required branches, and the discriminator it switches on is the same
+      // `status` field `_adoption.isMfaChallenge` reads. Re-encoding keeps ONE
+      // classifier for the two outcomes: `SessionAdoption` owns the decision,
+      // the challenge retention and the credential commit, and a second switch
+      // here would be a second place for the two to disagree.
+      final JsonMap payload = (await _client.identityLogin(
         body: IdentityLoginRequestDto(email: email.value, password: password.value),
         timeouts: TimeoutProfile.interactive,
-      );
+      ))
+          .toJson();
       if (_adoption.isMfaChallenge(payload)) {
         final IdentityPayload reader =
             IdentityPayload(payload, location: 'auth.login');

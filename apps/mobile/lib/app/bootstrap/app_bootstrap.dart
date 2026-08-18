@@ -7,8 +7,11 @@
 //   3. load and VALIDATE build configuration — a failure here becomes a
 //      CONFIG_INVALID state, not a crash and not a fallback endpoint;
 //   4. open non-sensitive preference storage;
-//   5. build the composition root;
-//   6. start the coordinator and run the shell.
+//   5. open durable local SECURITY state — separately, and with no fallback:
+//      a failure here becomes a LOCAL_SECURITY_STATE_UNAVAILABLE state rather
+//      than an invented answer about whether the application lock is on;
+//   6. build the composition root;
+//   7. start the coordinator and run the shell.
 //
 // The application ALWAYS reaches a rendered state, including when
 // configuration is invalid: a deterministic error screen is a better failure
@@ -27,6 +30,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import '../../core/errors/result.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/storage/preferences_key_value_store.dart';
+import '../../core/storage/preferences_local_security_state_store.dart';
 import '../../features/session_management/presentation/app_lock_providers.dart';
 import '../configuration/app_configuration.dart';
 import '../dependency_injection/providers.dart';
@@ -47,11 +51,18 @@ Future<void> bootstrapKararApp({List<Override> overrides = const <Override>[]}) 
       installErrorHandlers(logger);
 
       final preferences = await PreferencesKeyValueStore.open(logger: logger);
+      // Opened as its own step, through its own port. The preference store
+      // above may quietly degrade to memory when the platform refuses, because
+      // losing a theme costs a tap; this one reports the failure, because
+      // losing the lock choice would open a gate.
+      final securityState =
+          await PreferencesLocalSecurityStateStore.open(logger: logger);
 
       final container = ProviderContainer(
         overrides: <Override>[
           configurationResultProvider.overrideWithValue(configuration),
           keyValueStoreProvider.overrideWithValue(preferences),
+          localSecurityStateStoreProvider.overrideWithValue(securityState),
           loggerProvider.overrideWithValue(logger),
           ...overrides,
         ],

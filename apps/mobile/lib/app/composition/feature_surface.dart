@@ -1,34 +1,46 @@
 // THE COMPOSITION ROOT'S FEATURE SURFACE.
 //
-// Two workstreams contribute startup-gate screens, routes and tenant-scoped
-// providers, and both express their contribution as Riverpod overrides. An
+// Three workstreams contribute startup-gate screens, routes and tenant-scoped
+// providers, and each expresses its contribution as Riverpod overrides. An
 // override REPLACES a provider's value rather than adding to it, so applying
-// both sets independently would mean the second silently discards the first.
+// the sets independently would mean the last one silently discards the rest.
 // This file is the single place they are merged, and the only place that
-// knows both exist.
+// knows all three exist.
 //
 // Precedence is explicit rather than positional: identity owns the
 // authentication gates, the platform surface owns tenant selection and
-// bootstrap-unavailable, and the two sets are disjoint by construction — the
-// test beside this file fails if they ever overlap, rather than letting one
-// quietly win.
+// bootstrap-unavailable, session management owns the two security-state gates,
+// and the sets are disjoint by construction — the test beside this file fails
+// if they ever overlap, rather than letting one quietly win.
 
 import 'package:flutter_riverpod/misc.dart' show Override;
 
 import '../../features/authentication/presentation/routes/identity_module.dart';
 import '../../features/platform_bootstrap/presentation/platform_feature_registration.dart';
+import '../../features/session_management/presentation/security_state_screens.dart';
 import '../../shared/design_system/theme/karar_theme.dart';
 import '../dependency_injection/providers.dart';
+import '../lifecycle/startup_state.dart';
+import '../routing/app_router.dart';
 
 /// Every feature contribution the shell mounts, merged into one override list.
 ///
-/// `platformSurfaceOverrides` takes the identity contributions as its
+/// `platformSurfaceOverrides` takes the other workstreams' contributions as its
 /// `additional*` inputs, so exactly one override per provider is produced and
 /// the merge happens inside the function that owns the provider's shape.
+///
+/// The session-management gates are merged here rather than added to either of
+/// the other two registration files: the two security-state stages belong to
+/// the workstream that owns the states behind them, and neither identity nor
+/// the platform surface has any reason to know they exist. The three sets are
+/// disjoint, which the test beside this file asserts rather than assumes.
 List<Override> featureSurfaceOverrides() => <Override>[
       ...platformSurfaceOverrides(
         additionalRoutes: identityRoutes(),
-        additionalStartupScreens: identityStartupScreens(),
+        additionalStartupScreens: <StartupStage, StartupScreenBuilder>{
+          ...identityStartupScreens(),
+          ...securityStateStartupScreens(),
+        },
       ),
       ...themeOverrides(),
     ];

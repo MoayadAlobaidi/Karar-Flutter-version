@@ -55,6 +55,11 @@ GoRouter buildAppRouter({
     routes: <RouteBase>[
       gateRoute(RoutePaths.startup, StartupStage.configLoading),
       gateRoute(RoutePaths.configurationError, StartupStage.configInvalid),
+      gateRoute(
+        RoutePaths.securityUnavailable,
+        StartupStage.localSecurityStateUnavailable,
+      ),
+      gateRoute(RoutePaths.securityRecovery, StartupStage.securityRecoveryBlocked),
       gateRoute(RoutePaths.lock, StartupStage.appLocked),
       gateRoute(RoutePaths.signIn, StartupStage.unauthenticated),
       gateRoute(RoutePaths.verifyEmail, StartupStage.emailVerificationRequired),
@@ -90,6 +95,14 @@ VoidCallback? _recoveryAction(StartupCoordinator coordinator, StartupState state
       StartupRecovery.restart => () => unawaited(coordinator.start()),
       StartupRecovery.unlockApplication => () => unawaited(coordinator.unlock()),
       StartupRecovery.retryBootstrap => () => unawaited(coordinator.retryBootstrap()),
+      // Both security recoveries are real actions the coordinator can perform
+      // with no feature involved, so the placeholder gate screen offers them
+      // even before a product screen exists. A blocked security state with no
+      // button would be a dead end, which is the one thing the state machine
+      // does not permit.
+      StartupRecovery.retrySecurityState => () => unawaited(coordinator.start()),
+      StartupRecovery.retrySecurityRecovery => () =>
+          unawaited(coordinator.retrySecurityRecovery()),
       StartupRecovery.correctBuildConfiguration ||
       StartupRecovery.authenticate ||
       StartupRecovery.completeVerification ||

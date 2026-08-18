@@ -42,6 +42,14 @@ String identityFailureMessage(AppLocalizations l10n, Failure failure) =>
       // already says the device could not save something, so it is reused
       // rather than adding a message that says the same thing differently.
       LocalStorageUnavailableFailure() => l10n.failureSecureStorage,
+      // Local SECURITY state: the application-lock choice, the abandonment
+      // marker. A dedicated message, because the consequence is not "a setting
+      // did not save" — it is that a protection this device is meant to apply
+      // cannot be established, and the honest thing is to say so and offer the
+      // retry rather than to reuse a notice about storage in general.
+      LocalSecurityStateUnavailableFailure() ||
+      LocalSecurityStateCorruptFailure() =>
+        l10n.failureLocalSecurityState,
       ConfigurationInvalidFailure() => l10n.failureConfiguration,
       // A contract violation is a client/server mismatch. The user is told
       // something went wrong and nothing about the shape of the payload.
