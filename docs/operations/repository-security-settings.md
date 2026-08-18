@@ -18,7 +18,7 @@ parallel).
 | Setting | Required state | Current status | Owner | Verification method | Evidence |
 | --- | --- | --- | --- | --- | --- |
 | Branch protection on `main`: require pull request before merging | Enabled. Approving-review count follows EXC-001: 0 while the team is one person; raised to 1 (with stale-approval dismissal) when the team reaches 2 | VERIFIED 2026-08-15 — enabled, count 0 per EXC-001 | Engineering Owner | `gh api repos/{owner}/{repo}/branches/main/protection/required_pull_request_reviews` | EV-007 |
-| Branch protection on `main`: required status checks | Enabled, "require branches to be up to date" on, with exactly these checks: `workspace`, `architecture`, `mobile`, `codeql`, `secrets`, `dependency-review`, `iac-and-containers`, `sbom` | VERIFIED 2026-08-15 — all 8 required, strict up-to-date on | Engineering Owner | `gh api repos/{owner}/{repo}/branches/main/protection/required_status_checks` | EV-007 |
+| Branch protection on `main`: required status checks | Enabled, "require branches to be up to date" on, with exactly these checks: `workspace`, `architecture`, `mobile`, `codeql`, `secrets`, `dependency-review`, `iac-and-containers`, `sbom`, `mobile-android`, `mobile-ios` | VERIFIED 2026-08-18 — all 10 required, strict up-to-date on. `mobile-android` and `mobile-ios` were added at the Phase 4 PR close, once both had run to success on the PR head and their job names were observed stable; every prior check was preserved and admin enforcement, force-push and deletion settings were re-read afterwards and are unchanged | Engineering Owner | `gh api repos/{owner}/{repo}/branches/main/protection/required_status_checks` | EV-007 |
 | Branch protection on `main`: no direct pushes, no bypass | "Do not allow bypassing the above settings" enabled (applies to admins); merges only via PR | VERIFIED 2026-08-15 — enforce_admins true | Engineering Owner | `gh api repos/{owner}/{repo}/branches/main/protection --jq .enforce_admins` | EV-007 |
 | Branch protection on `main`: force pushes and deletion blocked | `allow_force_pushes: false`, `allow_deletions: false` | VERIFIED 2026-08-15 | Engineering Owner | `gh api repos/{owner}/{repo}/branches/main/protection --jq '{allow_force_pushes, allow_deletions}'` | EV-007 |
 | Branch protection on `main`: linear history | **Disabled** (documented choice, see below): phase PRs merge with a merge commit so phase history stays visible | VERIFIED 2026-08-15 — required_linear_history false | Engineering Owner | `gh api repos/{owner}/{repo}/branches/main/protection --jq .required_linear_history` and `gh api repos/{owner}/{repo} --jq '{allow_merge_commit, allow_squash_merge, allow_rebase_merge}'` | EV-007 |
@@ -47,6 +47,10 @@ Blocking (add all of these as required checks):
 - `dependency-review` (security.yml; runs on PRs only, skipped on push — a skipped run satisfies branch protection)
 - `iac-and-containers` (security.yml)
 - `sbom` (security.yml)
+- `mobile-android` (ci.yml; added 2026-08-18 — assembles a debug and an unsigned release APK and reads the merged manifest, the packaged network policy and the generated backup rules off the real artifact)
+- `mobile-ios` (ci.yml; added 2026-08-18 — builds all four environments without signing and verifies each packaged bundle's transport posture and effective bundle identifier, including the cross-platform identity comparison against the Android outputs it fetches from the lane above)
+
+`mobile-supply-chain` (security.yml) is **not** required, and that is a gap rather than a decision: it carries the blocking mobile secret scan. It is left for the next branch-protection review because a check should be observed stable on more than one PR head before it gates a merge, and Phase 4 is the first head any of these lanes has run on.
 
 Report-only (do NOT add as required checks; they are designed never to block):
 

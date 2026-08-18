@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **4 — IN PROGRESS** ([phase report](docs/phases/phase-04.md)); Phase 5 **NOT STARTED** |
-| Last completed phase | 3.5 (jurisdiction and capability foundation, [report](docs/phases/phase-03-5.md)) |
+| Current phase | **4 — COMPLETE** — PR open, not merged ([phase report](docs/phases/phase-04.md), [PR #7](https://github.com/MoayadAlobaidi/Karar-Flutter-version/pull/7)); Phase 5 **NOT STARTED**. COMPLETE means the implementation and its internal gates are done — **not** merged, deployed, signed, certified, app-store ready or production ready |
+| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — its PR is open and unmerged |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, and a Flutter client covering account, identity and platform state — **no consumer product capability is implemented or reachable** |
 | Mobile | Builds and tests for Android and iOS, with per-environment application identifiers verified out of real packaged artifacts. **No signed build, no signing material, no store submission, no deployed endpoint** — a build for any environment other than `LOCAL` is refused because no endpoint exists, and the biometric prompt has never been exercised on a device |
