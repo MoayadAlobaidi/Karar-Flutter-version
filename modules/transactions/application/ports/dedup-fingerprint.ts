@@ -48,26 +48,40 @@
  * is stored on the row, and participates in the unique constraint — so a
  * version bump starts a fresh namespace instead of colliding with the old one.
  *
- * ## Why the input carries an occurrence ordinal
+ * ## Why the input carries NO occurrence ordinal
  *
  * Two genuinely identical purchases exist: the same coffee, the same price,
- * the same shop, twice in one day. Without a discriminator, "exact duplicates
- * are impossible" would also make the second real purchase impossible. The
- * ordinal is that discriminator, and it is supplied explicitly — a reviewed
- * import or a person says "this is the second one", rather than the system
- * guessing that a repeat is legitimate.
+ * the same shop, twice in one day. That is a fact about how many times one
+ * content identity occurred — not a fact about what the content IS. So the
+ * discriminator is a separate explicit column (`occurrence_ordinal` on the
+ * row, `occurrenceOrdinal` on `TransactionCommit`), and the digest stays
+ * purely a statement about content.
+ *
+ * Keeping them apart is what makes each answerable. Fold the ordinal into the
+ * digest and the second coffee acquires a second, unrelated content identity:
+ * "have I seen this content before?" can no longer be asked without guessing
+ * every ordinal it might have been recorded under, and the unique constraint
+ * ends up enforcing something the digest no longer describes. Migration 0090
+ * carries the same split — content identity, legitimate repeat, and duplicate
+ * handling as three concepts — and the unique key is over the fingerprint AND
+ * the ordinal, with the guard there refusing any ordinal but the next unused
+ * one, so a high ordinal is not a way around duplicate review.
  */
 
 import type { AccountRef } from '../../domain/refs.js';
 import type { TransactionsPrincipal } from './principal-context.js';
 
 /**
- * The content a fingerprint is computed over. Content only: nothing derived
- * from a key, a ciphertext, or a row id may participate (packages/platform
- * keys/custody.ts states the rule — ciphertext changes on rotation and on
- * every fresh nonce, so an identifier derived from it would silently change
- * identity, and an identifier derived from a row id would make every row
- * unique and the constraint useless).
+ * The content a fingerprint is computed over. Content only, in both
+ * directions:
+ *
+ *  - nothing derived from a key, a ciphertext, or a row id may participate
+ *    (packages/platform keys/custody.ts states the rule — ciphertext changes
+ *    on rotation and on every fresh nonce, so an identifier derived from it
+ *    would silently change identity, and an identifier derived from a row id
+ *    would make every row unique and the constraint useless);
+ *  - and nothing about OCCURRENCE may participate either. There is
+ *    deliberately no `occurrenceOrdinal` field here; see the header.
  */
 export interface FingerprintInput {
   readonly accountRef: AccountRef;
@@ -83,8 +97,6 @@ export interface FingerprintInput {
    * create two rulesets that must agree forever.
    */
   readonly normalizedNarrative: string;
-  /** 1 for the first occurrence; 2 for a genuine second identical movement. */
-  readonly occurrenceOrdinal: number;
 }
 
 /** An opaque digest plus the definition that produced it. */

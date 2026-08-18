@@ -39,13 +39,18 @@ import {
   provisionDatabase,
   skipBanner,
   superuserMaintenanceProfile,
+  testEncryption,
+  testRetention,
+  withAdapter,
+  SYNTHETIC_SOURCE_REFERENCE,
 } from './fixtures.js';
+import { HsfFieldEncryptionError } from '../application/ports/hsf-field-encryption.js';
 import {
   ACCOUNT_STATUSES,
   ACCOUNT_TYPES,
   SOURCE_KINDS,
 } from '../domain/financial-account.js';
-import type { BalanceSnapshotId, FinancialAccountId, SourceReference } from '../domain/refs.js';
+import type { BalanceSnapshotId, FinancialAccountId } from '../domain/refs.js';
 import { PrismaBalanceSnapshotRepository } from '../infrastructure/persistence/prisma-balance-snapshot-repository.js';
 import { PrismaFinancialAccountRepository } from '../infrastructure/persistence/prisma-financial-account-repository.js';
 import { PrismaInstitutionCatalogueReader } from '../infrastructure/persistence/prisma-institution-catalogue-reader.js';
@@ -74,6 +79,22 @@ const MODULE_TABLES = [
   'financial_accounts',
   'financial_account_balance_snapshots',
 ] as const;
+
+/**
+ * The NOT NULL encryption columns every raw adversarial insert below has to
+ * supply. The byte values are deliberate nonsense — these rows are asserted
+ * to be REFUSED, so nothing ever decrypts them, and inventing a real
+ * ciphertext would only obscure which constraint is under test.
+ */
+const HSF_COLUMNS =
+  'hsf_algorithm, hsf_key_version, display_name_ciphertext, display_name_nonce, display_name_auth_tag';
+const HSF_VALUES = [
+  `'AES-256-GCM'`,
+  `'karar-ref:key-version:synthetic-test-accounts@v1'`,
+  `decode('53796e7468657469632052656675736564', 'hex')`,
+  `decode('000000000000000000000000', 'hex')`,
+  `decode('00000000000000000000000000000000', 'hex')`,
+].join(', ');
 
 let handle: PrismaHandle;
 let accounts: PrismaFinancialAccountRepository;
@@ -125,11 +146,12 @@ describe.skipIf(unreachable !== null)(
     beforeAll(async () => {
       await provisionDatabase(database);
       handle = buildHandle(database);
-      accounts = new PrismaFinancialAccountRepository(handle);
+      accounts = new PrismaFinancialAccountRepository(handle, testEncryption());
       snapshots = new PrismaBalanceSnapshotRepository(handle);
       const create = new CreateManualAccount(
         accounts,
         new PrismaInstitutionCatalogueReader(handle),
+        testRetention(),
         new Uuidv7IdSource(),
         clock,
       );
@@ -260,20 +282,89 @@ describe.skipIf(unreachable !== null)(
       }
     });
 
-    it('the mask CHECK carries the same pattern as the domain rule', async () => {
-      const definition =
-        (await checkDefsOf('financial_accounts')).get('financial_accounts_mask_check') ?? '';
-      expect(definition).toContain('^[*xX#]{0,4}[0-9]{2,4}$');
+    it('NO PLAINTEXT COLUMN exists for the display name, the institution label, or the mask', async () => {
+      // The defect this asserts against: three HIGHLY_SENSITIVE_FINANCIAL
+      // fields stored as `text` on a table classified HSF, while the
+      // transactions module encrypted its equivalents from its first line.
+      // Asserted against the LIVE catalogue, because a migration comment
+      // claiming ciphertext is worth exactly as much as the column behind it.
+      const columns = await columnsOf('financial_accounts');
+      for (const plaintext of [
+        'display_name',
+        'user_supplied_institution_label',
+        'mask',
+      ]) {
+        expect({ column: plaintext, present: columns.has(plaintext) }).toEqual({
+          column: plaintext,
+          present: false,
+        });
+      }
+
+      // And what IS there: a ciphertext / nonce / auth-tag triple per field,
+      // with the algorithm and key version per row.
+      for (const [column, type] of [
+        ['display_name_ciphertext', 'bytea'],
+        ['display_name_nonce', 'bytea'],
+        ['display_name_auth_tag', 'bytea'],
+        ['user_supplied_institution_label_ciphertext', 'bytea'],
+        ['user_supplied_institution_label_nonce', 'bytea'],
+        ['user_supplied_institution_label_auth_tag', 'bytea'],
+        ['mask_ciphertext', 'bytea'],
+        ['mask_nonce', 'bytea'],
+        ['mask_auth_tag', 'bytea'],
+        ['hsf_algorithm', 'text'],
+        ['hsf_key_version', 'text'],
+      ] as const) {
+        expect({ column, type: columns.get(column) }).toEqual({ column, type });
+      }
+
+      // Nothing else on the table carries free text a subject supplied. The
+      // survivors are operational metadata a query has to be able to read.
+      const textColumns = [...columns]
+        .filter(([, type]) => type === 'text')
+        .map(([column]) => column)
+        .sort();
+      expect(textColumns).toEqual([
+        'account_type',
+        'currency_code',
+        'hsf_algorithm',
+        'hsf_key_version',
+        'provider_connection_ref',
+        'source_kind',
+        'status',
+      ]);
     });
 
-    it('the database itself refuses a full card number in the mask column', async () => {
+    it('the mask column still cannot hold a card number, now by BYTE bound', async () => {
+      // The shape CHECK could not survive encryption — a CHECK cannot read a
+      // ciphertext — so it was removed rather than kept as a rule that never
+      // fires. AES-256-GCM is length-preserving, so the eight-byte bound is
+      // the domain pattern's own maximum, and a 16-digit PAN does not fit.
+      const definition =
+        (await checkDefsOf('financial_accounts')).get('financial_accounts_mask_bound_check') ?? '';
+      expect(definition).toContain('octet_length(mask_ciphertext) <= 8');
+
+      // The old constraint is gone, and no constraint anywhere on the table
+      // still claims to inspect mask characters.
+      const checks = await checkDefsOf('financial_accounts');
+      expect(checks.has('financial_accounts_mask_check')).toBe(false);
+      for (const def of checks.values()) {
+        expect(def).not.toContain('[0-9]{2,4}');
+      }
+
       const failure = await asApp(database, gucA1, (tx) =>
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, display_name, mask, status, source_kind, updated_at)
+               (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                ${HSF_COLUMNS}, mask_ciphertext, mask_nonce, mask_auth_tag, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000081', $1, $2, 'CREDIT_CARD', 'QAR',
-                     'Synthetic Refused Account', '4111111111111111', 'ACTIVE', 'MANUAL', now())`,
+                     'ACTIVE', 'MANUAL', ${HSF_VALUES},
+                     -- sixteen bytes: the length of a card number, encrypted
+                     decode('41111111111111114111111111111111', 'hex'),
+                     decode('000000000000000000000000', 'hex'),
+                     decode('00000000000000000000000000000000', 'hex'),
+                     now())`,
             [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
           )
           .then(
@@ -285,15 +376,53 @@ describe.skipIf(unreachable !== null)(
       expect((failure as PgError).sqlState).toBe('23514'); // check_violation
     });
 
+    it('a half-written encrypted field is unrepresentable, in either direction', async () => {
+      // A ciphertext without its nonce or its tag is unreadable AND
+      // unverifiable; letting one exist would turn a write bug into a
+      // permanently unreadable account nobody notices until a page load.
+      for (const [label, columns, values] of [
+        [
+          'mask ciphertext with no tag',
+          'mask_ciphertext, mask_nonce',
+          `decode('30303030', 'hex'), decode('000000000000000000000000', 'hex')`,
+        ],
+        [
+          'label nonce with no ciphertext',
+          'user_supplied_institution_label_nonce',
+          `decode('000000000000000000000000', 'hex')`,
+        ],
+      ] as const) {
+        const failure = await asApp(database, gucA1, (tx) =>
+          tx
+            .query(
+              `INSERT INTO public.financial_accounts
+                 (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                  ${HSF_COLUMNS}, ${columns}, updated_at)
+               VALUES ('99999999-0000-4000-8000-00000000008a', $1, $2, 'CURRENT', 'QAR',
+                       'ACTIVE', 'MANUAL', ${HSF_VALUES}, ${values}, now())`,
+              [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
+            )
+            .then(
+              () => null,
+              (error: unknown) => error,
+            ),
+        );
+        expect({ label, sqlState: (failure as PgError).sqlState }).toEqual({
+          label,
+          sqlState: '23514',
+        });
+      }
+    });
+
     it('the database refuses a manual account that claims a provider connection', async () => {
       const failure = await asApp(database, gucA1, (tx) =>
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, display_name, status,
-                source_kind, provider_connection_ref, updated_at)
+               (id, tenant_id, user_id, account_type, currency_code, status,
+                source_kind, provider_connection_ref, ${HSF_COLUMNS}, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000082', $1, $2, 'CURRENT', 'QAR',
-                     'Synthetic Refused Account', 'ACTIVE', 'MANUAL', 'pretend-connection', now())`,
+                     'ACTIVE', 'MANUAL', 'pretend-connection', ${HSF_VALUES}, now())`,
             [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
           )
           .then(
@@ -309,10 +438,10 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, display_name, status,
-                source_kind, updated_at)
+               (id, tenant_id, user_id, account_type, currency_code, status,
+                source_kind, ${HSF_COLUMNS}, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000083', $1, $2, 'CURRENT', 'QAR',
-                     'Synthetic Refused Account', 'ACTIVE', 'EXTERNAL_PROVIDER', now())`,
+                     'ACTIVE', 'EXTERNAL_PROVIDER', ${HSF_VALUES}, now())`,
             [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
           )
           .then(
@@ -328,11 +457,17 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, institution_ref, user_supplied_institution_label,
-                account_type, currency_code, display_name, status, source_kind, updated_at)
+               (id, tenant_id, user_id, institution_ref,
+                user_supplied_institution_label_ciphertext,
+                user_supplied_institution_label_nonce,
+                user_supplied_institution_label_auth_tag,
+                account_type, currency_code, status, source_kind, ${HSF_COLUMNS}, updated_at)
              VALUES ('99999999-0000-4000-8000-000000000084', $1, $2,
-                     '11111111-0000-4000-8000-000000000011', 'Synthetic Unlisted Institution',
-                     'CURRENT', 'QAR', 'Synthetic Refused Account', 'ACTIVE', 'MANUAL', now())`,
+                     '11111111-0000-4000-8000-000000000011',
+                     decode('4142', 'hex'),
+                     decode('000000000000000000000000', 'hex'),
+                     decode('00000000000000000000000000000000', 'hex'),
+                     'CURRENT', 'QAR', 'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
             [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
           )
           .then(
@@ -341,6 +476,103 @@ describe.skipIf(unreachable !== null)(
           ),
       );
       expect((failure as PgError).sqlState).toBe('23514');
+    });
+
+    it('a ciphertext transplanted BETWEEN ROWS in the real table fails to read back', async () => {
+      // The database-level version of the associated-data guarantee. Someone
+      // with write access to the table — a compromised backup restore, a bad
+      // migration, an operator — copies one account's encrypted name onto
+      // another row. The read must FAIL rather than render the wrong person's
+      // account name, which is what a row-level checksum would miss.
+      const planted = '99999999-0000-4000-8000-0000000000f0' as FinancialAccountId;
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query(
+          `INSERT INTO public.financial_accounts
+             (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+              hsf_algorithm, hsf_key_version,
+              display_name_ciphertext, display_name_nonce, display_name_auth_tag, updated_at)
+           SELECT $1, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                  hsf_algorithm, hsf_key_version,
+                  display_name_ciphertext, display_name_nonce, display_name_auth_tag, now()
+             FROM public.financial_accounts WHERE id = $2`,
+          [planted, accountId],
+        ),
+      );
+
+      const failure = await accounts.findOwnById(ACTOR_A1, planted).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(failure).toBeInstanceOf(HsfFieldEncryptionError);
+      expect((failure as HsfFieldEncryptionError).kind).toBe('decryption_failed');
+      // No plaintext in the failure, and no hint about whose row it came from.
+      expect((failure as Error).message).not.toContain('Synthetic');
+
+      // The row it was copied FROM is still perfectly readable: the failure is
+      // the transplant, not a broken adapter.
+      const original = await accounts.findOwnById(ACTOR_A1, accountId);
+      expect(original?.displayName.reveal()).toBe('Synthetic Test Account With Records');
+
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query('DELETE FROM public.financial_accounts WHERE id = $1', [planted]),
+      );
+    });
+
+    it('a ciphertext transplanted BETWEEN FIELDS on one row fails to read back', async () => {
+      // A mask presented as an account name, or the reverse: both would
+      // decrypt into something a reader would believe, if the field were not
+      // bound as associated data.
+      const planted = '99999999-0000-4000-8000-0000000000f1' as FinancialAccountId;
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query(
+          `INSERT INTO public.financial_accounts
+             (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+              hsf_algorithm, hsf_key_version,
+              display_name_ciphertext, display_name_nonce, display_name_auth_tag, updated_at)
+           SELECT $1, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                  hsf_algorithm, hsf_key_version,
+                  -- the MASK ciphertext, written into the display-name columns
+                  mask_ciphertext, mask_nonce, mask_auth_tag, now()
+             FROM public.financial_accounts WHERE id = $2`,
+          [planted, accountId],
+        ),
+      );
+
+      const failure = await accounts.findOwnById(ACTOR_A1, planted).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect(failure).toBeInstanceOf(HsfFieldEncryptionError);
+      expect((failure as HsfFieldEncryptionError).kind).toBe('decryption_failed');
+
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query('DELETE FROM public.financial_accounts WHERE id = $1', [planted]),
+      );
+    });
+
+    it('the stored bytes contain no plaintext, and the row still carries its key provenance', async () => {
+      const row = await asApp(database, gucA1, (tx) =>
+        tx.query<{
+          name_bytes: string;
+          mask_len: number;
+          algorithm: string;
+          key_version: string;
+        }>(
+          `SELECT encode(display_name_ciphertext, 'escape') AS name_bytes,
+                  octet_length(mask_ciphertext)             AS mask_len,
+                  hsf_algorithm                             AS algorithm,
+                  hsf_key_version                           AS key_version
+             FROM public.financial_accounts WHERE id = $1`,
+          [accountId],
+        ),
+      );
+      const stored = row.rows[0];
+      expect(stored?.name_bytes).not.toContain('Synthetic');
+      expect(stored?.name_bytes).not.toContain('Account');
+      // Length-preserving, so the mask ciphertext is exactly the mask length.
+      expect(stored?.mask_len).toBe('*0000'.length);
+      expect(stored?.algorithm).toBe('AES-256-GCM');
+      expect(stored?.key_version).not.toBe('');
     });
 
     it('money round-trips exactly through the database, beyond the safe integer range', async () => {
@@ -355,7 +587,7 @@ describe.skipIf(unreachable !== null)(
         amount: Money.of(beyondSafeInteger, QAR),
         asOf: clock.now(),
         sourceKind: 'MANUAL',
-        sourceReference: 'synthetic-test-fixture' as SourceReference,
+        sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         capturedAt: clock.now(),
         createdAt: clock.now(),
       });
@@ -381,7 +613,7 @@ describe.skipIf(unreachable !== null)(
         amount: Money.fromDecimalString('-1234.56', QAR),
         asOf: clock.now(),
         sourceKind: 'MANUAL',
-        sourceReference: 'synthetic-test-fixture' as SourceReference,
+        sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         capturedAt: clock.now(),
         createdAt: clock.now(),
       });
@@ -397,8 +629,13 @@ describe.skipIf(unreachable !== null)(
                (id, tenant_id, user_id, account_id, amount_minor_units, currency_code, as_of,
                 source_kind, source_reference, captured_at)
              VALUES ('99999999-0000-4000-8000-000000000085', $1, $2, $3, 1000, 'KWD', now(),
-                     'MANUAL', 'synthetic-test-fixture', now())`,
-            [TenantId.toString(TENANT_A), UserId.toString(USER_A1), accountId],
+                     'MANUAL', $4, now())`,
+            [
+              TenantId.toString(TENANT_A),
+              UserId.toString(USER_A1),
+              accountId,
+              SYNTHETIC_SOURCE_REFERENCE,
+            ],
           )
           .then(
             () => null,

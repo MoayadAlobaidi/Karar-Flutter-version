@@ -52,7 +52,8 @@ import {
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { LocalKeyedDedupFingerprintProvider } from '../infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
-import { FixedPrincipalContext } from './fakes/in-memory-repositories.js';
+import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
+import { FixedAccountDirectory, FixedPrincipalContext } from './fakes/in-memory-repositories.js';
 import {
   BOOKED,
   EARLIER,
@@ -150,6 +151,14 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
 
   const aliceAccount = randomUUID();
   const bobAccount = randomUUID();
+  // The account gate resolves through a port the composition root binds to an
+  // adapter over modules/financial-accounts. Here it is a double that models
+  // the same visibility rule — an account resolves only for its owner — so
+  // the write path is exercised exactly as it will be wired.
+  const accountDirectory = new FixedAccountDirectory([
+    { accountId: aliceAccount, owner: alice, currencyCode: 'QAR' },
+    { accountId: bobAccount, owner: bob, currencyCode: 'QAR' },
+  ]);
 
   let aliceTransactionId: string;
   let bobTransactionId: string;
@@ -228,7 +237,15 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     const catalogue = new PrismaFinancialCategoryCatalogue(prismaHandle);
     rules = new PrismaMerchantRuleDirectory(prismaHandle);
 
-    create = new CreateManualTransaction(context, repository, fingerprints, ids, clock);
+    create = new CreateManualTransaction(
+      context,
+      repository,
+      fingerprints,
+      ids,
+      clock,
+      new LocalSyntheticRetentionDecisionProvider({ environment: 'local' }),
+      accountDirectory,
+    );
     read = new ReadOwnTransaction(context, repository, assignments);
     list = new ListOwnTransactions(context, repository);
     update = new UpdateOwnTransaction(context, repository, ids, clock);

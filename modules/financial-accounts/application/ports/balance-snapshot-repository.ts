@@ -12,9 +12,14 @@
  * attempt, even for the owner (migration 0089).
  *
  * **There is no method that computes a balance, and there never will be.**
- * `countForAccount` answers "does this account hold any financial record?" —
- * the question the currency-immutability rule turns on — and nothing here
- * sums, nets, or projects anything.
+ * `countForAccount` answers "does this account hold any REPORTED BALANCE?"
+ * and nothing here sums, nets, or projects anything.
+ *
+ * That is HALF of what the currency-immutability rule turns on, and treating
+ * it as the whole answer was a defect: transactions are financial records
+ * too, and they live in another module. `UpdateOwnAccount` asks both this
+ * count and `FinancialRecordPresencePort`, and either one answering yes
+ * freezes the currency.
  */
 
 import type { BalanceSnapshot } from '../../domain/balance-snapshot.js';

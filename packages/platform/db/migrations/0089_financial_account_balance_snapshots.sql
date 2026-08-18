@@ -17,6 +17,36 @@
 -- name, its own column, and its own honest label, rather than being
 -- silently written into this table. Nothing in this module computes one.
 --
+-- source_reference IS A UUID, AND THE ALTERNATIVE WAS CONSIDERED AND
+-- REJECTED. This column used to be `text` bounded at 200 characters, on a
+-- table classified HIGHLY_SENSITIVE_FINANCIAL. Nothing stopped a caller
+-- putting a statement line, an account number, or an explanatory sentence
+-- into a field whose stated job is to NAME an artefact — so it was
+-- arbitrary subject narrative sitting in plaintext beside a balance and a
+-- date, which is the precise combination 0088's ciphertext columns exist to
+-- prevent. A field like that on an HSF table has exactly two honest
+-- outcomes: encrypt it, or make it structurally incapable of holding
+-- narrative.
+--
+-- It is now a uuid. The reasons, in order of weight:
+--   1. The only legitimate content was ALWAYS an identifier — the import
+--      that produced the figure, or the manual entry that recorded it — and
+--      source_kind already says which KIND of artefact it is, so the
+--      reference never had to carry a word of prose.
+--   2. Encryption would have HIDDEN the narrative rather than made it
+--      unrepresentable. The column would still accept a sentence; nobody
+--      could read it, and nobody could tell it was there either. A uuid
+--      cannot hold a sentence at all, and 22P02 from the driver is a better
+--      outcome than a successful insert of the wrong thing.
+--   3. The column's one operation is equality — "which balances came from
+--      this import?" — and encrypting a value that is only ever compared
+--      would either break the operation or require deterministic
+--      encryption, which over a small guessable input is a confirmation
+--      oracle. Neither is acceptable, and neither is necessary for an
+--      opaque identifier that reveals nothing on its own.
+-- The domain states the same rule (isValidSourceReference) so a caller gets
+-- an answer in its own vocabulary; the column is what makes it true.
+--
 -- MONEY IS BIGINT MINOR UNITS, ALWAYS (ADR-0006; data-model.md §1).
 -- amount_minor_units is BIGINT and currency_code names the currency whose
 -- ISO 4217 exponent scales it — 1000 minor units is ten QAR or one KWD
@@ -76,7 +106,10 @@
 --       legal one and has not been taken, so no period is written here.
 --       Non-local ingestion fails closed until a PolicyPack decision
 --       exists; LOCAL and TEST run on clearly synthetic fixtures with no
---       legal effect.
+--       legal effect. ENFORCED, not merely declared: RecordReportedBalance
+--       gates every append on FinancialAccountRetentionDecisionPort and
+--       refuses before the first statement reaches this table (0088
+--       header).
 --     Export treatment: included — alongside the account.
 --     Erasure strategy: CASCADE_DELETE.
 --
@@ -111,13 +144,12 @@ CREATE TABLE public.financial_account_balance_snapshots (
   source_kind        text        NOT NULL
     CONSTRAINT financial_account_balance_snapshots_source_kind_check
     CHECK (source_kind IN ('MANUAL', 'CSV', 'EXTERNAL_PROVIDER')),
-  -- WHICH artefact reported it: an opaque in-module reference such as the
-  -- statement import that produced the figure. Required, because a balance
+  -- WHICH artefact reported it: the identifier of the statement import or
+  -- the manual entry that produced the figure. Required, because a balance
   -- whose origin is unrecorded cannot be explained to the person it belongs
-  -- to.
-  source_reference   text        NOT NULL
-    CONSTRAINT financial_account_balance_snapshots_source_reference_check
-    CHECK (btrim(source_reference) <> '' AND length(source_reference) <= 200),
+  -- to. A uuid and nothing else — see the header for why this is not
+  -- bounded text and not an encrypted field.
+  source_reference   uuid        NOT NULL,
   -- When this platform learned it. Deliberately unconstrained against
   -- as_of; see the header.
   captured_at        timestamptz NOT NULL,
@@ -149,6 +181,13 @@ COMMENT ON TABLE public.financial_account_balance_snapshots IS
 COMMENT ON COLUMN public.financial_account_balance_snapshots.amount_minor_units IS
   'Exact signed integer minor units; scale is 10^exponent of currency_code '
   '(ADR-0006). Never a float, never assumed to be cents.';
+
+COMMENT ON COLUMN public.financial_account_balance_snapshots.source_reference IS
+  'The artefact that reported the figure, by identifier. A uuid so the '
+  'column is structurally incapable of holding a statement line, an account '
+  'number, or an explanation — arbitrary plaintext narrative has no place '
+  'on a HIGHLY_SENSITIVE_FINANCIAL table. source_kind says what KIND of '
+  'artefact this identifies. Opaque; equality only.';
 
 -- The read this module serves: one owner's snapshots for one account, in
 -- balance-date order.

@@ -10,12 +10,57 @@
 -- WHAT CANNOT BE STORED HERE, AND WHY THAT IS THE POINT. There is no
 -- account-number column, no IBAN column, no PAN column, no CVV column, no
 -- credential column, and no synchronisation cursor. The only identifying
--- fragment the schema admits is `mask`, whose CHECK permits at most FOUR
--- digits with optional masking characters — a column that cannot hold a
+-- fragment the schema admits is the mask, and the column that holds it is
+-- bounded at EIGHT BYTES of ciphertext — a column that cannot hold a
 -- 13-to-19-digit card number or a 15-to-34-character IBAN no matter what a
 -- caller sends. That is a structural guarantee, not a validation someone
 -- can forget to call, and it is asserted by test. A stolen dump of this
 -- table does not let anyone move money.
+--
+-- WHY THE SUBJECT-NARRATIVE COLUMNS ARE CIPHERTEXT AND NOT TEXT
+--
+-- display_name, user_supplied_institution_label and mask are
+-- HIGHLY_SENSITIVE_FINANCIAL. "Al Bayt joint savings" plus an unlisted bank
+-- name plus a four-digit tail identifies a person's banking relationships;
+-- the table's classification always said so, and until this was corrected
+-- the columns said otherwise. public.transactions (0090) — same
+-- classification, same phase — stored ITS narrative as ciphertext from the
+-- first line. Two modules under one classification with opposite treatment
+-- means the weaker one decides what a stolen dump yields, so the weaker one
+-- was the defect and this is the correction.
+--
+-- There is no plaintext column for any of the three: the structure, not a
+-- convention, is what guarantees plaintext never lands here. Each field
+-- stores ciphertext, its own fresh nonce, and its own AEAD authentication
+-- tag; the algorithm and the key VERSION that produced them are per row
+-- (ADR-0017: key and version provenance recorded for every encryption, so a
+-- rotation leaves old rows readable and a key loss is detectable rather
+-- than discovered by a user). The auth tag is the integrity metadata:
+-- without it a modified ciphertext decrypts to garbage instead of failing.
+-- The application binds tenant, user, table, row id and field as associated
+-- data, so a ciphertext moved between columns, between rows, or between two
+-- members of one household tenant fails authentication instead of
+-- decrypting into a plausible wrong record.
+--
+-- THE MASK CHECK THAT COULD NOT SURVIVE, AND WHAT REPLACED IT. This table
+-- used to carry CHECK (mask ~ '^[*xX#]{0,4}[0-9]{2,4}$') — the same regular
+-- expression the domain applies. A CHECK cannot read a ciphertext, so that
+-- constraint could not survive encryption and was REMOVED rather than left
+-- in place as a rule that can no longer fire. The shape rule now lives in
+-- exactly one place, modules/financial-accounts/domain/financial-account.ts,
+-- and a test asserts this file no longer claims otherwise.
+--
+-- What did survive is the property that actually mattered. AES-256-GCM is
+-- length-preserving, so |ciphertext| = |plaintext| exactly: bounding
+-- mask_ciphertext at eight bytes bounds the mask at eight characters, which
+-- is the longest string the domain pattern admits (four masking characters
+-- plus four digits). A 16-digit PAN is sixteen bytes and is refused by the
+-- database, encrypted or not. The identifying-fragment guarantee is
+-- therefore still enforced by the schema, not merely by the application.
+-- The same reasoning gives the two display fields a 360-byte bound: 120
+-- characters at no more than three UTF-8 bytes per UTF-16 code unit, so a
+-- field named for a NAME still cannot become a place to keep notes the
+-- classification does not cover.
 --
 -- WHERE AN ACCOUNT COMES FROM. source_kind names the path: MANUAL (the user
 -- typed it — the first-class path, and the one a cash account or an
@@ -40,11 +85,22 @@
 -- HOW AN INSTITUTION IS NAMED, in exactly one of two ways. Either
 -- institution_ref points at the reviewed catalogue (0087), or
 -- user_supplied_institution_label carries what the subject typed — never
--- both, by CHECK. The label is deliberately stored HERE, on the
--- subject-owned row, and never in the catalogue: one person's typed bank
--- name must not become global reference data every other tenant reads
+-- both, by CHECK on the PRESENCE of the label's ciphertext, which is a
+-- question the database can still answer without reading the value. The
+-- label is deliberately stored HERE, on the subject-owned row, and never in
+-- the catalogue: one person's typed bank name must not become global
+-- reference data every other tenant reads
 -- (modules/financial-accounts/MODULE.md). Both may be null: a cash or
 -- wallet account names no institution at all.
+--
+-- RETENTION IS ENFORCED IN CODE, NOT ONLY DECLARED HERE. The lifecycle
+-- block below says non-local durable creation fails closed while the
+-- retention decision is unresolved. That was a paragraph and nothing else
+-- until CreateManualAccount and RecordReportedBalance were gated on
+-- FinancialAccountRetentionDecisionPort, which refuses BEFORE any field is
+-- encrypted and before any statement reaches this table. A retention claim
+-- no code path can refuse is worse than an absent one, because it is
+-- believed.
 --
 -- MONEY. This table stores no amount. Every amount in this module is BIGINT
 -- MINOR UNITS plus its currency code (ADR-0006; data-model.md §1) and lives
@@ -131,13 +187,6 @@ CREATE TABLE public.financial_accounts (
   institution_ref                uuid            NULL
     CONSTRAINT financial_accounts_institution_ref_fkey
     REFERENCES public.institutions (id),
-  -- Subject-supplied text, and the reason it lives on this row rather than
-  -- in the catalogue. Bounded so it stays a name and cannot become a note.
-  user_supplied_institution_label text           NULL
-    CONSTRAINT financial_accounts_user_supplied_institution_label_check
-    CHECK (user_supplied_institution_label IS NULL
-           OR (btrim(user_supplied_institution_label) <> ''
-               AND length(user_supplied_institution_label) <= 120)),
   account_type                   text        NOT NULL
     CONSTRAINT financial_accounts_account_type_check
     CHECK (account_type IN ('CURRENT', 'SAVINGS', 'CREDIT_CARD', 'CASH', 'WALLET', 'OTHER')),
@@ -146,15 +195,74 @@ CREATE TABLE public.financial_accounts (
     CONSTRAINT financial_accounts_currency_code_check
     CHECK (currency_code IN
       ('QAR', 'SAR', 'AED', 'OMR', 'KWD', 'BHD', 'USD', 'EUR', 'GBP')),
-  display_name                   text        NOT NULL
-    CONSTRAINT financial_accounts_display_name_check
-    CHECK (btrim(display_name) <> '' AND length(display_name) <= 120),
-  -- MASK ONLY. At most four digits, optionally preceded by masking
-  -- characters. A PAN (13-19 digits) and an IBAN (15-34 alphanumerics) are
-  -- both unrepresentable here; that is the column's entire purpose.
-  mask                           text            NULL
-    CONSTRAINT financial_accounts_mask_check
-    CHECK (mask IS NULL OR mask ~ '^[*xX#]{0,4}[0-9]{2,4}$'),
+
+  -- Encryption context for this row's HSF fields (ADR-0017 provenance). One
+  -- algorithm and one key version per ROW: the three fields are written
+  -- together, always, and per-field versions would make a rotation a partial
+  -- state every reader has to reason about for no gain.
+  hsf_algorithm                  text        NOT NULL
+    CONSTRAINT financial_accounts_hsf_algorithm_check CHECK (hsf_algorithm <> ''),
+  hsf_key_version                text        NOT NULL
+    CONSTRAINT financial_accounts_hsf_key_version_check CHECK (hsf_key_version <> ''),
+
+  -- display_name is REQUIRED: an account a person cannot recognise in a list
+  -- is not usable. 360 bytes is 120 characters at no more than three UTF-8
+  -- bytes per UTF-16 code unit — the domain bound, expressed in the only
+  -- unit an encrypted column can still measure.
+  display_name_ciphertext        bytea       NOT NULL
+    CONSTRAINT financial_accounts_display_name_bound_check
+    CHECK (octet_length(display_name_ciphertext) <= 360),
+  display_name_nonce             bytea       NOT NULL
+    CONSTRAINT financial_accounts_display_name_nonce_check
+    CHECK (octet_length(display_name_nonce) = 12),
+  display_name_auth_tag          bytea       NOT NULL
+    CONSTRAINT financial_accounts_display_name_auth_tag_check
+    CHECK (octet_length(display_name_auth_tag) = 16),
+
+  -- Subject-supplied text, and the reason it lives on this row rather than
+  -- in the catalogue. Optional, as an ALL-OR-NOTHING triple: a ciphertext
+  -- without its nonce or its tag is unreadable and unverifiable, so a
+  -- half-written field must not be representable.
+  user_supplied_institution_label_ciphertext bytea NULL
+    CONSTRAINT financial_accounts_institution_label_bound_check
+    CHECK (octet_length(user_supplied_institution_label_ciphertext) <= 360),
+  user_supplied_institution_label_nonce      bytea NULL
+    CONSTRAINT financial_accounts_institution_label_nonce_check
+    CHECK (octet_length(user_supplied_institution_label_nonce) = 12),
+  user_supplied_institution_label_auth_tag   bytea NULL
+    CONSTRAINT financial_accounts_institution_label_auth_tag_check
+    CHECK (octet_length(user_supplied_institution_label_auth_tag) = 16),
+  CONSTRAINT financial_accounts_institution_label_triple
+    CHECK (
+      (user_supplied_institution_label_ciphertext IS NULL
+       AND user_supplied_institution_label_nonce IS NULL
+       AND user_supplied_institution_label_auth_tag IS NULL)
+      OR (user_supplied_institution_label_ciphertext IS NOT NULL
+          AND user_supplied_institution_label_nonce IS NOT NULL
+          AND user_supplied_institution_label_auth_tag IS NOT NULL)
+    ),
+
+  -- MASK ONLY. Eight ciphertext bytes is eight plaintext characters under a
+  -- length-preserving cipher, and eight characters is the longest string the
+  -- domain's mask pattern admits: four masking characters plus four digits.
+  -- A PAN (13-19 digits) and an IBAN (15-34 alphanumerics) therefore remain
+  -- unrepresentable here — that is the column's entire purpose, and it
+  -- survives encryption intact.
+  mask_ciphertext                bytea           NULL
+    CONSTRAINT financial_accounts_mask_bound_check
+    CHECK (octet_length(mask_ciphertext) <= 8),
+  mask_nonce                     bytea           NULL
+    CONSTRAINT financial_accounts_mask_nonce_check
+    CHECK (octet_length(mask_nonce) = 12),
+  mask_auth_tag                  bytea           NULL
+    CONSTRAINT financial_accounts_mask_auth_tag_check
+    CHECK (octet_length(mask_auth_tag) = 16),
+  CONSTRAINT financial_accounts_mask_triple
+    CHECK (
+      (mask_ciphertext IS NULL AND mask_nonce IS NULL AND mask_auth_tag IS NULL)
+      OR (mask_ciphertext IS NOT NULL AND mask_nonce IS NOT NULL AND mask_auth_tag IS NOT NULL)
+    ),
+
   -- The account's OWN lifecycle. No value means connected or synced, and
   -- none may be added: capability state is shown honestly, never implied by
   -- a status badge (modules/financial-accounts/MODULE.md).
@@ -178,9 +286,12 @@ CREATE TABLE public.financial_accounts (
   -- external-provider account cannot exist without one.
   CONSTRAINT financial_accounts_provider_connection_check
     CHECK ((source_kind = 'EXTERNAL_PROVIDER') = (provider_connection_ref IS NOT NULL)),
-  -- An institution is named exactly one way, or not at all.
+  -- An institution is named exactly one way, or not at all. Presence, not
+  -- content: whether a label EXISTS is still visible to the database once
+  -- the label itself is not.
   CONSTRAINT financial_accounts_institution_naming_check
-    CHECK (NOT (institution_ref IS NOT NULL AND user_supplied_institution_label IS NOT NULL)),
+    CHECK (NOT (institution_ref IS NOT NULL
+                AND user_supplied_institution_label_ciphertext IS NOT NULL)),
   -- Sole purpose: the target of 0089's composite FK, which is what makes
   -- "currency cannot change once records exist" true rather than intended.
   CONSTRAINT financial_accounts_id_currency_key UNIQUE (id, currency_code)
@@ -190,8 +301,14 @@ COMMENT ON TABLE public.financial_accounts IS
   'HIGHLY_SENSITIVE_FINANCIAL, SUBJECT_OWNED. The accounts a subject holds '
   'as they or their statement declared them. Stores NO account number, '
   'IBAN, PAN, CVV, credential, or sync cursor — the mask column admits at '
-  'most four digits by CHECK, so the sensitive identifier is structurally '
-  'absent rather than merely unused. source_kind EXTERNAL_PROVIDER is '
+  'most eight ciphertext bytes, which under a length-preserving cipher is '
+  'at most eight characters, so the sensitive identifier is structurally '
+  'absent rather than merely unused. display_name, '
+  'user_supplied_institution_label and mask exist ONLY as ciphertext + '
+  'nonce + auth tag, with the algorithm and key version per row; no '
+  'plaintext column exists for any of them, and tenant, user, table, row id '
+  'and field are bound as associated data so a ciphertext cannot be moved '
+  'between rows, columns, or subjects. source_kind EXTERNAL_PROVIDER is '
   'modelled and unreachable (no provider is integrated); the biconditional '
   'CHECK forbids any other source_kind from carrying a provider connection. '
   'Status is the account''s own lifecycle and never means connected or '
@@ -202,9 +319,20 @@ COMMENT ON TABLE public.financial_accounts IS
   'CASCADE_DELETE and deleting an account is a promised first-class '
   'operation. Lifecycle: 0088 header + DATA_LIFECYCLE.md.';
 
-COMMENT ON COLUMN public.financial_accounts.mask IS
-  'Masked fragment ONLY (^[*xX#]{0,4}[0-9]{2,4}$). Never a full account '
-  'number, IBAN, or PAN — those have no column anywhere in this module.';
+COMMENT ON COLUMN public.financial_accounts.mask_ciphertext IS
+  'Encrypted masked fragment ONLY, bounded at 8 bytes. AES-256-GCM is '
+  'length-preserving, so this bound is the domain pattern''s own maximum '
+  '(^[*xX#]{0,4}[0-9]{2,4}$ — four masking characters plus four digits) '
+  'expressed in the unit an encrypted column can still measure. A full '
+  'account number, IBAN, or PAN does not fit and has no column anywhere in '
+  'this module. The SHAPE rule lives in the domain: a CHECK cannot read a '
+  'ciphertext, so it was removed rather than kept as a rule that cannot '
+  'fire.';
+
+COMMENT ON COLUMN public.financial_accounts.hsf_key_version IS
+  'The key version that produced this row''s ciphertexts (ADR-0017). Per '
+  'row, so a rotation leaves earlier rows readable instead of turning a key '
+  'change into data loss a user discovers.';
 
 COMMENT ON COLUMN public.financial_accounts.provider_connection_ref IS
   'Opaque forward reference for a future provider integration. NEVER a '

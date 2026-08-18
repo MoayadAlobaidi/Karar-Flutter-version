@@ -24,11 +24,13 @@ import { ReadOwnTransaction } from '../application/use-cases/read-own-transactio
 import { UpdateOwnTransaction } from '../application/use-cases/update-own-transaction.js';
 import { LocalKeyedDedupFingerprintProvider } from '../infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
 import {
+  FixedAccountDirectory,
   FixedPrincipalContext,
   InMemoryCategoryAssignmentRepository,
   InMemoryTransactionRepository,
   SequentialIdSource,
   StaticCategoryCatalogue,
+  StubRetentionDecisionPort,
 } from './fakes/in-memory-repositories.js';
 import {
   account,
@@ -58,13 +60,37 @@ function harness(options: { readonly at?: Date } = {}) {
   const ids = new SequentialIdSource();
   const clock = fixedClock(options.at ?? NOW);
   const fingerprints = new LocalKeyedDedupFingerprintProvider({ rootKey: Buffer.alloc(32, 9) });
+  // Alice owns one QAR account. Every creation path below goes through the
+  // account gate, so the harness has to state who owns what — which is the
+  // point: before the gate existed, an account id was whatever the caller
+  // typed.
+  const accountRef = account();
+  const accounts = new FixedAccountDirectory([
+    { accountId: accountRef.accountId, owner: alice, currencyCode: 'QAR' },
+  ]);
+  const retention = new StubRetentionDecisionPort({
+    state: 'DECIDED',
+    retentionPeriod: 'P7D',
+    basis: 'test fixture — no legal effect',
+    effect: 'SYNTHETIC_NO_LEGAL_EFFECT',
+  });
   return {
     alice,
     context,
     transactions,
     assignments,
-    accountRef: account(),
-    create: new CreateManualTransaction(context, transactions, fingerprints, ids, clock),
+    accounts,
+    retention,
+    accountRef,
+    create: new CreateManualTransaction(
+      context,
+      transactions,
+      fingerprints,
+      ids,
+      clock,
+      retention,
+      accounts,
+    ),
     read: new ReadOwnTransaction(context, transactions, assignments),
     list: new ListOwnTransactions(context, transactions),
     update: new UpdateOwnTransaction(context, transactions, ids, clock),

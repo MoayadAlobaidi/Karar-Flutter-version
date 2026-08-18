@@ -12,6 +12,7 @@
     "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
   },
   "dependencies": {
+    "@karar/financial-accounts": "workspace:*",
     "@karar/platform": "workspace:*",
     "@karar/shared-kernel": "workspace:*"
   },

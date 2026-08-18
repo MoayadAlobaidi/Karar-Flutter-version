@@ -20,6 +20,18 @@
  * `public.financial_accounts` binds the inserted row to it at the database
  * layer, so even a defective repository cannot create an account for someone
  * else.
+ *
+ * **The retention gate runs FIRST, and the ordering is the control.** The
+ * module's data-lifecycle declaration says non-local durable financial
+ * creation fails closed while the retention decision is unresolved; until the
+ * Phase 5 remediation, nothing enforced that. The check therefore happens
+ * before the currency is resolved, before the catalogue is read, before any
+ * field is encrypted, and before any statement reaches the database — so a
+ * refusal leaves nothing behind at all: no row, no ciphertext, and no key
+ * usage recorded against a subject whose data the platform had not yet
+ * established it may keep. A gate placed after the encryption call would
+ * still refuse the write, and would still have handed a subject's account
+ * name to a key-management provider first.
  */
 
 import { Result } from '@karar/shared-kernel';
@@ -33,7 +45,15 @@ import {
 } from '../../domain/financial-account.js';
 import { isSelectableForNewAccount } from '../../domain/institution.js';
 import type { FinancialAccountId, InstitutionRef } from '../../domain/refs.js';
-import { storeFailure, type CreateManualAccountError } from '../errors.js';
+import {
+  retentionUnresolved,
+  storeFailure,
+  type CreateManualAccountError,
+} from '../errors.js';
+import {
+  permitsDurableWrite,
+  type FinancialAccountRetentionDecisionPort,
+} from '../ports/financial-account-retention-decision.js';
 import type { FinancialAccountRepository } from '../ports/financial-account-repository.js';
 import type { IdSource } from '../ports/id-source.js';
 import type { InstitutionCatalogueReader } from '../ports/institution-catalogue-reader.js';
@@ -59,6 +79,7 @@ export class CreateManualAccount {
   constructor(
     private readonly accounts: FinancialAccountRepository,
     private readonly institutions: InstitutionCatalogueReader,
+    private readonly retention: FinancialAccountRetentionDecisionPort,
     private readonly ids: IdSource,
     private readonly clock: Clock,
   ) {}
@@ -69,6 +90,20 @@ export class CreateManualAccount {
   ): Promise<Result<FinancialAccount, CreateManualAccountError>> {
     const principal = requirePrincipal(actor);
     if (!principal.ok) return principal;
+
+    // Before anything else — see the header. A port that cannot answer says
+    // UNAVAILABLE rather than throwing, so a rejection here is a genuine
+    // defect and is reported as a store failure rather than swallowed into
+    // the same refusal as an honest "we have not decided".
+    let decision;
+    try {
+      decision = await this.retention.decideFor(principal.value, 'financial_accounts');
+    } catch (error) {
+      return Result.err(storeFailure('retention decision resolution', error));
+    }
+    if (!permitsDurableWrite(decision)) {
+      return Result.err(retentionUnresolved('financial_accounts', decision));
+    }
 
     const currency = resolveSupportedCurrency(input.currencyCode);
     if (!currency.ok) {

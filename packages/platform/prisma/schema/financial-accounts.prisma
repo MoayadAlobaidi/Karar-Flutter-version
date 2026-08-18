@@ -10,10 +10,18 @@
 // cannot represent 0.10 exactly. There is no NUMERIC, DOUBLE PRECISION, or
 // FLOAT anywhere on this module's money path.
 //
+// Subject narrative is Bytes: ciphertext, nonce and auth tag per field, with
+// the algorithm and key version per row. No plaintext field exists for the
+// account's display name, its user-supplied institution label, or its mask,
+// because no plaintext column exists for them in the table — all three are
+// HIGHLY_SENSITIVE_FINANCIAL, exactly like the transactions module's
+// narrative columns, and are treated the same way.
+//
 // Deliberately NOT expressed here, enforced by the migrations and their
 // tests instead: every CHECK constraint (the closed currency, account-type,
-// status, and source-kind vocabularies; the mask shape that makes a full
-// account number unrepresentable; the provider-connection biconditional;
+// status, and source-kind vocabularies; the all-or-nothing ciphertext
+// triples; the eight-byte mask bound that makes a full account number
+// unrepresentable even encrypted; the provider-connection biconditional;
 // the one-way-to-name-an-institution rule), the version-increment and
 // immutability triggers, RLS enable/force with the tenant+user principal
 // policies, and the grants. Every repository statement runs inside a
@@ -44,11 +52,21 @@ model FinancialAccount {
   tenantId                     String   @map("tenant_id") @db.Uuid
   userId                       String   @map("user_id") @db.Uuid
   institutionRef               String?  @map("institution_ref") @db.Uuid
-  userSuppliedInstitutionLabel String?  @map("user_supplied_institution_label")
   accountType                  String   @map("account_type")
   currencyCode                 String   @map("currency_code")
-  displayName                  String   @map("display_name")
-  mask                         String?
+
+  hsfAlgorithm                 String   @map("hsf_algorithm")
+  hsfKeyVersion                String   @map("hsf_key_version")
+  displayNameCiphertext        Bytes    @map("display_name_ciphertext")
+  displayNameNonce             Bytes    @map("display_name_nonce")
+  displayNameAuthTag           Bytes    @map("display_name_auth_tag")
+  userSuppliedInstitutionLabelCiphertext Bytes? @map("user_supplied_institution_label_ciphertext")
+  userSuppliedInstitutionLabelNonce      Bytes? @map("user_supplied_institution_label_nonce")
+  userSuppliedInstitutionLabelAuthTag    Bytes? @map("user_supplied_institution_label_auth_tag")
+  maskCiphertext               Bytes?   @map("mask_ciphertext")
+  maskNonce                    Bytes?   @map("mask_nonce")
+  maskAuthTag                  Bytes?   @map("mask_auth_tag")
+
   status                       String
   sourceKind                   String   @map("source_kind")
   providerConnectionRef        String?  @map("provider_connection_ref")
@@ -78,7 +96,9 @@ model FinancialAccountBalanceSnapshot {
   currencyCode     String   @map("currency_code")
   asOf             DateTime @map("as_of") @db.Timestamptz(6)
   sourceKind       String   @map("source_kind")
-  sourceReference  String   @map("source_reference")
+  // uuid, not text: the column is structurally incapable of holding source
+  // narrative on a HIGHLY_SENSITIVE_FINANCIAL table (migration 0089 header).
+  sourceReference  String   @map("source_reference") @db.Uuid
   capturedAt       DateTime @map("captured_at") @db.Timestamptz(6)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 

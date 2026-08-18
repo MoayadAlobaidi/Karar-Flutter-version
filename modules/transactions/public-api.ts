@@ -7,6 +7,19 @@
  * `HsfFieldEncryptionPort` — the use cases, and the infrastructure
  * implementations the composition root wires.
  *
+ * Also exported, and worth finding quickly:
+ *
+ * - `FinancialAccountAccessPort` and `TransactionRetentionDecisionPort` —
+ *   the two inward ports `CreateManualTransaction` refuses through. The
+ *   composition root binds the first to an adapter over
+ *   `modules/financial-accounts`' public API (nothing here imports that
+ *   module) and the second to the PolicyPack retention slot, or, in a local
+ *   environment only, to the synthetic fixture below.
+ * - `PrismaFinancialRecordPresenceReader` and `PrismaFinancialRecordEraser` —
+ *   this module's implementations of the two ports the accounts module
+ *   declares, so that accounts can block a currency change while records
+ *   exist and erase an account's records without ever importing this module.
+ *
  * Deliberately absent:
  *
  * - **Any use case that reads or writes somebody else's transactions.** There
@@ -122,12 +135,16 @@ export {
   principalContextMissing,
   requireNonEmpty,
   toStoreFailure,
+  type AccountCurrencyMismatch,
+  type AccountNotWritable,
   type CategoryUnknown,
   type DuplicateTransaction,
   type InvalidCursor,
   type NoChange,
   type NotFound,
+  type OccurrenceOrdinalNotNext,
   type PrincipalContextMissing,
+  type RetentionUndecided,
   type StoreFailure,
   type UserAssignmentWins,
   type VersionConflict,
@@ -137,8 +154,46 @@ export type {
   TransactionsPrincipal,
 } from './application/ports/principal-context.js';
 export type { IdSource } from './application/ports/id-source.js';
+// The gates CreateManualTransaction refuses through. Bound by the lead: the
+// account port to a composition adapter over financial-accounts' public API,
+// the retention port to the PolicyPack slot (or, locally only, the fixture).
+export {
+  ACCOUNT_LIFECYCLE_STATES,
+  WRITABLE_ACCOUNT_LIFECYCLE_STATES,
+  isWritableLifecycleState,
+  type AccountAccessSummary,
+  type AccountLifecycleState,
+  type FinancialAccountAccessPort,
+} from './application/ports/financial-account-access.js';
+export {
+  RETENTION_DECISION_EFFECTS,
+  type RetentionDecided,
+  type RetentionDecisionEffect,
+  type RetentionPendingLegalReview,
+  type RetentionUnavailable,
+  type TransactionRetentionDecision,
+  type TransactionRetentionDecisionPort,
+} from './application/ports/transaction-retention-decision.js';
+// The two ports modules/financial-accounts declares and this module fills.
+// These are re-exports of that module's own declarations, not copies of them:
+// the types travel one way (accounts -> transactions) and the implementations
+// travel back through this surface, so the lead binds the adapters below
+// straight into its use cases with no adapter in between. A second structurally
+// identical declaration here would let the two drift apart silently, which is
+// exactly what a shared inward port must not permit.
+export {
+  ERASABLE_FINANCIAL_RECORD_KINDS,
+  NO_RECORDS_ERASED,
+  type ErasableFinancialRecordKind,
+  type FinancialRecordEraserPort,
+  type FinancialRecordErasureCounts,
+  type FinancialRecordErasureOutcome,
+  type FinancialRecordPresence,
+  type FinancialRecordPresencePort,
+} from './application/ports/financial-record-lifecycle.js';
 export {
   DuplicateTransactionError,
+  OccurrenceOrdinalNotNextError,
   TransactionVersionConflictError,
   type TransactionCommit,
   type TransactionCorrectionCommit,
@@ -216,6 +271,10 @@ export {
   PrismaFinancialCategoryCatalogue,
   PrismaMerchantRuleDirectory,
 } from './infrastructure/persistence/prisma-category-repositories.js';
+export {
+  PrismaFinancialRecordEraser,
+  PrismaFinancialRecordPresenceReader,
+} from './infrastructure/persistence/prisma-financial-record-lifecycle.js';
 export { TransactionStoreError } from './infrastructure/persistence/row-mappers.js';
 export { Uuidv7IdSource } from './infrastructure/persistence/uuidv7-id-source.js';
 // LOCAL/TEST ONLY — both hold key material in process memory. Production
@@ -227,3 +286,13 @@ export {
   LocalKeyedDedupFingerprintProvider,
   fingerprintsEqual,
 } from './infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
+// LOCAL ONLY — and it enforces that itself: constructing it outside a local
+// environment throws, because a decision with no legal effect must not be
+// able to govern real data. A deployed environment binds the retention port
+// to the PolicyPack slot, which today answers PENDING_LEGAL_REVIEW.
+export {
+  FIXTURE_ENVIRONMENT,
+  LocalSyntheticRetentionDecisionProvider,
+  SYNTHETIC_RETENTION_BASIS,
+  SYNTHETIC_RETENTION_PERIOD,
+} from './infrastructure/providers/local-synthetic-retention-decision-provider.js';

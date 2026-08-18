@@ -33,8 +33,12 @@ import {
 } from '@karar/platform/dist/db/index.js';
 import { createPrismaClient, type PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
+import type { FinancialAccountRetentionDecisionPort } from '../application/ports/financial-account-retention-decision.js';
+import type { HsfFieldEncryptionPort } from '../application/ports/hsf-field-encryption.js';
 import type { AccountsPrincipal } from '../application/principal.js';
-import type { InstitutionRef } from '../domain/refs.js';
+import type { InstitutionRef, SourceReference } from '../domain/refs.js';
+import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
+import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
 
 export const TENANT_A = TenantId.of('aaaaaaaa-0000-4000-8000-00000000000a');
 export const TENANT_B = TenantId.of('bbbbbbbb-0000-4000-8000-00000000000b');
@@ -49,6 +53,43 @@ export const ACTOR_B1: AccountsPrincipal = { tenantId: TENANT_B, userId: USER_B1
 
 export const INSTITUTION_ACTIVE = '11111111-0000-4000-8000-000000000011' as InstitutionRef;
 export const INSTITUTION_RETIRED = '22222222-0000-4000-8000-000000000022' as InstitutionRef;
+
+/**
+ * A UUID, because migration 0089 makes `source_reference` one — a column that
+ * structurally cannot hold a statement line or an explanation.
+ */
+export const SYNTHETIC_SOURCE_REFERENCE =
+  '5e000000-0000-4000-8000-00000000005e' as SourceReference;
+
+/**
+ * A FIXED key, so a suite can build a second adapter that reads what the
+ * first wrote — and so a test that wants a rotation can ask for a different
+ * key version deliberately rather than getting one by accident. The default
+ * random-per-instance key would make every repository in a suite mutually
+ * unreadable.
+ */
+const SYNTHETIC_HSF_KEY = new Uint8Array(32).fill(11);
+
+/**
+ * The LOCAL encryption adapter, with the synthetic key. Not a production key
+ * custody story and it refuses to construct outside `KARAR_ENV=local`; these
+ * suites are local by definition.
+ */
+export function testEncryption(keyVersion?: string): HsfFieldEncryptionPort {
+  return new LocalAesGcmFieldEncryptionProvider({
+    env: 'local',
+    key: SYNTHETIC_HSF_KEY,
+    keyVersion: keyVersion ?? 'karar-ref:key-version:synthetic-test-accounts@v1',
+  });
+}
+
+/**
+ * The LOCAL retention fixture — a labelled synthetic answer with no legal
+ * effect, which is what lets these suites create durable rows at all.
+ */
+export function testRetention(): FinancialAccountRetentionDecisionPort {
+  return new LocalSyntheticRetentionDecisionProvider({ env: 'local' });
+}
 
 export const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),

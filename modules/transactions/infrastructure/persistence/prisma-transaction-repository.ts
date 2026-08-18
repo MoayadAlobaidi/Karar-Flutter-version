@@ -34,6 +34,7 @@ import type { HsfFieldEncryptionPort } from '../../application/ports/hsf-field-e
 import type { TransactionsPrincipal } from '../../application/ports/principal-context.js';
 import {
   DuplicateTransactionError,
+  OccurrenceOrdinalNotNextError,
   TransactionVersionConflictError,
   type TransactionCommit,
   type TransactionCorrectionCommit,
@@ -101,6 +102,43 @@ export class PrismaTransactionRepository implements TransactionRepository {
 
     try {
       await this.run(principal, async (tx) => {
+        // The next-ordinal rule, checked inside the writing transaction so
+        // the refusal can name the ordinal that WOULD be accepted. The
+        // migration's transactions_occurrence_guard enforces the same rule
+        // for every writer including raw SQL; this check exists for the
+        // message, that trigger exists for the guarantee, and the unique
+        // constraint behind both is what settles a concurrent race (two
+        // callers reading the same maximum both aim at the same ordinal, and
+        // exactly one index entry can exist).
+        const recorded = await tx.transaction.findMany({
+          where: {
+            tenantId: principal.tenantId,
+            userId: principal.userId,
+            accountId: transaction.accountRef.accountId,
+            fingerprintVersion: fingerprint.version,
+            dedupFingerprint: fingerprint.value,
+          },
+          select: { occurrenceOrdinal: true },
+        });
+        const ordinals = recorded.map((row) => row.occurrenceOrdinal);
+        // "Already recorded" is checked before "not the next one", because
+        // they are different messages to a person: resubmitting the same
+        // occurrence is a duplicate, and being told to pick a different
+        // number would invite exactly the bypass the rule exists to close.
+        if (ordinals.includes(commit.occurrenceOrdinal)) {
+          throw new DuplicateTransactionError(
+            fingerprint.version,
+            'this occurrence of this content is already recorded for this principal on this account',
+          );
+        }
+        const nextOrdinal = Math.max(0, ...ordinals) + 1;
+        if (commit.occurrenceOrdinal !== nextOrdinal) {
+          throw new OccurrenceOrdinalNotNextError(
+            commit.occurrenceOrdinal,
+            nextOrdinal,
+            'the occurrence ordinal must be the next unused one for this content identity',
+          );
+        }
         await tx.transaction.create({
           data: {
             id: transaction.id,
@@ -134,7 +172,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
       if (isUniqueViolation(error)) {
         throw new DuplicateTransactionError(
           fingerprint.version,
-          'a transaction with this dedup fingerprint already exists for this principal on this account',
+          'this occurrence of this content is already recorded for this principal on this account',
         );
       }
       throw error;

@@ -14,6 +14,7 @@ import {
   ACCOUNT_STATUSES,
   ACCOUNT_TYPES,
   CONSTRUCTIBLE_SOURCE_KINDS,
+  MAX_MASK_LENGTH,
   SOURCE_KINDS,
   applyAccountEdit,
   checkCurrencyChange,
@@ -29,8 +30,14 @@ import {
   isValidInstitutionCode,
   type Institution,
 } from '../domain/institution.js';
-import { byMostRecentlyTrue, latestReported } from '../domain/balance-snapshot.js';
+import {
+  byMostRecentlyTrue,
+  createBalanceSnapshot,
+  isValidSourceReference,
+  latestReported,
+} from '../domain/balance-snapshot.js';
 import type { BalanceSnapshot } from '../domain/balance-snapshot.js';
+import { HSF_REDACTION, HsfField } from '../domain/hsf-field.js';
 import type {
   BalanceSnapshotId,
   FinancialAccountId,
@@ -46,6 +53,9 @@ const INSTITUTION_ID = '11111111-0000-4000-8000-000000000011' as InstitutionRef;
 const NOW = new Date('2026-08-18T12:00:00.000Z');
 const QAR = Currency.get('QAR');
 const KWD = Currency.get('KWD');
+/** Obviously synthetic, and a UUID because the column is one (migration 0089). */
+const SYNTHETIC_SOURCE_REFERENCE =
+  '5e000000-0000-4000-8000-00000000005e' as SourceReference;
 
 function newAccountInput(overrides: Partial<Parameters<typeof createFinancialAccount>[0]> = {}) {
   return {
@@ -278,7 +288,7 @@ describe('financial-accounts domain: display text', () => {
       newAccountInput({ displayName: '  Synthetic Test Account One  ' }),
     );
     expect(trimmed.ok).toBe(true);
-    if (trimmed.ok) expect(trimmed.value.displayName).toBe('Synthetic Test Account One');
+    if (trimmed.ok) expect(trimmed.value.displayName.reveal()).toBe('Synthetic Test Account One');
   });
 
   it('refuses display text longer than the schema admits', () => {
@@ -347,7 +357,7 @@ describe('financial-accounts domain: balances are selected, never computed', () 
       amount: Money.of(minorUnits, QAR),
       asOf: new Date(asOf),
       sourceKind: 'MANUAL',
-      sourceReference: 'synthetic-test-fixture' as SourceReference,
+      sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: new Date(capturedAt),
       createdAt: NOW,
     };
@@ -387,5 +397,133 @@ describe('financial-accounts domain: balances are selected, never computed', () 
 
   it('no reported snapshots means no balance, not a computed zero', () => {
     expect(latestReported([])).toBeNull();
+  });
+});
+
+describe('financial-accounts domain: HSF fields do not leak through a rendering path', () => {
+  // The three fields are HIGHLY_SENSITIVE_FINANCIAL. The wrapper exists so a
+  // console.log, a JSON.stringify, or a template literal in an error message
+  // cannot put an account name into a log file — the exact accident a branded
+  // string would not prevent, because a branded string is still a string.
+  const account = builtAccount({
+    displayName: 'Synthetic Test Account One',
+    mask: '*0000',
+  });
+
+  it('every accidental rendering path yields the redaction marker', () => {
+    const rendered = [
+      String(account.displayName),
+      `${account.displayName}`,
+      account.displayName.toString(),
+      account.displayName.toJSON(),
+      JSON.parse(JSON.stringify({ name: account.displayName })).name as string,
+      (account.displayName as unknown as Record<symbol, () => string>)[
+        Symbol.for('nodejs.util.inspect.custom')
+      ]!(),
+    ];
+    for (const value of rendered) expect(value).toBe(HSF_REDACTION);
+  });
+
+  it('a whole frozen account serialises without any HSF plaintext in it', () => {
+    const serialised = JSON.stringify(account);
+    expect(serialised).not.toContain('Synthetic Test Account One');
+    expect(serialised).not.toContain('*0000');
+    expect(serialised).toContain(HSF_REDACTION);
+    // The operational attributes are still there — the point is selective
+    // redaction, not an opaque object nobody can debug.
+    expect(serialised).toContain('CURRENT');
+    expect(serialised).toContain('QAR');
+  });
+
+  it('the plaintext is reachable only through the grep-able accessor', () => {
+    expect(account.displayName.reveal()).toBe('Synthetic Test Account One');
+    expect(account.mask?.reveal()).toBe('*0000');
+    // A length is not an identity, so it is safe to expose and useful to have.
+    expect(account.displayName.length).toBe('Synthetic Test Account One'.length);
+  });
+
+  it('refuses a blank or over-long value at construction rather than truncating', () => {
+    expect(() => HsfField.of('   ')).toThrow(/non-blank/);
+    expect(() => HsfField.of('x'.repeat(121))).toThrow(/refused, never truncated/);
+    expect(HsfField.optional(null)).toBeNull();
+  });
+});
+
+describe('financial-accounts domain: the mask bound the database can still enforce', () => {
+  it('the longest string the mask pattern admits is exactly the exported bound', () => {
+    // Migration 0088 bounds mask_ciphertext at MAX_MASK_LENGTH bytes. AES-GCM
+    // is length-preserving, so that byte bound IS this character bound; if the
+    // pattern ever widened without the migration following, this fails.
+    const longest = '****0000';
+    expect(longest.length).toBe(MAX_MASK_LENGTH);
+    expect(isMask(longest)).toBe(true);
+    // Nothing longer is a mask, so nothing longer can reach the column.
+    for (const candidate of ['*****0000', '****00000', '4111111111111111']) {
+      expect(isMask(candidate)).toBe(false);
+      expect(candidate.length).toBeGreaterThan(MAX_MASK_LENGTH);
+    }
+  });
+});
+
+describe('financial-accounts domain: a source reference is an identifier, not narrative', () => {
+  it('accepts a UUID and refuses anything that could carry a sentence', () => {
+    expect(isValidSourceReference('5e000000-0000-4000-8000-00000000005e')).toBe(true);
+    for (const candidate of [
+      'synthetic-test-fixture',
+      'statement line 42: groceries',
+      '',
+      '   ',
+      'QA00 0000 0000 0000 0000 0000 0000',
+    ]) {
+      expect(isValidSourceReference(candidate)).toBe(false);
+    }
+  });
+
+  it('the snapshot factory refuses a non-identifier reference and a currency mismatch', () => {
+    const account = builtAccount();
+    const narrative = createBalanceSnapshot({
+      id: 'b5000000-0000-4000-8000-0000000000b9' as BalanceSnapshotId,
+      account,
+      amount: Money.of(1_000n, QAR),
+      asOf: NOW,
+      sourceKind: 'MANUAL',
+      sourceReference: 'closing balance printed on page 2',
+      capturedAt: NOW,
+      createdAt: NOW,
+    });
+    expect(narrative.ok).toBe(false);
+    if (!narrative.ok) expect(narrative.error.kind).toBe('invalid_source_reference');
+
+    const wrongCurrency = createBalanceSnapshot({
+      id: 'b5000000-0000-4000-8000-0000000000ba' as BalanceSnapshotId,
+      account,
+      amount: Money.of(1_000n, KWD),
+      asOf: NOW,
+      sourceKind: 'MANUAL',
+      sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+      capturedAt: NOW,
+      createdAt: NOW,
+    });
+    expect(wrongCurrency.ok).toBe(false);
+    if (!wrongCurrency.ok) expect(wrongCurrency.error.kind).toBe('snapshot_currency_mismatch');
+
+    const accepted = createBalanceSnapshot({
+      id: 'b5000000-0000-4000-8000-0000000000bb' as BalanceSnapshotId,
+      account,
+      amount: Money.of(1_000n, QAR),
+      asOf: NOW,
+      sourceKind: 'MANUAL',
+      sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+      capturedAt: NOW,
+      createdAt: NOW,
+    });
+    expect(accepted.ok).toBe(true);
+    // Owner and account come from the ACCOUNT, so there is no second place
+    // for them to be named and no way for the two to disagree.
+    if (accepted.ok) {
+      expect(accepted.value.tenantId).toBe(account.tenantId);
+      expect(accepted.value.userId).toBe(account.userId);
+      expect(accepted.value.accountId).toBe(account.id);
+    }
   });
 });

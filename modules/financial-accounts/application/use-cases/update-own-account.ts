@@ -7,10 +7,24 @@
  *    Not visible means `account_not_found`, identically to a guessed id.
  * 2. **The currency-immutability rule.** This is the layer that knows whether
  *    financial records exist, so this is where the rule is decided
- *    (`checkCurrencyChange` states it; `countForAccount` answers the
- *    question). The database enforces it again through the composite foreign
- *    key from the snapshot table, so the invariant holds even against a
- *    caller that bypasses this path (migration 0089).
+ *    (`checkCurrencyChange` states it). The database enforces the SNAPSHOT
+ *    half again through the composite foreign key from the snapshot table
+ *    (migration 0089) — but only that half, and the gap mattered: this use
+ *    case used to ask about balance snapshots alone. Transactions are
+ *    financial records too, they are denominated in the account's currency
+ *    too, and no foreign key reaches them because no FK crosses a module
+ *    boundary (data-model.md §2). An account with a thousand transactions and
+ *    no snapshot could therefore be re-denominated, silently rescaling every
+ *    amount by a factor of ten between a two-decimal and a three-decimal
+ *    currency. Both stores are now asked, through
+ *    `BalanceSnapshotRepository.countForAccount` and
+ *    `FinancialRecordPresencePort`, and EITHER one answering yes freezes the
+ *    currency.
+ *
+ *    **The question fails closed.** If either store cannot answer, the
+ *    currency does not change. "We could not find records" and "there are no
+ *    records" are different facts, and treating the first as the second is
+ *    how a rescaling bug ships.
  * 3. **Optimistic concurrency.** The caller says which version they read; the
  *    store updates only if the row is still at that version. A losing edit
  *    reports `version_conflict` rather than being silently overwritten,
@@ -34,9 +48,16 @@ import {
 } from '../../domain/financial-account.js';
 import { isSelectableForNewAccount } from '../../domain/institution.js';
 import type { FinancialAccountId, InstitutionRef } from '../../domain/refs.js';
-import { ACCOUNT_NOT_FOUND, storeFailure, type UpdateOwnAccountError } from '../errors.js';
+import {
+  ACCOUNT_NOT_FOUND,
+  recordPresenceUnavailable,
+  storeFailure,
+  type RecordPresenceUnavailable,
+  type UpdateOwnAccountError,
+} from '../errors.js';
 import type { BalanceSnapshotRepository } from '../ports/balance-snapshot-repository.js';
 import type { FinancialAccountRepository } from '../ports/financial-account-repository.js';
+import type { FinancialRecordPresencePort } from '../ports/financial-record-presence.js';
 import type { InstitutionCatalogueReader } from '../ports/institution-catalogue-reader.js';
 import { requirePrincipal, type AccountsPrincipal } from '../principal.js';
 
@@ -61,9 +82,37 @@ export class UpdateOwnAccount {
   constructor(
     private readonly accounts: FinancialAccountRepository,
     private readonly snapshots: BalanceSnapshotRepository,
+    private readonly records: FinancialRecordPresencePort,
     private readonly institutions: InstitutionCatalogueReader,
     private readonly clock: Clock,
   ) {}
+
+  /**
+   * "Does this account hold any financial record?", asked of BOTH stores and
+   * failing closed on either failure.
+   *
+   * The snapshot store is asked first only because it is this module's own;
+   * neither answer is authoritative alone. Short-circuiting on a `true` from
+   * the snapshot count is deliberate — the answer is already settled, and
+   * asking another module about a subject's transactions when the outcome
+   * cannot change is a query nobody needs to have run.
+   */
+  private async holdsFinancialRecords(
+    actor: AccountsPrincipal,
+    accountId: FinancialAccountId,
+  ): Promise<Result<boolean, RecordPresenceUnavailable>> {
+    try {
+      if ((await this.snapshots.countForAccount(actor, accountId)) > 0) return Result.ok(true);
+    } catch (error) {
+      return Result.err(recordPresenceUnavailable('reported balances', error));
+    }
+    try {
+      const presence = await this.records.hasAnyRecordForAccount(actor, accountId);
+      return Result.ok(presence.hasAnyRecord);
+    } catch (error) {
+      return Result.err(recordPresenceUnavailable('financial records', error));
+    }
+  }
 
   async execute(
     input: UpdateOwnAccountInput,
@@ -120,15 +169,13 @@ export class UpdateOwnAccount {
     }
 
     // Only asked when it matters: the rule turns on whether records exist, and
-    // an account with no currency change does not need the question answered.
+    // an account with no currency change does not need the question answered
+    // — nor should it pay for a cross-module round trip to answer it.
     let hasFinancialRecords = false;
     if (edit.currency !== undefined && edit.currency.code !== current.currency.code) {
-      try {
-        hasFinancialRecords =
-          (await this.snapshots.countForAccount(principal.value, input.accountId)) > 0;
-      } catch (error) {
-        return Result.err(storeFailure('financial-record presence check', error));
-      }
+      const presence = await this.holdsFinancialRecords(principal.value, input.accountId);
+      if (!presence.ok) return Result.err(presence.error);
+      hasFinancialRecords = presence.value;
     }
 
     const next = applyAccountEdit(current, edit, {

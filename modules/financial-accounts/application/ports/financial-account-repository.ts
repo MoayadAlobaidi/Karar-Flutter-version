@@ -65,11 +65,21 @@ export interface FinancialAccountRepository {
   ): Promise<AccountUpdateOutcome>;
 
   /**
-   * Delete one of the caller's own accounts and everything scoped to it.
-   * This is the module's declared `CASCADE_DELETE` erasure strategy as an
-   * operation a person can invoke — not an administrative escape hatch. The
-   * count of removed snapshots is returned so the caller can report what was
-   * actually erased rather than assert it.
+   * Delete one of the caller's own accounts and the rows THIS MODULE owns
+   * beneath it: the account and its balance snapshots. Nothing else.
+   *
+   * The narrower claim is deliberate and replaces a wrong one. This method
+   * used to say it deleted "everything scoped to it", which it never did:
+   * transactions, revisions, provenance and category assignments live in
+   * another module, carry a raw `account_id` with no foreign key back here
+   * (data-model.md §2), and survived untouched. Account-scoped records owned
+   * by other modules are erased through `FinancialRecordEraserPort`, and
+   * `DeleteOwnAccount` is what sequences the two — a repository cannot,
+   * because reaching another module's store from an adapter is the coupling
+   * the ports exist to prevent.
+   *
+   * The count of removed snapshots is returned so the caller can report what
+   * was actually erased rather than assert it.
    */
   deleteOwn(
     actor: AccountsPrincipal,

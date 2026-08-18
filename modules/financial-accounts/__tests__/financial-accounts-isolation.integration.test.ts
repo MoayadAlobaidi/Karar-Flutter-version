@@ -43,6 +43,9 @@ import {
   probePostgres,
   provisionDatabase,
   skipBanner,
+  testEncryption,
+  testRetention,
+  SYNTHETIC_SOURCE_REFERENCE,
   superuserMaintenanceProfile,
   withAdapter,
 } from './fixtures.js';
@@ -52,12 +55,13 @@ import { ListOwnAccounts } from '../application/use-cases/list-own-accounts.js';
 import { ListOwnBalanceSnapshots } from '../application/use-cases/list-own-balance-snapshots.js';
 import { ReadOwnAccount } from '../application/use-cases/read-own-account.js';
 import { UpdateOwnAccount } from '../application/use-cases/update-own-account.js';
+import {
+  NO_RECORDS_ERASED,
+  type FinancialRecordEraserPort,
+} from '../application/ports/financial-record-eraser.js';
+import type { FinancialRecordPresencePort } from '../application/ports/financial-record-presence.js';
 import type { AccountsPrincipal } from '../application/principal.js';
-import type {
-  BalanceSnapshotId,
-  FinancialAccountId,
-  SourceReference,
-} from '../domain/refs.js';
+import type { BalanceSnapshotId, FinancialAccountId } from '../domain/refs.js';
 import { PrismaBalanceSnapshotRepository } from '../infrastructure/persistence/prisma-balance-snapshot-repository.js';
 import { PrismaFinancialAccountRepository } from '../infrastructure/persistence/prisma-financial-account-repository.js';
 import { PrismaInstitutionCatalogueReader } from '../infrastructure/persistence/prisma-institution-catalogue-reader.js';
@@ -93,6 +97,37 @@ let updateAccount: UpdateOwnAccount;
 let deleteAccount: DeleteOwnAccount;
 let listSnapshots: ListOwnBalanceSnapshots;
 
+/**
+ * The NOT NULL encryption columns every raw adversarial insert here has to
+ * supply. Deliberate nonsense bytes: these rows are asserted to be REFUSED by
+ * RLS, so nothing decrypts them, and a real ciphertext would only obscure
+ * which boundary is under test.
+ */
+const HSF_COLUMNS =
+  'hsf_algorithm, hsf_key_version, display_name_ciphertext, display_name_nonce, display_name_auth_tag';
+const HSF_VALUES = [
+  `'AES-256-GCM'`,
+  `'karar-ref:key-version:synthetic-test-accounts@v1'`,
+  `decode('506c616e746564', 'hex')`,
+  `decode('000000000000000000000000', 'hex')`,
+  `decode('00000000000000000000000000000000', 'hex')`,
+].join(', ');
+
+/**
+ * This suite holds no transaction store, so the two cross-module ports answer
+ * the only honest thing available: nothing exists, and nothing was erased.
+ * The behaviour that depends on them is covered where it can be observed —
+ * the use-case suite and the erasure suite — rather than simulated here.
+ */
+const NO_FINANCIAL_RECORDS: FinancialRecordPresencePort = {
+  hasAnyRecordForAccount: (_actor, accountId) =>
+    Promise.resolve({ accountId, hasAnyRecord: false }),
+};
+const ERASES_NOTHING: FinancialRecordEraserPort = {
+  eraseAccountScopedRecords: () =>
+    Promise.resolve({ kind: 'erased', deleted: NO_RECORDS_ERASED }),
+};
+
 /** Seeded, one per principal, so both sides of every assertion are populated. */
 let accountA1 = '' as FinancialAccountId;
 let accountA2 = '' as FinancialAccountId;
@@ -123,7 +158,7 @@ async function seedSnapshot(
     amount: Money.of(minorUnits, QAR),
     asOf: clock.now(),
     sourceKind: 'MANUAL',
-    sourceReference: 'synthetic-test-fixture' as SourceReference,
+    sourceReference: SYNTHETIC_SOURCE_REFERENCE,
     capturedAt: clock.now(),
     createdAt: clock.now(),
   });
@@ -135,15 +170,31 @@ describe.skipIf(unreachable !== null)(
     beforeAll(async () => {
       await provisionDatabase(database);
       handle = buildHandle(database);
-      accounts = new PrismaFinancialAccountRepository(handle);
+      accounts = new PrismaFinancialAccountRepository(handle, testEncryption());
       snapshots = new PrismaBalanceSnapshotRepository(handle);
       institutions = new PrismaInstitutionCatalogueReader(handle);
       const ids = new Uuidv7IdSource();
-      createAccount = new CreateManualAccount(accounts, institutions, ids, clock);
+      createAccount = new CreateManualAccount(
+        accounts,
+        institutions,
+        testRetention(),
+        ids,
+        clock,
+      );
       listAccounts = new ListOwnAccounts(accounts);
       readAccount = new ReadOwnAccount(accounts);
-      updateAccount = new UpdateOwnAccount(accounts, snapshots, institutions, clock);
-      deleteAccount = new DeleteOwnAccount(accounts);
+      // No transaction store exists in this suite, so the presence port answers
+      // "no records" — the currency rule's other half is covered by the
+      // use-case suite and by the erasure suite, and a fake that lied here
+      // would only hide which layer this file is testing.
+      updateAccount = new UpdateOwnAccount(
+        accounts,
+        snapshots,
+        NO_FINANCIAL_RECORDS,
+        institutions,
+        clock,
+      );
+      deleteAccount = new DeleteOwnAccount(accounts, ERASES_NOTHING);
       listSnapshots = new ListOwnBalanceSnapshots(accounts, snapshots);
 
       // BOTH SIDES SEEDED, through the real write path.
@@ -188,13 +239,13 @@ describe.skipIf(unreachable !== null)(
       // Repository and use case agree, and the content is the caller's own.
       const own = await accounts.listOwn(ACTOR_A1);
       expect(own).toHaveLength(1);
-      expect(own[0]?.displayName).toBe('Synthetic Test Account A1');
+      expect(own[0]?.displayName.reveal()).toBe('Synthetic Test Account A1');
 
       const listed = await listAccounts.execute(ACTOR_A2);
       expect(listed.ok).toBe(true);
       if (listed.ok) {
         expect(listed.value).toHaveLength(1);
-        expect(listed.value[0]?.displayName).toBe('Synthetic Test Account A2');
+        expect(listed.value[0]?.displayName.reveal()).toBe('Synthetic Test Account A2');
       }
     });
 
@@ -250,7 +301,7 @@ describe.skipIf(unreachable !== null)(
           );
           expect(select.rowCount).toBe(0);
           const update = await tx.query(
-            `UPDATE public.financial_accounts SET display_name = 'taken over', version = version + 1
+            `UPDATE public.financial_accounts SET status = 'CLOSED', version = version + 1
              WHERE tenant_id = $1`,
             [TenantId.toString(TENANT_A)],
           );
@@ -265,7 +316,7 @@ describe.skipIf(unreachable !== null)(
 
       // Untouched.
       const survivor = await accounts.findOwnById(ACTOR_A1, accountA1);
-      expect(survivor?.displayName).toBe('Synthetic Test Account A1');
+      expect(survivor?.displayName.reveal()).toBe('Synthetic Test Account A1');
       expect(survivor?.version).toBe(1);
     });
 
@@ -291,8 +342,10 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, display_name, status, source_kind, updated_at)
-             VALUES ('99999999-0000-4000-8000-000000000091', $1, $2, 'CURRENT', 'QAR', 'Planted Row', 'ACTIVE', 'MANUAL', now())`,
+               (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                ${HSF_COLUMNS}, updated_at)
+             VALUES ('99999999-0000-4000-8000-000000000091', $1, $2, 'CURRENT', 'QAR',
+                     'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
             [TenantId.toString(TENANT_A), UserId.toString(USER_A2)],
           )
           .then(
@@ -308,8 +361,10 @@ describe.skipIf(unreachable !== null)(
         tx
           .query(
             `INSERT INTO public.financial_accounts
-               (id, tenant_id, user_id, account_type, currency_code, display_name, status, source_kind, updated_at)
-             VALUES ('99999999-0000-4000-8000-000000000092', $1, $2, 'CURRENT', 'QAR', 'Planted Row', 'ACTIVE', 'MANUAL', now())`,
+               (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                ${HSF_COLUMNS}, updated_at)
+             VALUES ('99999999-0000-4000-8000-000000000092', $1, $2, 'CURRENT', 'QAR',
+                     'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
             [TenantId.toString(TENANT_B), UserId.toString(USER_A1)],
           )
           .then(
@@ -333,8 +388,10 @@ describe.skipIf(unreachable !== null)(
             ]);
             const inserted = await tx.query(
               `INSERT INTO public.financial_accounts
-                 (id, tenant_id, user_id, account_type, currency_code, display_name, status, source_kind, updated_at)
-               VALUES ('99999999-0000-4000-8000-000000000093', $1, $2, 'CASH', 'QAR', 'Synthetic Rolled Back Account', 'ACTIVE', 'MANUAL', now())`,
+                 (id, tenant_id, user_id, account_type, currency_code, status, source_kind,
+                  ${HSF_COLUMNS}, updated_at)
+               VALUES ('99999999-0000-4000-8000-000000000093', $1, $2, 'CASH', 'QAR',
+                       'ACTIVE', 'MANUAL', ${HSF_VALUES}, now())`,
               [TenantId.toString(TENANT_A), UserId.toString(USER_A1)],
             );
             expect(inserted.rowCount).toBe(1);
@@ -379,8 +436,13 @@ describe.skipIf(unreachable !== null)(
                  (id, tenant_id, user_id, account_id, amount_minor_units, currency_code, as_of,
                   source_kind, source_reference, captured_at)
                VALUES ('99999999-0000-4000-8000-000000000094', $1, $2, $3, 1, 'QAR', now(),
-                       'MANUAL', 'planted', now())`,
-              [TenantId.toString(TENANT_A), UserId.toString(USER_A1), accountA1],
+                       'MANUAL', $4, now())`,
+              [
+                TenantId.toString(TENANT_A),
+                UserId.toString(USER_A1),
+                accountA1,
+                SYNTHETIC_SOURCE_REFERENCE,
+              ],
             )
             .then(
               () => null,
@@ -585,7 +647,7 @@ describe.skipIf(unreachable !== null)(
         (tx) =>
           tx
             .query(
-              `UPDATE public.financial_accounts SET display_name = 'no version bump' WHERE id = $1`,
+              `UPDATE public.financial_accounts SET status = 'ARCHIVED' WHERE id = $1`,
               [accountA2],
             )
             .then(

@@ -46,17 +46,45 @@
 -- moved between columns or rows fails authentication instead of decrypting
 -- into a plausible wrong record.
 --
+-- THREE SEPARATE CONCEPTS, AND WHY THE KEY KEEPS THEM SEPARATE
+--
+-- Deduplication here is three questions, not one, and collapsing any two of
+-- them is how a dedup scheme starts lying:
+--
+--   1. CONTENT IDENTITY — "are these the same financial content?"  That is
+--      dedup_fingerprint: a keyed MAC over normalised content only (account,
+--      booking day, signed minor units, currency, normalised narrative). It
+--      says nothing about how many times that content occurred, and NOTHING
+--      about occurrence participates in the digest. Two identical coffees
+--      have ONE content identity, which is the honest answer.
+--   2. LEGITIMATE REPEAT — "did that same content genuinely happen more than
+--      once?"  That is occurrence_ordinal, an explicit integer column a
+--      person or a reviewed import supplies. The system never guesses that a
+--      repeat is legitimate.
+--   3. DUPLICATE HANDLING — "has this exact occurrence already been
+--      recorded?"  That is transactions_dedup_key, the unique constraint over
+--      both of the above.
+--
+-- The earlier draft folded the occurrence ordinal INTO the fingerprint input
+-- while leaving it out of the unique key. That made the digest mean "content
+-- and occurrence" while the key it fed meant "content", so the commentary and
+-- the SQL described different schemes, and content identity was no longer
+-- recoverable from the stored digest — "how many times did this content
+-- occur?" became unanswerable without recomputing every candidate ordinal.
+-- The three concepts are kept apart above precisely so that cannot recur.
+--
 -- WHY THE UNIQUE CONSTRAINT IS SHAPED THE WAY IT IS
 --
--- transactions_dedup_key makes committing the exact same movement twice
--- impossible under concurrency — not "unlikely", impossible: two concurrent
--- commits of the same statement row race for the same index entry and exactly
--- one wins, with the loser receiving 23505 and the application turning it into
--- a typed DUPLICATE_TRANSACTION outcome. An application-side "SELECT then
--- INSERT" check cannot do this; it is the textbook TOCTOU that produces
--- duplicate financial records under a double-submit.
+-- transactions_dedup_key makes committing the exact same occurrence of the
+-- exact same content twice impossible under concurrency — not "unlikely",
+-- impossible: two concurrent commits of the same statement row race for the
+-- same index entry and exactly one wins, with the loser receiving 23505 and
+-- the application turning it into a typed DUPLICATE_TRANSACTION outcome. An
+-- application-side "SELECT then INSERT" check cannot do this; it is the
+-- textbook TOCTOU that produces duplicate financial records under a
+-- double-submit.
 --
--- Three parts of the key earn their place:
+-- Every part of the key earns its place:
 --   * dedup_fingerprint is a KEYED MAC over content, keyed per subject, never
 --     a plain hash of predictable fields. A plain sha256(date|amount|merchant)
 --     is a confirmation oracle: the input space is small and guessable, so
@@ -67,12 +95,37 @@
 --     inside a shared table.
 --   * fingerprint_version participates in the key so a redefinition of the
 --     fingerprint starts a fresh namespace instead of colliding with values
---     computed under the old rules.
+--     computed under the old rules. Values minted under two definitions never
+--     meet, so a version bump cannot resurrect a duplicate or hide a new row.
 --   * occurrence_ordinal is what keeps "exact duplicates are impossible" from
---     also meaning "two identical coffees on one day are impossible". The
---     second genuine repeat is recorded explicitly as occurrence 2, by a
---     person or a reviewed import — the system never guesses that a repeat is
---     legitimate.
+--     also meaning "two identical coffees on one day are impossible". It is a
+--     column, in the key, and NOT in the digest, so the second genuine repeat
+--     commits as occurrence 2 of one content identity rather than as a
+--     second, unrelated identity.
+--
+-- WHY AN ARBITRARY ORDINAL IS NOT AN ESCAPE HATCH
+--
+-- If any integer were acceptable, duplicate review would be one field away
+-- from optional: submit the same statement row twice with occurrence_ordinal
+-- 1 and then 9999, and both commit, because (fingerprint, 9999) collides with
+-- nothing. transactions_occurrence_guard closes that: an inserted ordinal
+-- must be exactly one more than the highest ordinal already recorded for the
+-- same (tenant, user, account, fingerprint_version, dedup_fingerprint), or 1
+-- when none is recorded. So occurrence 2 is reachable only once occurrence 1
+-- exists, and the only ordinal a caller can ever choose is the next one —
+-- which is a claim about a real repeat, not a way around the constraint.
+--
+-- The guard also freezes the identity columns on UPDATE. A correction may
+-- move an amount or a date (it appends a revision saying so), but rewriting
+-- account_id, the fingerprint, its version, or the ordinal would relabel
+-- which content and which occurrence a row IS — the same bypass by a
+-- different verb.
+--
+-- The application repeats the same next-ordinal check inside the writing
+-- transaction. That is not redundancy for its own sake: the check exists so a
+-- caller gets a typed outcome naming the ordinal that WOULD be accepted, and
+-- the trigger exists so the rule holds for every writer, including raw SQL
+-- and the ingestion pipeline that is not built yet.
 --
 -- RLS decision: SUBJECT RECORDS — ENABLE and FORCE, one policy requiring BOTH
 -- principal GUCs (app.tenant_id AND app.user_id), on USING and WITH CHECK
@@ -105,7 +158,8 @@
 --     Erasure strategy: CASCADE_DELETE.
 --
 -- rollback: forward-only (README.md). A failed apply leaves nothing — one
--- transaction. Deliberate reversal would be DROP POLICY, DROP TABLE
+-- transaction. Deliberate reversal would be DROP TRIGGER and DROP FUNCTION
+-- for transactions_occurrence_guard, DROP POLICY, DROP TABLE
 -- public.transactions — destroying every subject's financial records and,
 -- through the cascades added in 0091 and 0093, their revision history and
 -- provenance with them. It would need the same review as destroying the
@@ -181,10 +235,13 @@ CREATE TABLE public.transactions (
   source_kind            text        NOT NULL CHECK (source_kind IN ('MANUAL', 'CSV')),
   status                 text        NOT NULL CHECK (status IN ('POSTED', 'VOIDED')),
 
-  -- Keyed, versioned dedup identity. Opaque: the only supported operation is
-  -- equality against another value of the same version.
+  -- Keyed, versioned CONTENT identity — occurrence plays no part in it.
+  -- Opaque: the only supported operation is equality against another value of
+  -- the same version.
   dedup_fingerprint      text        NOT NULL CHECK (dedup_fingerprint <> ''),
   fingerprint_version    text        NOT NULL CHECK (fingerprint_version <> ''),
+  -- Which occurrence of that content this row is. Explicit, never inferred,
+  -- and constrained to the next unused value by transactions_occurrence_guard.
   occurrence_ordinal     integer     NOT NULL DEFAULT 1 CHECK (occurrence_ordinal >= 1),
 
   created_at             timestamptz NOT NULL DEFAULT now(),
@@ -194,8 +251,11 @@ CREATE TABLE public.transactions (
   -- other's change.
   version                integer     NOT NULL DEFAULT 1 CHECK (version >= 1),
 
+  -- Content identity AND occurrence. Both, because one without the other
+  -- either forbids a genuine repeat or permits an unlimited number of them.
   CONSTRAINT transactions_dedup_key
-    UNIQUE (tenant_id, user_id, account_id, fingerprint_version, dedup_fingerprint)
+    UNIQUE (tenant_id, user_id, account_id, fingerprint_version, dedup_fingerprint,
+            occurrence_ordinal)
 );
 
 COMMENT ON TABLE public.transactions IS
@@ -206,16 +266,30 @@ COMMENT ON TABLE public.transactions IS
   'in transaction_provenance, never dissolved into the sign. Merchant, '
   'description and note exist ONLY as ciphertext + nonce + auth tag, with the '
   'algorithm and key version per row; no plaintext column exists. '
-  'transactions_dedup_key makes an exact duplicate impossible under '
-  'concurrency; the fingerprint is a per-subject keyed MAC, never a plain hash '
-  'of predictable fields. RLS ENABLEd and FORCEd on BOTH principal GUCs.';
+  'Deduplication keeps three concepts apart: dedup_fingerprint is CONTENT '
+  'identity (a per-subject keyed MAC over normalised content, never a plain '
+  'hash of predictable fields, and carrying nothing about occurrence); '
+  'occurrence_ordinal is which legitimate repeat of that content a row is; '
+  'transactions_dedup_key is duplicate handling, unique over both, so an '
+  'exact duplicate is impossible under concurrency while a genuine repeat '
+  'stays recordable. transactions_occurrence_guard forces an inserted ordinal '
+  'to be the next unused one, so duplicate review cannot be skipped by '
+  'choosing a high number, and freezes the identity columns on UPDATE. RLS '
+  'ENABLEd and FORCEd on BOTH principal GUCs.';
 
 COMMENT ON COLUMN public.transactions.amount_minor IS
   'Signed minor units in currency_code. Negative = money left the account. '
   'The exponent lives on the Currency type (KWD/BHD/OMR are 3-decimal).';
 COMMENT ON COLUMN public.transactions.dedup_fingerprint IS
-  'Per-subject keyed MAC over normalised content (never over ciphertext or key '
-  'material, which change on rotation). Opaque; equality only.';
+  'CONTENT identity: a per-subject keyed MAC over normalised content (never '
+  'over ciphertext or key material, which change on rotation, and never over '
+  'occurrence_ordinal, which is a separate column so that content identity '
+  'stays recoverable). Opaque; equality only.';
+COMMENT ON COLUMN public.transactions.occurrence_ordinal IS
+  'Which occurrence of dedup_fingerprint this row is: 1 for the first, 2 for a '
+  'genuine identical repeat. Supplied explicitly by a person or a reviewed '
+  'import, never inferred, and constrained by transactions_occurrence_guard to '
+  'the next unused ordinal for its content identity.';
 
 -- Keyset pagination reads newest-first, either across all of a principal's
 -- accounts or within one. Two indexes because the leading columns differ; a
@@ -244,3 +318,52 @@ CREATE POLICY transactions_subject ON public.transactions
 -- DELETE is granted deliberately (see header): CASCADE_DELETE is the declared
 -- erasure strategy and subject-initiated deletion is a product promise.
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.transactions TO karar_app;
+
+-- The next-ordinal rule and the identity freeze (see the header). BEFORE ROW
+-- so the refusal happens before the row exists, and SECURITY INVOKER so the
+-- lookup runs under the caller's own RLS policy — the only rows that may
+-- inform the answer are the principal's own, which is exactly the scope the
+-- content identity is defined over.
+CREATE FUNCTION public.transactions_occurrence_guard() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  next_ordinal integer;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    -- A correction moves values and appends a revision; it never relabels
+    -- WHICH content or WHICH occurrence the row is.
+    IF NEW.tenant_id           IS DISTINCT FROM OLD.tenant_id
+      OR NEW.user_id            IS DISTINCT FROM OLD.user_id
+      OR NEW.account_id         IS DISTINCT FROM OLD.account_id
+      OR NEW.fingerprint_version IS DISTINCT FROM OLD.fingerprint_version
+      OR NEW.dedup_fingerprint  IS DISTINCT FROM OLD.dedup_fingerprint
+      OR NEW.occurrence_ordinal IS DISTINCT FROM OLD.occurrence_ordinal
+    THEN
+      RAISE EXCEPTION 'transaction % may not have its dedup identity rewritten: tenant, user, account, fingerprint, fingerprint version and occurrence ordinal are what say which content and which occurrence this row IS. A different movement is a different transaction (modules/transactions/MODULE.md)',
+        OLD.id USING ERRCODE = 'raise_exception';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  SELECT COALESCE(max(existing.occurrence_ordinal), 0) + 1
+    INTO next_ordinal
+    FROM public.transactions AS existing
+   WHERE existing.tenant_id           = NEW.tenant_id
+     AND existing.user_id             = NEW.user_id
+     AND existing.account_id          = NEW.account_id
+     AND existing.fingerprint_version = NEW.fingerprint_version
+     AND existing.dedup_fingerprint   = NEW.dedup_fingerprint;
+
+  IF NEW.occurrence_ordinal <> next_ordinal THEN
+    RAISE EXCEPTION 'occurrence_ordinal % is not the next occurrence of this content identity (the next unused ordinal is %). An occurrence ordinal claims that identical content genuinely happened again; choosing an arbitrary higher number would commit a duplicate without any review having taken place (modules/transactions/MODULE.md)',
+      NEW.occurrence_ordinal, next_ordinal USING ERRCODE = 'raise_exception';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER transactions_occurrence_guard
+  BEFORE INSERT OR UPDATE ON public.transactions
+  FOR EACH ROW
+  EXECUTE FUNCTION public.transactions_occurrence_guard();

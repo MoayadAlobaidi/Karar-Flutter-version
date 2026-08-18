@@ -32,8 +32,14 @@ export type InstitutionRef = string & { readonly __brand: 'InstitutionRef' };
 export type ProviderConnectionRef = string & { readonly __brand: 'ProviderConnectionRef' };
 
 /**
- * Where the figure or the row came from, as an opaque in-module reference —
- * for example the statement import that reported a balance. Free-form to the
- * caller, bounded and non-empty at the boundary.
+ * Where the figure came from, as an OPAQUE UUID — the statement import or the
+ * manual entry that reported a balance, named by its identifier and by
+ * nothing else.
+ *
+ * Deliberately not free-form. The value sits on a table classified
+ * `HIGHLY_SENSITIVE_FINANCIAL`, and a free-form reference is a place a
+ * statement line or an account number can be written by a caller who meant
+ * to be helpful. `isValidSourceReference` and the `uuid` column in migration
+ * 0089 make that structurally impossible rather than discouraged.
  */
 export type SourceReference = string & { readonly __brand: 'SourceReference' };

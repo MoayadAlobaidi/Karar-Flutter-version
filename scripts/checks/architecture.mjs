@@ -2509,6 +2509,80 @@ export function checkAdminNoDbDriver(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Supplementary — no Phase 5 ingestion may be mounted before test 24 activates
+// ---------------------------------------------------------------------------
+//
+// Architecture test 24 (resource limits) activates at phase 5 and is what
+// guarantees every ingestion path declares byte, row, page, deadline and buffer
+// bounds. Until the registry says phase 5, that guarantee does not exist.
+//
+// The gap this closes is narrow and real: an ingestion endpoint could be
+// mounted while `currentPhase` still reads 4, and nothing would object. The
+// limits would be unenforced by the architecture suite, the path would be
+// reachable, and the phase marker would move later in a tidy documentation
+// commit that made it look as though the guarantee had been there all along.
+//
+// So the marker and the first mounted ingestion path are held together from
+// BOTH sides. Test 24 refuses a phase-5 tree whose ingestion paths declare no
+// limits; this refuses a pre-phase-5 tree that mounts an ingestion path at all.
+// The next commit that mounts one must move the marker in the same change.
+const PHASE5_INGESTION_MODULES = ['financial-accounts', 'transactions'];
+const INGESTION_WRITE_ROUTE = /@(Post|Put|Patch)\s*\(/;
+const INGESTION_USE_CASE =
+  /\b(CreateManual\w*|StartStatementImport|CommitStatementImport|UploadStatementSource|ParseStatement\w*)\b/;
+
+export function checkIngestionNotMountedBeforePhase5(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  let scanned = 0;
+
+  let currentPhase = null;
+  const registryPath = path.join(root, REGISTRY_REL);
+  if (fs.existsSync(registryPath)) {
+    try {
+      currentPhase = readJson(registryPath).currentPhase ?? null;
+    } catch {
+      currentPhase = null;
+    }
+  }
+  // No registry, or a registry already at phase 5: this control has nothing to
+  // say. Test 24 owns the tree from phase 5 onward.
+  if (typeof currentPhase !== 'number' || currentPhase >= 5) {
+    return violationsResult(violations, 0);
+  }
+
+  const candidates = [];
+  for (const moduleName of PHASE5_INGESTION_MODULES) {
+    const dir = path.join(root, 'modules', moduleName, 'presentation');
+    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
+  }
+  const compositionDir = path.join(root, 'apps', 'api', 'src', 'composition');
+  if (fs.existsSync(compositionDir)) candidates.push(...codeFiles([compositionDir]));
+
+  for (const file of candidates) {
+    if (file.endsWith('.test.ts') || file.endsWith('.d.ts')) continue;
+    scanned += 1;
+    const source = loadStripped(file);
+    const rel = path.relative(root, file);
+    const mountsRoute = /@Controller\s*\(/.test(source) && INGESTION_WRITE_ROUTE.test(source);
+    const wiresUseCase = INGESTION_USE_CASE.test(source);
+    if (mountsRoute || wiresUseCase) {
+      violations.push({
+        file: rel,
+        detail:
+          `mounts or wires a Phase 5 ingestion path while the architecture registry still reads ` +
+          `currentPhase ${currentPhase}. Architecture test 24 (resource limits) activates at phase 5, so this ` +
+          `path would be reachable with its byte, row, page, deadline and buffer limits unenforced by the ` +
+          `suite. Move currentPhase to 5, implement and activate test 24, and register this path's limit ` +
+          `policy in the SAME commit that mounts it`,
+      });
+    }
+  }
+
+  return violationsResult(violations, scanned);
+}
+
+// ---------------------------------------------------------------------------
 // Check registry (function map)
 // ---------------------------------------------------------------------------
 const CHECKS = {
@@ -2621,6 +2695,27 @@ function buildSelfTestFixture() {
     fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, content);
   };
+
+  // Pre-activation guard fixture: registry still at phase 4 while a Phase 5
+  // ingestion controller is mounted — exactly the state that would let an
+  // ingestion path go live with test 24 still deferred.
+  write(
+    path.join('docs', 'testing', 'architecture-test-registry.json'),
+    JSON.stringify({ currentPhase: 4, tests: [] }),
+  );
+  write(
+    'modules/transactions/presentation/http/fixture-import.controller.ts',
+    [
+      "import { Controller, Post } from '@nestjs/common';",
+      "@Controller('transactions')",
+      'export class FixtureImportController {',
+      '  @Post()',
+      '  create() {',
+      '    return null;',
+      '  }',
+      '}',
+    ].join('\n'),
+  );
 
   write(
     'packages/shared-kernel/package.json',
@@ -2988,6 +3083,9 @@ function buildSelfTestFixture() {
 }
 
 const SELF_TEST_CASES = [
+  // The pre-activation guard: an ingestion controller mounted while the
+  // registry still reads phase 4 must be caught, or the guard is decorative.
+  { fn: 'checkIngestionNotMountedBeforePhase5', expect: /fixture-import\.controller/ },
   { fn: 'checkDomainPurity', expect: /express/ },
   { fn: 'checkLayerDirection', expect: /infrastructure/ },
   { fn: 'checkModuleBoundary', expect: /beta/ },
@@ -3116,7 +3214,9 @@ function runSelfTest() {
             ? CHECKS[fn]({ root: fixtureRoot })
             : fn === 'checkAdminNoDbDriver'
               ? checkAdminNoDbDriver({ root: fixtureRoot })
-              : null,
+              : fn === 'checkIngestionNotMountedBeforePhase5'
+                ? checkIngestionNotMountedBeforePhase5({ root: fixtureRoot })
+                : null,
         );
       }
       return results.get(fn);
@@ -3259,6 +3359,14 @@ function main() {
   );
   for (const v of adminResult.violations) console.log(`          ${v.file} — ${v.detail}`);
 
+  const preActivation = checkIngestionNotMountedBeforePhase5({ root: REPO_ROOT });
+  const preActivationStatus = preActivation.violations.length === 0 ? 'PASS' : 'FAIL';
+  if (preActivation.violations.length > 0) failCount += 1;
+  console.log(
+    `${preActivationStatus.padEnd(7)} supplementary     phase5-ingestion-not-mounted-early (files scanned: ${preActivation.scanned})`,
+  );
+  for (const v of preActivation.violations) console.log(`          ${v.file} — ${v.detail}`);
+
   // Self-test at the end of every normal run: prove the passes above are not
   // vacuous by asserting each checker fails on seeded violations.
   console.log('');
@@ -3289,6 +3397,12 @@ function main() {
     results,
     supplementary: [
       { name: 'admin-no-db-driver', status: adminStatus, violations: adminResult.violations },
+      {
+        name: 'phase5-ingestion-not-mounted-early',
+        status: preActivationStatus,
+        violations: preActivation.violations,
+        scanned: preActivation.scanned,
+      },
     ],
   };
   fs.writeFileSync(

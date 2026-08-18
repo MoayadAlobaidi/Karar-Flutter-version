@@ -28,6 +28,21 @@ import type {
   AccountUpdateOutcome,
   FinancialAccountRepository,
 } from '../application/ports/financial-account-repository.js';
+import type {
+  FinancialAccountRetentionDecisionPort,
+  FinancialRetentionDecision,
+  RetentionGovernedDataset,
+} from '../application/ports/financial-account-retention-decision.js';
+import type {
+  FinancialRecordEraserPort,
+  FinancialRecordErasureCounts,
+  FinancialRecordErasureOutcome,
+} from '../application/ports/financial-record-eraser.js';
+import { NO_RECORDS_ERASED } from '../application/ports/financial-record-eraser.js';
+import type {
+  FinancialRecordPresence,
+  FinancialRecordPresencePort,
+} from '../application/ports/financial-record-presence.js';
 import type { IdSource } from '../application/ports/id-source.js';
 import type { InstitutionCatalogueReader } from '../application/ports/institution-catalogue-reader.js';
 import type { AccountsPrincipal } from '../application/principal.js';
@@ -36,6 +51,7 @@ import { DeleteOwnAccount } from '../application/use-cases/delete-own-account.js
 import { ListOwnAccounts } from '../application/use-cases/list-own-accounts.js';
 import { ListOwnBalanceSnapshots } from '../application/use-cases/list-own-balance-snapshots.js';
 import { ReadOwnAccount } from '../application/use-cases/read-own-account.js';
+import { RecordReportedBalance } from '../application/use-cases/record-reported-balance.js';
 import { UpdateOwnAccount } from '../application/use-cases/update-own-account.js';
 import type { BalanceSnapshot } from '../domain/balance-snapshot.js';
 import type { FinancialAccount } from '../domain/financial-account.js';
@@ -57,6 +73,8 @@ const RETIRED_INSTITUTION = '22222222-0000-4000-8000-000000000022' as Institutio
 const UNKNOWN_INSTITUTION = '33333333-0000-4000-8000-000000000033' as InstitutionRef;
 const NOW = new Date('2026-08-18T12:00:00.000Z');
 const QAR = Currency.get('QAR');
+/** A UUID, because migration 0089 makes the column one. Obviously synthetic. */
+const SYNTHETIC_SOURCE_REFERENCE = '5e000000-0000-4000-8000-00000000005e' as SourceReference;
 
 const actorA1: AccountsPrincipal = { tenantId: TENANT_A, userId: USER_A1 };
 /** A second person inside the SAME tenant — the isolation case tenant scoping alone misses. */
@@ -152,6 +170,12 @@ class FakeAccountRepository implements FinancialAccountRepository {
 
 class FakeSnapshotRepository implements BalanceSnapshotRepository {
   readonly rows: BalanceSnapshot[] = [];
+  #countFailure: Error | null = null;
+
+  /** Lets a test make this store go silent, to prove the rule fails closed. */
+  failCountWith(error: Error): void {
+    this.#countFailure = error;
+  }
 
   private visible(actor: AccountsPrincipal, row: BalanceSnapshot): boolean {
     return ownerKey(actor) === `${row.tenantId}:${row.userId}`;
@@ -172,6 +196,7 @@ class FakeSnapshotRepository implements BalanceSnapshotRepository {
   }
 
   countForAccount(actor: AccountsPrincipal, accountId: FinancialAccountId): Promise<number> {
+    if (this.#countFailure !== null) return Promise.reject(this.#countFailure);
     return Promise.resolve(
       this.rows.filter((row) => this.visible(actor, row) && row.accountId === accountId).length,
     );
@@ -193,6 +218,112 @@ class FakeSnapshotRepository implements BalanceSnapshotRepository {
     );
     for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
     return doomed.length;
+  }
+}
+
+
+/**
+ * A retention provider under test control. `DECIDED` is the labelled-synthetic
+ * answer the LOCAL fixture gives; every other state is the answer a deployment
+ * without a reviewed decision must get, and the gate has to refuse all of them.
+ */
+class ScriptedRetentionDecisionPort implements FinancialAccountRetentionDecisionPort {
+  readonly asked: RetentionGovernedDataset[] = [];
+  #decision: (dataset: RetentionGovernedDataset) => FinancialRetentionDecision;
+  #throws: Error | null = null;
+
+  constructor() {
+    this.#decision = (dataset) => ({
+      state: 'DECIDED',
+      dataset,
+      retentionPeriod: 'P0D',
+      basis: 'SYNTHETIC-NO-LEGAL-EFFECT: test fixture, not a legal opinion',
+      approvalReference: 'karar-ref:approval:SYNTHETIC-NO-LEGAL-EFFECT/test@v1',
+      packVersion: 'synthetic-test/SYNTHETIC-NO-LEGAL-EFFECT',
+    });
+  }
+
+  answer(decision: (dataset: RetentionGovernedDataset) => FinancialRetentionDecision): void {
+    this.#decision = decision;
+    this.#throws = null;
+  }
+
+  failWith(error: Error): void {
+    this.#throws = error;
+  }
+
+  decideFor(
+    _actor: AccountsPrincipal,
+    dataset: RetentionGovernedDataset,
+  ): Promise<FinancialRetentionDecision> {
+    this.asked.push(dataset);
+    if (this.#throws !== null) return Promise.reject(this.#throws);
+    return Promise.resolve(this.#decision(dataset));
+  }
+}
+
+/**
+ * Stands in for the transactions module. OWNERSHIP-AWARE like the other
+ * fakes: records are keyed on (tenant, user, account), so a neighbour's
+ * transaction is invisible rather than merely filtered — which is what lets
+ * the "another user's transaction does not freeze my currency" case actually
+ * fail if the use case ever asked the wrong question.
+ */
+class FakeFinancialRecordStore
+  implements FinancialRecordPresencePort, FinancialRecordEraserPort
+{
+  readonly rows: Array<{ owner: string; accountId: FinancialAccountId }> = [];
+  #presenceFailure: Error | null = null;
+  #erasure: ((accountId: FinancialAccountId) => FinancialRecordErasureOutcome) | null = null;
+  #eraserFailure: Error | null = null;
+
+  seed(actor: AccountsPrincipal, accountId: FinancialAccountId, count = 1): void {
+    for (let i = 0; i < count; i += 1) this.rows.push({ owner: ownerKey(actor), accountId });
+  }
+
+  failPresenceWith(error: Error): void {
+    this.#presenceFailure = error;
+  }
+
+  /** Setting one erasure behaviour clears the other: a fake with two live
+   *  moods is a fake nobody can reason about. */
+  eraseWith(outcome: (accountId: FinancialAccountId) => FinancialRecordErasureOutcome): void {
+    this.#erasure = outcome;
+    this.#eraserFailure = null;
+  }
+
+  failErasureWith(error: Error): void {
+    this.#eraserFailure = error;
+    this.#erasure = null;
+  }
+
+  private own(actor: AccountsPrincipal, accountId: FinancialAccountId) {
+    return this.rows.filter(
+      (row) => row.owner === ownerKey(actor) && row.accountId === accountId,
+    );
+  }
+
+  hasAnyRecordForAccount(
+    actor: AccountsPrincipal,
+    accountId: FinancialAccountId,
+  ): Promise<FinancialRecordPresence> {
+    if (this.#presenceFailure !== null) return Promise.reject(this.#presenceFailure);
+    return Promise.resolve({ accountId, hasAnyRecord: this.own(actor, accountId).length > 0 });
+  }
+
+  eraseAccountScopedRecords(
+    actor: AccountsPrincipal,
+    accountId: FinancialAccountId,
+  ): Promise<FinancialRecordErasureOutcome> {
+    if (this.#eraserFailure !== null) return Promise.reject(this.#eraserFailure);
+    if (this.#erasure !== null) return Promise.resolve(this.#erasure(accountId));
+    const doomed = this.own(actor, accountId);
+    for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
+    const deleted: FinancialRecordErasureCounts = {
+      ...NO_RECORDS_ERASED,
+      FINANCIAL_RECORD: doomed.length,
+    };
+    return Promise.resolve({ kind: 'erased', deleted });
   }
 }
 
@@ -233,6 +364,8 @@ class CountingIdSource implements IdSource {
 
 let accountStore: FakeAccountRepository;
 let snapshotStore: FakeSnapshotRepository;
+let recordStore: FakeFinancialRecordStore;
+let retention: ScriptedRetentionDecisionPort;
 let ids: CountingIdSource;
 
 function wire(): {
@@ -242,17 +375,33 @@ function wire(): {
   update: UpdateOwnAccount;
   remove: DeleteOwnAccount;
   listSnapshots: ListOwnBalanceSnapshots;
+  recordBalance: RecordReportedBalance;
 } {
   snapshotStore = new FakeSnapshotRepository();
   accountStore = new FakeAccountRepository(snapshotStore);
+  recordStore = new FakeFinancialRecordStore();
+  retention = new ScriptedRetentionDecisionPort();
   ids = new CountingIdSource();
   return {
-    create: new CreateManualAccount(accountStore, institutions, ids, clock),
+    create: new CreateManualAccount(accountStore, institutions, retention, ids, clock),
     list: new ListOwnAccounts(accountStore),
     read: new ReadOwnAccount(accountStore),
-    update: new UpdateOwnAccount(accountStore, snapshotStore, institutions, clock),
-    remove: new DeleteOwnAccount(accountStore),
+    update: new UpdateOwnAccount(
+      accountStore,
+      snapshotStore,
+      recordStore,
+      institutions,
+      clock,
+    ),
+    remove: new DeleteOwnAccount(accountStore, recordStore),
     listSnapshots: new ListOwnBalanceSnapshots(accountStore, snapshotStore),
+    recordBalance: new RecordReportedBalance(
+      accountStore,
+      snapshotStore,
+      retention,
+      ids,
+      clock,
+    ),
   };
 }
 
@@ -310,7 +459,7 @@ describe('financial-accounts use cases: the principal is context, never input', 
   });
 
   it('every use case fails closed on an incomplete principal', async () => {
-    const { list, read, create, update, remove, listSnapshots } = wire();
+    const { list, read, create, update, remove, listSnapshots, recordBalance } = wire();
     const broken = { tenantId: TENANT_A } as unknown as AccountsPrincipal;
     const id = 'fa000000-0000-4000-8000-000000000001' as FinancialAccountId;
 
@@ -321,6 +470,15 @@ describe('financial-accounts use cases: the principal is context, never input', 
       update.execute({ accountId: id, expectedVersion: 1, displayName: 'x' }, broken),
       remove.execute({ accountId: id, expectedVersion: 1 }, broken),
       listSnapshots.execute({ accountId: id }, broken),
+      recordBalance.execute(
+        {
+          accountId: id,
+          amount: Money.of(1_000n, QAR),
+          asOf: NOW,
+          sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+        },
+        broken,
+      ),
     ]);
     for (const outcome of outcomes) {
       expect(outcome.ok).toBe(false);
@@ -421,7 +579,9 @@ describe('financial-accounts use cases: create, read, list', () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
     expect(created.value.institutionRef).toBeNull();
-    expect(created.value.userSuppliedInstitutionLabel).toBe('Synthetic Unlisted Institution');
+    expect(created.value.userSuppliedInstitutionLabel?.reveal()).toBe(
+      'Synthetic Unlisted Institution',
+    );
   });
 
   it('surfaces a domain rule refusal rather than storing a full number', async () => {
@@ -464,7 +624,7 @@ describe('financial-accounts use cases: update', () => {
     );
     expect(renamed.ok).toBe(true);
     if (renamed.ok) {
-      expect(renamed.value.displayName).toBe('Synthetic Test Account Renamed');
+      expect(renamed.value.displayName.reveal()).toBe('Synthetic Test Account Renamed');
       expect(renamed.value.version).toBe(2);
     }
   });
@@ -487,7 +647,7 @@ describe('financial-accounts use cases: update', () => {
     expect(stale.ok).toBe(false);
     if (!stale.ok) expect(stale.error.kind).toBe('version_conflict');
     // The first edit survived: nothing was silently overwritten.
-    expect(accountStore.rows.get(created.value.id)?.displayName).toBe('First Device Edit');
+    expect(accountStore.rows.get(created.value.id)?.displayName.reveal()).toBe('First Device Edit');
   });
 
   it('cannot update a neighbour account inside the same tenant', async () => {
@@ -501,46 +661,160 @@ describe('financial-accounts use cases: update', () => {
     );
     expect(crossUser.ok).toBe(false);
     if (!crossUser.ok) expect(crossUser.error.kind).toBe('account_not_found');
-    expect(accountStore.rows.get(created.value.id)?.displayName).toBe(
+    expect(accountStore.rows.get(created.value.id)?.displayName.reveal()).toBe(
       'Synthetic Test Account One',
     );
   });
 
-  it('permits a currency correction on an empty account and refuses it once a balance exists', async () => {
+  it('leaves the currency alone when no currency change was asked for, without asking anyone', async () => {
+    // The cross-module question costs a round trip and reveals that an
+    // account was touched. An edit that cannot change the currency has no
+    // business asking it.
     const { create, update } = wire();
     const created = await create.execute(manualInput, actorA1);
     if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.failPresenceWith(new Error('this port must not be called'));
 
-    const corrected = await update.execute(
-      { accountId: created.value.id, expectedVersion: 1, currencyCode: 'KWD' },
+    const renamed = await update.execute(
+      { accountId: created.value.id, expectedVersion: 1, displayName: 'Renamed Only' },
       actorA1,
     );
-    expect(corrected.ok).toBe(true);
-    if (corrected.ok) expect(corrected.value.currency.code).toBe('KWD');
+    expect(renamed.ok).toBe(true);
+  });
+});
 
-    await snapshotStore.append(actorA1, {
-      id: 'b5000000-0000-4000-8000-0000000000b1' as BalanceSnapshotId,
+/**
+ * The currency-immutability rule, case by case.
+ *
+ * Stored minor units are scaled by their currency's exponent, so
+ * re-denominating an account that holds records multiplies or divides every
+ * historical figure by ten between a two-decimal and a three-decimal currency
+ * — silently, and with nothing on screen to tell the person it happened. The
+ * rule used to consult balance snapshots alone; a transaction is just as much
+ * a financial record and lives in another module, which is what
+ * `FinancialRecordPresencePort` is for.
+ */
+describe('financial-accounts use cases: currency immutability, in every case that decides it', () => {
+  async function accountFor(create: CreateManualAccount): Promise<FinancialAccount> {
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) throw new Error('fixture create failed');
+    return created.value;
+  }
+
+  function snapshotFor(accountId: FinancialAccountId, suffix: string): Promise<BalanceSnapshot> {
+    return snapshotStore.append(actorA1, {
+      id: `b5000000-0000-4000-8000-0000000000${suffix}` as BalanceSnapshotId,
       tenantId: TENANT_A,
       userId: USER_A1,
-      accountId: created.value.id,
-      amount: Money.of(1_000n, Currency.get('KWD')),
+      accountId,
+      amount: Money.of(1_000n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
-      sourceReference: 'synthetic-test-fixture' as SourceReference,
+      sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
     });
+  }
 
-    const refused = await update.execute(
-      { accountId: created.value.id, expectedVersion: 2, currencyCode: 'QAR' },
+  async function changeCurrency(update: UpdateOwnAccount, account: FinancialAccount) {
+    return update.execute(
+      { accountId: account.id, expectedVersion: account.version, currencyCode: 'KWD' },
       actorA1,
     );
+  }
+
+  it('1. an empty account may be corrected: nobody is harmed by fixing a mistyped currency', async () => {
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    const corrected = await changeCurrency(update, account);
+    expect(corrected.ok).toBe(true);
+    if (corrected.ok) expect(corrected.value.currency.code).toBe('KWD');
+  });
+
+  it('2. a balance snapshot freezes it', async () => {
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    await snapshotFor(account.id, 'c1');
+
+    const refused = await changeCurrency(update, account);
     expect(refused.ok).toBe(false);
     if (!refused.ok && refused.error.kind === 'rule_violated') {
       expect(refused.error.violation.kind).toBe('currency_immutable_with_records');
     } else {
       expect.unreachable('expected the currency-immutability rule to refuse');
     }
+    expect(accountStore.rows.get(account.id)?.currency.code).toBe('QAR');
+  });
+
+  it('3. a TRANSACTION freezes it, with no snapshot anywhere — the case that was missing', async () => {
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    recordStore.seed(actorA1, account.id);
+    expect(await snapshotStore.countForAccount(actorA1, account.id)).toBe(0);
+
+    const refused = await changeCurrency(update, account);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'rule_violated') {
+      expect(refused.error.violation.kind).toBe('currency_immutable_with_records');
+    } else {
+      expect.unreachable('a transaction is a financial record and must freeze the currency');
+    }
+    expect(accountStore.rows.get(account.id)?.currency.code).toBe('QAR');
+  });
+
+  it('4. both a snapshot and a transaction freeze it', async () => {
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    await snapshotFor(account.id, 'c2');
+    recordStore.seed(actorA1, account.id);
+
+    const refused = await changeCurrency(update, account);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'rule_violated') {
+      expect(refused.error.violation.kind).toBe('currency_immutable_with_records');
+    } else {
+      expect.unreachable('expected the currency-immutability rule to refuse');
+    }
+  });
+
+  it("5. another user's transaction does not freeze the caller's account", async () => {
+    // The port is principal-scoped. If it ever answered across subjects, a
+    // neighbour's activity would block a correction the owner is entitled to
+    // make — and a leak in that direction is as real as a leak the other way.
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    recordStore.seed(actorA2, account.id, 3);
+    recordStore.seed(actorB1, account.id, 3);
+
+    const corrected = await changeCurrency(update, account);
+    expect(corrected.ok).toBe(true);
+    if (corrected.ok) expect(corrected.value.currency.code).toBe('KWD');
+  });
+
+  it('6. a store that cannot answer fails CLOSED, and says so honestly', async () => {
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    recordStore.failPresenceWith(new Error('synthetic record-store outage'));
+
+    const refused = await changeCurrency(update, account);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      // NOT `currency_immutable_with_records`: asserting that records exist
+      // when the question went unanswered would be inventing a fact.
+      expect(refused.error.kind).toBe('record_presence_unavailable');
+    }
+    expect(accountStore.rows.get(account.id)?.currency.code).toBe('QAR');
+  });
+
+  it('6b. the same failure on the snapshot half also fails closed', async () => {
+    const { create, update } = wire();
+    const account = await accountFor(create);
+    snapshotStore.failCountWith(new Error('synthetic snapshot-store outage'));
+
+    const refused = await changeCurrency(update, account);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error.kind).toBe('record_presence_unavailable');
+    expect(accountStore.rows.get(account.id)?.currency.code).toBe('QAR');
   });
 });
 
@@ -559,7 +833,7 @@ describe('financial-accounts use cases: delete is first class and cannot cross a
         amount: Money.of(12_345n, QAR),
         asOf: NOW,
         sourceKind: 'MANUAL',
-        sourceReference: 'synthetic-test-fixture' as SourceReference,
+        sourceReference: SYNTHETIC_SOURCE_REFERENCE,
         capturedAt: NOW,
         createdAt: NOW,
       });
@@ -573,6 +847,7 @@ describe('financial-accounts use cases: delete is first class and cannot cross a
     if (deleted.ok) {
       expect(deleted.value.accountId).toBe(created.value.id);
       expect(deleted.value.snapshotsDeleted).toBe(2);
+      expect(deleted.value.recordsDeleted).toEqual(NO_RECORDS_ERASED);
     }
     const remaining = await list.execute(actorA1);
     if (remaining.ok) expect(remaining.value).toHaveLength(0);
@@ -628,7 +903,7 @@ describe('financial-accounts use cases: balance snapshots', () => {
       amount: Money.of(-123_456n, QAR),
       asOf: NOW,
       sourceKind: 'MANUAL',
-      sourceReference: 'synthetic-test-fixture' as SourceReference,
+      sourceReference: SYNTHETIC_SOURCE_REFERENCE,
       capturedAt: NOW,
       createdAt: NOW,
     });
@@ -661,5 +936,387 @@ describe('financial-accounts use cases: balance snapshots', () => {
     const listed = await listSnapshots.execute({ accountId: created.value.id }, actorA2);
     expect(listed.ok).toBe(false);
     if (!listed.ok) expect(listed.error.kind).toBe('account_not_found');
+  });
+});
+
+/**
+ * The retention gate.
+ *
+ * Migration 0088, migration 0089, MODULE.md and DATA_LIFECYCLE.md all say
+ * durable financial creation fails closed while the retention decision is
+ * unresolved. Until this gate existed that was a paragraph: `CreateManualAccount`
+ * asked nothing and wrote unconditionally. The assertion that matters in every
+ * case below is the same one — ZERO durable rows after a refusal.
+ */
+describe('financial-accounts use cases: durable creation fails closed on retention', () => {
+  const unresolvedDecisions: ReadonlyArray<
+    readonly [string, (dataset: RetentionGovernedDataset) => FinancialRetentionDecision]
+  > = [
+    [
+      'PENDING_LEGAL_REVIEW',
+      (dataset) => ({
+        state: 'PENDING_LEGAL_REVIEW',
+        dataset,
+        reason: 'the financial-data retention question is with legal review',
+        packVersion: 'synthetic-test/pending',
+      }),
+    ],
+    [
+      'UNAVAILABLE',
+      (dataset) => ({
+        state: 'UNAVAILABLE',
+        dataset,
+        reason: 'no policy pack is bound for this tenant',
+      }),
+    ],
+    [
+      // Structurally impossible for a subject's own financial records, and
+      // therefore a refusal: a provider answering this has a defect, and
+      // reading it as permission would be the failure the gate exists for.
+      'NOT_APPLICABLE',
+      (dataset) => ({
+        state: 'NOT_APPLICABLE',
+        dataset,
+        reason: 'claims retention law does not reach a subject financial dataset',
+      }),
+    ],
+    [
+      // A period with no evidence behind it. Absence of evidence means not
+      // approved, so DECIDED alone is not enough.
+      'DECIDED with no approval evidence',
+      (dataset) => ({
+        state: 'DECIDED',
+        dataset,
+        retentionPeriod: 'P7Y',
+        basis: 'someone typed a duration',
+        approvalReference: '',
+        packVersion: 'synthetic-test/unevidenced',
+      }),
+    ],
+  ];
+
+  for (const [label, decision] of unresolvedDecisions) {
+    it(`refuses account creation and writes ZERO rows when retention is ${label}`, async () => {
+      const { create, list } = wire();
+      retention.answer(decision);
+
+      const refused = await create.execute(manualInput, actorA1);
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) {
+        expect(refused.error.kind).toBe('retention_unresolved');
+        if (refused.error.kind === 'retention_unresolved') {
+          expect(refused.error.dataset).toBe('financial_accounts');
+        }
+      }
+      // Zero durable rows: nothing in the account store, nothing in the
+      // snapshot store, and no identifier was even minted.
+      expect(accountStore.rows.size).toBe(0);
+      expect(snapshotStore.rows).toHaveLength(0);
+      const listed = await list.execute(actorA1);
+      expect(listed.ok && listed.value).toHaveLength(0);
+    });
+  }
+
+  it('refuses a reported balance and writes ZERO rows when retention is unresolved', async () => {
+    const { create, recordBalance } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+
+    retention.answer((dataset) => ({
+      state: 'PENDING_LEGAL_REVIEW',
+      dataset,
+      reason: 'the financial-data retention question is with legal review',
+      packVersion: 'synthetic-test/pending',
+    }));
+
+    const refused = await recordBalance.execute(
+      {
+        accountId: created.value.id,
+        amount: Money.of(1_000n, QAR),
+        asOf: NOW,
+        sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+      },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'retention_unresolved') {
+      expect(refused.error.dataset).toBe('financial_account_balance_snapshots');
+    } else {
+      expect.unreachable('expected the retention gate to refuse');
+    }
+    expect(snapshotStore.rows).toHaveLength(0);
+  });
+
+  it('asks BEFORE reading the catalogue or minting an id, so a refusal touches nothing', async () => {
+    wire(); // for the stores and the scripted port; the use case is built below
+
+    retention.answer((dataset) => ({
+      state: 'UNAVAILABLE',
+      dataset,
+      reason: 'no policy pack is bound',
+    }));
+    // A named institution would normally be resolved before the insert; the
+    // gate runs first, so even that read does not happen.
+    let catalogueReads = 0;
+    const counting: InstitutionCatalogueReader = {
+      listSelectable: () => institutions.listSelectable(),
+      findByRef: (ref) => {
+        catalogueReads += 1;
+        return institutions.findByRef(ref);
+      },
+    };
+    const gated = new CreateManualAccount(accountStore, counting, retention, ids, clock);
+
+    const refused = await gated.execute(
+      { ...manualInput, institutionRef: ACTIVE_INSTITUTION },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    expect(catalogueReads).toBe(0);
+    expect(accountStore.rows.size).toBe(0);
+  });
+
+  it('a provider that throws is a defect, not an unresolved decision', async () => {
+    // The two are different: "we have not decided" is a policy state a caller
+    // can act on; a throwing provider is broken infrastructure. Collapsing
+    // them would send someone to legal for a connection timeout.
+    const { create } = wire();
+    retention.failWith(new Error('synthetic policy-pack outage'));
+
+    const refused = await create.execute(manualInput, actorA1);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error.kind).toBe('store_failure');
+    expect(accountStore.rows.size).toBe(0);
+  });
+
+  it('the LOCAL fixture answer is accepted, and carries its no-legal-effect label', async () => {
+    const { create } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    expect(created.ok).toBe(true);
+    expect(retention.asked).toEqual(['financial_accounts']);
+
+    const decision = await retention.decideFor(actorA1, 'financial_accounts');
+    expect(decision.state).toBe('DECIDED');
+    if (decision.state === 'DECIDED') {
+      expect(decision.basis).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
+      expect(decision.approvalReference).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
+    }
+  });
+});
+
+/**
+ * Deletion erases the records other modules hold, or it does not report
+ * success. The account row is never removed while records scoped to it might
+ * survive — that is the orphaning this port exists to end.
+ */
+describe('financial-accounts use cases: deletion erases account-scoped records or refuses', () => {
+  it('erases the records, deletes the account, and reports both counts as measurements', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.seed(actorA1, created.value.id, 4);
+    await snapshotStore.append(actorA1, {
+      id: 'b5000000-0000-4000-8000-0000000000d1' as BalanceSnapshotId,
+      tenantId: TENANT_A,
+      userId: USER_A1,
+      accountId: created.value.id,
+      amount: Money.of(1_000n, QAR),
+      asOf: NOW,
+      sourceKind: 'MANUAL',
+      sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+      capturedAt: NOW,
+      createdAt: NOW,
+    });
+
+    const deleted = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) {
+      expect(deleted.value.snapshotsDeleted).toBe(1);
+      expect(deleted.value.recordsDeleted.FINANCIAL_RECORD).toBe(4);
+    }
+    expect(recordStore.rows).toHaveLength(0);
+    expect(snapshotStore.rows).toHaveLength(0);
+    expect(accountStore.rows.size).toBe(0);
+  });
+
+  it('does NOT delete the account when the eraser fails, and does not report success', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.seed(actorA1, created.value.id, 2);
+    recordStore.failErasureWith(new Error('synthetic record-store outage'));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error.kind).toBe('erasure_incomplete');
+    // The account survives WITH its records: a coherent world to retry into,
+    // rather than an anchor deleted out from under rows that still exist.
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+    expect(recordStore.rows).toHaveLength(2);
+  });
+
+  it('does NOT delete the account on a PARTIAL erasure, and reports what was removed', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.eraseWith(() => ({
+      kind: 'incomplete',
+      deleted: { ...NO_RECORDS_ERASED, FINANCIAL_RECORD: 2 },
+      reason: 'the provenance rows could not be removed',
+    }));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'erasure_incomplete') {
+      expect(refused.error.outcome).toBe('incomplete');
+      expect(refused.error.deleted.FINANCIAL_RECORD).toBe(2);
+    } else {
+      expect.unreachable('a partial erasure must never be reported as success');
+    }
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+  });
+
+  it('checks the version BEFORE erasing, so a stale delete destroys nothing', async () => {
+    // The ordering is the whole point: erasing a person's records and then
+    // refusing with "try again" would destroy data to answer a race.
+    const { create, update, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.seed(actorA1, created.value.id, 3);
+    await update.execute(
+      { accountId: created.value.id, expectedVersion: 1, displayName: 'Edited Elsewhere' },
+      actorA1,
+    );
+
+    const stale = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(stale.ok).toBe(false);
+    if (!stale.ok) expect(stale.error.kind).toBe('version_conflict');
+    expect(recordStore.rows).toHaveLength(3);
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+  });
+
+  it('a neighbour cannot erase anything: the refusal comes before the eraser is reached', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.seed(actorA1, created.value.id, 2);
+    recordStore.failErasureWith(new Error('the eraser must not be reached for a foreign account'));
+
+    for (const intruder of [actorA2, actorB1]) {
+      const refused = await remove.execute(
+        { accountId: created.value.id, expectedVersion: 1 },
+        intruder,
+      );
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) expect(refused.error.kind).toBe('account_not_found');
+    }
+    expect(recordStore.rows).toHaveLength(2);
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+  });
+
+  it('a retry after a failed erasure converges, because the erasure is idempotent', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.seed(actorA1, created.value.id, 2);
+    recordStore.failErasureWith(new Error('synthetic transient outage'));
+
+    const first = await remove.execute({ accountId: created.value.id, expectedVersion: 1 }, actorA1);
+    expect(first.ok).toBe(false);
+
+    recordStore.eraseWith(() => ({ kind: 'erased', deleted: NO_RECORDS_ERASED }));
+    const second = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(second.ok).toBe(true);
+    expect(accountStore.rows.size).toBe(0);
+  });
+});
+
+/**
+ * Reported balances are gated, bound to the account, and never narrative.
+ */
+describe('financial-accounts use cases: recording a reported balance', () => {
+  it('records a figure a source asserted, with the capture instant taken from the clock', async () => {
+    const { create, recordBalance, listSnapshots } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+
+    const asOf = new Date('2026-08-01T00:00:00.000Z');
+    const recorded = await recordBalance.execute(
+      {
+        accountId: created.value.id,
+        amount: Money.fromDecimalString('-1234.56', QAR),
+        asOf,
+        sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+      },
+      actorA1,
+    );
+    expect(recorded.ok).toBe(true);
+    if (recorded.ok) {
+      expect(recorded.value.amount.minorUnits).toBe(-123_456n);
+      expect(recorded.value.asOf).toEqual(asOf);
+      // When this platform LEARNED it is the platform's fact, not a caller's.
+      expect(recorded.value.capturedAt).toEqual(NOW);
+      expect(recorded.value.sourceKind).toBe('MANUAL');
+    }
+
+    const listed = await listSnapshots.execute({ accountId: created.value.id }, actorA1);
+    expect(listed.ok && listed.value).toHaveLength(1);
+  });
+
+  it('refuses a source reference that could carry narrative, before any write', async () => {
+    const { create, recordBalance } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+
+    const refused = await recordBalance.execute(
+      {
+        accountId: created.value.id,
+        amount: Money.of(1_000n, QAR),
+        asOf: NOW,
+        sourceReference: 'closing balance printed on the second page of the statement',
+      },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'rule_violated') {
+      expect(refused.error.violation.kind).toBe('invalid_source_reference');
+    } else {
+      expect.unreachable('expected the source-reference rule to refuse');
+    }
+    expect(snapshotStore.rows).toHaveLength(0);
+  });
+
+  it('a neighbour cannot attach a balance to an account they cannot see', async () => {
+    const { create, recordBalance } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+
+    const refused = await recordBalance.execute(
+      {
+        accountId: created.value.id,
+        amount: Money.of(1_000n, QAR),
+        asOf: NOW,
+        sourceReference: SYNTHETIC_SOURCE_REFERENCE,
+      },
+      actorA2,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error.kind).toBe('account_not_found');
+    expect(snapshotStore.rows).toHaveLength(0);
   });
 });

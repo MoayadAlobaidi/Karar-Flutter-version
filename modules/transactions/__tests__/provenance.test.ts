@@ -31,7 +31,7 @@ const VERSIONS = {
   parserVersion: 'csv/rfc4180/2',
   mappingVersion: 'mapping/qnb-current/3',
   normalizationVersion: 'normalize/arabic-indic+accounting-negatives/1',
-  fingerprintVersion: 'dedup/hmac-sha256/utc-day/v1',
+  fingerprintVersion: 'dedup/hmac-sha256/utc-day/v2',
 } as const;
 
 function csvProvenance(overrides: Partial<TransactionProvenance> = {}): TransactionProvenance {
@@ -132,7 +132,7 @@ describe('processing versions are recorded, never omitted', () => {
         parserVersion: 'manual-entry/1',
         mappingVersion: 'manual-entry/1',
         normalizationVersion: 'manual-entry/1',
-        fingerprintVersion: 'dedup/hmac-sha256/utc-day/v1',
+        fingerprintVersion: 'dedup/hmac-sha256/utc-day/v2',
       },
     });
     expect(Object.values(provenance.versions).every((value) => value !== '')).toBe(true);

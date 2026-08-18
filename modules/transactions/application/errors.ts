@@ -18,10 +18,18 @@
  * seeing one.
  *
  * `DUPLICATE_TRANSACTION` is a first-class outcome, not a store failure. The
- * unique constraint on the dedup fingerprint is what makes committing the
- * same statement row twice impossible under concurrency, and the caller needs
- * to tell a user "this is already recorded" rather than surfacing a database
- * error.
+ * unique constraint on the dedup fingerprint and the occurrence ordinal is
+ * what makes committing the same occurrence of the same content twice
+ * impossible under concurrency, and the caller needs to tell a user "this is
+ * already recorded" rather than surfacing a database error.
+ *
+ * The account arms follow the same reasoning as `NOT_FOUND`, one step out. An
+ * account that is absent, another user's, another tenant's, or never minted
+ * is ONE outcome — `NOT_FOUND` with `resource: 'financial_account'` — for
+ * exactly the oracle reason above. `ACCOUNT_NOT_WRITABLE` and
+ * `ACCOUNT_CURRENCY_MISMATCH` are separate arms only because they concern an
+ * account the caller has already been shown to own, so naming the reason
+ * tells them something about their own data and nothing about anyone else's.
  */
 
 export interface StoreFailure {
@@ -46,10 +54,68 @@ export interface PrincipalContextMissing {
   readonly message: string;
 }
 
-/** The exact same transaction is already recorded on this account. */
+/** This exact occurrence of this exact content is already on this account. */
 export interface DuplicateTransaction {
   readonly kind: 'DUPLICATE_TRANSACTION';
   readonly fingerprintVersion: string;
+  readonly message: string;
+}
+
+/**
+ * The occurrence ordinal was not the next unused one for its content
+ * identity.
+ *
+ * An ordinal claims "this identical content genuinely happened again". Any
+ * integer being acceptable would make duplicate review optional: submit the
+ * same row twice as occurrence 1 and occurrence 9999, and both commit,
+ * because the second collides with nothing. So the only acceptable value is
+ * the next one, and it is reported here so the caller can offer it — "if this
+ * genuinely happened twice, record it as occurrence 2" — instead of leaving a
+ * user to guess a number the system will accept.
+ */
+export interface OccurrenceOrdinalNotNext {
+  readonly kind: 'OCCURRENCE_ORDINAL_NOT_NEXT';
+  readonly requestedOrdinal: number;
+  readonly nextOrdinal: number;
+  readonly message: string;
+}
+
+/**
+ * A retention decision is required before a durable financial record may be
+ * written, and none exists. Refused before encryption and before any write.
+ *
+ * `state` carries which of the two non-answers it was, because "with legal
+ * review" and "nothing could answer" have different owners and different
+ * fixes, and one denial that hid the difference would send the wrong person.
+ */
+export interface RetentionUndecided {
+  readonly kind: 'RETENTION_UNDECIDED';
+  readonly state: 'PENDING_LEGAL_REVIEW' | 'UNAVAILABLE';
+  readonly message: string;
+}
+
+/**
+ * The account exists and is the principal's own, but may not take a new
+ * record: it is archived or closed, its lifecycle state is one this module
+ * does not recognise, or it claims a provider connection.
+ */
+export interface AccountNotWritable {
+  readonly kind: 'ACCOUNT_NOT_WRITABLE';
+  readonly accountId: string;
+  readonly reason: 'ARCHIVED' | 'CLOSED' | 'UNRECOGNIZED_STATE' | 'PROVIDER_CONNECTED';
+  readonly message: string;
+}
+
+/**
+ * The amount's currency is not the account's currency. Refused rather than
+ * converted: this platform stores no exchange rate it did not observe, and a
+ * converted figure would be a number nobody can defend (migration 0090).
+ */
+export interface AccountCurrencyMismatch {
+  readonly kind: 'ACCOUNT_CURRENCY_MISMATCH';
+  readonly accountId: string;
+  readonly accountCurrency: string;
+  readonly transactionCurrency: string;
   readonly message: string;
 }
 

@@ -32,10 +32,27 @@ export interface MaskNotAMask {
   readonly message: string;
 }
 
-/** Display text was empty, whitespace-only, or longer than the schema admits. */
+/**
+ * Display text was empty, whitespace-only, or longer than this module admits.
+ *
+ * The message never quotes the offending value: both fields are
+ * `HIGHLY_SENSITIVE_FINANCIAL`, and an error string that echoes the input is
+ * the shortest path from an encrypted column to a plaintext log line.
+ */
 export interface InvalidDisplayText {
   readonly kind: 'invalid_display_text';
-  readonly field: 'displayName' | 'userSuppliedInstitutionLabel' | 'sourceReference';
+  readonly field: 'displayName' | 'userSuppliedInstitutionLabel';
+  readonly message: string;
+}
+
+/**
+ * A balance snapshot named its source with something that is not an opaque
+ * reference. Migration 0089 makes the column a `uuid`, so free text has
+ * nowhere to land; this rule is what turns the database's refusal into an
+ * answer a caller can act on rather than a 22P02 from the driver.
+ */
+export interface InvalidSourceReference {
+  readonly kind: 'invalid_source_reference';
   readonly message: string;
 }
 
@@ -71,6 +88,18 @@ export interface CurrencyImmutableWithRecords {
   readonly message: string;
 }
 
+/**
+ * A reported balance named a currency its account does not hold. The
+ * composite foreign key in migration 0089 makes the pair unrepresentable
+ * anyway; refusing here is what turns a 23503 from the driver into an answer
+ * that names the real problem.
+ */
+export interface SnapshotCurrencyMismatch {
+  readonly kind: 'snapshot_currency_mismatch';
+  readonly accountId: FinancialAccountId;
+  readonly message: string;
+}
+
 /** A value outside a closed vocabulary this module owns. */
 export interface UnknownVocabularyValue {
   readonly kind: 'unknown_vocabulary_value';
@@ -84,9 +113,11 @@ export type FinancialAccountRuleViolation =
   | UnsupportedCurrency
   | MaskNotAMask
   | InvalidDisplayText
+  | InvalidSourceReference
   | InstitutionNamedTwice
   | ProviderConnectionMismatch
   | CurrencyImmutableWithRecords
+  | SnapshotCurrencyMismatch
   | UnknownVocabularyValue;
 
 /**

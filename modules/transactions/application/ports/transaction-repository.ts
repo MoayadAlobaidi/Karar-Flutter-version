@@ -38,8 +38,15 @@ export interface TransactionCommit {
   readonly transaction: Transaction;
   readonly revision: TransactionRevision;
   readonly provenance: TransactionProvenance;
+  /** CONTENT identity. Carries nothing about occurrence — see the port. */
   readonly fingerprint: DedupFingerprint;
-  /** Discriminates a genuine repeat of an identical movement. 1 for the first. */
+  /**
+   * Which occurrence of that content this commit is. 1 for the first.
+   *
+   * Verified, not trusted: `commit` refuses anything but the next unused
+   * ordinal for this content identity (`OccurrenceOrdinalNotNextError`), so a
+   * caller cannot skip duplicate review by naming a high number.
+   */
   readonly occurrenceOrdinal: number;
 }
 
@@ -80,13 +87,36 @@ export interface TransactionPage {
 
 /**
  * Raised by an implementation when the dedup unique constraint refuses a
- * commit. A typed error rather than a leaked driver error, so the use case
- * can turn it into the `DUPLICATE_TRANSACTION` outcome a user can act on.
+ * commit — the same content at the same occurrence is already recorded. A
+ * typed error rather than a leaked driver error, so the use case can turn it
+ * into the `DUPLICATE_TRANSACTION` outcome a user can act on.
  */
 export class DuplicateTransactionError extends Error {
   override readonly name = 'DuplicateTransactionError';
 
   constructor(readonly fingerprintVersion: string, message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Raised when the requested occurrence ordinal is not the next unused one for
+ * its content identity.
+ *
+ * Carries the ordinal that WOULD be accepted, so the use case can tell a user
+ * "record it as occurrence 2" rather than leaving them to find a number the
+ * system tolerates. Distinct from `DuplicateTransactionError`: that one means
+ * "this occurrence already exists", this one means "that is not an occurrence
+ * you can claim yet".
+ */
+export class OccurrenceOrdinalNotNextError extends Error {
+  override readonly name = 'OccurrenceOrdinalNotNextError';
+
+  constructor(
+    readonly requestedOrdinal: number,
+    readonly nextOrdinal: number,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -107,9 +137,15 @@ export class TransactionVersionConflictError extends Error {
 export interface TransactionRepository {
   /**
    * Atomically inserts the transaction, its first revision, and its
-   * provenance. Throws `DuplicateTransactionError` when an identical
-   * movement is already recorded for this principal on this account under the
-   * same fingerprint version.
+   * provenance.
+   *
+   * Throws `DuplicateTransactionError` when this exact occurrence of this
+   * exact content is already recorded for this principal on this account
+   * under the same fingerprint version, and `OccurrenceOrdinalNotNextError`
+   * when the ordinal is not the next unused one for that content identity.
+   * Both checks run inside the writing transaction: the ordinal check is
+   * there so the refusal can name the acceptable ordinal, and the unique
+   * constraint behind it is what actually settles a concurrent race.
    */
   commit(principal: TransactionsPrincipal, commit: TransactionCommit): Promise<void>;
 

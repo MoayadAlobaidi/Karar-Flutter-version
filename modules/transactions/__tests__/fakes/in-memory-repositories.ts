@@ -33,6 +33,7 @@ import type {
 } from '../../application/ports/principal-context.js';
 import {
   DuplicateTransactionError,
+  OccurrenceOrdinalNotNextError,
   TransactionVersionConflictError,
   type TransactionCommit,
   type TransactionCorrectionCommit,
@@ -40,6 +41,16 @@ import {
   type TransactionPageQuery,
   type TransactionRepository,
 } from '../../application/ports/transaction-repository.js';
+import type {
+  AccountAccessSummary,
+  AccountLifecycleState,
+  FinancialAccountAccessPort,
+} from '../../application/ports/financial-account-access.js';
+import type { AccountRef } from '../../domain/refs.js';
+import type {
+  TransactionRetentionDecision,
+  TransactionRetentionDecisionPort,
+} from '../../application/ports/transaction-retention-decision.js';
 
 /** The principal source a composition root would bind to the session. */
 export class FixedPrincipalContext implements PrincipalContextPort {
@@ -75,7 +86,9 @@ interface StoredTransaction {
   transaction: Transaction;
   revisions: TransactionRevision[];
   provenance: TransactionProvenance[];
-  fingerprintKey: string;
+  /** Principal + account + fingerprint version + fingerprint. */
+  identityKey: string;
+  occurrenceOrdinal: number;
 }
 
 function scopeKey(principal: TransactionsPrincipal): string {
@@ -88,26 +101,52 @@ function owns(principal: TransactionsPrincipal, transaction: Transaction): boole
 
 export class InMemoryTransactionRepository implements TransactionRepository {
   readonly #rows = new Map<string, StoredTransaction>();
-  readonly #fingerprints = new Set<string>();
+
+  /**
+   * The stored occurrences of one content identity. Derived from the rows
+   * rather than from a counter kept beside them, so deletion behaves exactly
+   * as the live rule does: `max(occurrence_ordinal)` is taken over surviving
+   * rows, and erasing the second coffee makes occurrence 2 claimable again.
+   */
+  #ordinalsFor(identityKey: string): readonly number[] {
+    return [...this.#rows.values()]
+      .filter((stored) => stored.identityKey === identityKey)
+      .map((stored) => stored.occurrenceOrdinal);
+  }
 
   commit(principal: TransactionsPrincipal, commit: TransactionCommit): Promise<void> {
-    const fingerprintKey = [
+    // The double holds the REAL contract, ordinal included: the unique key is
+    // over content identity AND occurrence, and the ordinal must be the next
+    // unused one. A double that skipped the second rule would let the
+    // use-case tests pass while the live ones failed.
+    const identityKey = [
       scopeKey(principal),
       commit.transaction.accountRef.accountId,
       commit.fingerprint.version,
       commit.fingerprint.value,
     ].join('|');
-    if (this.#fingerprints.has(fingerprintKey)) {
+    const recorded = this.#ordinalsFor(identityKey);
+    if (recorded.includes(commit.occurrenceOrdinal)) {
       return Promise.reject(
         new DuplicateTransactionError(commit.fingerprint.version, 'duplicate fingerprint'),
       );
     }
-    this.#fingerprints.add(fingerprintKey);
+    const nextOrdinal = Math.max(0, ...recorded) + 1;
+    if (commit.occurrenceOrdinal !== nextOrdinal) {
+      return Promise.reject(
+        new OccurrenceOrdinalNotNextError(
+          commit.occurrenceOrdinal,
+          nextOrdinal,
+          'the occurrence ordinal must be the next unused one for this content identity',
+        ),
+      );
+    }
     this.#rows.set(commit.transaction.id, {
       transaction: commit.transaction,
       revisions: [commit.revision],
       provenance: [commit.provenance],
-      fingerprintKey,
+      identityKey,
+      occurrenceOrdinal: commit.occurrenceOrdinal,
     });
     return Promise.resolve();
   }
@@ -180,9 +219,9 @@ export class InMemoryTransactionRepository implements TransactionRepository {
       return Promise.resolve(false);
     }
     // The double models the schema's ON DELETE CASCADE: revisions and
-    // provenance go with the transaction, never outlive it.
+    // provenance go with the transaction, never outlive it. The dedup
+    // identity goes with it too, because it is columns ON the row.
     this.#rows.delete(id);
-    this.#fingerprints.delete(stored.fingerprintKey);
     return Promise.resolve(true);
   }
 
@@ -303,3 +342,90 @@ const DEFAULT_CATEGORIES = [
     retiredAt: new Date('2026-01-01T00:00:00.000Z'),
   },
 ] as const;
+
+/**
+ * The account-visibility double.
+ *
+ * It models the ONE rule the real composition adapter must hold: an account
+ * resolves only for the principal who owns it, and every other case — another
+ * user in the same tenant, another tenant, an id nobody minted — answers
+ * `null` indistinguishably. The real adapter gets that scoping from the
+ * accounts module's RLS policies; the double gets it from an owner check, so
+ * the use-case tests exercise the same three refusals the live suite does.
+ *
+ * Seeded accounts belong to somebody. There is no "unowned" account, because
+ * there is no such thing in the accounts module either.
+ */
+export interface SeededAccount {
+  readonly accountId: string;
+  readonly owner: TransactionsPrincipal;
+  readonly currencyCode: string;
+  readonly lifecycleState?: AccountLifecycleState;
+  readonly providerConnected?: boolean;
+}
+
+export class FixedAccountDirectory implements FinancialAccountAccessPort {
+  readonly #accounts = new Map<string, SeededAccount>();
+
+  constructor(accounts: readonly SeededAccount[] = []) {
+    for (const account of accounts) this.add(account);
+  }
+
+  add(account: SeededAccount): this {
+    this.#accounts.set(account.accountId, account);
+    return this;
+  }
+
+  resolveOwnAccount(
+    principal: TransactionsPrincipal,
+    accountRef: AccountRef,
+  ): Promise<AccountAccessSummary | null> {
+    const account = this.#accounts.get(accountRef.accountId);
+    if (
+      account === undefined ||
+      account.owner.tenantId !== principal.tenantId ||
+      account.owner.userId !== principal.userId
+    ) {
+      // Absent, another user's, another tenant's — one answer. The double
+      // must not be more helpful than the port, or the test that proves the
+      // outcomes are indistinguishable would be proving it about the double.
+      return Promise.resolve(null);
+    }
+    return Promise.resolve({
+      accountRef,
+      currencyCode: account.currencyCode,
+      lifecycleState: account.lifecycleState ?? 'ACTIVE',
+      providerConnected: account.providerConnected ?? false,
+    });
+  }
+}
+
+/**
+ * A retention decision the test states outright.
+ *
+ * Constructed with whichever of the three answers the case is about, so a
+ * refusal test asserts against a real `PENDING_LEGAL_REVIEW` or `UNAVAILABLE`
+ * rather than against a mock that throws.
+ */
+export class StubRetentionDecisionPort implements TransactionRetentionDecisionPort {
+  #decision: TransactionRetentionDecision;
+  #calls = 0;
+
+  constructor(decision: TransactionRetentionDecision) {
+    this.#decision = decision;
+  }
+
+  /** How many times the gate was consulted — proves it is not skipped. */
+  get calls(): number {
+    return this.#calls;
+  }
+
+  answerWith(decision: TransactionRetentionDecision): void {
+    this.#decision = decision;
+  }
+
+  decide(): Promise<TransactionRetentionDecision> {
+    this.#calls += 1;
+    return Promise.resolve(this.#decision);
+  }
+}

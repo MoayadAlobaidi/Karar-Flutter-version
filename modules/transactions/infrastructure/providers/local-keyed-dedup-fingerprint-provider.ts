@@ -46,6 +46,14 @@
  * from it would silently change identity on rotation; a row id would make
  * every row unique and the constraint useless (packages/platform
  * keys/custody.ts states the rule).
+ *
+ * And nothing about OCCURRENCE. The digest answers "is this the same
+ * content?"; how many times that content occurred is
+ * `transactions.occurrence_ordinal`, a separate column in the unique key
+ * (migration 0090). Folding the ordinal in would give the second identical
+ * coffee a second, unrelated content identity, after which "have I seen this
+ * content before?" could not be asked without guessing every ordinal it might
+ * have been filed under.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -62,8 +70,16 @@ import type { TransactionsPrincipal } from '../../application/ports/principal-co
  * fields participate, how they are encoded, and how the date is truncated.
  * Changing any of those changes this string, which starts a fresh namespace
  * in the unique constraint rather than colliding with the old one.
+ *
+ * v1 folded the occurrence ordinal into the digest; v2 does not, and the
+ * ordinal is a column of its own. That is a change to which fields
+ * participate, so it takes a new version — even though no v1 value ever
+ * reached a durable row outside a local test. Reusing v1 for a different
+ * definition is the silent redefinition this versioning exists to prevent,
+ * and a version string whose meaning depends on which commit produced it is
+ * not a version.
  */
-export const DEDUP_FINGERPRINT_VERSION = 'dedup/hmac-sha256/utc-day/v1';
+export const DEDUP_FINGERPRINT_VERSION = 'dedup/hmac-sha256/utc-day/v2';
 
 const SUBJECT_KEY_LABEL = 'karar/transactions/dedup/v1';
 const ROOT_KEY_BYTES = 32;
@@ -86,7 +102,6 @@ function canonicalEncoding(input: FingerprintInput): string {
     input.amountMinorUnits.toString(),
     input.currencyCode,
     input.normalizedNarrative,
-    input.occurrenceOrdinal.toString(),
   ];
   return parts.map((part) => `${part.length}:${part}`).join('|');
 }

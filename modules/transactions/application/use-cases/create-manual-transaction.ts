@@ -14,6 +14,32 @@
  * rather than silently reinterpreted.
  *
  * No `userId`, no `tenantId`: the principal comes from context.
+ *
+ * ## Two gates, both before anything is derived and long before anything is
+ * ## written
+ *
+ * 1. **Retention.** MODULE.md declares the retention of every table here as
+ *    an unresolved legal decision and says ingestion fails closed until a
+ *    decision exists. `TransactionRetentionDecisionPort` is what makes that
+ *    true rather than documented.
+ * 2. **The account.** `FinancialAccountAccessPort` resolves an account
+ *    **visible to this principal** and reports its currency, lifecycle state
+ *    and provider claim. Without it this use case accepted any UUID: another
+ *    user's account, another tenant's, one nobody minted, or one denominated
+ *    in a different currency. RLS cannot catch that — the row carries the
+ *    caller's own tenant and user, so the policy is satisfied; what is wrong
+ *    is the account the row points at.
+ *
+ * Retention is asked first, and the order matters. When retention is
+ * unresolved every account id gets the same refusal, so an unresolved legal
+ * decision cannot be turned into a probe against another context's data. The
+ * reverse order would answer "that account is not yours" to a caller the
+ * platform is not allowed to write anything for at all.
+ *
+ * Both gates run before the fingerprint is computed, before any narrative is
+ * encrypted, and before the repository is touched. Refusing after encryption
+ * would already have produced ciphertext of the subject's narrative; refusing
+ * after a write would leave the record the gate exists to prevent.
  */
 
 import { Clock, Money, Result } from '@karar/shared-kernel';
@@ -29,15 +55,32 @@ import {
   InvalidTransactionInputError,
   principalContextMissing,
   toStoreFailure,
+  type AccountCurrencyMismatch,
+  type AccountNotWritable,
   type DuplicateTransaction,
+  type NotFound,
+  type OccurrenceOrdinalNotNext,
   type PrincipalContextMissing,
+  type RetentionUndecided,
   type StoreFailure,
 } from '../errors.js';
 import type { DedupFingerprintPort } from '../ports/dedup-fingerprint.js';
+import {
+  isWritableLifecycleState,
+  type AccountAccessSummary,
+  type FinancialAccountAccessPort,
+} from '../ports/financial-account-access.js';
 import type { IdSource } from '../ports/id-source.js';
 import type { PrincipalContextPort } from '../ports/principal-context.js';
+import type {
+  RetentionPendingLegalReview,
+  RetentionUnavailable,
+  TransactionRetentionDecision,
+  TransactionRetentionDecisionPort,
+} from '../ports/transaction-retention-decision.js';
 import {
   DuplicateTransactionError,
+  OccurrenceOrdinalNotNextError,
   type TransactionRepository,
 } from '../ports/transaction-repository.js';
 
@@ -67,12 +110,22 @@ export interface CreateManualTransactionInput {
   /** All-or-nothing pair; a lone member is refused. */
   readonly originalMagnitude?: Money | null;
   readonly originalCurrency?: Currency | null;
-  /** 1 for the first such movement; 2 for a genuine identical repeat. */
+  /**
+   * Which occurrence of this content the entry claims to be. 1 for the first;
+   * 2 for a genuine identical repeat. Verified against what is recorded, not
+   * trusted — only the next unused ordinal is claimable, so a high number is
+   * not a way past duplicate review.
+   */
   readonly occurrenceOrdinal?: number;
 }
 
 export type CreateManualTransactionError =
   | PrincipalContextMissing
+  | RetentionUndecided
+  | NotFound
+  | AccountNotWritable
+  | AccountCurrencyMismatch
+  | OccurrenceOrdinalNotNext
   | DuplicateTransaction
   | StoreFailure;
 
@@ -83,6 +136,8 @@ export class CreateManualTransaction {
     private readonly fingerprints: DedupFingerprintPort,
     private readonly ids: IdSource,
     private readonly clock: Clock,
+    private readonly retention: TransactionRetentionDecisionPort,
+    private readonly accounts: FinancialAccountAccessPort,
   ) {}
 
   async execute(
@@ -91,8 +146,55 @@ export class CreateManualTransaction {
     const principal = this.principals.current();
     if (principal === null) return Result.err(principalContextMissing());
 
+    // GATE 1 — retention. Nothing is derived, nothing is encrypted, nothing
+    // is written until somebody has decided how long this record may be kept.
+    let decision: TransactionRetentionDecision;
+    try {
+      decision = await this.retention.decide(principal);
+    } catch (error) {
+      return Result.err(toStoreFailure(error));
+    }
+    if (decision.state !== 'DECIDED') {
+      return Result.err(retentionUndecided(decision));
+    }
+
     const accountRef = AccountRef.of(input.accountId);
     const amount = signedAmountFor(input.magnitude, input.direction);
+
+    // GATE 2 — the account. Resolving through the port is the ONLY thing that
+    // ties this record to an account that exists, is this principal's, and
+    // can hold this currency.
+    let account: AccountAccessSummary | null;
+    try {
+      account = await this.accounts.resolveOwnAccount(principal, accountRef);
+    } catch (error) {
+      return Result.err(toStoreFailure(error));
+    }
+    if (account === null) {
+      // Absent, another user's, another tenant's, never minted — one answer,
+      // deliberately. See application/errors.ts: a distinguishable denial is
+      // an existence oracle over another subject's account inventory.
+      return Result.err({
+        kind: 'NOT_FOUND',
+        resource: 'financial_account',
+        id: accountRef.accountId,
+      });
+    }
+    const refusal = refuseUnwritableAccount(account);
+    if (refusal !== null) return Result.err(refusal);
+    if (account.currencyCode !== amount.currency.code) {
+      return Result.err({
+        kind: 'ACCOUNT_CURRENCY_MISMATCH',
+        accountId: accountRef.accountId,
+        accountCurrency: account.currencyCode,
+        transactionCurrency: amount.currency.code,
+        message:
+          `this account is held in ${account.currencyCode} and the amount is in ` +
+          `${amount.currency.code}; the amount is not converted, because this platform stores no ` +
+          'exchange rate it did not observe and a converted figure would be a number nobody can defend',
+      });
+    }
+
     const description = HsfField.of(input.description);
     const merchant = HsfField.optional(input.merchant);
     const note = HsfField.optional(input.note);
@@ -132,14 +234,16 @@ export class CreateManualTransaction {
 
     // The fingerprint is computed over the SAME narrative the user typed. A
     // manual entry has no normalisation ruleset of its own, so the
-    // description travels as written and the version records that.
+    // description travels as written and the version records that. The
+    // occurrence ordinal is NOT part of it: the digest states what the
+    // content is, and how many times that content occurred is the separate
+    // column travelling beside it.
     const fingerprint = await this.fingerprints.fingerprint(principal, {
       accountRef,
       bookingDate: transaction.bookingDate,
       amountMinorUnits: amount.minorUnits,
       currencyCode: amount.currency.code,
       normalizedNarrative: description.reveal(),
-      occurrenceOrdinal,
     });
 
     const provenance = createProvenance({
@@ -182,13 +286,83 @@ export class CreateManualTransaction {
           kind: 'DUPLICATE_TRANSACTION',
           fingerprintVersion: error.fingerprintVersion,
           message:
-            'this exact transaction is already recorded on this account; if it genuinely happened twice, record the second one with the next occurrence ordinal so both are distinguishable',
+            'this exact transaction is already recorded on this account as occurrence ' +
+            `${occurrenceOrdinal}; if it genuinely happened again, record the next occurrence so both are distinguishable`,
+        });
+      }
+      if (error instanceof OccurrenceOrdinalNotNextError) {
+        return Result.err({
+          kind: 'OCCURRENCE_ORDINAL_NOT_NEXT',
+          requestedOrdinal: error.requestedOrdinal,
+          nextOrdinal: error.nextOrdinal,
+          message:
+            `occurrence ${error.requestedOrdinal} cannot be claimed for this transaction: the next ` +
+            `occurrence of this content is ${error.nextOrdinal}. An ordinal asserts that identical ` +
+            'content genuinely happened again, so it can only ever be the next one — otherwise the ' +
+            'same statement row could be committed twice under two different numbers with no review',
         });
       }
       return Result.err(toStoreFailure(error));
     }
     return Result.ok(transaction);
   }
+}
+
+/**
+ * The refusal for an account the principal owns but may not write to.
+ *
+ * Archived and closed are separate reasons rather than one "not active"
+ * because they mean different things to a person: an archived account is one
+ * they put away and can bring back, a closed one is finished. Recording new
+ * movements into either would produce records the subject believes they
+ * stopped keeping.
+ */
+function refuseUnwritableAccount(account: AccountAccessSummary): AccountNotWritable | null {
+  if (account.providerConnected) {
+    return {
+      kind: 'ACCOUNT_NOT_WRITABLE',
+      accountId: account.accountRef.accountId,
+      reason: 'PROVIDER_CONNECTED',
+      message:
+        'this account reports an external provider connection. No provider connector exists in this ' +
+        'phase, so that claim could not have been created legitimately; and a hand-typed record filed ' +
+        'into a stream the subject believes came from their bank is a fabricated financial fact',
+    };
+  }
+  if (isWritableLifecycleState(account.lifecycleState)) return null;
+  const reason =
+    account.lifecycleState === 'ARCHIVED'
+      ? 'ARCHIVED'
+      : account.lifecycleState === 'CLOSED'
+        ? 'CLOSED'
+        : 'UNRECOGNIZED_STATE';
+  return {
+    kind: 'ACCOUNT_NOT_WRITABLE',
+    accountId: account.accountRef.accountId,
+    reason,
+    message:
+      reason === 'UNRECOGNIZED_STATE'
+        ? 'this account is in a state this module does not recognise, so it is not writable — an ' +
+          'unmapped state is not permission to record money against an account'
+        : `this account is ${account.lifecycleState.toLowerCase()}; recording new movements into it ` +
+          'would produce records the account holder believes they stopped keeping',
+  };
+}
+
+/** Turns a non-DECIDED retention answer into the typed refusal. */
+function retentionUndecided(
+  decision: RetentionPendingLegalReview | RetentionUnavailable,
+): RetentionUndecided {
+  const detail =
+    decision.state === 'PENDING_LEGAL_REVIEW' ? decision.openQuestion : decision.reason;
+  return {
+    kind: 'RETENTION_UNDECIDED',
+    state: decision.state,
+    message:
+      'no retention decision governs transaction records here, so nothing durable may be written: ' +
+      `${decision.state} — ${detail}. How long a HIGHLY_SENSITIVE_FINANCIAL record may be kept is a ` +
+      'legal decision, and writing the record first while waiting for it is the outcome the gate exists to prevent',
+  };
 }
 
 function requireOrdinal(value: number | undefined): number {

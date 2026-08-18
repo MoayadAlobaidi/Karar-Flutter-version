@@ -8,9 +8,29 @@
  * There is no account-number field, no IBAN field, no PAN field, no CVV
  * field, and no credential field. The only identifying fragment is `mask`,
  * and `isMask` admits at most four digits — so a full card number (13-19
- * digits) and an IBAN (15-34 alphanumerics) are both unrepresentable, in the
- * type and in the column behind it (migration 0088). This is a structural
- * property asserted by test, not a validation a future call site can forget.
+ * digits) and an IBAN (15-34 alphanumerics) are both unrepresentable. This
+ * is a structural property asserted by test, not a validation a future call
+ * site can forget.
+ *
+ * **The shape rule now lives HERE and only here.** Until Phase 5's
+ * remediation the same regular expression was also a CHECK constraint on a
+ * plaintext `mask` column; encrypting the column removed the database's
+ * ability to inspect the characters, so the CHECK could not survive. What
+ * did survive is the property that actually mattered: AES-256-GCM preserves
+ * length, so migration 0088 bounds the mask CIPHERTEXT at eight bytes, and a
+ * 13-to-19-digit PAN remains unrepresentable in that column no matter what a
+ * caller sends. The database bounds the size; this file rules on the shape.
+ *
+ * ## The three fields that are HIGHLY_SENSITIVE_FINANCIAL
+ *
+ * `displayName`, `userSuppliedInstitutionLabel` and `mask` are `HsfField`
+ * values, not strings: the account name a subject chose, the bank they typed,
+ * and the tail of their card together identify a person's banking
+ * relationships, and the table's classification has always said so. They are
+ * held as plaintext in memory inside a wrapper that redacts on every
+ * accidental rendering path, and they exist at rest only as ciphertext (see
+ * `application/ports/hsf-field-encryption.ts`). Nothing in this file knows
+ * about keys, nonces, or algorithms.
  *
  * ## What an account does NOT claim
  *
@@ -34,6 +54,7 @@ import type {
   MaskNotAMask,
   UnsupportedCurrency,
 } from './errors.js';
+import { HSF_FIELD_MAX_LENGTH, HsfField } from './hsf-field.js';
 import type { FinancialAccountId, InstitutionRef, ProviderConnectionRef } from './refs.js';
 
 /**
@@ -90,14 +111,15 @@ export interface FinancialAccount {
   /**
    * What the subject typed when their institution is not in the catalogue.
    * Subject-owned and classified HIGHLY_SENSITIVE_FINANCIAL: it lives on this
-   * row and never enters the global catalogue.
+   * row, never enters the global catalogue, and is stored as ciphertext.
    */
-  readonly userSuppliedInstitutionLabel: string | null;
+  readonly userSuppliedInstitutionLabel: HsfField | null;
   readonly accountType: AccountType;
   readonly currency: Currency;
-  readonly displayName: string;
-  /** A masked fragment ONLY — see `isMask`. Never a full number. */
-  readonly mask: string | null;
+  /** The name the subject gave the account. HSF; ciphertext at rest. */
+  readonly displayName: HsfField;
+  /** A masked fragment ONLY — see `isMask`. Never a full number. HSF. */
+  readonly mask: HsfField | null;
   readonly status: AccountStatus;
   readonly sourceKind: SourceKind;
   /** Always null in Phase 5. Never a credential — see `ProviderConnectionRef`. */
@@ -108,15 +130,33 @@ export interface FinancialAccount {
   readonly version: number;
 }
 
-/** Longest display text the schema admits (migration 0088). */
-export const MAX_DISPLAY_TEXT_LENGTH = 120;
+/**
+ * Longest display text this module admits. One bound for every HSF field, so
+ * the byte bound migration 0088 puts on the ciphertext is derivable from a
+ * single number rather than from three that can drift apart.
+ */
+export const MAX_DISPLAY_TEXT_LENGTH = HSF_FIELD_MAX_LENGTH;
 
 /**
  * A mask is at most four digits, optionally preceded by masking characters.
- * Identical to the CHECK in migration 0088, and a test asserts the two stay
- * identical — a domain rule the database disagrees with protects nothing.
+ *
+ * This regular expression is now the ONLY place the shape is enforced. It
+ * used to be mirrored by a CHECK on a plaintext column; encrypting that
+ * column ended the database's ability to read the characters, so the mirror
+ * was removed rather than left in place as a constraint that could no longer
+ * fire. Migration 0088 keeps the part encryption does not hide — the length —
+ * and eight ciphertext bytes is the exact bound this pattern implies.
  */
 const MASK_SHAPE = /^[*xX#]{0,4}[0-9]{2,4}$/;
+
+/**
+ * Longest plaintext a mask can be under `MASK_SHAPE`: four masking characters
+ * plus four digits. Exported because migration 0088's ciphertext bound is
+ * this number, and a test asserts the two agree — AES-256-GCM does not change
+ * length, so the column's byte bound and this character bound are the same
+ * statement said twice.
+ */
+export const MAX_MASK_LENGTH = 8;
 
 /**
  * True only for something that is a MASK. Deliberately strict: the point is
@@ -167,10 +207,16 @@ export function resolveSupportedCurrency(code: string): Result<Currency, Unsuppo
   return Result.ok(currency);
 }
 
+/**
+ * Validates raw display text and wraps it. The refusals are EXPECTED outcomes
+ * (someone typed nothing, or pasted an essay), so they are `Result` arms; the
+ * `HsfField` construction that follows cannot fail, because these two checks
+ * are exactly its preconditions.
+ */
 function checkDisplayText(
   field: InvalidDisplayText['field'],
   value: string,
-): Result<string, InvalidDisplayText> {
+): Result<HsfField, InvalidDisplayText> {
   const trimmed = value.trim();
   if (trimmed === '') {
     return Result.err({
@@ -188,10 +234,10 @@ function checkDisplayText(
         `the field is a name, and an unbounded one becomes a place to hide notes the classification does not cover`,
     });
   }
-  return Result.ok(trimmed);
+  return Result.ok(HsfField.of(trimmed));
 }
 
-function checkMask(mask: string | null): Result<string | null, MaskNotAMask> {
+function checkMask(mask: string | null): Result<HsfField | null, MaskNotAMask> {
   if (mask === null) return Result.ok(null);
   const trimmed = mask.trim();
   if (trimmed === '') return Result.ok(null);
@@ -204,7 +250,7 @@ function checkMask(mask: string | null): Result<string | null, MaskNotAMask> {
         'IBAN, or card number, and refusing here is what keeps that true',
     });
   }
-  return Result.ok(trimmed);
+  return Result.ok(HsfField.of(trimmed));
 }
 
 /**
@@ -213,7 +259,7 @@ function checkMask(mask: string | null): Result<string | null, MaskNotAMask> {
  */
 function checkInstitutionNaming(
   institutionRef: InstitutionRef | null,
-  label: string | null,
+  label: HsfField | null,
 ): Result<void, FinancialAccountRuleViolation> {
   if (institutionRef !== null && label !== null) {
     return Result.err({
@@ -307,7 +353,7 @@ export function createFinancialAccount(
   const displayName = checkDisplayText('displayName', input.displayName);
   if (!displayName.ok) return displayName;
 
-  let label: string | null = null;
+  let label: HsfField | null = null;
   if (input.userSuppliedInstitutionLabel !== null) {
     const checked = checkDisplayText(
       'userSuppliedInstitutionLabel',

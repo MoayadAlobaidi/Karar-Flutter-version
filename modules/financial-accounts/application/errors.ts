@@ -13,6 +13,14 @@
  */
 
 import type { FinancialAccountRuleViolation } from '../domain/errors.js';
+import type {
+  FinancialRecordErasureCounts,
+  FinancialRecordErasureOutcome,
+} from './ports/financial-record-eraser.js';
+import type {
+  FinancialRetentionDecision,
+  RetentionGovernedDataset,
+} from './ports/financial-account-retention-decision.js';
 import type { MissingPrincipalContext } from './principal.js';
 
 /**
@@ -54,12 +62,71 @@ export interface StoreFailure {
   readonly message: string;
 }
 
+/**
+ * Durable financial creation was refused because the retention decision
+ * governing the dataset is not resolved.
+ *
+ * Carries the decision itself, not a rephrasing of it: an operator needs to
+ * know whether the answer was "legal has not ruled" or "we could not ask",
+ * and those have different remedies. Deliberately NOT a `store_failure` — no
+ * store was touched, and reporting it as one would send someone to look at
+ * the database for a problem that is a policy gap.
+ */
+export interface RetentionUnresolved {
+  readonly kind: 'retention_unresolved';
+  readonly dataset: RetentionGovernedDataset;
+  readonly decision: FinancialRetentionDecision;
+  readonly message: string;
+}
+
+/**
+ * The account was NOT deleted because the records scoped to it could not be
+ * erased. Carries whatever the eraser did manage to remove, because a caller
+ * that has to tell a person what happened needs the true number and not a
+ * guess.
+ */
+export interface ErasureIncomplete {
+  readonly kind: 'erasure_incomplete';
+  readonly deleted: FinancialRecordErasureCounts;
+  readonly outcome: FinancialRecordErasureOutcome['kind'];
+  readonly message: string;
+}
+
+/**
+ * The records were erased but the account row itself was not removed — the
+ * one window cross-module deletion leaves open (see `delete-own-account.ts`).
+ * Reported as its own kind so it can never be mistaken for success and never
+ * be mistaken for "nothing happened", which are the two comfortable lies
+ * available at this point.
+ */
+export interface DeletionPartiallyApplied {
+  readonly kind: 'deletion_partially_applied';
+  readonly deleted: FinancialRecordErasureCounts;
+  readonly message: string;
+}
+
+/**
+ * Whether the account holds financial records could not be established, so
+ * the currency change was refused.
+ *
+ * Distinct from `rule_violated / currency_immutable_with_records`, which
+ * asserts that records DO exist. Saying that when the question went
+ * unanswered would be inventing a fact about a person's account; saying this
+ * is the honest refusal, and the outcome is the same either way because the
+ * rule fails closed.
+ */
+export interface RecordPresenceUnavailable {
+  readonly kind: 'record_presence_unavailable';
+  readonly message: string;
+}
+
 export type ListOwnAccountsError = MissingPrincipalContext | StoreFailure;
 
 export type ReadOwnAccountError = MissingPrincipalContext | AccountNotFound | StoreFailure;
 
 export type CreateManualAccountError =
   | MissingPrincipalContext
+  | RetentionUnresolved
   | InstitutionNotSelectable
   | RuleViolated
   | StoreFailure;
@@ -69,6 +136,7 @@ export type UpdateOwnAccountError =
   | AccountNotFound
   | InstitutionNotSelectable
   | RuleViolated
+  | RecordPresenceUnavailable
   | VersionConflict
   | StoreFailure;
 
@@ -76,11 +144,20 @@ export type DeleteOwnAccountError =
   | MissingPrincipalContext
   | AccountNotFound
   | VersionConflict
+  | ErasureIncomplete
+  | DeletionPartiallyApplied
   | StoreFailure;
 
 export type ListOwnBalanceSnapshotsError =
   | MissingPrincipalContext
   | AccountNotFound
+  | StoreFailure;
+
+export type RecordReportedBalanceError =
+  | MissingPrincipalContext
+  | RetentionUnresolved
+  | AccountNotFound
+  | RuleViolated
   | StoreFailure;
 
 /** The one message every not-found arm uses, so no arm can drift into an oracle. */
@@ -97,5 +174,52 @@ export function storeFailure(operation: string, error: unknown): StoreFailure {
   return {
     kind: 'store_failure',
     message: `${operation} failed: ${error instanceof Error ? error.message : String(error)}`,
+  };
+}
+
+/**
+ * The refusal both halves of the record-presence question produce. Names
+ * WHICH store went silent, because the remedies differ, but says nothing
+ * about the records themselves — that is the other module's data, and this
+ * refusal exists precisely because nobody here learned anything about it.
+ */
+export function recordPresenceUnavailable(
+  store: string,
+  error: unknown,
+): RecordPresenceUnavailable {
+  return {
+    kind: 'record_presence_unavailable',
+    message:
+      `the currency was not changed: whether this account holds ${store} could not be established ` +
+      `(${error instanceof Error ? error.message : String(error)}). The rule fails closed — stored ` +
+      'minor units are scaled by their currency exponent, so re-denominating an account that might ' +
+      'hold records would silently rescale every figure already recorded',
+  };
+}
+
+/**
+ * The one refusal every retention gate produces, so the wording cannot drift
+ * between the two write paths that use it and so the reason is always the
+ * decision's own.
+ */
+export function retentionUnresolved(
+  dataset: RetentionGovernedDataset,
+  decision: FinancialRetentionDecision,
+): RetentionUnresolved {
+  const because =
+    decision.state === 'DECIDED'
+      ? 'the decision claims DECIDED but carries no basis or no approval reference, and absence of ' +
+        'evidence means not approved'
+      : decision.reason;
+  return {
+    kind: 'retention_unresolved',
+    dataset,
+    decision,
+    message:
+      `refusing to create a durable record in ${dataset}: the retention decision governing it is ` +
+      `${decision.state} — ${because}. This module's data-lifecycle declaration says non-local ` +
+      'durable financial creation fails closed until a reviewed decision exists, and this is that ' +
+      'gate; the remedy is a legal decision recorded in an approved policy pack, never a duration ' +
+      'chosen in code',
   };
 }

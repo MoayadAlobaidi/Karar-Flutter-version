@@ -15,7 +15,10 @@
 // Deliberately NOT expressed here, enforced by the migrations and their tests
 // instead: every CHECK constraint (vocabularies, the all-or-nothing amount
 // and ciphertext triples, the source-kind/origin pairing, the merchant-rule
-// generalisation rules), the immutability and supersession triggers, the
+// generalisation rules), the immutability, supersession and occurrence
+// guards — including the rule that an occurrence ordinal must be the next
+// unused one for its content identity, without which duplicate review would
+// be one field away from optional — the
 // partial unique index that keeps exactly one ACTIVE category assignment, RLS
 // enable/force with the tenant+user principal policies, and the grants. The
 // repositories run every statement inside a principal-context transaction
@@ -56,6 +59,9 @@ model Transaction {
 
   sourceKind           String    @map("source_kind")
   status               String
+  // Content identity, and separately which occurrence of that content this
+  // row is. The digest carries nothing about occurrence; the unique key below
+  // carries both (migration 0090).
   dedupFingerprint     String    @map("dedup_fingerprint")
   fingerprintVersion   String    @map("fingerprint_version")
   occurrenceOrdinal    Int       @default(1) @map("occurrence_ordinal")
@@ -64,7 +70,7 @@ model Transaction {
   updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
   version              Int       @default(1)
 
-  @@unique([tenantId, userId, accountId, fingerprintVersion, dedupFingerprint], map: "transactions_dedup_key")
+  @@unique([tenantId, userId, accountId, fingerprintVersion, dedupFingerprint, occurrenceOrdinal], map: "transactions_dedup_key")
   @@index([tenantId, userId, bookingDate, id], map: "transactions_owner_recent_idx")
   @@index([tenantId, userId, accountId, bookingDate, id], map: "transactions_account_recent_idx")
   @@map("transactions")

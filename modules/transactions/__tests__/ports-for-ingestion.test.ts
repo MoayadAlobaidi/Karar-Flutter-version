@@ -8,13 +8,17 @@
  *
  *  - the dedup fingerprint is KEYED (not recomputable from the column alone),
  *    PER SUBJECT (not a cross-subject join key), VERSIONED, deterministic,
- *    and unambiguous under field-boundary shifts;
+ *    unambiguous under field-boundary shifts, and a statement about CONTENT
+ *    ONLY — occurrence is a separate column, not part of the digest;
  *  - HSF field encryption round-trips, produces a fresh nonce every time,
  *    carries the key version, and REFUSES a ciphertext moved to another row,
  *    another column, or another subject.
  */
 
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -39,7 +43,6 @@ function input(overrides: Partial<FingerprintInput> = {}): FingerprintInput {
     amountMinorUnits: -4500n,
     currencyCode: 'QAR',
     normalizedNarrative: syntheticMerchant('corner shop'),
-    occurrenceOrdinal: 1,
     ...overrides,
   };
 }
@@ -89,7 +92,6 @@ describe('dedup fingerprint', () => {
       ['amount', { amountMinorUnits: -4501n }],
       ['currency', { currencyCode: 'KWD' }],
       ['narrative', { normalizedNarrative: syntheticMerchant('other shop') }],
-      ['occurrence', { occurrenceOrdinal: 2 }],
       ['booking day', { bookingDate: new Date('2026-08-18T00:00:00.000Z') }],
     ];
     for (const [label, override] of variants) {
@@ -124,12 +126,43 @@ describe('dedup fingerprint', () => {
     expect(left.value).not.toBe(right.value);
   });
 
-  it('lets a genuine repeat through by occurrence ordinal', async () => {
-    // "Exact duplicates are impossible" must not also mean "two identical
-    // coffees on one day are impossible".
-    const first = await provider.fingerprint(alice, input({ occurrenceOrdinal: 1 }));
-    const second = await provider.fingerprint(alice, input({ occurrenceOrdinal: 2 }));
-    expect(first.value).not.toBe(second.value);
+  it('says nothing about occurrence — the input has no field for it', () => {
+    // The fingerprint is CONTENT identity. Two identical coffees are one
+    // content identity that occurred twice, and "twice" lives in
+    // transactions.occurrence_ordinal, a column in the unique key beside the
+    // digest (migration 0090). Asserted structurally, over the port's own
+    // source, because the property is the ABSENCE of a field and no runtime
+    // call can demonstrate that a field is missing.
+    const portSource = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'application', 'ports', 'dedup-fingerprint.ts'),
+      'utf8',
+    );
+    const inputBlock = /export interface FingerprintInput \{[\s\S]*?\n\}/.exec(portSource)?.[0] ?? '';
+    expect(inputBlock).not.toBe('');
+    expect(inputBlock).not.toMatch(/occurrence/i);
+
+    // …and the same for what the implementation actually digests.
+    const providerSource = readFileSync(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '..',
+        'infrastructure',
+        'providers',
+        'local-keyed-dedup-fingerprint-provider.ts',
+      ),
+      'utf8',
+    );
+    const encoding = /function canonicalEncoding[\s\S]*?\n\}/.exec(providerSource)?.[0] ?? '';
+    expect(encoding).not.toBe('');
+    expect(encoding).not.toMatch(/occurrence/i);
+  });
+
+  it('mints a version that names the definition, and the definition moved', () => {
+    // v1 folded the ordinal in; v2 does not. Reusing a version string for a
+    // changed definition is the silent redefinition the versioning exists to
+    // prevent, so the constant must have moved with the code.
+    expect(DEDUP_FINGERPRINT_VERSION).toBe('dedup/hmac-sha256/utc-day/v2');
+    expect(provider.version).toBe(DEDUP_FINGERPRINT_VERSION);
   });
 
   it('refuses a short root key', () => {

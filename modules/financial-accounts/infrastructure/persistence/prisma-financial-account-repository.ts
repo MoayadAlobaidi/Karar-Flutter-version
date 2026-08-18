@@ -10,6 +10,21 @@
  * and this file is written so that removing every filter would change nothing
  * about which rows a caller can reach.
  *
+ * **This is also where the account's HSF fields become ciphertext and come
+ * back.** The display name, the user-supplied institution label and the mask
+ * have no plaintext column (migration 0088); they are encrypted on the way in
+ * and decrypted on the way out, bound to tenant, user, table, row id and
+ * field as associated data. Two consequences worth stating because they look
+ * like inefficiencies until the reason is visible:
+ *
+ * - the row id is minted by the DOMAIN before the insert, so the associated
+ *   data can name the row a ciphertext belongs to. A database-generated id
+ *   would leave nothing to bind to at encryption time.
+ * - a decryption failure propagates. It is not caught and turned into a null
+ *   field: a ciphertext that does not authenticate means the wrong key, the
+ *   wrong subject, or tampering, and a blank account name is a worse answer
+ *   than a loud one.
+ *
  * The update and delete paths carry the version predicate into the WHERE
  * clause and read the affected-row count back, so a concurrent edit loses
  * visibly instead of being overwritten. The database backs this twice: the
@@ -24,6 +39,7 @@ import {
 } from '@karar/platform/dist/db/principal-context.js';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
+import type { HsfFieldEncryptionPort } from '../../application/ports/hsf-field-encryption.js';
 import type {
   AccountDeleteOutcome,
   AccountUpdateOutcome,
@@ -32,10 +48,13 @@ import type {
 import type { AccountsPrincipal } from '../../application/principal.js';
 import type { FinancialAccount } from '../../domain/financial-account.js';
 import type { FinancialAccountId } from '../../domain/refs.js';
-import { toFinancialAccount } from './row-mappers.js';
+import { encryptAccountFields, toFinancialAccount } from './row-mappers.js';
 
 export class PrismaFinancialAccountRepository implements FinancialAccountRepository {
-  constructor(private readonly handle: PrismaHandle) {}
+  constructor(
+    private readonly handle: PrismaHandle,
+    private readonly encryption: HsfFieldEncryptionPort,
+  ) {}
 
   private inContext<T>(
     actor: AccountsPrincipal,
@@ -56,6 +75,15 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
     );
   }
 
+  /** The HSF columns for one account, encrypted under the acting principal. */
+  private encrypt(actor: AccountsPrincipal, account: FinancialAccount) {
+    return encryptAccountFields(this.encryption, actor, account.id, {
+      displayName: account.displayName,
+      userSuppliedInstitutionLabel: account.userSuppliedInstitutionLabel,
+      mask: account.mask,
+    });
+  }
+
   listOwn(actor: AccountsPrincipal): Promise<readonly FinancialAccount[]> {
     return this.inContext(actor, async (tx) => {
       const rows = await tx.financialAccount.findMany({
@@ -65,7 +93,15 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
         },
         orderBy: { createdAt: 'asc' },
       });
-      return rows.map(toFinancialAccount);
+      // Sequential rather than concurrent: a key-management provider is a
+      // rate-limited external dependency in every environment but this one,
+      // and a listing that fans out one call per field per row is how a
+      // page load becomes a throttling incident.
+      const accounts: FinancialAccount[] = [];
+      for (const row of rows) {
+        accounts.push(await toFinancialAccount(row, this.encryption, actor));
+      }
+      return accounts;
     });
   }
 
@@ -81,11 +117,18 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
           userId: UserId.toString(actor.userId),
         },
       });
-      return row === null ? null : toFinancialAccount(row);
+      return row === null ? null : toFinancialAccount(row, this.encryption, actor);
     });
   }
 
-  create(actor: AccountsPrincipal, account: FinancialAccount): Promise<FinancialAccount> {
+  async create(
+    actor: AccountsPrincipal,
+    account: FinancialAccount,
+  ): Promise<FinancialAccount> {
+    // Encryption happens BEFORE the transaction opens. A key-management call
+    // inside an open database transaction holds a connection and a row lock
+    // for the duration of a network round trip to another system.
+    const encrypted = await this.encrypt(actor, account);
     return this.inContext(actor, async (tx) => {
       const row = await tx.financialAccount.create({
         data: {
@@ -93,11 +136,9 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
           tenantId: TenantId.toString(account.tenantId),
           userId: UserId.toString(account.userId),
           institutionRef: account.institutionRef,
-          userSuppliedInstitutionLabel: account.userSuppliedInstitutionLabel,
           accountType: account.accountType,
           currencyCode: account.currency.code,
-          displayName: account.displayName,
-          mask: account.mask,
+          ...encrypted,
           status: account.status,
           sourceKind: account.sourceKind,
           providerConnectionRef: account.providerConnectionRef,
@@ -106,15 +147,20 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
           updatedAt: account.updatedAt,
         },
       });
-      return toFinancialAccount(row);
+      return toFinancialAccount(row, this.encryption, actor);
     });
   }
 
-  update(
+  async update(
     actor: AccountsPrincipal,
     expectedVersion: number,
     next: FinancialAccount,
   ): Promise<AccountUpdateOutcome> {
+    // Re-encrypted in full on every update, with a fresh nonce per field.
+    // Reusing a nonce under GCM is catastrophic, so "only re-encrypt what
+    // changed" would need per-field nonce bookkeeping to be safe; writing
+    // three fresh ciphertexts is both cheaper and harder to get wrong.
+    const encrypted = await this.encrypt(actor, next);
     return this.inContext(actor, async (tx) => {
       // updateMany, not update: the version predicate belongs in the WHERE
       // clause so the check and the write are one statement, and the affected
@@ -128,11 +174,9 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
         },
         data: {
           institutionRef: next.institutionRef,
-          userSuppliedInstitutionLabel: next.userSuppliedInstitutionLabel,
           accountType: next.accountType,
           currencyCode: next.currency.code,
-          displayName: next.displayName,
-          mask: next.mask,
+          ...encrypted,
           status: next.status,
           version: next.version,
           updatedAt: next.updatedAt,
@@ -161,7 +205,10 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
       });
       return row === null
         ? { kind: 'not_found' as const }
-        : { kind: 'updated' as const, account: toFinancialAccount(row) };
+        : {
+            kind: 'updated' as const,
+            account: await toFinancialAccount(row, this.encryption, actor),
+          };
     });
   }
 
@@ -173,6 +220,9 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
     return this.inContext(actor, async (tx) => {
       const tenantId = TenantId.toString(actor.tenantId);
       const userId = UserId.toString(actor.userId);
+      // Only the id and the version are selected: a delete has no reason to
+      // decrypt the account's name on its way out, and the cheapest way not
+      // to leak a value is not to read it.
       const account = await tx.financialAccount.findFirst({
         where: { id, tenantId, userId },
         select: { id: true, version: true },
@@ -183,7 +233,10 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
       // The snapshots go first, explicitly, so the count returned to the
       // caller is a measurement rather than an assumption. The foreign key's
       // ON DELETE CASCADE (migration 0089) is the backstop that makes the
-      // erasure correct even if this statement is ever removed.
+      // erasure correct even if this statement is ever removed. Records owned
+      // by other modules are NOT reached from here — no FK crosses a module
+      // boundary — and are erased through FinancialRecordEraserPort, which
+      // `DeleteOwnAccount` calls before this method runs.
       const snapshots = await tx.financialAccountBalanceSnapshot.deleteMany({
         where: { accountId: id, tenantId, userId },
       });
