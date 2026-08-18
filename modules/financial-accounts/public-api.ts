@@ -25,17 +25,19 @@
  * and its composition belong to the API application, and nothing here assumes
  * a transport.
  *
- * **Four ports are declared here and implemented elsewhere**, and the
+ * **Five ports are declared here and implemented elsewhere**, and the
  * direction is the point: `FinancialRecordPresencePort` and
  * `FinancialRecordEraserPort` are satisfied by the transactions module,
- * `AccountSourceLinkEraserPort` by the financial-connections module, and
+ * `AccountSourceLinkEraserPort` by the financial-connections module,
+ * `PaymentInstrumentEraserPort` by the payment-instruments module, and
  * `FinancialAccountRetentionDecisionPort` by whatever reads an approved
  * policy pack. Nothing in this module imports any of those implementations,
  * so the interfaces are exported for a composition root to bind — never for
  * another module to depend on this one's internals. In particular this module
- * imports nothing from `@karar/financial-connections`: that module depends on
- * this one, and the erasure port is what lets the deletion path reach its rows
- * without the dependency ever pointing back.
+ * imports nothing from `@karar/financial-connections` or
+ * `@karar/payment-instruments`: those modules depend on this one, and the
+ * erasure ports are what let the deletion path reach their rows without the
+ * dependency ever pointing back.
  *
  * **The local providers are exported and are refusals as much as they are
  * implementations.** `LocalAesGcmFieldEncryptionProvider` and
@@ -148,6 +150,7 @@ export {
   type DeletionPartiallyApplied,
   type ErasureIncomplete,
   type InstitutionNotSelectable,
+  type InstrumentErasureIncomplete,
   type ListOwnAccountsError,
   type ListOwnBalanceSnapshotsError,
   type ReadOwnAccountError,
@@ -204,6 +207,10 @@ export type {
   AccountSourceLinkEraserPort,
   AccountSourceLinkErasureOutcome,
 } from './application/ports/account-source-link-eraser.js';
+export type {
+  PaymentInstrumentEraserPort,
+  PaymentInstrumentErasureOutcome,
+} from './application/ports/payment-instrument-eraser.js';
 
 // application — use cases
 export { ListOwnAccounts } from './application/use-cases/list-own-accounts.js';

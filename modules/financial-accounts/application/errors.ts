@@ -14,6 +14,7 @@
 
 import type { FinancialAccountRuleViolation } from '../domain/errors.js';
 import type { AccountSourceLinkErasureOutcome } from './ports/account-source-link-eraser.js';
+import type { PaymentInstrumentErasureOutcome } from './ports/payment-instrument-eraser.js';
 import type {
   FinancialRecordErasureCounts,
   FinancialRecordErasureOutcome,
@@ -116,35 +117,71 @@ export interface SourceLinkErasureIncomplete {
 }
 
 /**
+ * The account was NOT deleted because the payment instruments spending from
+ * it could not be erased. Its own kind rather than a flavour of
+ * `erasure_incomplete` or of `source_link_erasure_incomplete`, for the reason
+ * given above: three erasures are three ports with three implementers, and an
+ * operator reading this needs to know WHICH store refused, because the
+ * remedies live in different modules.
+ *
+ * Instruments are erased after the source links and before the records, so
+ * this arm means the links really have gone — the count says so rather than
+ * pretending the request left no trace — and that nothing was attempted
+ * beyond them: the account, its snapshots and every financial record are all
+ * still there.
+ *
+ * `cause` holds the original throw for the ONE place allowed to log it and is
+ * defined NON-ENUMERABLE, for the reason given on `StoreFailure`.
+ */
+export interface InstrumentErasureIncomplete {
+  readonly kind: 'instrument_erasure_incomplete';
+  readonly paymentInstrumentsDeleted: number;
+  readonly accountSourceLinksDeleted: number;
+  readonly outcome: PaymentInstrumentErasureOutcome['kind'];
+  readonly message: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
+}
+
+/**
  * The account was NOT deleted because the records scoped to it could not be
  * erased. Carries whatever the eraser did manage to remove, because a caller
  * that has to tell a person what happened needs the true number and not a
  * guess.
  *
- * It carries the source-link count too, and that number is usually NOT zero:
- * links are erased before records, so by the time this arm is reachable they
- * have already gone. A caller reporting "nothing happened" here would be
- * wrong about the rows that carried the account's external identity.
+ * It carries the source-link and instrument counts too, and those numbers are
+ * usually NOT zero: both are erased before the records, so by the time this
+ * arm is reachable they have already gone. A caller reporting "nothing
+ * happened" here would be wrong about the rows that carried the account's
+ * external identity and about the instruments that spent from it.
+ *
+ * `financialRecordRelationshipsDeleted` is `undefined` when the eraser
+ * measured no relationships rather than measured none — see the port. Folding
+ * the two together here would turn "nobody counted" into "there were none".
  */
 export interface ErasureIncomplete {
   readonly kind: 'erasure_incomplete';
   readonly deleted: FinancialRecordErasureCounts;
+  readonly financialRecordRelationshipsDeleted?: number;
   readonly accountSourceLinksDeleted: number;
+  readonly paymentInstrumentsDeleted: number;
   readonly outcome: FinancialRecordErasureOutcome['kind'];
   readonly message: string;
 }
 
 /**
- * The source links and the records were erased but the account row itself was
- * not removed — the one window cross-module deletion leaves open (see
- * `delete-own-account.ts`). Reported as its own kind so it can never be
- * mistaken for success and never be mistaken for "nothing happened", which
- * are the two comfortable lies available at this point.
+ * The source links, the instruments and the records were all erased but the
+ * account row itself was not removed — the one window cross-module deletion
+ * leaves open (see `delete-own-account.ts`). Reported as its own kind so it
+ * can never be mistaken for success and never be mistaken for "nothing
+ * happened", which are the two comfortable lies available at this point.
  */
 export interface DeletionPartiallyApplied {
   readonly kind: 'deletion_partially_applied';
   readonly deleted: FinancialRecordErasureCounts;
+  readonly financialRecordRelationshipsDeleted?: number;
   readonly accountSourceLinksDeleted: number;
+  readonly paymentInstrumentsDeleted: number;
   readonly message: string;
 }
 
@@ -190,6 +227,7 @@ export type DeleteOwnAccountError =
   | AccountNotFound
   | VersionConflict
   | SourceLinkErasureIncomplete
+  | InstrumentErasureIncomplete
   | ErasureIncomplete
   | DeletionPartiallyApplied
   | StoreFailure;

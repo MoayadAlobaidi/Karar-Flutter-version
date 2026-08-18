@@ -96,6 +96,7 @@ import {
   testRetention,
   withAdapter,
 } from './fixtures.js';
+import type { PaymentInstrumentEraserPort } from '@karar/financial-accounts';
 
 const unreachable = await probePostgres();
 if (unreachable !== null) {
@@ -194,6 +195,16 @@ class RefusingSourceLinkRepository implements AccountSourceLinkRepository {
  * for these accounts and this module must not write one, so the honest answer
  * is that nothing was there and nothing went.
  */
+/**
+ * Explicit, because the argument is required rather than defaulted: a
+ * composition root that binds payment-instruments and forgets the wiring would
+ * otherwise skip instrument erasure in silence. This suite is about source
+ * links, so it names the no-op instead of pretending to erase instruments.
+ */
+const ERASES_NO_INSTRUMENTS: PaymentInstrumentEraserPort = {
+  erasePaymentInstruments: async () => ({ kind: 'erased', paymentInstrumentsDeleted: 0 }),
+};
+
 const ERASES_NO_RECORDS: FinancialRecordEraserPort = {
   eraseAccountScopedRecords: () =>
     Promise.resolve({ kind: 'erased', deleted: NO_RECORDS_ERASED }),
@@ -334,6 +345,7 @@ describe.skipIf(unreachable !== null)(
         accounts,
         ERASES_NO_RECORDS,
         new FinancialAccountsSourceLinkEraser(new EraseAccountSourceLinks(links)),
+        ERASES_NO_INSTRUMENTS,
       );
       deleteAccountWithRefusingLinks = new DeleteOwnAccount(
         accounts,
@@ -341,6 +353,7 @@ describe.skipIf(unreachable !== null)(
         new FinancialAccountsSourceLinkEraser(
           new EraseAccountSourceLinks(new RefusingSourceLinkRepository(links)),
         ),
+        ERASES_NO_INSTRUMENTS,
       );
     }, 180_000);
 

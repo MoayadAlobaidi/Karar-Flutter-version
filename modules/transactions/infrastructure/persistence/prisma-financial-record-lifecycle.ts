@@ -22,6 +22,26 @@
  * and renaming it to satisfy a name pattern would trade the clearer name for
  * a weaker one. It implements `FinancialRecordEraserPort` explicitly, and the
  * suite asserts the binding directly.
+ *
+ * ## Why the eraser holds a THIRD module's port
+ *
+ * `public.transfer_matches` names two of a person's transactions and says
+ * they were one movement of their own money. Its references are raw uuids
+ * with no foreign keys back, so erasing an account's transactions left every
+ * such match behind, asserting a transfer whose other side no longer existed
+ * — which keeps a real expense hidden from the person's own record of what
+ * they spent. `TransferMatchEraserPort`, declared by this module's
+ * application layer and satisfied by `modules/transfer-matching`, is how that
+ * is reached, and the ACCOUNT-scoped method is why it is a separate port
+ * rather than a loop over ids: the statement below deletes an account's
+ * transactions in bulk without ever enumerating them, and enumerating them
+ * just to erase relationships would turn one statement into a scan of a
+ * person's entire history.
+ *
+ * The count travels back to `modules/financial-accounts` in the outcome's
+ * `financialRecordRelationshipsDeleted`, so a person deleting an account is
+ * told what actually went rather than only the part the accounts module has
+ * vocabulary for.
  */
 
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
@@ -35,6 +55,7 @@ import type {
   FinancialRecordPresencePort,
 } from '../../application/ports/financial-record-lifecycle.js';
 import type { TransactionsPrincipal } from '../../application/ports/principal-context.js';
+import type { TransferMatchEraserPort } from '../../application/ports/transfer-match-eraser.js';
 import type { FinancialAccountId } from '@karar/financial-accounts';
 
 /** PostgreSQL counts arrive as bigint; the driver hands them over as BigInt. */
@@ -100,12 +121,69 @@ interface ErasureRow {
 }
 
 export class PrismaFinancialRecordEraser implements FinancialRecordEraserPort {
-  constructor(private readonly handle: PrismaHandle) {}
+  constructor(
+    private readonly handle: PrismaHandle,
+    private readonly transferMatches: TransferMatchEraserPort,
+  ) {}
 
   async eraseAccountScopedRecords(
     actor: TransactionsPrincipal,
     accountId: string,
   ): Promise<FinancialRecordErasureOutcome> {
+    // The relationships BEFORE the records they name, and before anything is
+    // deleted here. The reverse order has a window in which a match points at
+    // a transaction that is gone, and if the run stops in that window the
+    // residue is permanent — nothing afterwards would know to look for it.
+    // This order's window is the harmless one: a transaction that has lost its
+    // matches is an ordinary unmatched transaction.
+    //
+    // The two are not one unit of work and cannot be made into one — separate
+    // modules, separate principal-scoped transactions — so a refusal here
+    // refuses the whole erasure and erases no record at all. The accounts
+    // module reads that as `erasure_incomplete` and leaves the account row in
+    // place, which is a coherent world to retry into.
+    let matches;
+    try {
+      matches = await this.transferMatches.eraseTransferMatchesForAccount(actor, accountId);
+    } catch (error) {
+      const outcome = {
+        kind: 'failed' as const,
+        reason:
+          'the transfer matches naming this account could not be erased, so nothing was erased at ' +
+          'all. Removing the records first would leave a match asserting that a movement was one ' +
+          'side of a transfer whose other side no longer exists; no row was removed, so an ' +
+          'immediate retry is safe',
+      };
+      // The reason is read by the ACCOUNTS module and interpolated into a
+      // message a person sees, so it is our own words. The throw travels
+      // non-enumerably for the boundary logger.
+      Object.defineProperty(outcome, 'cause', {
+        value: error,
+        enumerable: false,
+        writable: false,
+      });
+      return outcome;
+    }
+    if (matches.kind !== 'erased') {
+      const outcome = {
+        kind: 'failed' as const,
+        reason:
+          `the transfer matches naming this account could not be fully erased ` +
+          `(${matches.kind}), so no financial record was erased either. Retrying is safe: nothing ` +
+          'here was removed, and the match erasure is idempotent',
+      };
+      const cause = (matches as { cause?: unknown }).cause;
+      if (cause !== undefined) {
+        Object.defineProperty(outcome, 'cause', {
+          value: cause,
+          enumerable: false,
+          writable: false,
+        });
+      }
+      return outcome;
+    }
+    const financialRecordRelationshipsDeleted = matches.transferMatchesDeleted;
+
     // ONE statement, so counting and deleting cannot disagree. Every CTE in a
     // statement sees the same snapshot, so `tallied` reports what existed
     // before the delete no matter what order the planner picks — which is the
@@ -177,6 +255,12 @@ export class PrismaFinancialRecordEraser implements FinancialRecordEraserPort {
 
     const row = rows[0];
     if (row === undefined) {
+      // The relationships DID go, and this arm cannot say so — it carries no
+      // count at all, because nothing about the records themselves was
+      // established. Reporting a relationship count beside "we learned
+      // nothing" would invite it to be read as partial progress on the
+      // erasure, which is precisely what `failed` denies. The rows are gone
+      // either way, and the retry that follows erases nothing twice.
       return {
         kind: 'failed',
         reason:
@@ -199,6 +283,7 @@ export class PrismaFinancialRecordEraser implements FinancialRecordEraserPort {
       return {
         kind: 'incomplete',
         deleted,
+        financialRecordRelationshipsDeleted,
         reason:
           `${row.transactions.toString()} record(s) matched but ` +
           `${row.removed_transactions.toString()} were deleted`,
@@ -211,12 +296,13 @@ export class PrismaFinancialRecordEraser implements FinancialRecordEraserPort {
       return {
         kind: 'incomplete',
         deleted,
+        financialRecordRelationshipsDeleted,
         reason:
           `${row.dedup_identities.toString()} dedup identities were scoped to ` +
           `${row.removed_transactions.toString()} erased records; the two must match, because a dedup ` +
           'identity that outlived its record would refuse a later commit as a duplicate of something gone',
       };
     }
-    return { kind: 'erased', deleted };
+    return { kind: 'erased', deleted, financialRecordRelationshipsDeleted };
   }
 }

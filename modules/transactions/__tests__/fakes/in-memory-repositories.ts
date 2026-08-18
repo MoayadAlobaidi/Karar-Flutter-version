@@ -51,6 +51,10 @@ import type {
   TransactionRetentionDecision,
   TransactionRetentionDecisionPort,
 } from '../../application/ports/transaction-retention-decision.js';
+import type {
+  TransferMatchEraserPort,
+  TransferMatchErasureOutcome,
+} from '../../application/ports/transfer-match-eraser.js';
 
 /** The principal source a composition root would bind to the session. */
 export class FixedPrincipalContext implements PrincipalContextPort {
@@ -432,3 +436,94 @@ export class StubRetentionDecisionPort implements TransactionRetentionDecisionPo
     return Promise.resolve(this.#decision);
   }
 }
+
+/**
+ * `TransferMatchEraserPort`, in memory — the port `modules/transfer-matching`
+ * satisfies for real.
+ *
+ * OWNERSHIP-AWARE like the transaction store: a match is keyed on (tenant,
+ * user, transaction, account), so a neighbour's match is invisible rather than
+ * merely filtered. That is what makes "a caller who names a stranger's
+ * transaction erases none of their matches" testable here rather than only
+ * against RLS.
+ *
+ * `calls` counts how often the eraser was consulted, because "the deletion
+ * path reached it at all" and "the deletion path refused before reaching it"
+ * are both contracts: a delete with no principal bound must touch nothing, and
+ * a delete that proceeds must cut the relationship before the record.
+ */
+export class InMemoryTransferMatchEraser implements TransferMatchEraserPort {
+  readonly rows: Array<{
+    owner: string;
+    transactionIds: readonly string[];
+    accountIds: readonly string[];
+  }> = [];
+  calls = 0;
+  #outcome: (() => TransferMatchErasureOutcome) | null = null;
+  #failure: Error | null = null;
+
+  seed(
+    actor: TransactionsPrincipal,
+    what: { readonly transactionIds?: readonly string[]; readonly accountIds?: readonly string[] },
+    count = 1,
+  ): void {
+    for (let i = 0; i < count; i += 1) {
+      this.rows.push({
+        owner: `${actor.tenantId}/${actor.userId}`,
+        transactionIds: what.transactionIds ?? [],
+        accountIds: what.accountIds ?? [],
+      });
+    }
+  }
+
+  /** Setting one behaviour clears the other: a double with two live moods is
+   *  a double nobody can reason about. */
+  eraseWith(outcome: () => TransferMatchErasureOutcome): void {
+    this.#outcome = outcome;
+    this.#failure = null;
+  }
+
+  failErasureWith(error: Error): void {
+    this.#failure = error;
+    this.#outcome = null;
+  }
+
+  eraseTransferMatchesForTransaction(
+    actor: TransactionsPrincipal,
+    transactionId: string,
+  ): Promise<TransferMatchErasureOutcome> {
+    return this.#erase(actor, (row) => row.transactionIds.includes(transactionId));
+  }
+
+  eraseTransferMatchesForAccount(
+    actor: TransactionsPrincipal,
+    accountId: string,
+  ): Promise<TransferMatchErasureOutcome> {
+    return this.#erase(actor, (row) => row.accountIds.includes(accountId));
+  }
+
+  #erase(
+    actor: TransactionsPrincipal,
+    matches: (row: { transactionIds: readonly string[]; accountIds: readonly string[] }) => boolean,
+  ): Promise<TransferMatchErasureOutcome> {
+    this.calls += 1;
+    if (this.#failure !== null) return Promise.reject(this.#failure);
+    if (this.#outcome !== null) return Promise.resolve(this.#outcome());
+    const owner = `${actor.tenantId}/${actor.userId}`;
+    const doomed = this.rows.filter((row) => row.owner === owner && matches(row));
+    for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
+    return Promise.resolve({ kind: 'erased', transferMatchesDeleted: doomed.length });
+  }
+}
+
+/**
+ * The double a suite uses when transfer matches are not what it is about:
+ * there are none, and it says so. Never a silent success — it answers `erased`
+ * with an exact zero, which is what an empty store must answer.
+ */
+export const ERASES_NO_TRANSFER_MATCHES: TransferMatchEraserPort = {
+  eraseTransferMatchesForTransaction: () =>
+    Promise.resolve({ kind: 'erased', transferMatchesDeleted: 0 }),
+  eraseTransferMatchesForAccount: () =>
+    Promise.resolve({ kind: 'erased', transferMatchesDeleted: 0 }),
+};

@@ -44,6 +44,10 @@ import type {
 } from '../application/ports/financial-record-eraser.js';
 import { NO_RECORDS_ERASED } from '../application/ports/financial-record-eraser.js';
 import type {
+  PaymentInstrumentEraserPort,
+  PaymentInstrumentErasureOutcome,
+} from '../application/ports/payment-instrument-eraser.js';
+import type {
   FinancialRecordPresence,
   FinancialRecordPresencePort,
 } from '../application/ports/financial-record-presence.js';
@@ -396,6 +400,55 @@ class FakeAccountSourceLinkStore implements AccountSourceLinkEraserPort {
   }
 }
 
+/**
+ * Stands in for the payment-instruments module. OWNERSHIP-AWARE like the
+ * others: instruments are keyed on (tenant, user, account), so a neighbour's
+ * card is invisible rather than merely filtered.
+ *
+ * `erasedAt` records the call order against the other two stores, because the
+ * ordering is a contract and not an implementation detail. An instrument is a
+ * way to SPEND from the account, so it is cut after the source link — the only
+ * one of the two that can put a row in the database — and before the records,
+ * which are the part a retry cannot rebuild. Nothing else in this suite could
+ * observe that, and an ordering nobody checks is an ordering that drifts.
+ */
+class FakePaymentInstrumentStore implements PaymentInstrumentEraserPort {
+  readonly rows: Array<{ owner: string; accountId: FinancialAccountId }> = [];
+  erasedAt: number | null = null;
+  #outcome: ((accountId: FinancialAccountId) => PaymentInstrumentErasureOutcome) | null = null;
+  #failure: Error | null = null;
+
+  seed(actor: AccountsPrincipal, accountId: FinancialAccountId, count = 1): void {
+    for (let i = 0; i < count; i += 1) this.rows.push({ owner: ownerKey(actor), accountId });
+  }
+
+  /** Setting one behaviour clears the other: a fake with two live moods is a
+   *  fake nobody can reason about. */
+  eraseWith(outcome: (accountId: FinancialAccountId) => PaymentInstrumentErasureOutcome): void {
+    this.#outcome = outcome;
+    this.#failure = null;
+  }
+
+  failErasureWith(error: Error): void {
+    this.#failure = error;
+    this.#outcome = null;
+  }
+
+  erasePaymentInstruments(
+    actor: AccountsPrincipal,
+    accountId: FinancialAccountId,
+  ): Promise<PaymentInstrumentErasureOutcome> {
+    this.erasedAt = nextCallOrdinal();
+    if (this.#failure !== null) return Promise.reject(this.#failure);
+    if (this.#outcome !== null) return Promise.resolve(this.#outcome(accountId));
+    const doomed = this.rows.filter(
+      (row) => row.owner === ownerKey(actor) && row.accountId === accountId,
+    );
+    for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
+    return Promise.resolve({ kind: 'erased', paymentInstrumentsDeleted: doomed.length });
+  }
+}
+
 const institutionRows: readonly Institution[] = [
   {
     id: ACTIVE_INSTITUTION,
@@ -437,6 +490,7 @@ let accountStore: FakeAccountRepository;
 let snapshotStore: FakeSnapshotRepository;
 let recordStore: FakeFinancialRecordStore;
 let sourceLinkStore: FakeAccountSourceLinkStore;
+let instrumentStore: FakePaymentInstrumentStore;
 let retention: ScriptedRetentionDecisionPort;
 let ids: CountingIdSource;
 
@@ -454,6 +508,7 @@ function wire(): {
   accountStore = new FakeAccountRepository(snapshotStore);
   recordStore = new FakeFinancialRecordStore();
   sourceLinkStore = new FakeAccountSourceLinkStore();
+  instrumentStore = new FakePaymentInstrumentStore();
   retention = new ScriptedRetentionDecisionPort();
   ids = new CountingIdSource();
   return {
@@ -467,7 +522,7 @@ function wire(): {
       institutions,
       clock,
     ),
-    remove: new DeleteOwnAccount(accountStore, recordStore, sourceLinkStore),
+    remove: new DeleteOwnAccount(accountStore, recordStore, sourceLinkStore, instrumentStore),
     listSnapshots: new ListOwnBalanceSnapshots(accountStore, snapshotStore),
     recordBalance: new RecordReportedBalance(
       accountStore,
@@ -1655,5 +1710,282 @@ describe('financial-accounts use cases: recording a reported balance', () => {
     expect(refused.ok).toBe(false);
     if (!refused.ok) expect(refused.error.kind).toBe('account_not_found');
     expect(snapshotStore.rows).toHaveLength(0);
+  });
+});
+
+/**
+ * Deletion also erases the PAYMENT INSTRUMENTS that spend from the account, or
+ * it does not report success.
+ *
+ * Those rows live in `modules/payment-instruments` and say what SPENDS from a
+ * balance-bearing account, carrying the encrypted mask a person reads off
+ * their own card. `account_id` there is a raw uuid with no foreign key back
+ * here, so nothing cascaded to them and an account delete left every one of
+ * them behind while telling the person the account was gone — an instrument
+ * naming a deleted account being a way to spend from something the person
+ * believes no longer exists. `PaymentInstrumentEraserPort` is how that claim
+ * becomes true; these cases are what makes it checkable.
+ */
+describe('financial-accounts use cases: deletion erases payment instruments or refuses', () => {
+  it('erases links, THEN instruments, THEN records — and reports every count', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    instrumentStore.seed(actorA1, created.value.id, 3);
+    recordStore.seed(actorA1, created.value.id, 4);
+
+    const deleted = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) {
+      expect(deleted.value.accountSourceLinksDeleted).toBe(2);
+      expect(deleted.value.paymentInstrumentsDeleted).toBe(3);
+      expect(deleted.value.recordsDeleted.FINANCIAL_RECORD).toBe(4);
+    }
+    expect(sourceLinkStore.rows).toHaveLength(0);
+    expect(instrumentStore.rows).toHaveLength(0);
+    expect(recordStore.rows).toHaveLength(0);
+    expect(accountStore.rows.size).toBe(0);
+
+    // The ORDER is a contract, and the whole order is asserted rather than one
+    // pair of it. The link is the only one of the three routes that can put a
+    // row in the database, so it is cut first; the instrument is a way to
+    // SPEND from the account and is cut next; the records go last of the three
+    // because they are the part a retry cannot rebuild by asking the person.
+    expect(sourceLinkStore.erasedAt).not.toBeNull();
+    expect(instrumentStore.erasedAt).not.toBeNull();
+    expect(recordStore.erasedAt).not.toBeNull();
+    expect(sourceLinkStore.erasedAt as number).toBeLessThan(instrumentStore.erasedAt as number);
+    expect(instrumentStore.erasedAt as number).toBeLessThan(recordStore.erasedAt as number);
+  });
+
+  it('does NOT delete the account when the instrument eraser fails, and never reaches the records', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    instrumentStore.seed(actorA1, created.value.id, 3);
+    recordStore.seed(actorA1, created.value.id, 4);
+    instrumentStore.failErasureWith(new Error('synthetic instrument store outage'));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'instrument_erasure_incomplete') {
+      expect(refused.error.outcome).toBe('failed');
+      // A throw is not a partial erasure: nothing is KNOWN to have gone.
+      expect(refused.error.paymentInstrumentsDeleted).toBe(0);
+      // The links DID go, and the refusal says so rather than pretending the
+      // request left no trace.
+      expect(refused.error.accountSourceLinksDeleted).toBe(2);
+    } else {
+      expect.unreachable('a failed instrument erasure must never be reported as success');
+    }
+    // A coherent world to retry into, and the records were never touched —
+    // step 3 refuses before step 4 begins.
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+    expect(instrumentStore.rows).toHaveLength(3);
+    expect(recordStore.rows).toHaveLength(4);
+    expect(recordStore.erasedAt).toBeNull();
+  });
+
+  it('does NOT delete the account on a PARTIAL instrument erasure, and reports what was removed', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    instrumentStore.eraseWith(() => ({
+      kind: 'incomplete',
+      paymentInstrumentsDeleted: 1,
+      reason: 'one instrument could not be removed',
+    }));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'instrument_erasure_incomplete') {
+      expect(refused.error.outcome).toBe('incomplete');
+      expect(refused.error.paymentInstrumentsDeleted).toBe(1);
+    } else {
+      expect.unreachable('a partial instrument erasure must never be reported as success');
+    }
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+    expect(recordStore.erasedAt).toBeNull();
+  });
+
+  it('the record-erasure refusal reports the instruments that ALREADY went', async () => {
+    // The half-done case, which is the one a person would most want the truth
+    // about: the links and the instruments are gone, the records are not, the
+    // account stands.
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    instrumentStore.seed(actorA1, created.value.id, 3);
+    recordStore.seed(actorA1, created.value.id, 4);
+    recordStore.failErasureWith(new Error('synthetic record-store outage'));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'erasure_incomplete') {
+      expect(refused.error.accountSourceLinksDeleted).toBe(2);
+      expect(refused.error.paymentInstrumentsDeleted).toBe(3);
+    } else {
+      expect.unreachable('a failed record erasure must never be reported as success');
+    }
+    expect(instrumentStore.rows).toHaveLength(0);
+    expect(recordStore.rows).toHaveLength(4);
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+  });
+
+  it('checks the version BEFORE erasing instruments, so a stale delete destroys nothing', async () => {
+    const { create, update, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    instrumentStore.seed(actorA1, created.value.id, 3);
+    await update.execute(
+      { accountId: created.value.id, expectedVersion: 1, displayName: 'Renamed Synthetic' },
+      actorA1,
+    );
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error.kind).toBe('version_conflict');
+    expect(instrumentStore.rows).toHaveLength(3);
+    expect(instrumentStore.erasedAt).toBeNull();
+  });
+
+  it('an instrument failure carries NO store text outward, and keeps the cause for the boundary', async () => {
+    // The same rule as `storeFailure`, applied to a third module's throw: a
+    // driver message can carry a connection string, the failing SQL, or a
+    // fragment of the ciphertext of an instrument mask.
+    const CONNECTION_STRING = 'postgres://user:password@internal-host:5432/karar';
+    const SQL = 'DELETE FROM public.payment_instruments';
+    const poisoned = new Error(`connection to ${CONNECTION_STRING} failed while running ${SQL}`);
+
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    instrumentStore.failErasureWith(poisoned);
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return expect.unreachable('the erasure was supposed to fail');
+
+    for (const rendered of [
+      JSON.stringify(refused.error) ?? '',
+      JSON.stringify({ ...refused.error }),
+      Object.keys(refused.error).join(','),
+      refused.error.message,
+    ]) {
+      expect(rendered).not.toContain(CONNECTION_STRING);
+      expect(rendered).not.toContain(SQL);
+      expect(rendered).not.toContain('password');
+      expect(rendered).not.toContain('internal-host');
+    }
+    // Reachable by name for the one boundary allowed to log it, and
+    // non-enumerable so no serializer can reach it by accident.
+    expect((refused.error as { cause?: unknown }).cause).toBe(poisoned);
+    expect(Object.getOwnPropertyDescriptor(refused.error, 'cause')?.enumerable).toBe(false);
+  });
+
+  it('a retry after a failed instrument erasure converges, because the erasure is idempotent', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    instrumentStore.seed(actorA1, created.value.id, 2);
+    instrumentStore.failErasureWith(new Error('synthetic transient outage'));
+
+    const first = await remove.execute({ accountId: created.value.id, expectedVersion: 1 }, actorA1);
+    expect(first.ok).toBe(false);
+
+    instrumentStore.eraseWith(() => ({ kind: 'erased', paymentInstrumentsDeleted: 2 }));
+    const second = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(second.ok).toBe(true);
+    if (second.ok) expect(second.value.paymentInstrumentsDeleted).toBe(2);
+    expect(accountStore.rows.size).toBe(0);
+  });
+
+  it('a neighbour cannot reach the instrument eraser at all', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    instrumentStore.seed(actorA1, created.value.id, 2);
+    instrumentStore.failErasureWith(
+      new Error('the instrument eraser must not be reached for a foreign account'),
+    );
+
+    for (const intruder of [actorA2, actorB1]) {
+      const refused = await remove.execute(
+        { accountId: created.value.id, expectedVersion: 1 },
+        intruder,
+      );
+      expect(refused.ok).toBe(false);
+      // The same oracle-free answer a guessed id gets: the refusal happens at
+      // the visibility check, before any erasure is attempted.
+      if (!refused.ok) expect(refused.error.kind).toBe('account_not_found');
+    }
+    expect(instrumentStore.erasedAt).toBeNull();
+    expect(instrumentStore.rows).toHaveLength(2);
+  });
+
+  it('the relationship count the record eraser measured is folded into the outcome', async () => {
+    // `financialRecordRelationshipsDeleted` is how a person is told that the
+    // transfer matches relating their movements went too. `undefined` means
+    // nobody measured, `0` means measured and none — the two are different
+    // claims and the outcome keeps them apart.
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.eraseWith((accountId) => ({
+      kind: 'erased',
+      deleted: { ...NO_RECORDS_ERASED, FINANCIAL_RECORD: 2 },
+      financialRecordRelationshipsDeleted: accountId === created.value.id ? 3 : 0,
+    }));
+
+    const deleted = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) expect(deleted.value.financialRecordRelationshipsDeleted).toBe(3);
+  });
+
+  it('an eraser that measured NO relationships leaves the field absent, not zero', async () => {
+    // The counterpart. An implementation with no relationships to erase must
+    // not be made to write a zero it never counted, and a reader must not be
+    // able to mistake "nobody looked" for "there were none".
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    recordStore.eraseWith(() => ({ kind: 'erased', deleted: NO_RECORDS_ERASED }));
+
+    const deleted = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) {
+      expect(deleted.value.financialRecordRelationshipsDeleted).toBeUndefined();
+      expect(Object.keys(deleted.value)).not.toContain('financialRecordRelationshipsDeleted');
+    }
   });
 });

@@ -73,22 +73,60 @@ export type FinancialRecordErasureCounts = Readonly<
   Record<ErasableFinancialRecordKind, number>
 >;
 
+/**
+ * Rows that RELATE two financial records to each other and were erased
+ * alongside them — today, the transfer matches saying that two of a person's
+ * movements were one movement of their own money.
+ *
+ * ## Why the count travels back here rather than staying inside the eraser
+ *
+ * A relationship whose records are gone is not tidy-up. It asserts that two
+ * movements were one movement while one of them no longer exists, so the
+ * surviving side stays explained away as a transfer and a real expense stays
+ * hidden from the person's own record of what they spent. The implementer
+ * therefore erases them BEFORE the records they name, and reports how many
+ * went, so `DeleteOwnAccount` can tell a person what was actually removed
+ * instead of describing only the part this module happens to have vocabulary
+ * for.
+ *
+ * ## Why it is NOT a fifth `ErasableFinancialRecordKind`
+ *
+ * The kinds are the tables the record eraser itself owns and deletes. A
+ * relationship row belongs to a THIRD module, reached by the implementer
+ * through a port of its own, and folding it into the closed set would say
+ * this module's record eraser owns rows it does not — the same conflation
+ * `AccountSourceLinkEraserPort` exists to avoid. Counting it and owning it
+ * are different claims.
+ *
+ * ## Why OPTIONAL, and what `undefined` means
+ *
+ * `undefined` is "nothing measured this", `0` is "measured, and none went".
+ * They are different claims and the port keeps them apart, for the same
+ * reason `incomplete` and `failed` are separate arms: an implementation that
+ * erases no relationships at all should not be made to write a zero it never
+ * counted, and a caller must not read that zero as evidence.
+ */
+type WithRelationshipCount = {
+  readonly financialRecordRelationshipsDeleted?: number;
+};
+
 export type FinancialRecordErasureOutcome =
   /**
    * Everything scoped to the account is gone, and these are the exact counts.
    * The only arm a caller may report as a successful erasure.
    */
-  | { readonly kind: 'erased'; readonly deleted: FinancialRecordErasureCounts }
+  | ({ readonly kind: 'erased'; readonly deleted: FinancialRecordErasureCounts } &
+      WithRelationshipCount)
   /**
    * Some rows were removed and some remain. Carries what WAS removed, so the
    * caller can say so honestly, and why it stopped. Never success: a
    * half-erased account is the state a person would most want to know about.
    */
-  | {
+  | ({
       readonly kind: 'incomplete';
       readonly deleted: FinancialRecordErasureCounts;
       readonly reason: string;
-    }
+    } & WithRelationshipCount)
   /**
    * Nothing could be established — the store was unreachable, or the erasure
    * could not begin. Distinct from `incomplete` because the remedies differ:

@@ -48,7 +48,11 @@ import {
   LocalKeyedDedupFingerprintProvider,
 } from '../infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
 import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
-import { FixedAccountDirectory, FixedPrincipalContext } from './fakes/in-memory-repositories.js';
+import {
+  ERASES_NO_TRANSFER_MATCHES,
+  FixedAccountDirectory,
+  FixedPrincipalContext,
+} from './fakes/in-memory-repositories.js';
 import { BOOKED, NOW, fixedClock, principal, qar, syntheticMerchant } from './fakes/synthetic-fixtures.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
@@ -219,7 +223,7 @@ describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', 
       retention,
       accounts,
     );
-    remove = new DeleteOwnTransaction(context, repository);
+    remove = new DeleteOwnTransaction(context, repository, ERASES_NO_TRANSFER_MATCHES);
   }, 90_000);
 
   afterAll(async () => {

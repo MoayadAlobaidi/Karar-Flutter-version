@@ -55,7 +55,11 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { LocalKeyedDedupFingerprintProvider } from '../infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
 import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
-import { FixedAccountDirectory, FixedPrincipalContext } from './fakes/in-memory-repositories.js';
+import {
+  ERASES_NO_TRANSFER_MATCHES,
+  FixedAccountDirectory,
+  FixedPrincipalContext,
+} from './fakes/in-memory-repositories.js';
 import {
   BOOKED,
   EARLIER,
@@ -251,7 +255,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     read = new ReadOwnTransaction(context, repository, assignments);
     list = new ListOwnTransactions(context, repository);
     update = new UpdateOwnTransaction(context, repository, ids, clock);
-    remove = new DeleteOwnTransaction(context, repository);
+    remove = new DeleteOwnTransaction(context, repository, ERASES_NO_TRANSFER_MATCHES);
     assign = new AssignCategory(context, repository, assignments, catalogue, ids, clock);
 
     // SEED BOTH SIDES before any isolation assertion runs — and seed EVERY

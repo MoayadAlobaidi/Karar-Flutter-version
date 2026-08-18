@@ -56,6 +56,7 @@ import { ListOwnBalanceSnapshots } from '../application/use-cases/list-own-balan
 import { ReadOwnAccount } from '../application/use-cases/read-own-account.js';
 import { UpdateOwnAccount } from '../application/use-cases/update-own-account.js';
 import type { AccountSourceLinkEraserPort } from '../application/ports/account-source-link-eraser.js';
+import type { PaymentInstrumentEraserPort } from '../application/ports/payment-instrument-eraser.js';
 import {
   NO_RECORDS_ERASED,
   type FinancialRecordEraserPort,
@@ -135,6 +136,19 @@ const ERASES_NO_SOURCE_LINKS: AccountSourceLinkEraserPort = {
     Promise.resolve({ kind: 'erased', accountSourceLinksDeleted: 0 }),
 };
 
+/**
+ * Passed EXPLICITLY by suites that are not about instruments.
+ *
+ * The argument is required rather than defaulted on purpose: a composition
+ * root that binds payment-instruments and forgets this wiring would otherwise
+ * skip instrument erasure silently, and a subject would be told an account was
+ * gone while the cards that spent from it survived. Naming the no-op is a
+ * decision a reader can see; a default is one nobody made.
+ */
+const ERASES_NO_INSTRUMENTS: PaymentInstrumentEraserPort = {
+  erasePaymentInstruments: async () => ({ kind: 'erased', paymentInstrumentsDeleted: 0 }),
+};
+
 /** Seeded, one per principal, so both sides of every assertion are populated. */
 let accountA1 = '' as FinancialAccountId;
 let accountA2 = '' as FinancialAccountId;
@@ -202,7 +216,7 @@ describe.skipIf(unreachable !== null)(
         institutions,
         clock,
       );
-      deleteAccount = new DeleteOwnAccount(accounts, ERASES_NOTHING, ERASES_NO_SOURCE_LINKS);
+      deleteAccount = new DeleteOwnAccount(accounts, ERASES_NOTHING, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS);
       listSnapshots = new ListOwnBalanceSnapshots(accounts, snapshots);
 
       // BOTH SIDES SEEDED, through the real write path.

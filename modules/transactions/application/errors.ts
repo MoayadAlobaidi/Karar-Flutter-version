@@ -158,6 +158,52 @@ export interface InvalidCursor {
   readonly message: string;
 }
 
+/**
+ * The transaction was NOT deleted, because the transfer matches naming it
+ * could not be erased first.
+ *
+ * Its own arm rather than a `STORE_FAILURE`, because the store that refused is
+ * not this module's: the remedy lives in `modules/transfer-matching`, and an
+ * operator sent to look at the transactions tables would find nothing wrong
+ * with them. `outcome` says which kind of refusal it was, because "some rows
+ * went" and "nothing went" carry different instructions — the second is safe
+ * to retry immediately.
+ *
+ * `transferMatchesDeleted` is honest about a partial erasure and zero after a
+ * throw, since a throw means nothing is KNOWN to have gone.
+ *
+ * `cause` holds the original throw for the ONE place allowed to log it and is
+ * defined NON-ENUMERABLE, for the reason given on `toStoreFailure`.
+ */
+export interface TransferMatchErasureIncomplete {
+  readonly kind: 'TRANSFER_MATCH_ERASURE_INCOMPLETE';
+  readonly transferMatchesDeleted: number;
+  readonly outcome: 'incomplete' | 'failed';
+  readonly message: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
+}
+
+/**
+ * The transfer matches naming the transaction were erased but the transaction
+ * row itself was not removed — the window cross-module deletion leaves open.
+ *
+ * Reported as its own arm so it can never be mistaken for success and never
+ * for "nothing happened", which are the two comfortable lies available at
+ * this point. A caller that answered `NOT_FOUND` here would be telling a
+ * person nothing happened to a request that really did remove rows describing
+ * their money.
+ *
+ * `cause` is non-enumerable where one exists, for the usual reason.
+ */
+export interface TransactionDeletionPartiallyApplied {
+  readonly kind: 'DELETION_PARTIALLY_APPLIED';
+  readonly transferMatchesDeleted: number;
+  readonly message: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
+}
+
 /** Thrown, not returned: defective input at a trusted call site. */
 export class InvalidTransactionInputError extends Error {
   override readonly name = 'InvalidTransactionInputError';

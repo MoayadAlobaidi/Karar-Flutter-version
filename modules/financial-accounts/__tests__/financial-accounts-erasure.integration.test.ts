@@ -60,6 +60,7 @@ import {
 } from './fixtures.js';
 import type { AccountsPrincipal } from '../application/principal.js';
 import type { AccountSourceLinkEraserPort } from '../application/ports/account-source-link-eraser.js';
+import type { PaymentInstrumentEraserPort } from '../application/ports/payment-instrument-eraser.js';
 import {
   ERASABLE_FINANCIAL_RECORD_KINDS,
   NO_RECORDS_ERASED,
@@ -186,6 +187,19 @@ const eraser = new SqlFinancialRecordEraser();
 const ERASES_NO_SOURCE_LINKS: AccountSourceLinkEraserPort = {
   eraseAccountSourceLinks: () =>
     Promise.resolve({ kind: 'erased', accountSourceLinksDeleted: 0 }),
+};
+
+/**
+ * Passed EXPLICITLY by suites that are not about instruments.
+ *
+ * The argument is required rather than defaulted on purpose: a composition
+ * root that binds payment-instruments and forgets this wiring would otherwise
+ * skip instrument erasure silently, and a subject would be told an account was
+ * gone while the cards that spent from it survived. Naming the no-op is a
+ * decision a reader can see; a default is one nobody made.
+ */
+const ERASES_NO_INSTRUMENTS: PaymentInstrumentEraserPort = {
+  erasePaymentInstruments: async () => ({ kind: 'erased', paymentInstrumentsDeleted: 0 }),
 };
 
 /** Raw counts with RLS bypassed: proof of "gone", not of "hidden". */
@@ -376,7 +390,7 @@ describe.skipIf(unreachable !== null)(
         transaction_category_assignments: 1,
       });
 
-      const deleted = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
+      const deleted = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -410,7 +424,7 @@ describe.skipIf(unreachable !== null)(
       const accountId = await newAccount(ACTOR_A1, 'Synthetic Test Account With Orphans');
       await seedFinancialRecords(ACTOR_A1, accountId, 'a2');
 
-      await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
+      await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -435,7 +449,7 @@ describe.skipIf(unreachable !== null)(
       await seedFinancialRecords(ACTOR_A1, accountId, 'a3');
       eraser.failWith(new Error('synthetic record-store outage'));
 
-      const refused = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
+      const refused = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -455,7 +469,7 @@ describe.skipIf(unreachable !== null)(
 
       // And the retry converges, because the erasure is idempotent.
       eraser.failWith(null);
-      const retried = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
+      const retried = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -476,7 +490,7 @@ describe.skipIf(unreachable !== null)(
       const accountId = await newAccount(ACTOR_A1, 'Synthetic Test Account Not Yours');
       await seedFinancialRecords(ACTOR_A1, accountId, 'a4');
 
-      const refused = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
+      const refused = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A2,
       );
@@ -515,7 +529,7 @@ describe.skipIf(unreachable !== null)(
 
       // The owner can still erase them, which is what makes the point above
       // about scoping rather than about the eraser simply not working.
-      const deleted = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
+      const deleted = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS, ERASES_NO_INSTRUMENTS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );

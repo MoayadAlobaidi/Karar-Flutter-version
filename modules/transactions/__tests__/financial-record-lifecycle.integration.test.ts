@@ -50,7 +50,11 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { LocalKeyedDedupFingerprintProvider } from '../infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
 import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
-import { FixedAccountDirectory, FixedPrincipalContext } from './fakes/in-memory-repositories.js';
+import {
+  FixedAccountDirectory,
+  FixedPrincipalContext,
+  InMemoryTransferMatchEraser,
+} from './fakes/in-memory-repositories.js';
 import type { FinancialAccountId } from '@karar/financial-accounts';
 import {
   BOOKED,
@@ -118,6 +122,18 @@ describe.skipIf(unreachable !== null)('financial-record lifecycle ports (live Po
   let assign: AssignCategory;
   let presence: FinancialRecordPresencePort;
   let eraser: FinancialRecordEraserPort;
+  /**
+   * `modules/transfer-matching` satisfies `TransferMatchEraserPort` for real,
+   * and this module may not import it — the dependency runs the other way. So
+   * the eraser is driven here by the in-memory double, whose subject is THIS
+   * module's contract: that the relationships are cut before the records, and
+   * that a refusal there refuses the whole erasure. The end-to-end proof over
+   * real `transfer_matches` rows lives in that module's own suite, where the
+   * real adapter and real rows exist.
+   */
+  let transferMatches: InMemoryTransferMatchEraser;
+  /** Held at suite scope so a case can add an account it seeds for itself. */
+  let accountDirectory: FixedAccountDirectory;
 
   const tenant = randomUUID();
   const alice: TransactionsPrincipal = principal(tenant);
@@ -212,13 +228,14 @@ describe.skipIf(unreachable !== null)('financial-record lifecycle ports (live Po
     const assignments = new PrismaCategoryAssignmentRepository(prismaHandle);
     const ids = new Uuidv7IdSource();
     const clock = fixedClock(NOW);
-    const accounts = new FixedAccountDirectory([
+    accountDirectory = new FixedAccountDirectory([
       { accountId: doomedAccount, owner: alice, currencyCode: 'QAR' },
       { accountId: survivingAccount, owner: alice, currencyCode: 'QAR' },
       { accountId: emptyAccount, owner: alice, currencyCode: 'QAR' },
       { accountId: malloryAccount, owner: mallory, currencyCode: 'QAR' },
       { accountId: bobAccount, owner: bob, currencyCode: 'QAR' },
     ]);
+    const accounts = accountDirectory;
 
     context = new FixedPrincipalContext(alice);
     create = new CreateManualTransaction(
@@ -240,7 +257,8 @@ describe.skipIf(unreachable !== null)('financial-record lifecycle ports (live Po
       clock,
     );
     presence = new PrismaFinancialRecordPresenceReader(prismaHandle);
-    eraser = new PrismaFinancialRecordEraser(prismaHandle);
+    transferMatches = new InMemoryTransferMatchEraser();
+    eraser = new PrismaFinancialRecordEraser(prismaHandle, transferMatches);
 
     // SEED EVERY SIDE NON-EMPTY, and seed every KIND of row the erasure has
     // to remove: transactions, a correction (so revisions and provenance are
@@ -446,6 +464,9 @@ describe.skipIf(unreachable !== null)('financial-record lifecycle ports (live Po
       // naming somebody else's data — zeros, because within alice's scope
       // there is indeed nothing.
       const crossUser = await eraser.eraseAccountScopedRecords(alice, malloryAccount);
+      // The WHOLE outcome, by equality: the relationship count belongs in it
+      // too, and asserting the exact shape is what makes a field added later
+      // fail here instead of slipping past.
       expect(crossUser).toEqual({
         kind: 'erased',
         deleted: {
@@ -454,6 +475,7 @@ describe.skipIf(unreachable !== null)('financial-record lifecycle ports (live Po
           FINANCIAL_RECORD_PROVENANCE: 0,
           FINANCIAL_RECORD_CATEGORY_ASSIGNMENT: 0,
         },
+        financialRecordRelationshipsDeleted: 0,
       });
       const crossTenant = await eraser.eraseAccountScopedRecords(alice, bobAccount);
       expect(crossTenant.kind).toBe('erased');
@@ -470,6 +492,104 @@ describe.skipIf(unreachable !== null)('financial-record lifecycle ports (live Po
       expect(byOwner.kind).toBe('erased');
       if (byOwner.kind === 'erased') expect(byOwner.deleted.FINANCIAL_RECORD).toBe(1);
       expect((await rowsFor(malloryAccount)).transactions).toBe(0);
+    });
+  });
+
+  /**
+   * The relationships that name a person's records go with them, or nothing
+   * goes.
+   *
+   * `public.transfer_matches` says two of the subject's transactions were ONE
+   * movement of their own money. Its references are raw uuids with no foreign
+   * keys back, so an account erasure took the records and left every match
+   * asserting a transfer whose other side no longer existed — which keeps a
+   * real expense hidden from the person's own record of what they spent.
+   */
+  describe('the transfer matches naming the account', () => {
+    /** A fresh account with one real transaction on it, per case. */
+    async function accountWithOneRecord(label: string): Promise<FinancialAccountId> {
+      const accountId = asAccountId(randomUUID());
+      accountDirectory.add({ accountId, owner: alice, currencyCode: 'QAR' });
+      await seed(alice, accountId, label);
+      expect((await rowsFor(accountId)).transactions).toBe(1);
+      return accountId;
+    }
+
+    it('are erased BEFORE the records, and the exact count travels in the outcome', async () => {
+      const accountId = await accountWithOneRecord('matched account');
+      transferMatches.seed(alice, { accountIds: [accountId] }, 2);
+
+      const outcome = await eraser.eraseAccountScopedRecords(alice, accountId);
+      expect(outcome.kind).toBe('erased');
+      if (outcome.kind !== 'erased') return;
+      // The count the accounts module folds into what it tells the person.
+      // Reported, never assumed: two rows were there and two went.
+      expect(outcome.financialRecordRelationshipsDeleted).toBe(2);
+      expect(outcome.deleted.FINANCIAL_RECORD).toBe(1);
+      expect(transferMatches.rows).toHaveLength(0);
+      expect((await rowsFor(accountId)).transactions).toBe(0);
+    });
+
+    it('refuse the WHOLE erasure when they cannot go, leaving every record in place', async () => {
+      // The ordering made checkable. If the records went first and the match
+      // erasure then failed, the residue would be permanent and nothing
+      // afterwards would know to look for it.
+      const accountId = await accountWithOneRecord('unerasable matches');
+      transferMatches.seed(alice, { accountIds: [accountId] }, 1);
+      transferMatches.failErasureWith(new Error('synthetic transfer-match store outage'));
+
+      const outcome = await eraser.eraseAccountScopedRecords(alice, accountId);
+      expect(outcome.kind).toBe('failed');
+      // A coherent world to retry into, counted as superuser: the record is
+      // still there, and so is the relationship naming it.
+      expect((await rowsFor(accountId)).transactions).toBe(1);
+      expect(transferMatches.rows).toHaveLength(1);
+    });
+
+    it('carry NO store text outward when they fail, and keep the cause for the boundary', async () => {
+      // The accounts module interpolates `reason` into a message a person
+      // sees. A driver message can carry a connection string, the failing SQL,
+      // or a fragment of the very record being erased.
+      const CONNECTION_STRING = 'postgres://user:password@internal-host:5432/karar';
+      const SQL = 'DELETE FROM public.transfer_matches';
+      const poisoned = new Error(`connection to ${CONNECTION_STRING} failed while running ${SQL}`);
+      const accountId = await accountWithOneRecord('poisoned matches');
+      transferMatches.failErasureWith(poisoned);
+
+      const outcome = await eraser.eraseAccountScopedRecords(alice, accountId);
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind !== 'failed') return;
+      for (const rendered of [
+        outcome.reason,
+        JSON.stringify(outcome) ?? '',
+        JSON.stringify({ ...outcome }),
+        Object.keys(outcome).join(','),
+      ]) {
+        expect(rendered).not.toContain(CONNECTION_STRING);
+        expect(rendered).not.toContain(SQL);
+        expect(rendered).not.toContain('password');
+        expect(rendered).not.toContain('internal-host');
+      }
+      // Reachable by name for the one boundary allowed to log it, and
+      // non-enumerable so no serializer reaches it by accident.
+      expect((outcome as { cause?: unknown }).cause).toBe(poisoned);
+      expect(Object.getOwnPropertyDescriptor(outcome, 'cause')?.enumerable).toBe(false);
+      expect((await rowsFor(accountId)).transactions).toBe(1);
+    });
+
+    it('refuse on a PARTIAL erasure too — half a relationship set is not a completion', async () => {
+      const accountId = await accountWithOneRecord('partially erased matches');
+      transferMatches.eraseWith(() => ({
+        kind: 'incomplete',
+        transferMatchesDeleted: 1,
+        reason: 'one match could not be removed',
+      }));
+
+      const outcome = await eraser.eraseAccountScopedRecords(alice, accountId);
+      expect(outcome.kind).toBe('failed');
+      // Nothing here was removed, which is what makes the retry safe and what
+      // the reason promises.
+      expect((await rowsFor(accountId)).transactions).toBe(1);
     });
   });
 });

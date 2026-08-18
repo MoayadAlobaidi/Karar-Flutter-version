@@ -28,6 +28,7 @@ import {
   FixedPrincipalContext,
   InMemoryCategoryAssignmentRepository,
   InMemoryTransactionRepository,
+  InMemoryTransferMatchEraser,
   SequentialIdSource,
   StaticCategoryCatalogue,
   StubRetentionDecisionPort,
@@ -56,6 +57,7 @@ function harness(options: { readonly at?: Date } = {}) {
   const alice = principal();
   const context = new FixedPrincipalContext(alice);
   const transactions = new InMemoryTransactionRepository();
+  const transferMatches = new InMemoryTransferMatchEraser();
   const assignments = new InMemoryCategoryAssignmentRepository();
   const catalogue = new StaticCategoryCatalogue();
   const ids = new SequentialIdSource();
@@ -79,6 +81,7 @@ function harness(options: { readonly at?: Date } = {}) {
     alice,
     context,
     transactions,
+    transferMatches,
     assignments,
     accounts,
     retention,
@@ -95,7 +98,7 @@ function harness(options: { readonly at?: Date } = {}) {
     read: new ReadOwnTransaction(context, transactions, assignments),
     list: new ListOwnTransactions(context, transactions),
     update: new UpdateOwnTransaction(context, transactions, ids, clock),
-    remove: new DeleteOwnTransaction(context, transactions),
+    remove: new DeleteOwnTransaction(context, transactions, transferMatches),
     assign: new AssignCategory(context, transactions, assignments, catalogue, ids, clock),
   };
 }
@@ -579,5 +582,175 @@ describe('AssignCategory', () => {
     });
     expect(denied.ok).toBe(false);
     if (!denied.ok) expect(denied.error.kind).toBe('NOT_FOUND');
+  });
+});
+
+/**
+ * Deleting a transaction also erases the TRANSFER MATCHES that name it, or it
+ * does not report success.
+ *
+ * Those rows live in `modules/transfer-matching` and say that two of the
+ * person's movements were ONE movement of their own money. The transaction id
+ * there is a raw uuid with no foreign key back here, so nothing cascaded to
+ * them: deleting one row made a second row assert a transfer whose other side
+ * no longer existed, which keeps a real expense hidden from the person's own
+ * record of what they spent. `TransferMatchEraserPort` is how that claim
+ * becomes true; these cases are what makes it checkable.
+ */
+describe('DeleteOwnTransaction: the transfer matches naming it', () => {
+  async function seededTransfer() {
+    const h = harness();
+    const created = await h.create.execute({
+      accountId: h.accountRef.accountId,
+      magnitude: qar(100),
+      direction: 'MONEY_OUT',
+      bookingDate: BOOKED,
+      description: syntheticMerchant('wallet top-up'),
+    });
+    if (!created.ok) throw new Error('seed failed');
+    h.transferMatches.seed(h.alice, { transactionIds: [created.value.id] }, 2);
+    return { ...h, transactionId: created.value.id };
+  }
+
+  it('erases them BEFORE the transaction, and reports the exact count', async () => {
+    const { remove, transactions, transferMatches, transactionId } = await seededTransfer();
+    // NON-EMPTY FIRST: an erasure test with no match to erase proves nothing.
+    expect(transferMatches.rows).toHaveLength(2);
+
+    const deleted = await remove.execute({ transactionId });
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) expect(deleted.value.transferMatchesDeleted).toBe(2);
+    expect(transferMatches.rows).toHaveLength(0);
+    expect(transactions.size()).toBe(0);
+  });
+
+  it('does NOT delete the transaction when the eraser fails, and reports no success', async () => {
+    const { remove, transactions, transferMatches, transactionId } = await seededTransfer();
+    transferMatches.failErasureWith(new Error('synthetic transfer-match store outage'));
+
+    const refused = await remove.execute({ transactionId });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'TRANSFER_MATCH_ERASURE_INCOMPLETE') {
+      expect(refused.error.outcome).toBe('failed');
+      // A throw is not a partial erasure: nothing is KNOWN to have gone.
+      expect(refused.error.transferMatchesDeleted).toBe(0);
+    } else {
+      expect.unreachable('a failed match erasure must never be reported as success');
+    }
+    // A coherent world to retry into: the movement is still there, and so is
+    // the relationship naming it.
+    expect(transactions.size()).toBe(1);
+    expect(transferMatches.rows).toHaveLength(2);
+  });
+
+  it('does NOT delete the transaction on a PARTIAL erasure, and reports what was removed', async () => {
+    const { remove, transactions, transferMatches, transactionId } = await seededTransfer();
+    transferMatches.eraseWith(() => ({
+      kind: 'incomplete',
+      transferMatchesDeleted: 1,
+      reason: 'one match could not be removed',
+    }));
+
+    const refused = await remove.execute({ transactionId });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'TRANSFER_MATCH_ERASURE_INCOMPLETE') {
+      expect(refused.error.outcome).toBe('incomplete');
+      expect(refused.error.transferMatchesDeleted).toBe(1);
+    } else {
+      expect.unreachable('a partial match erasure must never be reported as success');
+    }
+    expect(transactions.size()).toBe(1);
+  });
+
+  it('carries NO store text outward, and keeps the cause for the boundary', async () => {
+    // A driver message can carry a connection string, the failing SQL, or a
+    // fragment of the record itself. The original still travels, because
+    // redaction that DISCARDED it would trade a leak for blindness.
+    const CONNECTION_STRING = 'postgres://user:password@internal-host:5432/karar';
+    const SQL = 'DELETE FROM public.transfer_matches';
+    const poisoned = new Error(`connection to ${CONNECTION_STRING} failed while running ${SQL}`);
+    const { remove, transferMatches, transactionId } = await seededTransfer();
+    transferMatches.failErasureWith(poisoned);
+
+    const refused = await remove.execute({ transactionId });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return expect.unreachable('the erasure was supposed to fail');
+    if (refused.error.kind !== 'TRANSFER_MATCH_ERASURE_INCOMPLETE') {
+      return expect.unreachable('the match erasure was supposed to be the thing that refused');
+    }
+
+    for (const rendered of [
+      JSON.stringify(refused.error) ?? '',
+      JSON.stringify({ ...refused.error }),
+      Object.keys(refused.error).join(','),
+      refused.error.message,
+    ]) {
+      expect(rendered).not.toContain(CONNECTION_STRING);
+      expect(rendered).not.toContain(SQL);
+      expect(rendered).not.toContain('password');
+      expect(rendered).not.toContain('internal-host');
+    }
+    expect((refused.error as { cause?: unknown }).cause).toBe(poisoned);
+    expect(Object.getOwnPropertyDescriptor(refused.error, 'cause')?.enumerable).toBe(false);
+  });
+
+  it('a retry after a failed erasure converges, because the erasure is idempotent', async () => {
+    const { remove, transactions, transferMatches, transactionId } = await seededTransfer();
+    transferMatches.failErasureWith(new Error('synthetic transient outage'));
+    expect((await remove.execute({ transactionId })).ok).toBe(false);
+
+    transferMatches.eraseWith(() => ({ kind: 'erased', transferMatchesDeleted: 2 }));
+    const retried = await remove.execute({ transactionId });
+    expect(retried.ok).toBe(true);
+    if (retried.ok) expect(retried.value.transferMatchesDeleted).toBe(2);
+    expect(transactions.size()).toBe(0);
+  });
+
+  it('a delete that erased matches but found no transaction is NOT reported as not-found', async () => {
+    // The dangling-relationship case, cleaned up by a repeat of a delete that
+    // had previously stopped halfway. Answering `NOT_FOUND` would tell a
+    // person nothing happened to a request that really did remove rows
+    // describing their money.
+    const { remove, alice, transferMatches } = harness();
+    const orphaned = '00000000-0000-7000-8000-0000000000ff';
+    transferMatches.seed(alice, { transactionIds: [orphaned] }, 1);
+
+    const refused = await remove.execute({ transactionId: orphaned });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'DELETION_PARTIALLY_APPLIED') {
+      expect(refused.error.transferMatchesDeleted).toBe(1);
+    } else {
+      expect.unreachable('erasing a dangling match is not "nothing happened"');
+    }
+    expect(transferMatches.rows).toHaveLength(0);
+
+    // And with nothing erased, the same call is the oracle-free `NOT_FOUND`
+    // an id nobody minted has always answered.
+    const again = await remove.execute({ transactionId: orphaned });
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.error.kind).toBe('NOT_FOUND');
+  });
+
+  it("erases none of a neighbour's matches, and never reaches the eraser without a principal", async () => {
+    const { remove, context, transferMatches, alice, transactionId } = await seededTransfer();
+
+    // Another subject: the eraser is principal-scoped, so it finds nothing of
+    // theirs under this id and the delete then answers the same `NOT_FOUND` a
+    // guessed id gets.
+    context.actAs(principal());
+    const denied = await remove.execute({ transactionId });
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.error.kind).toBe('NOT_FOUND');
+    expect(transferMatches.rows).toHaveLength(2);
+
+    // No principal at all: fail closed, before the eraser is consulted.
+    const callsBefore = transferMatches.calls;
+    context.actAs(null);
+    const unbound = await remove.execute({ transactionId });
+    expect(unbound.ok).toBe(false);
+    if (!unbound.ok) expect(unbound.error.kind).toBe('PRINCIPAL_CONTEXT_MISSING');
+    expect(transferMatches.calls).toBe(callsBefore);
+    expect(transferMatches.rows).toHaveLength(2);
+    expect(alice).toBeDefined();
   });
 });

@@ -19,6 +19,11 @@
  *   this module's implementations of the two ports the accounts module
  *   declares, so that accounts can block a currency change while records
  *   exist and erase an account's records without ever importing this module.
+ *   The eraser takes a `TransferMatchEraserPort` because a record cannot go
+ *   before the relationships naming it do.
+ * - `TransferMatchEraserPort` — declared here and satisfied by
+ *   `modules/transfer-matching`, which depends on this module and is not
+ *   depended on by it. Both of this module's deletion paths call it.
  *
  * Deliberately absent:
  *
@@ -146,6 +151,8 @@ export {
   type PrincipalContextMissing,
   type RetentionUndecided,
   type StoreFailure,
+  type TransactionDeletionPartiallyApplied,
+  type TransferMatchErasureIncomplete,
   type UserAssignmentWins,
   type VersionConflict,
 } from './application/errors.js';
@@ -191,6 +198,14 @@ export {
   type FinancialRecordPresence,
   type FinancialRecordPresencePort,
 } from './application/ports/financial-record-lifecycle.js';
+// The port THIS module declares and modules/transfer-matching fills, so that
+// deleting a transaction — or erasing every record on an account — reaches
+// the matches that name them without either deletion path ever importing that
+// module. See the file for why both scopes live on one port.
+export type {
+  TransferMatchEraserPort,
+  TransferMatchErasureOutcome,
+} from './application/ports/transfer-match-eraser.js';
 export {
   DuplicateTransactionError,
   OccurrenceOrdinalNotNextError,
