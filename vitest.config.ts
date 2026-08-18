@@ -15,7 +15,7 @@
  *
  * The worker count therefore comes from the connection budget rather than from
  * the CPU count, with the equation and its inputs in
- * `packages/platform/src/testing/database-availability.ts` so that a change to
+ * `packages/platform/src/db/connection-budget.ts` so that a change to
  * a pool size is visibly a change to the worker count. Set
  * `KARAR_TEST_MAX_CONNECTIONS` when running against a server configured for
  * more; set `KARAR_INTEGRATION=1` to make an unavailable database a failure
@@ -25,7 +25,7 @@ import os from 'node:os';
 
 import { defineConfig } from 'vitest/config';
 
-import { connectionBudget } from './packages/platform/src/testing/database-availability.js';
+import { connectionBudget } from './packages/platform/src/db/connection-budget.js';
 
 const budget = connectionBudget(process.env, os.cpus().length);
 

@@ -41,12 +41,19 @@
  *
  * The fingerprint definition is not eternal: which fields participate, how
  * narrative is normalised (Arabic-Indic digits, U+066B/U+066C separators,
- * accounting negatives), and how dates are truncated will all change. A
- * digest whose definition is unrecorded becomes uninterpretable the moment
+ * accounting negatives), and what KIND of value the date is will all change.
+ * A digest whose definition is unrecorded becomes uninterpretable the moment
  * the definition moves, and a silent redefinition either resurrects
  * duplicates or hides genuine new rows. The version travels with the value,
  * is stored on the row, and participates in the unique constraint — so a
  * version bump starts a fresh namespace instead of colliding with the old one.
+ *
+ * It has moved once already, for exactly that reason. The previous definition
+ * took a booking INSTANT and truncated it to a UTC day; the day is now a
+ * `CalendarDay` and enters the digest as its own `YYYY-MM-DD` string
+ * (ADR-0027). That is a change to what the input IS, so it took a new
+ * version rather than a quiet substitution — see the LOCAL adapter for the
+ * identifier and the reasoning.
  *
  * ## Why the input carries NO occurrence ordinal
  *
@@ -68,25 +75,42 @@
  * one, so a high ordinal is not a way around duplicate review.
  */
 
+import type { CalendarDay } from '@karar/shared-kernel';
+
 import type { AccountRef } from '../../domain/refs.js';
 import type { TransactionsPrincipal } from './principal-context.js';
 
 /**
- * The content a fingerprint is computed over. Content only, in both
- * directions:
+ * The content a fingerprint is computed over: **these five fields and nothing
+ * else.** The list is exhaustive by design, and every absence below is a
+ * decision rather than an omission.
  *
- *  - nothing derived from a key, a ciphertext, or a row id may participate
+ *  - Nothing derived from a key, a ciphertext, or a row id may participate
  *    (packages/platform keys/custody.ts states the rule — ciphertext changes
  *    on rotation and on every fresh nonce, so an identifier derived from it
  *    would silently change identity, and an identifier derived from a row id
- *    would make every row unique and the constraint useless);
- *  - and nothing about OCCURRENCE may participate either. There is
- *    deliberately no `occurrenceOrdinal` field here; see the header.
+ *    would make every row unique and the constraint useless).
+ *  - Nothing about OCCURRENCE. There is deliberately no `occurrenceOrdinal`
+ *    field here; see the header.
+ *  - **Nothing about the instant a movement happened.** There is deliberately
+ *    no `eventOccurredAt` and no `sourceTimezone` field either. Those record
+ *    WHEN something happened; the digest answers WHAT it is. One export of a
+ *    statement may carry a time and the next may not, and both describe the
+ *    same movement — folding the instant in would make the second import a
+ *    new transaction rather than a duplicate.
+ *  - **No timezone of any kind.** Not the server's, not the device's, and not
+ *    one inferred from the account's country. The day arrives as a
+ *    `CalendarDay`, which has no timezone to consult, so the same statement
+ *    row cannot fingerprint differently in Doha and in Toronto.
  */
 export interface FingerprintInput {
   readonly accountRef: AccountRef;
-  /** The booking instant; the implementation truncates it per its version's rule. */
-  readonly bookingDate: Date;
+  /**
+   * The source's booking day, as a calendar day. Enters the digest as its
+   * `YYYY-MM-DD` string — nothing is truncated, because there is no time to
+   * truncate and no midnight to invent (ADR-0027).
+   */
+  readonly bookingDate: CalendarDay;
   /** Exact minor units, signed under the canonical convention. */
   readonly amountMinorUnits: bigint;
   readonly currencyCode: string;

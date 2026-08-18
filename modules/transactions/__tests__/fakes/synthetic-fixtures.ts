@@ -14,7 +14,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { Clock, Currency, Money, TenantId, UserId } from '@karar/shared-kernel';
+import { CalendarDay, Clock, Currency, Money, TenantId, UserId } from '@karar/shared-kernel';
 
 import { AccountRef } from '../../domain/refs.js';
 import type { TransactionsPrincipal } from '../../application/ports/principal-context.js';
@@ -28,8 +28,26 @@ export const USD = Currency.get('USD');
 
 /** A fixed instant, so every assertion about time is reproducible. */
 export const NOW = new Date('2026-08-18T09:00:00.000Z');
-export const BOOKED = new Date('2026-08-17T00:00:00.000Z');
-export const EARLIER = new Date('2026-08-10T00:00:00.000Z');
+
+/**
+ * Fixed booking DAYS — `CalendarDay`, not `Date` (ADR-0027).
+ *
+ * They are days because the column is a day and the domain is a day. A
+ * fixture that handed a `Date` here would be the one place in the suite where
+ * the distinction quietly collapsed, and every test built on it would then be
+ * proving something about instants.
+ */
+export const BOOKED = CalendarDay.of(2026, 8, 17);
+export const EARLIER = CalendarDay.of(2026, 8, 10);
+
+/**
+ * A source-supplied INSTANT, for the rows that have one. Deliberately not
+ * midnight and deliberately unrelated to `BOOKED`: nothing in this module
+ * derives one from the other, so a fixture that made them look derivable
+ * would hide the bug it is here to catch.
+ */
+export const EVENT_OCCURRED_AT = new Date('2026-08-17T14:23:45.000Z');
+export const SOURCE_TIMEZONE = 'Asia/Qatar';
 
 export function fixedClock(at: Date = NOW): Clock {
   return new Clock.Fixed(at);

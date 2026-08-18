@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { CalendarDay } from '@karar/shared-kernel';
+
 import {
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
@@ -182,7 +184,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     who: TransactionsPrincipal,
     accountId: string,
     label: string,
-    options: { bookingDate?: Date; occurrenceOrdinal?: number } = {},
+    options: { bookingDate?: CalendarDay; occurrenceOrdinal?: number } = {},
   ): Promise<string> {
     context.actAs(who);
     const created = await create.execute({
@@ -524,7 +526,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
       accountId: aliceAccount,
       magnitude: qar(12, 34),
       direction: 'MONEY_OUT' as const,
-      bookingDate: new Date('2026-08-12T00:00:00.000Z'),
+      bookingDate: CalendarDay.of(2026, 8, 12),
       description: syntheticMerchant('concurrent purchase'),
     };
     // Two commits of the same movement, in flight at once. Exactly one wins.
@@ -578,7 +580,11 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     const stored = await rawAsPrincipal(
       alice,
       `SELECT id FROM transactions WHERE booking_date = $1`,
-      [input.bookingDate],
+      // The day as YYYY-MM-DD, not a Date: a Date parameter would be
+      // serialised as an instant and cast back to a day in whatever timezone
+      // the session happens to hold, which is the round trip this whole
+      // change exists to remove.
+      [input.bookingDate.toString()],
     );
     expect(stored.rowCount).toBe(1);
 
@@ -587,7 +593,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
     expect(repeat.ok).toBe(true);
     expect(
       (await rawAsPrincipal(alice, `SELECT id FROM transactions WHERE booking_date = $1`, [
-        input.bookingDate,
+        input.bookingDate.toString(),
       ])).rowCount,
     ).toBe(2);
 
@@ -599,7 +605,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
 
   it('a correction appends a revision and provenance, and the original stays attributable', async () => {
     const correctedId = await seedFor(alice, aliceAccount, 'corrected', {
-      bookingDate: new Date('2026-08-11T00:00:00.000Z'),
+      bookingDate: CalendarDay.of(2026, 8, 11),
     });
     context.actAs(alice);
     const corrected = await update.execute({
@@ -658,7 +664,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
 
   it('exactly one category assignment stays ACTIVE, and a rule cannot replace a person', async () => {
     const categorisedId = await seedFor(alice, aliceAccount, 'categorised', {
-      bookingDate: new Date('2026-08-09T00:00:00.000Z'),
+      bookingDate: CalendarDay.of(2026, 8, 9),
     });
     context.actAs(alice);
 
@@ -896,7 +902,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
         accountId: bobAccount,
         magnitude: qar(1 + i),
         direction: 'MONEY_OUT',
-        bookingDate: new Date(Date.UTC(2026, 6, 1 + i)),
+        bookingDate: CalendarDay.of(2026, 7, 1 + i),
         description: syntheticMerchant(`page ${i}`),
       });
       expect(created.ok).toBe(true);
@@ -912,7 +918,7 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
       accountId: bobAccount,
       magnitude: qar(99),
       direction: 'MONEY_IN',
-      bookingDate: new Date('2026-12-01T00:00:00.000Z'),
+      bookingDate: CalendarDay.of(2026, 12, 1),
       description: syntheticMerchant('inserted between pages'),
     });
     expect(inserted.ok).toBe(true);

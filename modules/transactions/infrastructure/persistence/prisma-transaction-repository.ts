@@ -219,8 +219,15 @@ export class PrismaTransactionRepository implements TransactionRepository {
             currencyCode: transaction.amount.currency.code,
             originalAmountMinor: transaction.originalAmount?.amount.minorUnits ?? null,
             originalCurrencyCode: transaction.originalAmount?.currency.code ?? null,
-            bookingDate: transaction.bookingDate,
-            valueDate: transaction.valueDate,
+            // A `date` column through a driver that models it as a `Date`.
+            // `toUtcMidnight` is the one sanctioned transport for that (see
+            // CalendarDay): Prisma truncates the instant to its UTC date
+            // part, so the day written is the day held, with no host
+            // timezone in the path.
+            bookingDate: transaction.bookingDate.toUtcMidnight(),
+            valueDate: transaction.valueDate?.toUtcMidnight() ?? null,
+            eventOccurredAt: transaction.eventOccurredAt,
+            sourceTimezone: transaction.sourceTimezone,
             ...narrative,
             sourceKind: transaction.sourceKind,
             status: transaction.status,
@@ -273,7 +280,14 @@ export class PrismaTransactionRepository implements TransactionRepository {
     // Keyset: strictly "older than the cursor" in the total order
     // (bookingDate DESC, id DESC). One extra row tells us whether another
     // page exists without a second count query.
-    const after = query.after;
+    // The cursor's position, with its day in the transport form the `date`
+    // column takes through this driver. Comparing days as days is what keeps
+    // the boundary stable: an instant here would order against a shifted
+    // value and skip or repeat a row for a reader at another offset.
+    const after =
+      query.after === null
+        ? null
+        : { day: query.after.bookingDate.toUtcMidnight(), id: query.after.id };
     const rows = await this.run(principal, (tx) =>
       tx.transaction.findMany({
         where: {
@@ -284,8 +298,8 @@ export class PrismaTransactionRepository implements TransactionRepository {
             ? {}
             : {
                 OR: [
-                  { bookingDate: { lt: after.bookingDate } },
-                  { bookingDate: after.bookingDate, id: { lt: after.id } },
+                  { bookingDate: { lt: after.day } },
+                  { bookingDate: after.day, id: { lt: after.id } },
                 ],
               }),
         },
@@ -340,8 +354,11 @@ export class PrismaTransactionRepository implements TransactionRepository {
         data: {
           amountMinor: transaction.amount.minorUnits,
           currencyCode: transaction.amount.currency.code,
-          bookingDate: transaction.bookingDate,
-          valueDate: transaction.valueDate,
+          bookingDate: transaction.bookingDate.toUtcMidnight(),
+          valueDate: transaction.valueDate?.toUtcMidnight() ?? null,
+          // event_occurred_at and source_timezone are absent from this SET
+          // list on purpose: a correction may not restate what the source
+          // said about when the movement happened (TransactionCorrection).
           ...narrative,
           status: transaction.status,
           updatedAt: revision.recordedAt,
@@ -422,8 +439,10 @@ function revisionData(
     actorRef: revision.actorRef,
     amountMinor: revision.values.amount.minorUnits,
     currencyCode: revision.values.amount.currency.code,
-    bookingDate: revision.values.bookingDate,
-    valueDate: revision.values.valueDate,
+    bookingDate: revision.values.bookingDate.toUtcMidnight(),
+    valueDate: revision.values.valueDate?.toUtcMidnight() ?? null,
+    eventOccurredAt: revision.values.eventOccurredAt,
+    sourceTimezone: revision.values.sourceTimezone,
     status: revision.values.status,
     ...narrative,
     changedFields: [...revision.changedFields],

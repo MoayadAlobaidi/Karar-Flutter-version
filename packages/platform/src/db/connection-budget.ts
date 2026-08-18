@@ -2,6 +2,13 @@
  * Whether a missing database is a skip or a failure, and how many test workers
  * the connection budget actually allows.
  *
+ * This lives under `db/` rather than a `testing/` directory because it reads
+ * `process.env`, and the configuration convention (see `config.ts`, enforced by
+ * `no-direct-env-access.test.ts`) permits that only in the typed config loader
+ * and in this db layer. The subject really is database connections, so the
+ * rule and the content agree; putting it elsewhere would have meant widening a
+ * rule to fit a file rather than putting the file where it belongs.
+ *
  * ## Why a skip is dangerous here
  *
  * Every integration suite in this repository guards itself with

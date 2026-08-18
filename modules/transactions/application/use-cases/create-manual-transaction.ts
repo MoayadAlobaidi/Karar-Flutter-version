@@ -43,7 +43,7 @@
  */
 
 import { Clock, Money, Result } from '@karar/shared-kernel';
-import type { Currency } from '@karar/shared-kernel';
+import type { CalendarDay, Currency } from '@karar/shared-kernel';
 
 import { HsfField } from '../../domain/hsf-field.js';
 import { createProvenance, type CategoryAssignmentSource } from '../../domain/provenance.js';
@@ -102,8 +102,25 @@ export interface CreateManualTransactionInput {
   /** Non-negative magnitude; the direction decides the stored sign. */
   readonly magnitude: Money;
   readonly direction: MoneyDirection;
-  readonly bookingDate: Date;
-  readonly valueDate?: Date | null;
+  /** The day the movement is booked. A calendar day, not an instant (ADR-0027). */
+  readonly bookingDate: CalendarDay;
+  readonly valueDate?: CalendarDay | null;
+  /**
+   * The instant the movement happened, ONLY if the person stated one.
+   *
+   * On this path the person IS the source, so a time they actually supplied
+   * is a source-stated fact and belongs here. Omitting it is the ordinary
+   * case and the honest one: nothing derives an instant from `bookingDate`,
+   * because midnight on a booked day is a moment nobody observed.
+   */
+  readonly eventOccurredAt?: Date | null;
+  /**
+   * The IANA zone stated alongside that instant, if one was stated. Never
+   * filled in from the server, the device, or the account's country — see
+   * `Transaction.sourceTimezone`. Supplying it without `eventOccurredAt` is
+   * refused.
+   */
+  readonly sourceTimezone?: string | null;
   readonly merchant?: string | null;
   readonly description: string;
   readonly note?: string | null;
@@ -213,6 +230,8 @@ export class CreateManualTransaction {
       amount,
       bookingDate: input.bookingDate,
       valueDate: input.valueDate ?? null,
+      eventOccurredAt: input.eventOccurredAt ?? null,
+      sourceTimezone: input.sourceTimezone ?? null,
       merchant,
       description,
       note,
@@ -234,10 +253,14 @@ export class CreateManualTransaction {
 
     // The fingerprint is computed over the SAME narrative the user typed. A
     // manual entry has no normalisation ruleset of its own, so the
-    // description travels as written and the version records that. The
-    // occurrence ordinal is NOT part of it: the digest states what the
-    // content is, and how many times that content occurred is the separate
-    // column travelling beside it.
+    // description travels as written and the version records that.
+    //
+    // Two things are deliberately NOT part of it. The occurrence ordinal:
+    // the digest states what the content is, and how many times that content
+    // occurred is the separate column travelling beside it. And the instant —
+    // `eventOccurredAt` and `sourceTimezone` are absent from the port's input
+    // type entirely, so re-entering the same movement with a time attached
+    // is still the same content and still refused as a duplicate.
     const fingerprint = await this.fingerprints.fingerprint(principal, {
       accountRef,
       bookingDate: transaction.bookingDate,

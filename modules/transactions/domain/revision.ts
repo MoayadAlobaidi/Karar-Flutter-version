@@ -24,7 +24,7 @@
  * Pure: no clock, no randomness, no I/O.
  */
 
-import type { Money } from '@karar/shared-kernel';
+import type { CalendarDay, Money } from '@karar/shared-kernel';
 
 import type { HsfField } from './hsf-field.js';
 import { hsfFieldsEqual } from './hsf-field.js';
@@ -58,11 +58,20 @@ export type RevisableField = (typeof REVISABLE_FIELDS)[number];
 /**
  * The value snapshot a revision carries. HSF text stays wrapped, so a
  * revision cannot leak a merchant name through a log line either.
+ *
+ * A COMPLETE snapshot, which is why `eventOccurredAt` and `sourceTimezone`
+ * are here even though no correction can move them (`TransactionCorrection`).
+ * That is not redundancy: because they cannot move, every revision of one
+ * transaction repeats the same pair, and a history in which they ever differ
+ * is a history in which somebody rewrote what the source said about when the
+ * movement happened. The snapshot is what makes that visible.
  */
 export interface RevisionValues {
   readonly amount: Money;
-  readonly bookingDate: Date;
-  readonly valueDate: Date | null;
+  readonly bookingDate: CalendarDay;
+  readonly valueDate: CalendarDay | null;
+  readonly eventOccurredAt: Date | null;
+  readonly sourceTimezone: string | null;
   readonly merchant: HsfField | null;
   readonly description: HsfField;
   readonly note: HsfField | null;
@@ -96,6 +105,8 @@ export function valuesOf(transaction: Transaction): RevisionValues {
     amount: transaction.amount,
     bookingDate: transaction.bookingDate,
     valueDate: transaction.valueDate,
+    eventOccurredAt: transaction.eventOccurredAt,
+    sourceTimezone: transaction.sourceTimezone,
     merchant: transaction.merchant,
     description: transaction.description,
     note: transaction.note,
@@ -107,6 +118,13 @@ export function valuesOf(transaction: Transaction): RevisionValues {
  * Fields whose value differs between two snapshots, in declaration order so
  * the list is deterministic (a set that reorders would make two identical
  * corrections produce two different rows).
+ *
+ * `eventOccurredAt` and `sourceTimezone` are absent from `REVISABLE_FIELDS`
+ * and therefore from this comparison. They are not correctable, so a
+ * difference between two snapshots of one transaction cannot arise from a
+ * correction; if one ever did arise it would mean the source's own instant
+ * had been rewritten, which is a defect to find rather than a change to
+ * describe.
  */
 export function changedFieldsBetween(
   before: RevisionValues,
@@ -114,8 +132,8 @@ export function changedFieldsBetween(
 ): readonly RevisableField[] {
   const changed: RevisableField[] = [];
   if (!before.amount.equals(after.amount)) changed.push('amount');
-  if (before.bookingDate.getTime() !== after.bookingDate.getTime()) changed.push('bookingDate');
-  if (instantOrNull(before.valueDate) !== instantOrNull(after.valueDate)) changed.push('valueDate');
+  if (!before.bookingDate.equals(after.bookingDate)) changed.push('bookingDate');
+  if (!calendarDaysEqual(before.valueDate, after.valueDate)) changed.push('valueDate');
   if (!hsfFieldsEqual(before.merchant, after.merchant)) changed.push('merchant');
   if (!hsfFieldsEqual(before.description, after.description)) changed.push('description');
   if (!hsfFieldsEqual(before.note, after.note)) changed.push('note');
@@ -123,8 +141,10 @@ export function changedFieldsBetween(
   return Object.freeze(changed);
 }
 
-function instantOrNull(value: Date | null): number | null {
-  return value === null ? null : value.getTime();
+/** Null-safe day equality: absent equals absent, and absent never equals a day. */
+function calendarDaysEqual(left: CalendarDay | null, right: CalendarDay | null): boolean {
+  if (left === null || right === null) return left === right;
+  return left.equals(right);
 }
 
 /**

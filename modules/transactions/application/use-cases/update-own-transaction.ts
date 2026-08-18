@@ -22,6 +22,7 @@
  */
 
 import { Clock, Money, Result } from '@karar/shared-kernel';
+import type { CalendarDay } from '@karar/shared-kernel';
 
 import { HsfField } from '../../domain/hsf-field.js';
 import { createProvenance } from '../../domain/provenance.js';
@@ -63,6 +64,12 @@ import {
  * hands over a pre-signed amount. Omitted fields are left untouched;
  * `valueDate` and `note` accept an explicit `null` to clear them, which is
  * why they are typed with `null` rather than only optional.
+ *
+ * There is deliberately no `eventOccurredAt` and no `sourceTimezone` here.
+ * Those are what the SOURCE said about when the movement happened; a person
+ * correcting their own record may move the amount or the booked day, but
+ * restating the source's instant would erase the fact those columns exist to
+ * keep, and adding one where the source stated none would fabricate it.
  */
 export interface UpdateOwnTransactionInput {
   readonly transactionId: string;
@@ -70,8 +77,8 @@ export interface UpdateOwnTransactionInput {
   readonly expectedVersion: number;
   readonly magnitude?: Money;
   readonly direction?: MoneyDirection;
-  readonly bookingDate?: Date;
-  readonly valueDate?: Date | null;
+  readonly bookingDate?: CalendarDay;
+  readonly valueDate?: CalendarDay | null;
   readonly merchant?: string | null;
   readonly description?: string;
   readonly note?: string | null;

@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { Money } from '@karar/shared-kernel';
+import { CalendarDay, Money } from '@karar/shared-kernel';
 
 import { HsfField } from '../domain/hsf-field.js';
 import { ActorRef, AccountRef, TransactionId } from '../domain/refs.js';
@@ -47,6 +47,8 @@ function imported(): Transaction {
     amount: Money.of(-4500n, QAR),
     bookingDate: BOOKED,
     valueDate: null,
+    eventOccurredAt: null,
+    sourceTimezone: null,
     merchant: HsfField.of(syntheticMerchant('Corner Shop')),
     description: HsfField.of(syntheticMerchant('card purchase')),
     note: null,
@@ -163,8 +165,8 @@ describe('change detection', () => {
     const before = imported();
     const after = applyCorrection(before, {
       amount: Money.of(-1n, QAR),
-      bookingDate: new Date('2026-08-16T00:00:00.000Z'),
-      valueDate: new Date('2026-08-18T00:00:00.000Z'),
+      bookingDate: CalendarDay.of(2026, 8, 16),
+      valueDate: CalendarDay.of(2026, 8, 18),
       merchant: HsfField.of(syntheticMerchant('Other Shop')),
       description: HsfField.of(syntheticMerchant('corrected description')),
       note: HsfField.of(syntheticMerchant('a note')),

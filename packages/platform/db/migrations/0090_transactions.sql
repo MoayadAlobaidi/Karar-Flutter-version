@@ -52,11 +52,35 @@
 -- them is how a dedup scheme starts lying:
 --
 --   1. CONTENT IDENTITY — "are these the same financial content?"  That is
---      dedup_fingerprint: a keyed MAC over normalised content only (account,
---      booking day, signed minor units, currency, normalised narrative). It
---      says nothing about how many times that content occurred, and NOTHING
---      about occurrence participates in the digest. Two identical coffees
---      have ONE content identity, which is the honest answer.
+--      dedup_fingerprint, definition dedup/hmac-sha256/calendar-day/v3: a
+--      per-subject keyed MAC over exactly five normalised inputs and nothing
+--      else —
+--        * the account reference type and the account id,
+--        * the source booking CALENDAR DAY, as its YYYY-MM-DD string,
+--        * the signed amount in minor units,
+--        * the ISO 4217 currency code,
+--        * the normalised narrative,
+--      each length-prefixed so no field-boundary shift can collide. It says
+--      nothing about how many times that content occurred, and NOTHING about
+--      occurrence participates in the digest. Two identical coffees have ONE
+--      content identity, which is the honest answer.
+--
+--      Excluded, deliberately and permanently: occurrence_ordinal; the
+--      instant columns event_occurred_at and source_timezone (WHEN a movement
+--      happened, and in whose zone, is not WHAT it is — two imports of one
+--      statement row must agree even if only one of them carried a time);
+--      ciphertext, nonce and key material (they change on rotation, so an
+--      identifier derived from them would silently change identity); the row
+--      id (which would make every row unique and the constraint useless); and
+--      any server or device timezone, which would make the same statement row
+--      fingerprint differently depending on where it was imported.
+--
+--      The day enters the digest as a CALENDAR DAY (ADR-0027), which is why
+--      the definition moved from .../utc-day/v2 to .../calendar-day/v3. The
+--      old rule truncated a booking INSTANT to a UTC day, so a row imported
+--      at 23:00 local in Doha and the same row imported at 01:00 the next
+--      morning could land on two different digests. A calendar day has
+--      nothing to truncate and nothing to shift by, so it cannot.
 --   2. LEGITIMATE REPEAT — "did that same content genuinely happen more than
 --      once?"  That is occurrence_ordinal, an explicit integer column a
 --      person or a reviewed import supplies. The system never guesses that a
@@ -196,10 +220,39 @@ CREATE TABLE public.transactions (
   CONSTRAINT transactions_original_currency_differs
     CHECK (original_currency_code IS NULL OR original_currency_code <> currency_code),
 
+  -- A CALENDAR DAY, not an instant (ADR-0027). What the institution wrote on
+  -- its books has no time and therefore no timezone; `date` is the only type
+  -- that can hold that without inventing one.
   booking_date           date        NOT NULL,
   -- Optional and never inferred: a value date copied from the booking date
   -- would assert a fact the source did not state.
   value_date             date            NULL,
+
+  -- A true INSTANT, present ONLY when the source actually supplied one.
+  --
+  -- The pair above and the pair below are the two halves of ADR-0027, and the
+  -- distinction is the whole point: booking_date is what the institution
+  -- WROTE, event_occurred_at is when the movement HAPPENED. Most statement
+  -- formats state only the first, so this column is null on most rows, and
+  -- that is the honest answer rather than a gap to fill.
+  --
+  -- It is NEVER derived from booking_date. Reading midnight off a date would
+  -- manufacture a moment nobody observed — a fabricated financial fact of
+  -- exactly the kind this module refuses — and the manufactured value would
+  -- then be wrong by up to a day for every reader at a different offset.
+  event_occurred_at      timestamptz     NULL,
+  -- The IANA zone the source itself STATED, alongside that instant.
+  --
+  -- Never guessed from the account's country, the issuer, the server, or the
+  -- device: a guessed zone is indistinguishable from a stated one once
+  -- stored, and it would silently move every derived local time. Absent means
+  -- the source did not say, which is a fact worth keeping.
+  source_timezone        text            NULL CHECK (source_timezone <> ''),
+  -- A zone with no instant describes nothing: there is no moment for it to
+  -- qualify, so the pair is either an instant alone or an instant with the
+  -- zone the source stated for it.
+  CONSTRAINT transactions_source_timezone_needs_instant
+    CHECK (source_timezone IS NULL OR event_occurred_at IS NOT NULL),
 
   -- Encryption context for this row's HSF fields (ADR-0017 provenance).
   hsf_algorithm          text        NOT NULL CHECK (hsf_algorithm <> ''),
@@ -265,7 +318,11 @@ COMMENT ON TABLE public.transactions IS
   'money out is negative. The source''s own debit/credit wording is preserved '
   'in transaction_provenance, never dissolved into the sign. Merchant, '
   'description and note exist ONLY as ciphertext + nonce + auth tag, with the '
-  'algorithm and key version per row; no plaintext column exists. '
+  'algorithm and key version per row; no plaintext column exists. Temporal '
+  'columns are typed by what they ARE (ADR-0027): booking_date and value_date '
+  'are calendar days the institution wrote, event_occurred_at is a true '
+  'instant present only when the source supplied one, and created_at/'
+  'updated_at are instants this system observed. '
   'Deduplication keeps three concepts apart: dedup_fingerprint is CONTENT '
   'identity (a per-subject keyed MAC over normalised content, never a plain '
   'hash of predictable fields, and carrying nothing about occurrence); '
@@ -280,11 +337,45 @@ COMMENT ON TABLE public.transactions IS
 COMMENT ON COLUMN public.transactions.amount_minor IS
   'Signed minor units in currency_code. Negative = money left the account. '
   'The exponent lives on the Currency type (KWD/BHD/OMR are 3-decimal).';
+COMMENT ON COLUMN public.transactions.booking_date IS
+  'The CALENDAR DAY the institution booked the movement on — a year, a month '
+  'and a day, with no time and no timezone (ADR-0027). Carried in the domain '
+  'as CalendarDay and on the wire as YYYY-MM-DD, so it cannot shift: stored '
+  'as an instant it would read as the previous day, and at a month boundary '
+  'the previous MONTH, for any reader at a negative offset.';
+COMMENT ON COLUMN public.transactions.value_date IS
+  'The calendar day value is applied, where the source distinguishes it from '
+  'the booking day. Optional and NEVER inferred — copying booking_date here '
+  'would assert a fact the source did not state.';
+COMMENT ON COLUMN public.transactions.event_occurred_at IS
+  'The INSTANT the movement happened, present only when the source actually '
+  'supplied one. Never derived from booking_date: reading midnight off a '
+  'calendar day would manufacture a moment nobody observed. Null on most '
+  'rows, because most statement formats state a date and no time.';
+COMMENT ON COLUMN public.transactions.source_timezone IS
+  'The IANA zone the source itself stated for event_occurred_at. Never '
+  'guessed from country, issuer, server or device — a guessed zone is '
+  'indistinguishable from a stated one once stored. Only present alongside '
+  'event_occurred_at (transactions_source_timezone_needs_instant).';
 COMMENT ON COLUMN public.transactions.dedup_fingerprint IS
-  'CONTENT identity: a per-subject keyed MAC over normalised content (never '
-  'over ciphertext or key material, which change on rotation, and never over '
-  'occurrence_ordinal, which is a separate column so that content identity '
-  'stays recoverable). Opaque; equality only.';
+  'CONTENT identity: a per-subject keyed MAC over exactly five normalised '
+  'inputs — the account reference type and id, the source booking CALENDAR '
+  'DAY as YYYY-MM-DD, the signed minor units, the ISO 4217 currency code, '
+  'and the normalised narrative — length-prefixed so no field-boundary shift '
+  'can collide. Nothing else participates: not occurrence_ordinal (a '
+  'separate column, so content identity stays recoverable), not '
+  'event_occurred_at or source_timezone (when a movement happened is not '
+  'what it IS), not ciphertext, nonce or key material (they change on '
+  'rotation), not the row id, and no server or device timezone. Opaque; '
+  'equality only, and only against a value of the same fingerprint_version.';
+COMMENT ON COLUMN public.transactions.fingerprint_version IS
+  'Which fingerprint definition produced dedup_fingerprint. It participates '
+  'in transactions_dedup_key, so a redefinition starts a fresh namespace '
+  'rather than colliding with values computed under the old rules. The '
+  'current definition is dedup/hmac-sha256/calendar-day/v3, which takes the '
+  'booking day as a calendar day; its predecessor truncated a booking '
+  'INSTANT to a UTC day, which is a different input and therefore a '
+  'different definition.';
 COMMENT ON COLUMN public.transactions.occurrence_ordinal IS
   'Which occurrence of dedup_fingerprint this row is: 1 for the first, 2 for a '
   'genuine identical repeat. Supplied explicitly by a person or a reviewed '

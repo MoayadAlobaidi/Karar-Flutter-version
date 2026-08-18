@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { CalendarDay } from '@karar/shared-kernel';
+
 import { HsfField } from '../domain/hsf-field.js';
 import type { FingerprintInput } from '../application/ports/dedup-fingerprint.js';
 import { HsfFieldEncryptionError } from '../application/ports/hsf-field-encryption.js';
@@ -92,7 +94,7 @@ describe('dedup fingerprint', () => {
       ['amount', { amountMinorUnits: -4501n }],
       ['currency', { currencyCode: 'KWD' }],
       ['narrative', { normalizedNarrative: syntheticMerchant('other shop') }],
-      ['booking day', { bookingDate: new Date('2026-08-18T00:00:00.000Z') }],
+      ['booking day', { bookingDate: CalendarDay.of(2026, 8, 18) }],
     ];
     for (const [label, override] of variants) {
       const variant = await provider.fingerprint(alice, input(override));
@@ -100,16 +102,25 @@ describe('dedup fingerprint', () => {
     }
   });
 
-  it('ignores the time of day, because a statement states a date', async () => {
-    const morning = await provider.fingerprint(
+  it('has no time of day to ignore, because the day is a CalendarDay', async () => {
+    // The old input was a booking INSTANT that the provider truncated to a
+    // UTC day, so "does it ignore the time?" was a real question with a real
+    // way to get it wrong. The input is now a calendar day (ADR-0027), so
+    // there is no time component to keep or drop and no zone to truncate in:
+    // the same day always encodes as the same YYYY-MM-DD string.
+    const day = CalendarDay.of(2026, 8, 17);
+    const fromComponents = await provider.fingerprint(alice, input({ bookingDate: day }));
+    const fromParsedString = await provider.fingerprint(
       alice,
-      input({ bookingDate: new Date('2026-08-17T01:00:00.000Z') }),
+      input({ bookingDate: CalendarDay.parse('2026-08-17') }),
     );
-    const evening = await provider.fingerprint(
+    expect(fromComponents.value).toBe(fromParsedString.value);
+    // And a day it could once have been mistaken for is a different digest.
+    const dayBefore = await provider.fingerprint(
       alice,
-      input({ bookingDate: new Date('2026-08-17T23:59:59.000Z') }),
+      input({ bookingDate: CalendarDay.of(2026, 8, 16) }),
     );
-    expect(morning.value).toBe(evening.value);
+    expect(dayBefore.value).not.toBe(fromComponents.value);
   });
 
   it('is unambiguous under a field-boundary shift', async () => {
@@ -157,12 +168,67 @@ describe('dedup fingerprint', () => {
     expect(encoding).not.toMatch(/occurrence/i);
   });
 
-  it('mints a version that names the definition, and the definition moved', () => {
-    // v1 folded the ordinal in; v2 does not. Reusing a version string for a
-    // changed definition is the silent redefinition the versioning exists to
-    // prevent, so the constant must have moved with the code.
-    expect(DEDUP_FINGERPRINT_VERSION).toBe('dedup/hmac-sha256/utc-day/v2');
+  it('says nothing about WHEN, and reads no timezone — the input has no field for either', () => {
+    // Content identity answers "what is this movement?". eventOccurredAt and
+    // sourceTimezone answer "when did it happen, and in whose zone?" — a
+    // different question, and one many sources answer for some rows and not
+    // others. Folding either in would make the same statement row import as a
+    // new transaction the day the export starts carrying a time.
+    //
+    // Asserted structurally, over the source, because the property is the
+    // ABSENCE of a field and no runtime call can demonstrate that.
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const portSource = readFileSync(
+      path.join(here, '..', 'application', 'ports', 'dedup-fingerprint.ts'),
+      'utf8',
+    );
+    const inputBlock = /export interface FingerprintInput \{[\s\S]*?\n\}/.exec(portSource)?.[0] ?? '';
+    expect(inputBlock).not.toBe('');
+    expect(inputBlock).not.toMatch(/eventOccurredAt/);
+    expect(inputBlock).not.toMatch(/sourceTimezone/);
+    // The five approved inputs, and nothing beside them.
+    const declaredFields = [...inputBlock.matchAll(/^\s{2}readonly (\w+)/gm)].map(
+      (match) => match[1],
+    );
+    expect(declaredFields).toEqual([
+      'accountRef',
+      'bookingDate',
+      'amountMinorUnits',
+      'currencyCode',
+      'normalizedNarrative',
+    ]);
+
+    const providerSource = readFileSync(
+      path.join(here, '..', 'infrastructure', 'providers', 'local-keyed-dedup-fingerprint-provider.ts'),
+      'utf8',
+    );
+    const encoding = /function canonicalEncoding[\s\S]*?\n\}/.exec(providerSource)?.[0] ?? '';
+    expect(encoding).not.toBe('');
+    expect(encoding).not.toMatch(/eventOccurredAt/);
+    expect(encoding).not.toMatch(/sourceTimezone/);
+    // No clock, no Date, no Intl, no zone. A digest that consulted any of
+    // them would depend on where it was computed, which is the whole failure
+    // ADR-0027 is about.
+    for (const forbidden of [/\bnew Date\b/, /Date\.UTC/, /Date\.now/, /\bIntl\b/, /timeZone/i, /getTimezoneOffset/]) {
+      expect(encoding, `canonicalEncoding must not use ${String(forbidden)}`).not.toMatch(forbidden);
+    }
+  });
+
+  it('mints a version that names the definition, and the definition moved again', () => {
+    // v1 folded the ordinal in; v2 dropped it but truncated a booking INSTANT
+    // to a UTC day; v3 takes a CalendarDay and uses it as it stands
+    // (ADR-0027). Each is a change to what the input IS, and reusing a
+    // version string for a changed definition is the silent redefinition the
+    // versioning exists to prevent — so the constant must have moved with the
+    // code, and it must not be either predecessor.
+    expect(DEDUP_FINGERPRINT_VERSION).toBe('dedup/hmac-sha256/calendar-day/v3');
+    expect(DEDUP_FINGERPRINT_VERSION).not.toBe('dedup/hmac-sha256/utc-day/v2');
+    expect(DEDUP_FINGERPRINT_VERSION).not.toBe('dedup/hmac-sha256/utc-day/v1');
     expect(provider.version).toBe(DEDUP_FINGERPRINT_VERSION);
+    // The identifier names the day rule, so a reader can tell which one a
+    // stored value was minted under without opening this file.
+    expect(DEDUP_FINGERPRINT_VERSION).toContain('calendar-day');
+    expect(DEDUP_FINGERPRINT_VERSION).not.toContain('utc');
   });
 
   it('refuses a short root key', () => {

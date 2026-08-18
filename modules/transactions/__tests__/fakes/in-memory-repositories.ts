@@ -167,7 +167,10 @@ export class InMemoryTransactionRepository implements TransactionRepository {
           transaction.accountRef.accountId === query.accountRef.accountId,
       )
       .sort((left, right) => {
-        const byDate = right.bookingDate.getTime() - left.bookingDate.getTime();
+        // Days compare as days. `compare` is the only ordering CalendarDay
+        // offers, which is the point: there is no instant to subtract and no
+        // timezone to make the order depend on where this runs.
+        const byDate = right.bookingDate.compare(left.bookingDate);
         if (byDate !== 0) return byDate;
         return left.id < right.id ? 1 : left.id > right.id ? -1 : 0;
       });
@@ -176,7 +179,7 @@ export class InMemoryTransactionRepository implements TransactionRepository {
       after === null
         ? ordered
         : ordered.filter((transaction) => {
-            const byDate = transaction.bookingDate.getTime() - after.bookingDate.getTime();
+            const byDate = transaction.bookingDate.compare(after.bookingDate);
             if (byDate !== 0) return byDate < 0;
             return transaction.id < after.id;
           });

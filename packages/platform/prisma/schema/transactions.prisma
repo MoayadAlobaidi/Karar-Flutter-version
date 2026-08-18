@@ -42,8 +42,18 @@ model Transaction {
   originalAmountMinor  BigInt?   @map("original_amount_minor")
   originalCurrencyCode String?   @map("original_currency_code") @db.Char(3)
 
+  // Calendar days and instants are different kinds of value (ADR-0027), and
+  // the column types say so: @db.Date carries no time and therefore no
+  // timezone, @db.Timestamptz(6) carries a moment. Prisma has one TypeScript
+  // type for both, so the domain — not this file — is where the distinction
+  // is enforced: the row mappers convert @db.Date to CalendarDay and back.
   bookingDate          DateTime  @map("booking_date") @db.Date
   valueDate            DateTime? @map("value_date") @db.Date
+  // Present only when the source supplied them; never inferred from the days
+  // above. The CHECK that keeps the zone from appearing without the instant
+  // lives in migration 0090, not here.
+  eventOccurredAt      DateTime? @map("event_occurred_at") @db.Timestamptz(6)
+  sourceTimezone       String?   @map("source_timezone")
 
   hsfAlgorithm         String    @map("hsf_algorithm")
   hsfKeyVersion        String    @map("hsf_key_version")
@@ -89,6 +99,10 @@ model TransactionRevision {
   currencyCode          String    @map("currency_code") @db.Char(3)
   bookingDate           DateTime  @map("booking_date") @db.Date
   valueDate             DateTime? @map("value_date") @db.Date
+  // The snapshot is complete, so it carries the source instant too — even
+  // though a correction cannot move it (migration 0091).
+  eventOccurredAt       DateTime? @map("event_occurred_at") @db.Timestamptz(6)
+  sourceTimezone        String?   @map("source_timezone")
   status                String
 
   hsfAlgorithm          String    @map("hsf_algorithm")

@@ -115,8 +115,24 @@ CREATE TABLE public.transaction_revisions (
   -- reading one row answers "what did it say then" without replaying a chain.
   amount_minor           bigint      NOT NULL,
   currency_code          char(3)     NOT NULL CHECK (currency_code ~ '^[A-Z]{3}$'),
+  -- Calendar days, matching 0090 (ADR-0027). A revision snapshot of a date
+  -- has to be the same KIND of value as the column it snapshots, or the
+  -- history would answer "what did the statement say" in a different frame
+  -- from the row it is history for.
   booking_date           date        NOT NULL,
   value_date             date            NULL,
+  -- The source-supplied instant and the zone the source stated for it, as
+  -- they stood at this revision. Carried so the snapshot is COMPLETE — a
+  -- revision is a full picture, not a patch — and because that completeness
+  -- is itself the evidence: these two are not correctable, so every revision
+  -- of one transaction repeats the same values, and a history where they ever
+  -- differ is a history where somebody rewrote when the source said a
+  -- movement happened.
+  event_occurred_at      timestamptz     NULL,
+  source_timezone        text            NULL CHECK (source_timezone <> ''),
+  -- As in 0090: a zone with no instant qualifies nothing.
+  CONSTRAINT transaction_revisions_source_timezone_needs_instant
+    CHECK (source_timezone IS NULL OR event_occurred_at IS NOT NULL),
   status                 text        NOT NULL CHECK (status IN ('POSTED', 'VOIDED')),
 
   -- Same encryption discipline as 0090: ciphertext, nonce, tag, with the
@@ -166,6 +182,22 @@ COMMENT ON TABLE public.transaction_revisions IS
   'attributable after any edit. Immutable by trigger (no rewrite) but '
   'deliberately deletable by cascade (CASCADE_DELETE erasure). RLS ENABLEd '
   'and FORCEd on BOTH principal GUCs.';
+
+COMMENT ON COLUMN public.transaction_revisions.booking_date IS
+  'The booking CALENDAR DAY as of this revision (ADR-0027) — the same kind of '
+  'value as transactions.booking_date, so the history and the row it explains '
+  'never speak in different frames.';
+COMMENT ON COLUMN public.transaction_revisions.value_date IS
+  'The value calendar day as of this revision, where the source stated one. '
+  'Never inferred from booking_date.';
+COMMENT ON COLUMN public.transaction_revisions.event_occurred_at IS
+  'The source-supplied INSTANT as of this revision, or null where the source '
+  'stated none. Not correctable, so it is identical across every revision of '
+  'one transaction — a history where it differs is a history where somebody '
+  'rewrote when the source said the movement happened.';
+COMMENT ON COLUMN public.transaction_revisions.source_timezone IS
+  'The IANA zone the source stated for event_occurred_at, as of this '
+  'revision. Never guessed, and only present alongside that instant.';
 
 CREATE INDEX transaction_revisions_history_idx
   ON public.transaction_revisions (tenant_id, user_id, transaction_id, revision_number);

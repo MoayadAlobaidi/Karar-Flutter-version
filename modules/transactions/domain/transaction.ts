@@ -20,11 +20,22 @@
  *     every later correction becomes a revision (`revision.ts`) rather than an
  *     overwrite.
  *
+ *  4. **A date is not an instant** (ADR-0027). `bookingDate` and `valueDate`
+ *     are `CalendarDay`: what the institution wrote on its books, with no
+ *     time and therefore no timezone. `eventOccurredAt` is a `Date` — a real
+ *     moment — and exists only when the source actually supplied one. The two
+ *     are never derived from each other in either direction. Modelling the
+ *     first pair as instants would move a purchase to the previous day, and
+ *     at a month boundary to the previous MONTH, for any reader at a negative
+ *     offset; modelling the third as a day would discard the ordering that a
+ *     time-of-day question depends on.
+ *
  * The three free-text fields are `HsfField` values: plaintext in memory,
  * inside a wrapper that redacts on every accidental rendering path, encrypted
  * at rest behind the `HsfFieldEncryption` port. The domain never sees a key.
  */
 
+import { CalendarDay } from '@karar/shared-kernel';
 import type { Currency, Money } from '@karar/shared-kernel';
 
 import type { HsfField } from './hsf-field.js';
@@ -113,10 +124,39 @@ export interface Transaction {
   readonly accountRef: AccountRef;
   /** Exact, signed under the canonical convention. */
   readonly amount: Money;
-  /** When the movement is booked to the account. Required — a transaction with no date is not a transaction. */
-  readonly bookingDate: Date;
-  /** When value is applied, where a source distinguishes it. Optional; never inferred from bookingDate. */
-  readonly valueDate: Date | null;
+  /**
+   * The calendar day the movement is booked to the account. Required — a
+   * transaction with no date is not a transaction.
+   *
+   * A `CalendarDay` and not a `Date`: this is what the institution wrote, not
+   * a moment in time, and it must read as the same day for every reader
+   * (ADR-0027).
+   */
+  readonly bookingDate: CalendarDay;
+  /** The calendar day value is applied, where a source distinguishes it. Optional; never inferred from bookingDate. */
+  readonly valueDate: CalendarDay | null;
+  /**
+   * The instant the movement happened, present ONLY when the source stated
+   * one. A genuine moment, so a `Date`.
+   *
+   * Never inferred from `bookingDate`. Midnight on a booked day is a moment
+   * nobody observed, and manufacturing it would put a fabricated financial
+   * fact where an honest absence belongs. Most CSV statements carry no time
+   * at all, so `null` is the ordinary value.
+   */
+  readonly eventOccurredAt: Date | null;
+  /**
+   * The IANA zone the source itself stated for `eventOccurredAt`, when it
+   * stated one.
+   *
+   * Never guessed — not from the account's country, not from the issuer, and
+   * above all not from the server or the device this code happens to run on.
+   * A guessed zone is indistinguishable from a stated one once stored, and it
+   * would silently move every local time derived from the instant. Only
+   * meaningful alongside `eventOccurredAt`, which `createTransaction`
+   * enforces.
+   */
+  readonly sourceTimezone: string | null;
   readonly merchant: HsfField | null;
   readonly description: HsfField;
   readonly note: HsfField | null;
@@ -140,9 +180,24 @@ export function createTransaction(fields: Transaction): Transaction {
       `version must be a positive integer, got ${String(fields.version)}`,
     );
   }
-  requireInstant('bookingDate', fields.bookingDate);
+  requireCalendarDay('bookingDate', fields.bookingDate);
   requireInstant('createdAt', fields.createdAt);
-  if (fields.valueDate !== null) requireInstant('valueDate', fields.valueDate);
+  if (fields.valueDate !== null) requireCalendarDay('valueDate', fields.valueDate);
+  if (fields.eventOccurredAt !== null) requireInstant('eventOccurredAt', fields.eventOccurredAt);
+  if (fields.sourceTimezone !== null) {
+    // A zone with no instant qualifies nothing: there is no moment for it to
+    // apply to, so the value can only be a leftover or a guess. The same
+    // rule is a CHECK constraint in migration 0090, because the schema must
+    // hold it against every writer and not only against this constructor.
+    if (fields.eventOccurredAt === null) {
+      throw new InvalidTransactionError(
+        `sourceTimezone '${fields.sourceTimezone}' was supplied without an eventOccurredAt; ` +
+          'a timezone with no instant to qualify describes nothing, and keeping it would leave a ' +
+          'zone that later reads as if the source had stated a time it never stated',
+      );
+    }
+    requireIanaTimeZone(fields.sourceTimezone);
+  }
   if (
     fields.originalAmount !== null &&
     fields.originalAmount.currency.code === fields.amount.currency.code
@@ -162,15 +217,56 @@ function requireInstant(field: string, value: Date): void {
 }
 
 /**
+ * A `Date` in a calendar-day position is the exact confusion ADR-0027 exists
+ * to stop, and it is one that type erasure at a boundary (a JSON body, a
+ * driver row, an `any` from a test fixture) lets through. So it is checked at
+ * runtime rather than trusted to the compiler.
+ */
+function requireCalendarDay(field: string, value: unknown): void {
+  if (!(value instanceof CalendarDay)) {
+    throw new InvalidTransactionError(
+      `${field} must be a CalendarDay, not ${value instanceof Date ? 'a Date' : typeof value}; ` +
+        'a booked date is what the institution wrote, and an instant in its place acquires a ' +
+        'timezone nobody chose and reads as a different day for readers at different offsets',
+    );
+  }
+}
+
+/**
+ * Refuses a zone the platform cannot resolve. A zone string that names no
+ * zone is worse than none: it survives storage, reads as a source-stated
+ * fact, and fails only much later at the point that tries to use it.
+ */
+function requireIanaTimeZone(zone: string): void {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: zone });
+  } catch {
+    throw new InvalidTransactionError(
+      `sourceTimezone '${zone}' is not a known IANA timezone; a source-stated zone that names no ` +
+        'zone cannot be used to render the instant it qualifies, and storing it would defer the ' +
+        'failure to whoever reads the record',
+    );
+  }
+}
+
+/**
  * The fields a correction may change. Deliberately narrow: identity, owner,
  * account anchor, source kind, and creation instant are NOT correctable —
  * changing any of them would make the record a different record wearing the
  * same id, and the honest operation for that is a delete plus a new entry.
+ *
+ * `eventOccurredAt` and `sourceTimezone` are not correctable either, for a
+ * different reason: they are what the SOURCE said about when the movement
+ * happened. A person may correct the amount they were charged; letting them
+ * restate the source's own instant would erase the one fact those columns
+ * exist to preserve, and letting them add one where the source stated none
+ * would fabricate it outright. Both stay exactly as committed, which is why
+ * every revision of one transaction repeats the same pair.
  */
 export interface TransactionCorrection {
   readonly amount?: Money;
-  readonly bookingDate?: Date;
-  readonly valueDate?: Date | null;
+  readonly bookingDate?: CalendarDay;
+  readonly valueDate?: CalendarDay | null;
   readonly merchant?: HsfField | null;
   readonly description?: HsfField;
   readonly note?: HsfField | null;

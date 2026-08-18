@@ -22,6 +22,8 @@
  * isolation argument.
  */
 
+import type { CalendarDay } from '@karar/shared-kernel';
+
 import type { Transaction } from '../../domain/transaction.js';
 import type { TransactionProvenance } from '../../domain/provenance.js';
 import type { TransactionRevision } from '../../domain/revision.js';
@@ -73,9 +75,16 @@ export interface TransactionPageQuery {
   readonly limit: number;
 }
 
-/** The position a page ended at. Opaque to callers; encoded by the use case. */
+/**
+ * The position a page ended at. Opaque to callers; encoded by the use case.
+ *
+ * The day is a `CalendarDay`, matching the column and the domain (ADR-0027).
+ * A cursor carrying an instant would re-enter the timezone question at the
+ * page boundary: the same cursor read at a different offset would resume a
+ * day early or a day late, dropping or repeating a row on a financial list.
+ */
 export interface TransactionCursor {
-  readonly bookingDate: Date;
+  readonly bookingDate: CalendarDay;
   readonly id: TransactionId;
 }
 

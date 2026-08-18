@@ -17,13 +17,22 @@
  * somewhere else in the forger's own list. Signing it would add key
  * management and a rotation story to defend against nothing.
  *
- * The encoding is base64url of `<iso-8601>|<uuid>`, validated strictly on the
- * way in: a malformed cursor is a typed `INVALID_CURSOR` outcome, never a
+ * The encoding is base64url of `<YYYY-MM-DD>|<uuid>`, validated strictly on
+ * the way in: a malformed cursor is a typed `INVALID_CURSOR` outcome, never a
  * silent fall back to "start from the beginning" (a silent reset is how a
  * user ends up re-reading page one forever and concluding the list is broken).
+ *
+ * **A calendar day, not an instant** (ADR-0027). The ordering column is a
+ * `date`, so the cursor that names a position in that ordering has to be the
+ * same kind of value. An ISO instant here would put a timezone back into the
+ * page boundary — the same cursor resuming a day early for one reader and a
+ * day late for another, which on a transaction list means a row the user
+ * never saw. `CalendarDay.parse` also refuses a string carrying a time, so a
+ * cursor minted under the old encoding is rejected outright rather than
+ * silently truncated into a position that means something slightly different.
  */
 
-import { Result } from '@karar/shared-kernel';
+import { CalendarDay, Result } from '@karar/shared-kernel';
 
 import { TransactionId } from '../domain/refs.js';
 import type { InvalidCursor } from './errors.js';
@@ -32,7 +41,7 @@ import type { TransactionCursor } from './ports/transaction-repository.js';
 const CURSOR_SEPARATOR = '|';
 
 export function encodeCursor(cursor: TransactionCursor): string {
-  const raw = `${cursor.bookingDate.toISOString()}${CURSOR_SEPARATOR}${cursor.id}`;
+  const raw = `${cursor.bookingDate.toString()}${CURSOR_SEPARATOR}${cursor.id}`;
   return Buffer.from(raw, 'utf8').toString('base64url');
 }
 
@@ -48,11 +57,13 @@ export function decodeCursor(encoded: string): Result<TransactionCursor, Invalid
   }
   const separatorAt = raw.indexOf(CURSOR_SEPARATOR);
   if (separatorAt === -1) {
-    return Result.err(invalid('the cursor does not carry both a booking instant and a row id'));
+    return Result.err(invalid('the cursor does not carry both a booking day and a row id'));
   }
-  const instant = new Date(raw.slice(0, separatorAt));
-  if (Number.isNaN(instant.getTime())) {
-    return Result.err(invalid('the cursor does not carry a valid booking instant'));
+  let bookingDate;
+  try {
+    bookingDate = CalendarDay.parse(raw.slice(0, separatorAt));
+  } catch {
+    return Result.err(invalid('the cursor does not carry a valid booking day (YYYY-MM-DD)'));
   }
   let id;
   try {
@@ -60,7 +71,7 @@ export function decodeCursor(encoded: string): Result<TransactionCursor, Invalid
   } catch {
     return Result.err(invalid('the cursor does not carry a valid row id'));
   }
-  return Result.ok({ bookingDate: instant, id });
+  return Result.ok({ bookingDate, id });
 }
 
 function invalid(detail: string): InvalidCursor {

@@ -8,7 +8,7 @@ Transactions, statement import, normalisation, deduplication, provenance, and ca
 
 - **Business owner:** _unassigned — solo team, Phase 0_
 - **Technical owner:** _unassigned — solo team, Phase 0_
-- **Status:** ACTIVE — Phase 5 implemented the transaction core: `public.transactions` with exact signed BIGINT minor units and per-field encrypted HSF columns, append-only revisions and provenance, category assignments with a single ACTIVE row, and the global category and merchant-rule catalogues. A manual entry is admitted only through two gates — a retention decision and an account this principal actually owns — and neither the fingerprint, the encryption, nor any write happens until both pass. **The CSV ingestion pipeline is not built yet**; the dedup-fingerprint and HSF field-encryption ports it will use are declared here with LOCAL/TEST adapters only
+- **Status:** ACTIVE — Phase 5 implemented the transaction core: `public.transactions` with exact signed BIGINT minor units and per-field encrypted HSF columns, booked dates typed as calendar days rather than instants (ADR-0027), append-only revisions and provenance, category assignments with a single ACTIVE row, and the global category and merchant-rule catalogues. A manual entry is admitted only through two gates — a retention decision and an account this principal actually owns — and neither the fingerprint, the encryption, nor any write happens until both pass. **The CSV ingestion pipeline is not built yet**; the dedup-fingerprint and HSF field-encryption ports it will use are declared here with LOCAL/TEST adapters only
 - **Phase:** 5
 - **Capability:** TRANSACTIONS
 - **Highest classification:** HIGHLY_SENSITIVE_FINANCIAL
@@ -57,7 +57,7 @@ carry a raw UUID plus a reference type declared **in this module**.
 |---|---|---|
 | `TransactionRetentionDecisionPort` | how long a transaction record may be kept: `DECIDED` · `PENDING_LEGAL_REVIEW` · `UNAVAILABLE` | the PolicyPack retention slot for the subject's jurisdiction; in a **local environment only**, `LocalSyntheticRetentionDecisionProvider` |
 | `FinancialAccountAccessPort` | the minimum about an account **visible to this principal**: existence, currency, lifecycle state, provider claim — never account narrative | a composition adapter over `modules/financial-accounts`' `public-api.ts`. **This module imports nothing from that module** |
-| `DedupFingerprintPort` | the keyed, per-subject, versioned content identity of a movement | LOCAL/TEST: `LocalKeyedDedupFingerprintProvider`. Production: a key-management-backed adapter (ADR-0017) |
+| `DedupFingerprintPort` | the keyed, per-subject, versioned content identity of a movement — definition `dedup/hmac-sha256/calendar-day/v3`, stated in full below | LOCAL/TEST: `LocalKeyedDedupFingerprintProvider`. Production: a key-management-backed adapter (ADR-0017) |
 | `HsfFieldEncryptionPort` | per-field encryption of merchant, description and note | LOCAL/TEST: `LocalAesGcmFieldEncryptionProvider`. Production: as above |
 
 ### Ports this module IMPLEMENTS for `modules/financial-accounts`
@@ -109,13 +109,57 @@ reference, and it is not a proposal for a period.
 
 Rules ported from the legacy as *rules plus test cases*, not code: Arabic-Indic digit and U+066B/U+066C separator normalisation; accounting negatives and trailing minus; **unreadable rows return null, never a substituted zero**; ambiguous dates flagged rather than assumed; exact reconciliation with **no tolerance**; duplicate rejection by content hash; review before commit.
 
+### Temporal model: a calendar day is not an instant (ADR-0027)
+
+Every temporal column here is typed by what the value IS, not by what is convenient to store.
+
+| Field | Kind | PostgreSQL | Domain | Rule |
+|---|---|---|---|---|
+| `booking_date` | calendar day | `date` | `CalendarDay` | **Required.** What the institution wrote on its books. No time, therefore no timezone, therefore nothing to shift by |
+| `value_date` | calendar day | `date` | `CalendarDay \| null` | Optional. **Never inferred from `booking_date`** — copying it would assert a fact the source did not state |
+| `event_occurred_at` | instant | `timestamptz` | `Date \| null` | Optional, and present **only when the source actually supplied an instant**. **Never derived from `booking_date`**: midnight on a booked day is a moment nobody observed, and manufacturing it is a fabricated financial fact |
+| `source_timezone` | IANA zone | `text` | `string \| null` | Optional, and present **only when the source explicitly stated a zone or offset**. **Never guessed** from the account's country, the issuer, the server, or the device. A `CHECK` refuses it without `event_occurred_at`, because a zone with no instant qualifies nothing |
+| `created_at`, `updated_at`, `recorded_at`, `captured_at`, `assigned_at`, `superseded_at` | instant | `timestamptz` | `Date` | Moments this system observed or recorded |
+
+`event_occurred_at` and `source_timezone` are on `transactions` and on `transaction_revisions`, but they are **not correctable**: a person may correct an amount or a booked day, while restating the source's own instant would erase the fact those columns exist to keep, and adding one where the source stated none would fabricate it. The revision snapshot carries them anyway, so every revision of one transaction repeats the same pair — and a history where they differ is a history where somebody rewrote what the source said.
+
+The row mappers are the only place a `date` column becomes a `CalendarDay`. That conversion is not a one-liner: Prisma's pg adapter yields a `Date` at midnight **UTC** while node-postgres yields one at midnight **LOCAL**, so on any non-UTC host the two are different instants naming the same day, and reading UTC components off whichever arrives is wrong by a day for one of them.
+
 ### Deduplication: three concepts, kept apart
 
 | Concept | Where it lives | What it answers |
 |---|---|---|
-| **Content identity** | `transactions.dedup_fingerprint` (+ `fingerprint_version`) — a per-subject keyed MAC over normalised content: account, booking day, signed minor units, currency, normalised narrative | "is this the same financial content?" |
+| **Content identity** | `transactions.dedup_fingerprint` (+ `fingerprint_version`) — a per-subject keyed MAC over normalised content | "is this the same financial content?" |
 | **Legitimate repeat** | `transactions.occurrence_ordinal`, an explicit integer a person or a reviewed import supplies | "did that same content genuinely happen more than once?" |
 | **Duplicate handling** | `transactions_dedup_key`, unique over `(tenant, user, account, fingerprint_version, fingerprint, occurrence_ordinal)` | "has this exact occurrence already been recorded?" |
+
+#### The fingerprint definition, in full
+
+Current version identifier: **`dedup/hmac-sha256/calendar-day/v3`**. It is stored on every row it produces and it participates in the unique key.
+
+```
+subjectKey = HMAC-SHA256(rootKey, "karar/transactions/dedup/v1" | tenantId | userId)
+value      = HMAC-SHA256(subjectKey, canonicalEncoding)   rendered as hex
+```
+
+`canonicalEncoding` is the `|`-joined sequence of exactly these six strings, each prefixed with its own length so no field-boundary shift can collide:
+
+1. `accountRef.referenceType`
+2. `accountRef.accountId`
+3. the source booking day, as its `YYYY-MM-DD` string (a `CalendarDay`; no timezone is consulted)
+4. the signed amount in minor units, base 10
+5. the ISO 4217 alphabetic currency code
+6. the deterministic normalised narrative
+
+**Nothing else participates, in either direction:**
+
+- not `occurrence_ordinal` — that is a legitimate repeat, not a different content;
+- not `event_occurred_at` and not `source_timezone` — *when* a movement happened is not *what* it is, and one export of a statement may carry a time where the next does not; folding the instant in would import the second copy as a new transaction;
+- not ciphertext, nonce, or any key material — they change on rotation and on every fresh nonce, so identity derived from them would silently change (`packages/platform` keys/custody.ts);
+- not the database row id — that would make every row unique and the constraint useless;
+- not the server timezone, the device timezone, or any inferred midnight timestamp — the encoding reads no clock and consults no zone, which is what makes the same statement row digest identically in Doha and in Toronto.
+
+**Why the identifier moved.** The version names the whole definition, so any change to it changes the string, and a bump starts a fresh namespace instead of colliding with values computed under the old rules. `v1` folded the occurrence ordinal into the digest. `v2` (`dedup/hmac-sha256/utc-day/v2`) dropped it but took a booking *instant* and truncated it to a UTC day — a rule with a timezone hidden inside it, so one statement line could digest two ways depending on where it was parsed. `v3` takes a `CalendarDay` and uses it as it stands. Both moves changed what the input IS, and reusing an identifier for a changed definition is exactly the silent redefinition this versioning exists to prevent.
 
 **Occurrence is not part of the digest.** Two identical coffees are one content
 identity that occurred twice. Folding the ordinal into the fingerprint would give the

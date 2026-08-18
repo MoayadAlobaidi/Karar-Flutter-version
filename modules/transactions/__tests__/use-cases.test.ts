@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { Money } from '@karar/shared-kernel';
+import { CalendarDay, Money } from '@karar/shared-kernel';
 
 import { AssignCategory } from '../application/use-cases/assign-category.js';
 import { CreateManualTransaction } from '../application/use-cases/create-manual-transaction.js';
@@ -384,7 +384,7 @@ describe('DeleteOwnTransaction', () => {
 describe('ListOwnTransactions', () => {
   async function seedThree() {
     const h = harness();
-    const days = [EARLIER, new Date('2026-08-14T00:00:00.000Z'), BOOKED];
+    const days = [EARLIER, CalendarDay.of(2026, 8, 14), BOOKED];
     for (const [index, day] of days.entries()) {
       const created = await h.create.execute({
         accountId: h.accountRef.accountId,
@@ -403,7 +403,7 @@ describe('ListOwnTransactions', () => {
     const page = await list.execute({});
     expect(page.ok).toBe(true);
     if (!page.ok) return;
-    const dates = page.value.transactions.map((t) => t.bookingDate.toISOString());
+    const dates = page.value.transactions.map((t) => t.bookingDate.toString());
     expect(dates).toEqual([...dates].sort().reverse());
   });
 

@@ -11,9 +11,13 @@
  * deliberate and visible: a synchronous mapper would mean the narrative was
  * lying around in plaintext somewhere, and the whole point is that the only
  * plaintext that exists is a short-lived `HsfField` inside a use case.
+ *
+ * This file is also the ONLY place a `date` column becomes a `CalendarDay`
+ * and back (ADR-0027). `calendarDayFromColumn` below explains why that
+ * conversion is not the one-liner it looks like.
  */
 
-import { Currency, Money } from '@karar/shared-kernel';
+import { CalendarDay, Currency, Money } from '@karar/shared-kernel';
 import type { TenantId, UserId } from '@karar/shared-kernel';
 
 import { HsfField } from '../../domain/hsf-field.js';
@@ -78,6 +82,72 @@ interface OptionalCipherTriple {
   readonly authTag: Uint8Array | null;
 }
 
+/**
+ * A `date` column, in whichever shape the driver in use hands it over.
+ *
+ * Two are in play and they disagree, which is exactly why this is a type and
+ * not a `Date`: see `calendarDayFromColumn`.
+ */
+export type DateColumn = Date | string;
+
+/**
+ * A `date` column as the `CalendarDay` it always was.
+ *
+ * The obvious implementation reads the UTC components off the `Date` the
+ * driver returns. It is wrong for one of the two drivers this repository
+ * runs, and wrong by a whole day — which at a month boundary is a whole
+ * month (ADR-0027).
+ *
+ *   * Prisma's pg adapter passes `date` through as the text PostgreSQL sent
+ *     and the client builds a `Date` at midnight **UTC**: `2026-08-12`
+ *     becomes `2026-08-12T00:00:00Z`.
+ *   * node-postgres, used directly by this module's raw-SQL probes, parses it
+ *     as `new Date(year, month - 1, day)` — midnight **LOCAL**. On the
+ *     machine this is written for (Asia/Qatar, +03) that is
+ *     `2026-08-11T21:00:00Z`, whose UTC day is the 11th.
+ *
+ * So neither reading is safe on its own. What both encodings DO agree on is
+ * that the value is midnight of the intended day in the encoder's own frame,
+ * and only one of the two frames can put a `date` at exactly 00:00 UTC. That
+ * is the discriminator used below, and it is correct for both drivers at
+ * every host offset rather than at the one this happens to run on.
+ *
+ * A string is preferred over either, because `YYYY-MM-DD` is unambiguous and
+ * needs no discriminating at all — a driver configured to hand the text over
+ * untouched is the shape this conversion would rather receive.
+ */
+function calendarDayFromColumn(field: string, value: DateColumn): CalendarDay {
+  if (typeof value === 'string') {
+    try {
+      return CalendarDay.parse(value);
+    } catch {
+      throw new TransactionStoreError(
+        `stored ${field} '${value}' is not an ISO calendar date; a date column that cannot be read as a day is refused rather than guessed at`,
+      );
+    }
+  }
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    throw new TransactionStoreError(
+      `stored ${field} is neither an ISO calendar date nor a valid Date`,
+    );
+  }
+  const isUtcMidnight =
+    value.getUTCHours() === 0 &&
+    value.getUTCMinutes() === 0 &&
+    value.getUTCSeconds() === 0 &&
+    value.getUTCMilliseconds() === 0;
+  return isUtcMidnight
+    ? CalendarDay.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate())
+    : CalendarDay.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+}
+
+function optionalCalendarDayFromColumn(
+  field: string,
+  value: DateColumn | null,
+): CalendarDay | null {
+  return value === null ? null : calendarDayFromColumn(field, value);
+}
+
 /** The columns 0090 creates on `transactions`. */
 export interface TransactionRow {
   id: string;
@@ -89,8 +159,10 @@ export interface TransactionRow {
   currencyCode: string;
   originalAmountMinor: bigint | null;
   originalCurrencyCode: string | null;
-  bookingDate: Date;
-  valueDate: Date | null;
+  bookingDate: DateColumn;
+  valueDate: DateColumn | null;
+  eventOccurredAt: Date | null;
+  sourceTimezone: string | null;
   hsfAlgorithm: string;
   hsfKeyVersion: string;
   descriptionCiphertext: Uint8Array;
@@ -123,8 +195,10 @@ export interface RevisionRow {
   actorRef: string;
   amountMinor: bigint;
   currencyCode: string;
-  bookingDate: Date;
-  valueDate: Date | null;
+  bookingDate: DateColumn;
+  valueDate: DateColumn | null;
+  eventOccurredAt: Date | null;
+  sourceTimezone: string | null;
   status: string;
   hsfAlgorithm: string;
   hsfKeyVersion: string;
@@ -379,8 +453,10 @@ export async function toTransaction(
       row.accountReferenceType as AccountReferenceType,
     ),
     amount: Money.of(row.amountMinor, currency),
-    bookingDate: row.bookingDate,
-    valueDate: row.valueDate,
+    bookingDate: calendarDayFromColumn('booking_date', row.bookingDate),
+    valueDate: optionalCalendarDayFromColumn('value_date', row.valueDate),
+    eventOccurredAt: row.eventOccurredAt,
+    sourceTimezone: row.sourceTimezone,
     merchant,
     description,
     note,
@@ -441,8 +517,10 @@ export async function toRevision(
     actorRef: ActorRef.of(row.actorRef),
     values: Object.freeze({
       amount: Money.of(row.amountMinor, currency),
-      bookingDate: row.bookingDate,
-      valueDate: row.valueDate,
+      bookingDate: calendarDayFromColumn('booking_date', row.bookingDate),
+      valueDate: optionalCalendarDayFromColumn('value_date', row.valueDate),
+      eventOccurredAt: row.eventOccurredAt,
+      sourceTimezone: row.sourceTimezone,
       merchant,
       description,
       note,
