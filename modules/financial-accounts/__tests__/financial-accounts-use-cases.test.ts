@@ -34,6 +34,10 @@ import type {
   RetentionGovernedDataset,
 } from '../application/ports/financial-account-retention-decision.js';
 import type {
+  AccountSourceLinkEraserPort,
+  AccountSourceLinkErasureOutcome,
+} from '../application/ports/account-source-link-eraser.js';
+import type {
   FinancialRecordEraserPort,
   FinancialRecordErasureCounts,
   FinancialRecordErasureOutcome,
@@ -268,6 +272,16 @@ class ScriptedRetentionDecisionPort implements FinancialAccountRetentionDecision
 }
 
 /**
+ * A monotonic counter the two erasure fakes stamp themselves with, so a test
+ * can assert WHICH ran first. Reset by `wire()`.
+ */
+let callOrdinal = 0;
+function nextCallOrdinal(): number {
+  callOrdinal += 1;
+  return callOrdinal;
+}
+
+/**
  * Stands in for the transactions module. OWNERSHIP-AWARE like the other
  * fakes: records are keyed on (tenant, user, account), so a neighbour's
  * transaction is invisible rather than merely filtered — which is what lets
@@ -278,6 +292,7 @@ class FakeFinancialRecordStore
   implements FinancialRecordPresencePort, FinancialRecordEraserPort
 {
   readonly rows: Array<{ owner: string; accountId: FinancialAccountId }> = [];
+  erasedAt: number | null = null;
   #presenceFailure: Error | null = null;
   #erasure: ((accountId: FinancialAccountId) => FinancialRecordErasureOutcome) | null = null;
   #eraserFailure: Error | null = null;
@@ -320,6 +335,7 @@ class FakeFinancialRecordStore
     actor: AccountsPrincipal,
     accountId: FinancialAccountId,
   ): Promise<FinancialRecordErasureOutcome> {
+    this.erasedAt = nextCallOrdinal();
     if (this.#eraserFailure !== null) return Promise.reject(this.#eraserFailure);
     if (this.#erasure !== null) return Promise.resolve(this.#erasure(accountId));
     const doomed = this.own(actor, accountId);
@@ -329,6 +345,54 @@ class FakeFinancialRecordStore
       FINANCIAL_RECORD: doomed.length,
     };
     return Promise.resolve({ kind: 'erased', deleted });
+  }
+}
+
+/**
+ * Stands in for the financial-connections module. OWNERSHIP-AWARE like the
+ * others: links are keyed on (tenant, user, account), so a neighbour's link
+ * is invisible rather than merely filtered.
+ *
+ * `erasedAt` records the call order against the record store, because the
+ * ordering is a contract and not an implementation detail: the source link is
+ * the route by which new records arrive, so it is cut BEFORE the records that
+ * travel down it (see `delete-own-account.ts`). Nothing else in this suite
+ * could observe that, and an ordering nobody checks is an ordering that drifts.
+ */
+class FakeAccountSourceLinkStore implements AccountSourceLinkEraserPort {
+  readonly rows: Array<{ owner: string; accountId: FinancialAccountId }> = [];
+  erasedAt: number | null = null;
+  #outcome: ((accountId: FinancialAccountId) => AccountSourceLinkErasureOutcome) | null = null;
+  #failure: Error | null = null;
+
+  seed(actor: AccountsPrincipal, accountId: FinancialAccountId, count = 1): void {
+    for (let i = 0; i < count; i += 1) this.rows.push({ owner: ownerKey(actor), accountId });
+  }
+
+  /** Setting one behaviour clears the other: a fake with two live moods is a
+   *  fake nobody can reason about. */
+  eraseWith(outcome: (accountId: FinancialAccountId) => AccountSourceLinkErasureOutcome): void {
+    this.#outcome = outcome;
+    this.#failure = null;
+  }
+
+  failErasureWith(error: Error): void {
+    this.#failure = error;
+    this.#outcome = null;
+  }
+
+  eraseAccountSourceLinks(
+    actor: AccountsPrincipal,
+    accountId: FinancialAccountId,
+  ): Promise<AccountSourceLinkErasureOutcome> {
+    this.erasedAt = nextCallOrdinal();
+    if (this.#failure !== null) return Promise.reject(this.#failure);
+    if (this.#outcome !== null) return Promise.resolve(this.#outcome(accountId));
+    const doomed = this.rows.filter(
+      (row) => row.owner === ownerKey(actor) && row.accountId === accountId,
+    );
+    for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
+    return Promise.resolve({ kind: 'erased', accountSourceLinksDeleted: doomed.length });
   }
 }
 
@@ -372,6 +436,7 @@ class CountingIdSource implements IdSource {
 let accountStore: FakeAccountRepository;
 let snapshotStore: FakeSnapshotRepository;
 let recordStore: FakeFinancialRecordStore;
+let sourceLinkStore: FakeAccountSourceLinkStore;
 let retention: ScriptedRetentionDecisionPort;
 let ids: CountingIdSource;
 
@@ -384,9 +449,11 @@ function wire(): {
   listSnapshots: ListOwnBalanceSnapshots;
   recordBalance: RecordReportedBalance;
 } {
+  callOrdinal = 0;
   snapshotStore = new FakeSnapshotRepository();
   accountStore = new FakeAccountRepository(snapshotStore);
   recordStore = new FakeFinancialRecordStore();
+  sourceLinkStore = new FakeAccountSourceLinkStore();
   retention = new ScriptedRetentionDecisionPort();
   ids = new CountingIdSource();
   return {
@@ -400,7 +467,7 @@ function wire(): {
       institutions,
       clock,
     ),
-    remove: new DeleteOwnAccount(accountStore, recordStore),
+    remove: new DeleteOwnAccount(accountStore, recordStore, sourceLinkStore),
     listSnapshots: new ListOwnBalanceSnapshots(accountStore, snapshotStore),
     recordBalance: new RecordReportedBalance(
       accountStore,
@@ -1291,6 +1358,225 @@ describe('financial-accounts use cases: deletion erases account-scoped records o
     );
     expect(second.ok).toBe(true);
     expect(accountStore.rows.size).toBe(0);
+  });
+});
+
+/**
+ * Deletion also erases the SOURCE LINKS that say which data source feeds the
+ * account, or it does not report success.
+ *
+ * Those rows live in `modules/financial-connections` and carry the encrypted
+ * external account reference — a protected external identity. `account_id`
+ * there is a raw uuid with no foreign key back here, so nothing cascaded to
+ * them and an account delete left every one of them behind while telling the
+ * person the account was gone. `AccountSourceLinkEraserPort` is how that
+ * claim becomes true; these cases are what makes it checkable.
+ */
+describe('financial-accounts use cases: deletion erases account-source links or refuses', () => {
+  it('erases the source links BEFORE the records, deletes the account, and reports both counts', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    recordStore.seed(actorA1, created.value.id, 3);
+
+    const deleted = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) {
+      expect(deleted.value.accountSourceLinksDeleted).toBe(2);
+      expect(deleted.value.recordsDeleted.FINANCIAL_RECORD).toBe(3);
+    }
+    expect(sourceLinkStore.rows).toHaveLength(0);
+    expect(recordStore.rows).toHaveLength(0);
+    expect(accountStore.rows.size).toBe(0);
+
+    // The ORDER is a contract: the link is the route by which new records
+    // arrive, so it is cut before the records that travel down it. Reverse
+    // this and an import through a still-live link can write rows into the
+    // gap, which the account delete then orphans while reporting success.
+    expect(sourceLinkStore.erasedAt).not.toBeNull();
+    expect(recordStore.erasedAt).not.toBeNull();
+    expect(sourceLinkStore.erasedAt as number).toBeLessThan(recordStore.erasedAt as number);
+  });
+
+  it('does NOT delete the account when the source-link eraser fails, and never reaches the records', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    recordStore.seed(actorA1, created.value.id, 3);
+    sourceLinkStore.failErasureWith(new Error('synthetic source-link store outage'));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'source_link_erasure_incomplete') {
+      expect(refused.error.outcome).toBe('failed');
+      // A throw is not a partial erasure: nothing is KNOWN to have gone.
+      expect(refused.error.accountSourceLinksDeleted).toBe(0);
+    } else {
+      expect.unreachable('a failed source-link erasure must never be reported as success');
+    }
+    // A coherent world to retry into, and the records were never touched —
+    // step 2 refuses before step 3 begins.
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+    expect(sourceLinkStore.rows).toHaveLength(2);
+    expect(recordStore.rows).toHaveLength(3);
+    expect(recordStore.erasedAt).toBeNull();
+  });
+
+  it('does NOT delete the account on a PARTIAL source-link erasure, and reports what was removed', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.eraseWith(() => ({
+      kind: 'incomplete',
+      accountSourceLinksDeleted: 1,
+      reason: 'one link could not be removed',
+    }));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'source_link_erasure_incomplete') {
+      expect(refused.error.outcome).toBe('incomplete');
+      expect(refused.error.accountSourceLinksDeleted).toBe(1);
+    } else {
+      expect.unreachable('a partial source-link erasure must never be reported as success');
+    }
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+    expect(recordStore.erasedAt).toBeNull();
+  });
+
+  it('the record-erasure refusal reports the source links that ALREADY went', async () => {
+    // The half-done case, which is the one a person would most want the truth
+    // about: the links are gone, the records are not, the account stands.
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    recordStore.seed(actorA1, created.value.id, 3);
+    recordStore.failErasureWith(new Error('synthetic record-store outage'));
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok && refused.error.kind === 'erasure_incomplete') {
+      expect(refused.error.accountSourceLinksDeleted).toBe(2);
+    } else {
+      expect.unreachable('a failed record erasure must never be reported as success');
+    }
+    expect(sourceLinkStore.rows).toHaveLength(0);
+    expect(recordStore.rows).toHaveLength(3);
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
+  });
+
+  it('checks the version BEFORE erasing links, so a stale delete destroys nothing', async () => {
+    const { create, update, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    await update.execute(
+      { accountId: created.value.id, expectedVersion: 1, displayName: 'Renamed Synthetic' },
+      actorA1,
+    );
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error.kind).toBe('version_conflict');
+    expect(sourceLinkStore.rows).toHaveLength(2);
+    expect(sourceLinkStore.erasedAt).toBeNull();
+  });
+
+  it('a source-link failure carries NO store text outward, and keeps the cause for the boundary', async () => {
+    // The same rule as `storeFailure`, applied to the other module's throw: a
+    // driver message can carry a connection string, the failing SQL, or a
+    // fragment of the ciphertext of the external account reference.
+    const CONNECTION_STRING = 'postgres://user:password@internal-host:5432/karar';
+    const SQL = 'DELETE FROM public.account_source_links';
+    const poisoned = new Error(`connection to ${CONNECTION_STRING} failed while running ${SQL}`);
+
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.failErasureWith(poisoned);
+
+    const refused = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return expect.unreachable('the erasure was supposed to fail');
+
+    for (const rendered of [
+      JSON.stringify(refused.error) ?? '',
+      JSON.stringify({ ...refused.error }),
+      Object.keys(refused.error).join(','),
+      refused.error.message,
+    ]) {
+      expect(rendered).not.toContain(CONNECTION_STRING);
+      expect(rendered).not.toContain(SQL);
+      expect(rendered).not.toContain('password');
+      expect(rendered).not.toContain('internal-host');
+    }
+    // Reachable by name for the one boundary allowed to log it, and
+    // non-enumerable so no serializer can reach it by accident.
+    expect((refused.error as { cause?: unknown }).cause).toBe(poisoned);
+    expect(Object.getOwnPropertyDescriptor(refused.error, 'cause')?.enumerable).toBe(false);
+  });
+
+  it('a retry after a failed source-link erasure converges, because the erasure is idempotent', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    sourceLinkStore.failErasureWith(new Error('synthetic transient outage'));
+
+    const first = await remove.execute({ accountId: created.value.id, expectedVersion: 1 }, actorA1);
+    expect(first.ok).toBe(false);
+
+    sourceLinkStore.eraseWith(() => ({ kind: 'erased', accountSourceLinksDeleted: 2 }));
+    const second = await remove.execute(
+      { accountId: created.value.id, expectedVersion: 1 },
+      actorA1,
+    );
+    expect(second.ok).toBe(true);
+    if (second.ok) expect(second.value.accountSourceLinksDeleted).toBe(2);
+    expect(accountStore.rows.size).toBe(0);
+  });
+
+  it('a neighbour cannot reach the source-link eraser at all', async () => {
+    const { create, remove } = wire();
+    const created = await create.execute(manualInput, actorA1);
+    if (!created.ok) return expect.unreachable('fixture create failed');
+    sourceLinkStore.seed(actorA1, created.value.id, 2);
+    sourceLinkStore.failErasureWith(
+      new Error('the source-link eraser must not be reached for a foreign account'),
+    );
+
+    for (const intruder of [actorA2, actorB1]) {
+      const refused = await remove.execute(
+        { accountId: created.value.id, expectedVersion: 1 },
+        intruder,
+      );
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) expect(refused.error.kind).toBe('account_not_found');
+    }
+    expect(sourceLinkStore.erasedAt).toBeNull();
+    expect(sourceLinkStore.rows).toHaveLength(2);
+    expect(accountStore.rows.has(created.value.id)).toBe(true);
   });
 });
 

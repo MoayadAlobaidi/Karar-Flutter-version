@@ -157,10 +157,22 @@ export class PrismaFinancialRecordEraser implements FinancialRecordEraserPort {
       // Nothing could be established, and the transaction is already rolled
       // back. `failed` rather than `incomplete`: no row went, so an immediate
       // retry is safe — which is a different instruction to the caller.
-      return {
-        kind: 'failed',
-        reason: error instanceof Error ? error.message : String(error),
+      // The reason is read by the ACCOUNTS module and interpolated into a
+      // message a person sees, so it must be our own words. A driver message
+      // here would carry a fragment of the very financial records this call
+      // was erasing. The throw travels non-enumerably for the boundary logger.
+      const outcome = {
+        kind: 'failed' as const,
+        reason:
+          'the store did not answer, and nothing was erased. No row was removed, so an immediate ' +
+          'retry is safe',
       };
+      Object.defineProperty(outcome, 'cause', {
+        value: error,
+        enumerable: false,
+        writable: false,
+      });
+      return outcome;
     }
 
     const row = rows[0];

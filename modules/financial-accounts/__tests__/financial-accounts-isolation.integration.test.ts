@@ -55,6 +55,7 @@ import { ListOwnAccounts } from '../application/use-cases/list-own-accounts.js';
 import { ListOwnBalanceSnapshots } from '../application/use-cases/list-own-balance-snapshots.js';
 import { ReadOwnAccount } from '../application/use-cases/read-own-account.js';
 import { UpdateOwnAccount } from '../application/use-cases/update-own-account.js';
+import type { AccountSourceLinkEraserPort } from '../application/ports/account-source-link-eraser.js';
 import {
   NO_RECORDS_ERASED,
   type FinancialRecordEraserPort,
@@ -114,10 +115,12 @@ const HSF_VALUES = [
 ].join(', ');
 
 /**
- * This suite holds no transaction store, so the two cross-module ports answer
- * the only honest thing available: nothing exists, and nothing was erased.
- * The behaviour that depends on them is covered where it can be observed —
- * the use-case suite and the erasure suite — rather than simulated here.
+ * This suite holds no transaction store and no connection store, so the three
+ * cross-module ports answer the only honest thing available: nothing exists,
+ * and nothing was erased. The behaviour that depends on them is covered where
+ * it can be observed — the use-case suite, the erasure suite, and the
+ * account-erasure suite in `modules/financial-connections` — rather than
+ * simulated here.
  */
 const NO_FINANCIAL_RECORDS: FinancialRecordPresencePort = {
   hasAnyRecordForAccount: (_actor, accountId) =>
@@ -126,6 +129,10 @@ const NO_FINANCIAL_RECORDS: FinancialRecordPresencePort = {
 const ERASES_NOTHING: FinancialRecordEraserPort = {
   eraseAccountScopedRecords: () =>
     Promise.resolve({ kind: 'erased', deleted: NO_RECORDS_ERASED }),
+};
+const ERASES_NO_SOURCE_LINKS: AccountSourceLinkEraserPort = {
+  eraseAccountSourceLinks: () =>
+    Promise.resolve({ kind: 'erased', accountSourceLinksDeleted: 0 }),
 };
 
 /** Seeded, one per principal, so both sides of every assertion are populated. */
@@ -195,7 +202,7 @@ describe.skipIf(unreachable !== null)(
         institutions,
         clock,
       );
-      deleteAccount = new DeleteOwnAccount(accounts, ERASES_NOTHING);
+      deleteAccount = new DeleteOwnAccount(accounts, ERASES_NOTHING, ERASES_NO_SOURCE_LINKS);
       listSnapshots = new ListOwnBalanceSnapshots(accounts, snapshots);
 
       // BOTH SIDES SEEDED, through the real write path.

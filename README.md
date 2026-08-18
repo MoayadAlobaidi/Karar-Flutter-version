@@ -190,6 +190,37 @@ Seven separated dimensions, deliberately never conflated:
 
 See [`jurisdiction-policy.md`](docs/architecture/jurisdiction-policy.md) and [`operating-entity.md`](docs/architecture/operating-entity.md).
 
+## Financial data model
+
+Seven concepts kept apart, because collapsing any pair asserts something untrue about a real person's finances ([ADR-0028](docs/adr/0028-multi-rail-financial-sources.md)). A person here typically holds several banks, more than one account of the same type at one of them, a mobile-money wallet or two, a payroll wallet, cards spending from a wallet, and cash.
+
+```mermaid
+graph TD
+  U[User] --> C[FinancialConnection<br/>how data arrives]
+  I[Institution / issuer] --> M[InstitutionMarket<br/>one row per country]
+  I -.names.-> C
+  C --> L[AccountSourceLink<br/>many-to-many]
+  L --> A[FinancialAccount / Wallet<br/>where a balance sits]
+  A --> S[BalanceSnapshot<br/>source-reported, per kind]
+  A --> T[Transaction]
+  T --> P[TransactionProvenance]
+  A -.not built.-> PI[PaymentInstrument<br/>card, no balance]
+  T -.not built.-> TM[TransferMatch<br/>own-account movement]
+```
+
+**Dashed edges are not built.** Payment instruments and transfer matching are modelled in the ADR and have no migration, no table and no code. Everything else in the diagram exists in the schema and is **reachable by nothing** — no HTTP route, no client method, no screen.
+
+Why each separation earns its cost:
+
+- **An issuer is not a market presence.** One issuer operating in four countries is one issuer with four market rows. Issuer codes carry no country prefix, because a code beginning `QA_` reads as a fact about where the issuer belongs and invites a duplicate row the moment a second market appears. **Country is not Jurisdiction** — the market table keys on country and has no jurisdiction column.
+- **A connection is not an account.** One connection may feed many accounts; one person may hold several connections to one institution.
+- **An account's origin is not its current source.** `origin_kind` is immutable and says only how the account first came to exist. An account may be typed in, then fed by CSV, then linked to an API, and stay one account — which is what account-source links exist for. No column asserts a single permanent data source.
+- **A wallet is an account; a card is not.** `CHECK ((wallet_kind IS NOT NULL) = (account_type = 'WALLET'))`. Two virtual cards on one wallet must not read as two more balances.
+- **The account is identified by its id alone.** There is deliberately no uniqueness over institution + user, institution + type, institution + currency, or issuer + wallet kind. Two current accounts at one bank in one currency is ordinary.
+- **A balance kind is never inferred from another.** `balance_kind` is `NOT NULL` with no default, so a caller asking what can be spent cannot silently receive a settled figure.
+
+**Thirteen acquisition rails are named; only `MANUAL` and `USER_FILE_UPLOAD` may exist.** Every other rail is refused by a database CHECK, not merely by application code, so an unimplemented rail cannot be written even by direct SQL. **No credential of any kind is stored** — no username, password, mPIN, OTP, token, cookie or session state — there is no scraping or app automation, and nothing may display "Connected" for data that arrived by hand or by file.
+
 ## Infrastructure and database portability
 
 Karar is multi-cloud capable by structure: no business capability knows which cloud hosts it. GCP is one provider profile — the Qatar candidate, **UNVERIFIED**, no account exists. The UAE may use a locally-available provider; a partner bank may mandate its own.

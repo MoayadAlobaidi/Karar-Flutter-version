@@ -59,6 +59,7 @@ import {
   SYNTHETIC_SOURCE_REFERENCE,
 } from './fixtures.js';
 import type { AccountsPrincipal } from '../application/principal.js';
+import type { AccountSourceLinkEraserPort } from '../application/ports/account-source-link-eraser.js';
 import {
   ERASABLE_FINANCIAL_RECORD_KINDS,
   NO_RECORDS_ERASED,
@@ -172,6 +173,20 @@ class SqlFinancialRecordEraser implements FinancialRecordEraserPort {
 }
 
 const eraser = new SqlFinancialRecordEraser();
+
+/**
+ * No connection store exists in this suite, so the source-link eraser answers
+ * the only honest thing available: nothing was there and nothing went. The
+ * end-to-end proof that deleting an account really removes the source links
+ * naming it lives in `modules/financial-connections`, where the real adapter,
+ * the real use case and real rows exist. This module cannot import that one —
+ * the dependency runs the other way — and a richer stand-in here would assert
+ * only that the stand-in works.
+ */
+const ERASES_NO_SOURCE_LINKS: AccountSourceLinkEraserPort = {
+  eraseAccountSourceLinks: () =>
+    Promise.resolve({ kind: 'erased', accountSourceLinksDeleted: 0 }),
+};
 
 /** Raw counts with RLS bypassed: proof of "gone", not of "hidden". */
 async function countAsSuperuser(accountId: FinancialAccountId): Promise<
@@ -361,7 +376,7 @@ describe.skipIf(unreachable !== null)(
         transaction_category_assignments: 1,
       });
 
-      const deleted = await new DeleteOwnAccount(accounts, eraser).execute(
+      const deleted = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -395,7 +410,7 @@ describe.skipIf(unreachable !== null)(
       const accountId = await newAccount(ACTOR_A1, 'Synthetic Test Account With Orphans');
       await seedFinancialRecords(ACTOR_A1, accountId, 'a2');
 
-      await new DeleteOwnAccount(accounts, eraser).execute(
+      await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -420,7 +435,7 @@ describe.skipIf(unreachable !== null)(
       await seedFinancialRecords(ACTOR_A1, accountId, 'a3');
       eraser.failWith(new Error('synthetic record-store outage'));
 
-      const refused = await new DeleteOwnAccount(accounts, eraser).execute(
+      const refused = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -440,7 +455,7 @@ describe.skipIf(unreachable !== null)(
 
       // And the retry converges, because the erasure is idempotent.
       eraser.failWith(null);
-      const retried = await new DeleteOwnAccount(accounts, eraser).execute(
+      const retried = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );
@@ -461,7 +476,7 @@ describe.skipIf(unreachable !== null)(
       const accountId = await newAccount(ACTOR_A1, 'Synthetic Test Account Not Yours');
       await seedFinancialRecords(ACTOR_A1, accountId, 'a4');
 
-      const refused = await new DeleteOwnAccount(accounts, eraser).execute(
+      const refused = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A2,
       );
@@ -500,7 +515,7 @@ describe.skipIf(unreachable !== null)(
 
       // The owner can still erase them, which is what makes the point above
       // about scoping rather than about the eraser simply not working.
-      const deleted = await new DeleteOwnAccount(accounts, eraser).execute(
+      const deleted = await new DeleteOwnAccount(accounts, eraser, ERASES_NO_SOURCE_LINKS).execute(
         { accountId, expectedVersion: 1 },
         ACTOR_A1,
       );

@@ -35,6 +35,8 @@
 export interface StoreFailure {
   readonly kind: 'STORE_FAILURE';
   readonly message: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
 }
 
 /**
@@ -168,11 +170,32 @@ export function requireNonEmpty(field: string, value: string): string {
   return value;
 }
 
+/**
+ * Wrap an unexpected store throw without carrying its words outward.
+ *
+ * This used to be the driver's message verbatim. A driver message can hold the
+ * connection string with credentials, the SQL that failed, a table name, a host
+ * and port, and — worst in this module — a fragment of the row that failed,
+ * which here is the narrative and the amount that every HSF column exists to
+ * protect. It is also unstable, so a caller keying on it breaks on a driver
+ * upgrade.
+ *
+ * The cause still travels, because the platform logging rule is that an error
+ * is logged ONCE at the boundary that turns it into a response and interior
+ * code must not log; discarding it would trade a leak for blindness. It is
+ * defined NON-ENUMERABLE, so `JSON.stringify`, object spread, a structured log
+ * line and an RFC 7807 body all drop it without anyone remembering to.
+ */
 export function toStoreFailure(error: unknown): StoreFailure {
-  return {
-    kind: 'STORE_FAILURE',
-    message: error instanceof Error ? error.message : String(error),
+  const failure = {
+    kind: 'STORE_FAILURE' as const,
+    message:
+      'the store did not answer. The reason is deliberately not described here: it comes from the ' +
+      'database driver, and driver text can carry credentials, SQL, or a fragment of the record ' +
+      'itself. It is logged once at the boundary, against this request',
   };
+  Object.defineProperty(failure, 'cause', { value: error, enumerable: false, writable: false });
+  return failure as StoreFailure;
 }
 
 export function principalContextMissing(): PrincipalContextMissing {
