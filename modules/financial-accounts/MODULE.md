@@ -2,7 +2,11 @@
 
 ## Purpose
 
-Accounts and balances. Accounts are created from statement import; there is no bank connection.
+Financial accounts and the source-reported balance snapshots attached to them, plus the platform's reviewed institution catalogue.
+
+**An account may come into existence three ways, and only two of them are implemented.** Manual account creation is a first-class path: a user creates, edits and deletes an account directly, and that is the path a cash account or an unlisted institution takes. CSV statement ingestion may create an account as part of a reviewed import. A third seam exists for future external providers and is **NOT_IMPLEMENTED** — it is modelled so the schema does not have to be rewritten later, not because anything can use it.
+
+**There is no bank connection, and nothing here fabricates one.** No provider is integrated, no credential is stored, no synchronisation cursor exists, and no code path can produce a Connected or Synced status. **A manually created account does not imply a synced provider** — it is a record the user typed, and the surfaces that display it say so. The legacy product's connect-a-bank screen inserted a fabricated account row with an invented masked number and a Synced badge; its own audit called that the single most misleading surface in the product, and it is not carried forward in any form.
 
 ## Ownership
 
@@ -17,10 +21,15 @@ Accounts and balances. Accounts are created from statement import; there is no b
 
 ## Data owned
 
-| Table | Classification | Erasure strategy | Notes |
-|---|---|---|---|
-| `accounts` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | **only a mask is stored — no full account number column exists** |
-| `institutions` | `PUBLIC` | `RETAIN_WITH_BASIS` | public catalogue |
+Every persistent dataset declares its full lifecycle (ADR-0026, architecture test 25):
+
+| Table | Subject relationship | Purpose | Classification | Retention | Export treatment | Erasure strategy |
+|---|---|---|---|---|---|---|
+| `financial_accounts` | `SUBJECT_OWNED` | the accounts a subject holds, as the subject or their statement declared them — the anchor every transaction and import is scoped to | `HIGHLY_SENSITIVE_FINANCIAL` | **unresolved: the financial-data retention decision is a legal one and has not been taken.** No period is written here. Non-local ingestion fails closed until a PolicyPack decision exists; LOCAL and TEST run on a clearly synthetic fixture with no legal effect | included — the subject's export contains their own accounts | `CASCADE_DELETE` |
+| `financial_account_balance_snapshots` | `SUBJECT_OWNED` | balances **as a source reported them** at a stated moment, never a figure this platform computed | `HIGHLY_SENSITIVE_FINANCIAL` | as above — unresolved, fails closed outside LOCAL/TEST | included alongside the account | `CASCADE_DELETE` |
+| `institutions` | `NON_PERSONAL` | reviewed catalogue of institutions an account may name; platform reference data owned by no tenant and no subject | `PUBLIC` | the catalogue outlives any account referencing it; no subject-derived bound applies | n/a (no subject owns a catalogue row) | `NON_PERSONAL_BY_DESIGN` |
+
+**Why the institution catalogue is `NON_PERSONAL_BY_DESIGN` and not `RETAIN_WITH_BASIS`.** The Phase 0 stub said `RETAIN_WITH_BASIS`, which is the strategy for data that *is* subject-linked and is kept anyway on a declared basis. That is the wrong shape here, and keeping it because the stub said so would have been the easy answer rather than the correct one. The table is structurally incapable of subject linkage: it carries no tenant id, no user id, no account id and no free text a subject supplied. **A user-supplied institution label never enters this table** — it is stored on the account, subject-owned and treated as `HIGHLY_SENSITIVE_FINANCIAL`, precisely so that an unlisted bank name typed by one person cannot become global reference data. The distinction is enforced by schema, not by convention, and is asserted by test.
 
 ## Events published
 

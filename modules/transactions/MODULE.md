@@ -15,12 +15,20 @@ Transactions, statement import, normalisation, deduplication, provenance, and ca
 
 ## Data owned
 
-| Table | Classification | Erasure strategy | Notes |
-|---|---|---|---|
-| `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` | merchant and note encrypted at rest |
-| `statement_imports` | `HIGHLY_SENSITIVE_FINANCIAL` | `RETAIN_WITH_BASIS` | raw file **encrypted from the start** |
-| `statement_import_rows` | `HIGHLY_SENSITIVE_FINANCIAL` | `CASCADE_DELETE` |  |
-| `merchant_rules` | `INTERNAL` | `NON_PERSONAL_BY_DESIGN` | curated corpus; see notes |
+Every persistent dataset declares its full lifecycle (ADR-0026, architecture test 25):
+
+| Table | Subject relationship | Purpose | Classification | Retention | Export treatment | Erasure strategy |
+|---|---|---|---|---|---|---|
+| `transactions` | `SUBJECT_OWNED` | the canonical transaction records a subject entered manually or committed from a reviewed import | `HIGHLY_SENSITIVE_FINANCIAL` | **unresolved: a legal decision nobody here may take.** No period is written; non-local ingestion fails closed until a PolicyPack decision exists, LOCAL and TEST use a synthetic fixture with no legal effect | included — the subject's export contains their own transactions | `CASCADE_DELETE` |
+| `transaction_revisions` | `SUBJECT_OWNED` | append-only history keeping the imported value attributable after a user correction, so a correction never silently overwrites the source fact | `HIGHLY_SENSITIVE_FINANCIAL` | as above — unresolved, fails closed outside LOCAL/TEST | included with the transaction | `CASCADE_DELETE` |
+| `transaction_provenance` | `SUBJECT_DERIVED` | the traceable origin of every stored financial fact: source kind, import and row reference, parser, mapping, normalisation and fingerprint versions | `HIGHLY_SENSITIVE_FINANCIAL` | as above | included — a subject may see where their own data came from | `CASCADE_DELETE` |
+| `transaction_category_assignments` | `SUBJECT_DERIVED` | which category applies, by which source (user or deterministic rule), with supersession history | `HIGHLY_SENSITIVE_FINANCIAL` | as above | included | `CASCADE_DELETE` |
+| `statement_imports` | `SUBJECT_OWNED` | one ingestion attempt and its state, from draft through reviewed commit or refusal | `HIGHLY_SENSITIVE_FINANCIAL` | as above | included as import metadata, never raw source bytes | `CASCADE_DELETE` |
+| `statement_import_sources` | `SUBJECT_OWNED` | the uploaded statement bytes, **encrypted before durable storage**, with key reference and integrity metadata only | `HIGHLY_SENSITIVE_FINANCIAL` | **unresolved and materially so** — whether an original statement is retained, and for how long, is exactly the decision counsel owes. Nothing here retains by default outside LOCAL/TEST | **excluded** — the subject's export contains their transactions, not a re-download of the source file | `CASCADE_DELETE` |
+| `statement_import_rows` | `SUBJECT_OWNED` | staged rows awaiting review, with encrypted source text and typed parse results | `HIGHLY_SENSITIVE_FINANCIAL` | as above; staging is transient by intent | excluded (superseded by committed transactions) | `CASCADE_DELETE` |
+| `statement_import_row_errors` | `SUBJECT_DERIVED` | typed, non-echoing validation failures naming row, field and reason code | `HIGHLY_SENSITIVE_FINANCIAL` | as above | excluded — these are diagnostics about an import attempt, not facts about the subject; the rows they describe are either committed as transactions (and exported as such) or discarded, so exporting the error list would add process detail without adding anything the subject holds | `CASCADE_DELETE` |
+| `financial_categories` | `NON_PERSONAL` | versioned catalogue of category codes with English and Arabic labels | `PUBLIC` | the catalogue outlives any assignment referencing it | n/a | `NON_PERSONAL_BY_DESIGN` |
+| `merchant_rules` | `NON_PERSONAL` | reviewed, generalised patterns mapping merchant text to a category, derived from many subjects and linked to none | `INTERNAL` | no subject-derived bound applies because no subject is linked | n/a | `NON_PERSONAL_BY_DESIGN` |
 
 ## Events published
 
