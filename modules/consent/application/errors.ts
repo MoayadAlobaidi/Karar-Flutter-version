@@ -93,6 +93,34 @@ export interface AmbiguousJurisdiction {
   readonly message: string;
 }
 
+/**
+ * The platform holds no displayable content for the version a subject would
+ * accept. A REAL answer, not a fault: the catalogue records what a version is
+ * and where its bytes live, and this deployment cannot retrieve them — so the
+ * client shows its own honest unavailable state rather than substitute prose.
+ * `reason` distinguishes the three ways that happens; none of them is an
+ * invitation to render anything.
+ */
+export interface DocumentContentUnavailable {
+  readonly kind: 'DOCUMENT_CONTENT_UNAVAILABLE';
+  readonly documentId: string;
+  readonly reason: 'NO_EFFECTIVE_VERSION' | 'NOT_RETRIEVABLE' | 'LANGUAGE_NOT_STATED';
+  readonly message: string;
+}
+
+/**
+ * The retrieved bytes do not hash to what the published version pinned. The
+ * content is REFUSED, never served with a warning: a consent grant pins a
+ * version id, so showing text that is not that version's text would ask a
+ * subject to accept one document while reading another.
+ */
+export interface DocumentContentIntegrityMismatch {
+  readonly kind: 'DOCUMENT_CONTENT_INTEGRITY_MISMATCH';
+  readonly documentId: string;
+  readonly versionId: string;
+  readonly message: string;
+}
+
 /** The fail-closed denial `assertConsentFor` returns for anything not ACTIVE. */
 export interface ConsentRequired {
   readonly kind: 'CONSENT_REQUIRED';

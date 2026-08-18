@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG-ONLY NETWORK POLICY.
+
+  This resource lives in the `debug` source set and therefore replaces the
+  release policy in src/main/res/xml for debug builds ONLY. It is not merged
+  into, and cannot leak into, a release or profile artifact: the file is not
+  part of those variants at all.
+
+  What it changes, and nothing else:
+
+    * Cleartext HTTP is permitted for LOOPBACK HOSTS ONLY — the developer's own
+      machine, reached directly or through the Android emulator's host alias.
+      No routable host is listed and none may be added. The LOCAL profile is
+      the only profile whose API runs on the developer's machine.
+
+  What it deliberately does NOT change:
+
+    * Trust anchors remain SYSTEM ONLY. User-installed certificate authorities
+      are not trusted even in debug, so an intercepting proxy cannot read this
+      application's traffic by installing a certificate. Debugging a TLS
+      session is not a capability this project grants itself; a developer who
+      needs to inspect traffic inspects it at the local API instead.
+
+    * base-config still forbids cleartext. The permission below is an explicit
+      per-domain exception, not a relaxed default.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- The developer's machine, from a physical device or the host itself. -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- The Android emulator's alias for the host machine's loopback. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

@@ -58,7 +58,14 @@ export {
   type PolicyService,
 } from './application/ports/policy-service.js';
 export type { IdSource } from './application/ports/id-source.js';
+export type { ContentDigest } from './application/ports/content-digest.js';
 export type { LegalDocumentRepository } from './application/ports/legal-document-repository.js';
+export {
+  LEGAL_DOCUMENT_CONTENT_FORMATS,
+  type LegalDocumentContent,
+  type LegalDocumentContentFormat,
+  type LegalDocumentContentSource,
+} from './application/ports/legal-document-content-source.js';
 export type {
   ConsentGrantRepository,
   ConsentPrincipal,
@@ -80,6 +87,8 @@ export {
   type AmbiguousJurisdiction,
   type AuditAppendFailed,
   type ConsentRequired,
+  type DocumentContentIntegrityMismatch,
+  type DocumentContentUnavailable,
   type DocumentNotApplicable,
   type EvaluationMismatch,
   type GrantNotActive,
@@ -135,8 +144,16 @@ export {
 } from './application/use-cases/consent.js';
 
 export {
+  GetLegalDocumentContent,
+  type GetLegalDocumentContentError,
+  type GetLegalDocumentContentInput,
+  type LegalDocumentContentView,
+} from './application/use-cases/legal-document-content.js';
+
+export {
   ConsentApiModule,
 } from './presentation/consent-api.module.js';
+export { ConsentDocumentContentApiModule } from './presentation/document-content-api.module.js';
 export {
   CONSENT_ENDPOINT_USE_CASES,
   ConsentController,
@@ -144,4 +161,9 @@ export {
   type RecordAcceptanceBody,
   type WithdrawConsentBody,
 } from './presentation/consent.controller.js';
+export {
+  CONSENT_DOCUMENT_CONTENT_USE_CASES,
+  ConsentDocumentContentController,
+  type ConsentDocumentContentUseCases,
+} from './presentation/document-content.controller.js';
 export { requirePrincipal, type RequestPrincipal } from './presentation/principal.js';

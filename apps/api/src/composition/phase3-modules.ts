@@ -9,7 +9,12 @@
  *   (`createPrismaClient`); the audit writer shares main's
  *   PostgresPersistenceAdapter. Everything connects lazily — booting without
  *   PostgreSQL or Redis must succeed (probes report readiness; guarded
- *   operations fail closed at call time).
+ *   operations fail closed at call time). The ONE exception is the rate-limit
+ *   store's socket, returned as `rateLimitStore` for main.ts to open before
+ *   it listens: the limiter has no offline queue, so a connection still being
+ *   established when the first login arrives would fail closed on a store
+ *   that is up. Opening it is still not REQUIRING it — a store that is down
+ *   leaves the boot alone and shows up as `redis: 'down'` in /readyz.
  * - The kill-switch gate is ONE CheckKillSwitch instance: it satisfies
  *   identity's and tenancy's own OperationGate ports structurally and is the
  *   KILL_SWITCH_PORT the control-plane module exports.
@@ -39,6 +44,7 @@ import {
 import { LocalDevEncryptionProvider } from '@karar/platform/dist/keys/index.js';
 import { LocalMailSink } from '@karar/platform/dist/notifications/index.js';
 import {
+  RateLimitRedisConnection,
   RedisSlidingWindowRateLimiter,
   createRateLimitRedisClient,
 } from '@karar/platform/dist/ratelimit/index.js';
@@ -124,6 +130,11 @@ export interface Phase3Composition {
   readonly modules: DynamicModule[];
   readonly enrichmentGuard: PrincipalEnrichmentGuard;
   readonly resources: ShutdownResource[];
+  /**
+   * The rate-limit store's connection: main.ts opens it before listening and
+   * hands it to the readiness probes. It is drained through `resources` too.
+   */
+  readonly rateLimitStore: RateLimitRedisConnection;
 }
 
 export interface Phase3CompositionInput {
@@ -148,6 +159,14 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
 
   // Identity — runtime outside Nest (create-identity-runtime.ts contract).
   const redis = createRateLimitRedisClient(redisEndpointFromEnv(env));
+  const rateLimitStore = new RateLimitRedisConnection(redis, {
+    // Reconnect attempts during an outage are a retry log, not an incident —
+    // readiness carries the state. They stay at debug so the outage does not
+    // drown the signal, and never reach ioredis's own console.error.
+    onConnectionError: (error) => {
+      logger.debug({ err: error }, 'rate-limit store connection error');
+    },
+  });
   const identityRuntime = createIdentityRuntime({
     config: loadIdentityConfig(config.env, env),
     prisma,
@@ -304,15 +323,12 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
   return {
     modules,
     enrichmentGuard,
+    rateLimitStore,
     resources: [
       { name: 'prisma', close: () => prisma.end() },
-      {
-        name: 'redis',
-        close: () => {
-          redis.disconnect();
-          return Promise.resolve();
-        },
-      },
+      // QUIT when the socket is live, dropped when it is not — see
+      // RateLimitRedisConnection.close().
+      { name: 'redis', close: () => rateLimitStore.close() },
     ],
   };
 }

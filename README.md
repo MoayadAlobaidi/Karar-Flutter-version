@@ -17,12 +17,15 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **3.5 — COMPLETE** ([phase report](docs/phases/phase-03-5.md)); Phase 4 not started |
-| Last completed phase | 2 (platform and data foundation, [report](docs/phases/phase-02.md)) |
+| Current phase | **4 — COMPLETE** — PR open, not merged ([phase report](docs/phases/phase-04.md), [PR #7](https://github.com/MoayadAlobaidi/Karar-Flutter-version/pull/7)); Phase 5 **NOT STARTED**. COMPLETE means the implementation and its internal gates are done — **not** merged, deployed, signed, certified, app-store ready or production ready |
+| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — its PR is open and unmerged |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
-| Application implementation | Platform foundation, identity/tenancy/access control, and the jurisdiction and capability foundation — **no consumer product capability is implemented or reachable** |
+| Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, and a Flutter client covering account, identity and platform state — **no consumer product capability is implemented or reachable** |
+| Mobile | Builds and tests for Android and iOS, with per-environment application identifiers verified out of real packaged artifacts. **No signed build, no signing material, no store submission, no deployed endpoint** — a build for any environment other than `LOCAL` is refused because no endpoint exists, and the biometric prompt has never been exercised on a device |
 | Cloud | None provisioned; local development is cloud-free |
 | Compliance | Readiness framework in place; **no certification is claimed** |
+
+"COMPLETE" means a phase's deliverables exist and its own internal gates passed. It does **not** mean merged, deployed, production ready, app-store ready, signed, or certified — the distinction is kept in [`docs/phases/README.md`](docs/phases/README.md).
 
 ## Start here
 
@@ -31,6 +34,7 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 | Understand the system | [`docs/architecture/overview.md`](docs/architecture/overview.md) |
 | Know why something is the way it is | [`docs/adr/`](docs/adr/README.md) — 26 decision records |
 | Onboard as an engineer | [`docs/onboarding/developer.md`](docs/onboarding/developer.md) |
+| Work on the Flutter client | [`docs/onboarding/flutter.md`](docs/onboarding/flutter.md) |
 | Run it locally | [Developer quick start](#developer-quick-start) below |
 | See how it extends | [`docs/architecture/extension-pattern.md`](docs/architecture/extension-pattern.md) |
 | See it worked end to end | [`docs/scenarios/`](docs/scenarios/a-new-country.md) — four scenarios |
@@ -83,7 +87,7 @@ graph TB
 
 | Container | What it is |
 |---|---|
-| `apps/mobile` | Flutter client (consumer + white-label flavors). Renders values; computes nothing authoritative |
+| `apps/mobile` | Flutter client (consumer; white-label flavors are Phase 11). Renders values; computes nothing authoritative. Ten feature folders, all of them account, identity or platform state; a generated Dart API client with contract drift detection; Android and iOS build guards that refuse a deployed-environment package with no usable endpoint — see [`flutter.md`](docs/architecture/flutter.md) |
 | `apps/api` | NestJS modular monolith — the only public API surface |
 | `apps/worker` | Second entrypoint over the same modules: outbox relay, projections, scheduled jobs |
 | `apps/admin` | Super Admin SPA; talks to the control plane only, carries no database driver |
@@ -241,6 +245,8 @@ make verify           # run the full local check suite
 
 Tenant-scoped endpoints additionally need a tenant to bind a session to. `node scripts/db/seed-local-first-party.mjs` creates the local first-party tenant that `KARAR_FIRST_PARTY_TENANT_ID` names — required outside `local`, defaulted to a documented synthetic id locally ([onboarding Q59](docs/onboarding/developer.md)).
 
+The client runs against that local API with `cd apps/mobile && flutter run --dart-define=KARAR_ENV=LOCAL`. **The dart-define is now required** — since the per-environment application identifiers landed, a build told nothing about its environment is refused rather than silently becoming a production-identified artifact, and that applies to `flutter run` and to Xcode-IDE builds as well as to release assemblies. `LOCAL` is the only profile that needs no explicit endpoint; a build for `DEV`, `STAGING` or `PRODUCTION` **fails at configuration time** unless it is given an HTTPS endpoint that is not a developer-machine address, which is why no deployed-environment package can currently be produced. Client-specific commands and rules are in [`docs/onboarding/flutter.md`](docs/onboarding/flutter.md).
+
 No cloud account, API key, or shared database is required for any of it — that is a design rule, not a convenience ([`environments.md` §3](docs/architecture/environments.md)).
 
 ## Testing and CI
@@ -252,15 +258,18 @@ No cloud account, API key, or shared database is required for any of it — that
 - **Leak-regression tests** — since Phase 3.5, suites that drive fakes trying to leak through every port and assert the serialized output carries exactly the declared fields: the bootstrap surface's closed field set, and the subject-policy audit trail's reference-only metadata.
 - **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today, module repository ports since Phase 3; cloud provider legs are future.
 - **Architecture tests** — 26 CI-blocking structural tests plus a canary-purity check, kept in a registry with per-test activation phases; a test activates when the structure it guards exists, and the registry fails the run if an activation phase arrives without an implementation.
+- **Client tests** — since Phase 4, the Flutter suite runs on every PR: unit, widget and source-scanning tests, every component and screen exercised in **both locales** with direction derived from the locale rather than passed in, tap targets and overflow checked at 1.0x and 2.0x text scale, and WCAG contrast computed over both palettes. Golden baselines exist but are **deliberately excluded from CI** ([`flutter.md` §5](docs/architecture/flutter.md)).
+- **Artifact tests** — since Phase 4, assertions that read a real build rather than its source: the merged Android manifest's permission set compared exactly, the built APK's network policy and absence of credential material, the assertion that the Android release is unsigned rather than debug-signed, and the packaged iOS bundle's transport posture and **effective bundle identifier across all four environments**. They run on the lanes that produce an artifact, and a missing artifact fails them rather than skipping them — the correction for a period when they lived on a lane that built nothing and passed by skipping.
+- **Runtime contract conformance** — since Phase 4, real serialized responses from the composed application validated against the OpenAPI document that describes them, across 82 of the 128 declared operation/status pairs, with two ledgers asserted empty: no response carries an RFC 7807 body under the wrong media type, and no operation describes its body in prose without a schema. The contract drift check binds contract to client; this binds server to contract ([`flutter.md` §8](docs/architecture/flutter.md)).
 - **Security scans and SBOM** — dependency and secret scanning, software bill of materials, supply-chain checks.
 
-Required PR checks must pass before merge — CI blocks the merge, not merely the workflow run. The workflows are [`ci.yml`](.github/workflows/ci.yml) (lint, type-check, build, tests, architecture tests) and [`security.yml`](.github/workflows/security.yml) (scans, SBOM). See [`architecture-tests.md`](docs/testing/architecture-tests.md).
+Required PR checks must pass before merge — CI blocks the merge, not merely the workflow run. The workflows are [`ci.yml`](.github/workflows/ci.yml) (lint, type-check, build, tests, architecture tests, the mobile lanes) and [`security.yml`](.github/workflows/security.yml) (scans, SBOM). Not every job is a required check; the current list is in [`repository-security-settings.md`](docs/operations/repository-security-settings.md). See [`architecture-tests.md`](docs/testing/architecture-tests.md).
 
 Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never as public issues.
 
 ## Roadmap and phase discipline
 
-Completed: 0, 0.5, 1, 2, 3, and 3.5 — Phase 3 delivered identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests; Phase 3.5 added Country and Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface. Next: 4 (Flutter foundation — app architecture, authentication and session UX, tenant selection, capability-aware navigation, Arabic RTL, accessibility, mobile security), not started.
+Completed: 0, 0.5, 1, 2, 3, 3.5. Phase 4 is IN PROGRESS. Phase 3 delivered identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests; Phase 3.5 added Country and Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface; Phase 4, still in progress, adds the Flutter client — the startup state machine, a generated Dart API client with contract drift detection, authentication and session flows, secure token storage with single-flight refresh, application lock, tenant selection, jurisdiction self-declaration, capability-aware navigation, the consent surface, a design system with Arabic and RTL first-class, and Android and iOS build guards that refuse a deployed-environment package without a usable endpoint — and hardens the contracts it consumes, so that a bootstrap resolution failure and a legitimately empty capability set are now different answers, every problem document leaves through one writer, and real server responses are held against the OpenAPI document rather than only the generated client. What it does **not** deliver is stated as plainly in its [report](docs/phases/phase-04.md): no signed build, no deployed endpoint, and a biometric prompt that has never been exercised on a device. Next: 5 (financial data platform — institutions, connectors, accounts, transactions, normalization, provenance, categorization), **not started**.
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -272,7 +281,7 @@ Every phase ends with the same documented update set — README status block, ro
 | Decisions | [`docs/adr/`](docs/adr/README.md) — 26 records |
 | Security | [`docs/security/`](docs/README.md#security) |
 | Compliance | [`docs/compliance/`](docs/compliance/README.md) · policies in [`docs/policies/`](docs/policies/README.md) |
-| Onboarding | [`docs/onboarding/developer.md`](docs/onboarding/developer.md) |
+| Onboarding | [`docs/onboarding/developer.md`](docs/onboarding/developer.md) · client: [`docs/onboarding/flutter.md`](docs/onboarding/flutter.md) |
 | Roadmap | [`docs/roadmap.md`](docs/roadmap.md) |
 | Capability map | [`docs/architecture/capability-map.md`](docs/architecture/capability-map.md) |
 | Deployment matrix | [`docs/architecture/country-deployment-matrix.md`](docs/architecture/country-deployment-matrix.md) |

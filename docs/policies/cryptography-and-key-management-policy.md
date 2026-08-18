@@ -1,6 +1,6 @@
 # Cryptography and Key Management Policy
 
-**Status:** DRAFT · **Owner:** Security Owner · **Approver:** Platform Owner (pending) · **Version:** 0.1 · **Effective:** — (not yet approved) · **Review:** Phase 3.5 gate (Phase 2 gate missed)
+**Status:** DRAFT · **Owner:** Security Owner · **Approver:** Platform Owner (pending) · **Version:** 0.1 · **Effective:** — (not yet approved) · **Review:** Phase 4 gate (Phase 2 target missed; re-affirmed but not content-reviewed at Phase 3.5)
 
 ## Scope
 

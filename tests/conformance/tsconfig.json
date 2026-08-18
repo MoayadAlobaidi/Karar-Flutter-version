@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["contract.ts", "schema-validator.ts", "app-under-test.ts", "__tests__/**/*"],
+  "exclude": ["dist", "node_modules"],
+  "references": [
+    {
+      "path": "../../apps/api"
+    },
+    {
+      "path": "../../modules/consent"
+    },
+    {
+      "path": "../../packages/platform"
+    },
+    {
+      "path": "../../packages/shared-kernel"
+    }
+  ]
+}

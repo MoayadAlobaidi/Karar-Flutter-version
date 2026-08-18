@@ -41,27 +41,27 @@ overview · backend · data-model · tenancy · jurisdiction-policy · operating
 
 | Criterion | Status |
 |---|---|
-| D1–D6 marked RESOLVED | ✅ §1 |
-| Zakat integrated into capability map | ✅ registry table + gates |
-| Subject-policy seam canonical | ✅ ADR-0015; mechanism/content split |
-| Key custody/recovery canonical | ✅ ADR-0017 |
-| White-label data/control plane distinction canonical | ✅ |
-| Legal-document transition canonical | ✅ ADR-0024 |
-| Data lifecycle canonical | ✅ ADR-0026 |
-| 26 architecture tests canonical | ✅ + related DB contract suite pointer |
-| 26 ADRs numbered continuously 0001–0026 | ✅ renumbering recorded in ADR README, deltas banner, phase-0-completion notes |
-| Greenfield rule documented | ✅ |
-| Infrastructure portability documented | ✅ |
-| Database portability documented | ✅ |
-| DeploymentProfile documented | ✅ |
-| Country deployment matrix created | ✅ — unknowns marked, nothing invented |
-| Topology ladder cloud-neutral | ✅ ADR-0023 amended |
-| Terraform design multi-provider-capable | ✅ structure only; nothing provisioned |
-| Control plane cloud-neutral | ✅ infrastructure-portability §13 — provider ops behind adapters, no cloud console through Admin |
-| Internal links pass | ✅ see §5 |
-| Diagrams render | ✅ mermaid blocks unchanged in kind; new diagram added (§4 of infrastructure-portability) |
-| No contradictory rule across canonical documents | ✅ deltas marked historical; stale numbering lines fixed; one-home-per-rule table in [`phase-0-completion.md` §6](phase-0-completion.md) extended by the four new canonical homes |
-| `plan-v2-deltas.md` marked RESOLVED / HISTORICAL | ✅ banner with per-delta canonical homes |
+| D1–D6 marked RESOLVED | PASS — §1 |
+| Zakat integrated into capability map | PASS — registry table + gates |
+| Subject-policy seam canonical | PASS — ADR-0015; mechanism/content split |
+| Key custody/recovery canonical | PASS — ADR-0017 |
+| White-label data/control plane distinction canonical | PASS |
+| Legal-document transition canonical | PASS — ADR-0024 |
+| Data lifecycle canonical | PASS — ADR-0026 |
+| 26 architecture tests canonical | PASS — plus the related DB contract suite pointer |
+| 26 ADRs numbered continuously 0001–0026 | PASS — renumbering recorded in ADR README, deltas banner, phase-0-completion notes |
+| Greenfield rule documented | PASS |
+| Infrastructure portability documented | PASS |
+| Database portability documented | PASS |
+| DeploymentProfile documented | PASS |
+| Country deployment matrix created | PASS — unknowns marked, nothing invented |
+| Topology ladder cloud-neutral | PASS — ADR-0023 amended |
+| Terraform design multi-provider-capable | PASS — structure only; nothing provisioned |
+| Control plane cloud-neutral | PASS — infrastructure-portability §13 — provider ops behind adapters, no cloud console through Admin |
+| Internal links pass | PASS — see §5 |
+| Diagrams render | PASS — mermaid blocks unchanged in kind; new diagram added (§4 of infrastructure-portability) |
+| No contradictory rule across canonical documents | PASS — deltas marked historical; stale numbering lines fixed; one-home-per-rule table in [`phase-0-completion.md` §6](phase-0-completion.md) extended by the four new canonical homes |
+| `plan-v2-deltas.md` marked RESOLVED / HISTORICAL | PASS — banner with per-delta canonical homes |
 
 ## 5. Verification
 

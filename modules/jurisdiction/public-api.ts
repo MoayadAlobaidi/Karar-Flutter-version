@@ -39,10 +39,13 @@ export {
   type ActivePackState,
   type PackActivationRecord,
 } from './domain/pack-activation.js';
-export type {
-  CountryRecord,
-  JurisdictionRecord,
-  JurisdictionSettingsRecord,
+export {
+  approvalRecorded,
+  declarabilityRefusalAt,
+  type CountryRecord,
+  type DeclarabilityRefusal,
+  type JurisdictionRecord,
+  type JurisdictionSettingsRecord,
 } from './domain/reference.js';
 
 export {
@@ -66,6 +69,7 @@ export {
   type ActivationDenied,
   type AlreadyActive,
   type AuditAppendFailed,
+  type DeclarationNotPermitted,
   type NotActive,
   type NotFound,
   type PackInvalid,
@@ -108,3 +112,34 @@ export {
   type RetirePackVersionError,
   type RetirePackVersionInput,
 } from './application/use-cases/pack-activation.js';
+export {
+  DeclareOwnJurisdiction,
+  type DeclareOwnJurisdictionError,
+  type DeclareOwnJurisdictionInput,
+  type DeclaredJurisdiction,
+} from './application/use-cases/self-declaration.js';
+export {
+  ListDeclarableJurisdictions,
+  type DeclarableJurisdiction,
+  type ListDeclarableJurisdictionsError,
+  type ListDeclarableJurisdictionsInput,
+} from './application/use-cases/declarable-jurisdictions.js';
+
+// presentation — the subject-facing routes: the declarable-reference listing
+// a client needs to offer a chooser, and the self-declaration write itself.
+// Operator assignment, verification, and pack activation stay off the
+// consumer API.
+export {
+  JURISDICTION_PRINCIPAL_SOURCE,
+  type JurisdictionPrincipal,
+  type JurisdictionPrincipalSource,
+} from './presentation/http/principal-source.js';
+export {
+  JURISDICTION_USE_CASES,
+  JurisdictionController,
+  type JurisdictionUseCases,
+} from './presentation/http/jurisdiction.controller.js';
+export {
+  JurisdictionApiModule,
+  type JurisdictionApiModuleOptions,
+} from './presentation/jurisdiction-api.module.js';

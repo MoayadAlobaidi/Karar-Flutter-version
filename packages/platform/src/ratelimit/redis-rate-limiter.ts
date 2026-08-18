@@ -59,7 +59,11 @@ export interface RedisEvalClient {
  * Builds a fail-fast ioredis client suitable for rate limiting: no offline
  * queue (a down Redis must error NOW, not buffer commands until the outage
  * ends and then replay stale limit checks) and a single retry per request.
- * The composition root owns the lifecycle (`client.quit()` on shutdown).
+ * The client is lazy: `RateLimitRedisConnection` (redis-connection.ts) owns
+ * the lifecycle and the composition root OPENS IT BEFORE SERVING TRAFFIC —
+ * the first command must never be the one that starts the handshake, because
+ * with no offline queue it would be rejected and the fail-closed policies
+ * would refuse a request over a store that is up.
  */
 export function createRateLimitRedisClient(options: {
   readonly host: string;

@@ -41,6 +41,42 @@ import type {
   RoleAssignmentQuery,
   RoleAssignmentRepository,
 } from '../../application/ports/repositories.js';
+import type {
+  OperatingEntitySummary,
+  OperatingEntitySummaryReader,
+} from '../../application/ports/entity-summary-reader.js';
+
+/**
+ * The client-safe projection, read with an explicit column SELECT: the
+ * excluded columns (registration number, contracting capacity, status,
+ * administrative timestamps) never leave the database, so no later mistake in
+ * a mapper or serializer can disclose them. The reviewed field set and its
+ * exclusions are documented on the port.
+ */
+export class PrismaOperatingEntitySummaryReader implements OperatingEntitySummaryReader {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findSummaryById(id: OperatingEntityId): Promise<OperatingEntitySummary | null> {
+    const row = await this.prisma.operatingEntity.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        legalName: true,
+        registeredJurisdictionRef: true,
+        dataProtectionContact: true,
+      },
+    });
+    if (row === null) {
+      return null;
+    }
+    return {
+      id: row.id as OperatingEntityId,
+      legalName: row.legalName,
+      registeredJurisdictionRef: row.registeredJurisdictionRef as JurisdictionRef,
+      dataProtectionContact: row.dataProtectionContact,
+    };
+  }
+}
 
 export class PrismaOperatingEntityRepository implements OperatingEntityRepository {
   constructor(private readonly prisma: PrismaClient) {}

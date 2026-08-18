@@ -7,6 +7,9 @@
  *   POST /consent/withdrawals  withdraw OWN consent (row preserved)
  *   GET  /consent/status       read OWN status per (purpose, jurisdiction?)
  *
+ * The listing carries METADATA only — never the internal storage locator; the
+ * document TEXT and its language come from document-content.controller.ts.
+ *
  * Thin by design (architecture test 6): validate, resolve the principal,
  * call one use case, map the Result. No admin surface exists here — entity
  * administration is deferred to the control-plane phase (ADR-0021), and no
@@ -140,7 +143,7 @@ export class ConsentController {
                 versionId: entry.effectiveVersion.id,
                 version: entry.effectiveVersion.version,
                 contentHash: entry.effectiveVersion.contentHash,
-                storageRef: entry.effectiveVersion.storageRef,
+                // `storageRef` is deliberately ABSENT (see the header note).
                 classification: entry.effectiveVersion.classification,
                 effectiveAt: entry.effectiveVersion.effectiveAt?.toISOString() ?? null,
               },

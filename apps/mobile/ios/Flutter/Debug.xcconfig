@@ -1,1 +1,48 @@
 #include "Generated.xcconfig"
+
+// ---------------------------------------------------------------------------
+// Bundle identity — the CONFIGURATION's default, not the artifact's identity
+// ---------------------------------------------------------------------------
+//
+// PRODUCT_BUNDLE_IDENTIFIER is `com.kararfinance.app$(KARAR_BUNDLE_ID_SUFFIX)`,
+// and Xcode resolves it from build settings before any build phase runs. An
+// xcconfig therefore cannot know which ENVIRONMENT a build was compiled for:
+// the Flutter tool does forward the dart-defines, but only as DART_DEFINES, a
+// comma-separated list of base64-encoded entries, and xcconfig has no string
+// functions with which to decode one.
+//
+// So this is a DEFAULT and nothing more. Debug defaults to LOCAL because that
+// is the configuration a developer builds without arguments, and LOCAL is the
+// one environment that can never be mistaken for production — the same reason
+// `-Pkarar.env` defaults to LOCAL on Android. The value below is `.local` and
+// not empty precisely so that a Debug build which somehow escaped the
+// packaging phase would carry the developer identity rather than the
+// production one.
+//
+// What the ARTIFACT is called is settled by the `Verify Packaged Bundle` build
+// phase, which decodes KARAR_ENV out of DART_DEFINES, derives the identifier
+// from the shared rule in Scripts/bundle_identity.sh, narrows the packaged
+// plist to it and fails the build if the two cannot be made to agree. Debug and
+// LOCAL are different axes — `flutter build ios --debug
+// --dart-define=KARAR_ENV=DEV` is a Debug build of a deployed environment — and
+// that build gets `.dev`, from the phase, not `.local`, from here.
+//
+// The canonical per-environment build commands are in Scripts/bundle_identity.sh
+// beside the rule they produce.
+KARAR_BUNDLE_ID_SUFFIX = .local
+
+// ---------------------------------------------------------------------------
+// App Transport Security
+// ---------------------------------------------------------------------------
+//
+// Nothing to set here, and nothing that could be set here would help.
+// Runner/Info.plist carries no NSAppTransportSecurity key in any
+// configuration; the local-development exception lives in
+// Runner/ATSLocalDevelopment.plist and is merged into the packaged plist by
+// the `Verify Packaged Bundle` build phase, which grants it only to a Debug
+// build whose compiled KARAR_ENV is LOCAL.
+//
+// The Xcode configuration is deliberately NOT the gate on its own. Debug and
+// LOCAL are different axes: `flutter build ios --debug
+// --dart-define=KARAR_ENV=DEV` is a Debug build of a deployed environment, and
+// an xcconfig cannot see the dart-defines that say so.

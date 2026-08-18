@@ -14,13 +14,16 @@
  * capability workstream's logic); the field projection still applies.
  */
 
-import type { BootstrapView } from '../../application/use-cases/get-bootstrap.js';
+import type {
+  BootstrapView,
+  ResolvedCapabilitiesView,
+} from '../../application/use-cases/get-bootstrap.js';
 import type { SetTenantBindingResult } from '../../application/use-cases/set-tenant-binding.js';
 import type { BindingStateView } from '../../application/binding-state.js';
 import type {
   ClientCapabilityView,
   JurisdictionStateView,
-  OperatingEntityReferenceView,
+  OperatingEntityStateView,
   PolicyPackStatusView,
 } from '../../application/ports/context-enrichment.js';
 import type { TenantChoiceView } from '../../application/ports/tenant-context.js';
@@ -60,8 +63,31 @@ function toJurisdiction(view: JurisdictionStateView) {
   };
 }
 
-function toOperatingEntity(view: OperatingEntityReferenceView | null) {
-  return view === null ? null : { id: String(view.id), name: String(view.name) };
+/**
+ * The entity section crosses the edge as its STATE plus, when assigned, the
+ * reviewed safe field set — picked by name like everything else here, so a
+ * licence record or register internal attached upstream is dropped. `entity`
+ * is explicitly null in the two absent states rather than omitted: a client
+ * reading `state` never has to guess whether the field failed to serialize.
+ */
+/** Absent stays absent; present is coerced. A reference is DATA, never a branch. */
+function optionalRef(value: string | null): string | null {
+  return value === null ? null : String(value);
+}
+
+function toOperatingEntity(view: OperatingEntityStateView) {
+  if (view.kind !== 'ASSIGNED') {
+    return { state: String(view.kind), entity: null };
+  }
+  return {
+    state: 'ASSIGNED' as const,
+    entity: {
+      id: String(view.entity.id),
+      name: String(view.entity.name),
+      jurisdictionRef: optionalRef(view.entity.jurisdictionRef),
+      contactReference: optionalRef(view.entity.contactReference),
+    },
+  };
 }
 
 function toPolicyPack(view: PolicyPackStatusView | null) {
@@ -79,6 +105,15 @@ function toCapability(view: ClientCapabilityView) {
   };
 }
 
+/**
+ * State first, list second. A 200 always carries `state: 'RESOLVED'`, so an
+ * empty `items` is a stated answer rather than an ambiguous one — a failed
+ * resolution never reaches this serializer (it answers 503).
+ */
+function toCapabilities(view: ResolvedCapabilitiesView) {
+  return { state: String(view.state), items: view.items.map(toCapability) };
+}
+
 export function toBootstrapResponse(view: BootstrapView) {
   return {
     user: {
@@ -90,7 +125,7 @@ export function toBootstrapResponse(view: BootstrapView) {
     jurisdiction: toJurisdiction(view.jurisdiction),
     operatingEntity: toOperatingEntity(view.operatingEntity),
     policyPack: toPolicyPack(view.policyPack),
-    capabilities: view.capabilities.map(toCapability),
+    capabilities: toCapabilities(view.capabilities),
   };
 }
 

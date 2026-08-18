@@ -22,6 +22,11 @@ export {
   type RedisEvalClient,
 } from './redis-rate-limiter.js';
 export {
+  RateLimitRedisConnection,
+  STARTUP_CONNECT_BUDGET_MS,
+  type RateLimitRedisConnectionOptions,
+} from './redis-connection.js';
+export {
   RATE_LIMIT_METRIC_NAMES,
   RateLimitService,
   type RateLimitServiceOptions,

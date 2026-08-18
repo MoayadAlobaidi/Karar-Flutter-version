@@ -1,9 +1,23 @@
 # Identity paths fragment — authored by hand (ADR-0009), merged into
-# openapi.yaml by the phase lead. Deliberately schema-light and HONEST:
-# response shapes here are what the controllers actually return, including
-# the enumeration-resistant sameness of the pre-auth flows. Errors are
-# RFC 7807 (application/problem+json) via the platform error model; 401s are
-# generic on purpose (one invalid-credentials answer, whatever the cause).
+# openapi.yaml by the phase lead. Response shapes here are what the
+# controllers actually return, including the enumeration-resistant sameness of
+# the pre-auth flows. Errors are RFC 7807 (application/problem+json) via the
+# platform error model; 401s are generic on purpose (one invalid-credentials
+# answer, whatever the cause).
+#
+# EVERY RESPONSE CARRIES A SCHEMA. It did not always: this fragment described
+# its bodies in prose ("{status: verified}") and attached no `content`, so the
+# generated client had nothing to decode against and the runtime conformance
+# suite had nothing to hold the server to — 17 operations, unbindable at both
+# ends. The shapes below are modelled from the controllers
+# (modules/identity/presentation/http) and are held against REAL responses in
+# tests/conformance/__tests__/runtime-conformance.integration.test.ts.
+#
+# NO SECRET IS ILLUSTRATED. Several of these bodies carry the only copy of a
+# credential the platform will ever hand out — the refresh token, the TOTP
+# secret and its otpauth URL, the ten recovery codes. They are described and
+# constrained here; none of them is given an `example`, because an example
+# credential in a committed contract is a credential in a committed contract.
 #
 # Documented policies (modules/identity/MODULE.md):
 # - access tokens: ES256 JWT, 10 minutes, claims {sub, sid, iss=karar,
@@ -40,13 +54,18 @@
               password: { type: string, minLength: 8, maxLength: 512 }
     responses:
       '202':
-        description: 'Accepted (identical whether or not the address was new): {status: accepted, detail}'
-      '400': { description: Malformed e-mail or password outside the length policy (problem+json) }
-      '429': { description: Verification-send budget exhausted (3/h per address) }
+        description: >-
+          Accepted. Byte-for-byte identical whether or not the address was
+          new — the neutral receipt is the enumeration defence.
+        content:
+          application/json:
+            schema: { $ref: '#/components/NeutralReceipt' }
+      '400':
+        $ref: '#/components/BadRequest'
+      '429':
+        $ref: '#/components/RateLimited'
       '503':
-        {
-          description: Rate limiting or a required dependency unavailable — the request was not processed,
-        }
+        $ref: '#/components/DependencyUnavailable'
 
 /auth/verify-email:
   post:
@@ -66,8 +85,13 @@
               email: { type: string }
               code: { type: string, description: 8-character code from the e-mail }
     responses:
-      '200': { description: '{status: verified}' }
-      '401': { description: That code did not verify (generic) }
+      '200':
+        description: The address is verified (idempotent).
+        content:
+          application/json:
+            schema: { $ref: '#/components/EmailVerifiedResult' }
+      '401':
+        $ref: '#/components/Unauthorized'
 
 /auth/resend-verification:
   post:
@@ -86,8 +110,13 @@
             properties:
               email: { type: string }
     responses:
-      '202': { description: 'Accepted: {status: accepted, detail}' }
-      '429': { description: Send budget exhausted (3/h per address) }
+      '202':
+        description: Accepted. The same neutral receipt in every case.
+        content:
+          application/json:
+            schema: { $ref: '#/components/NeutralReceipt' }
+      '429':
+        $ref: '#/components/RateLimited'
 
 /auth/login:
   post:
@@ -110,12 +139,25 @@
     responses:
       '200':
         description: >-
-          Either {status: authenticated, accessToken, accessTokenExpiresAt,
-          refreshToken, refreshTokenExpiresAt, sessionId} or
-          {status: mfa_required, challengeToken, challengeExpiresAt}.
-      '401': { description: Invalid credentials (generic, always) }
-      '429': { description: Login budget exhausted (10/15m per address, 30/15m per IP) }
-      '503': { description: Rate limiting unavailable — login fails closed }
+          Either a session or an MFA challenge. The two branches are closed
+          and their `status` values are disjoint, so exactly one decodes.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/AuthenticatedSession'
+                - $ref: '#/components/MfaChallengeRequired'
+              discriminator:
+                propertyName: status
+                mapping:
+                  authenticated: '#/components/AuthenticatedSession'
+                  mfa_required: '#/components/MfaChallengeRequired'
+      '401':
+        $ref: '#/components/Unauthorized'
+      '429':
+        $ref: '#/components/RateLimited'
+      '503':
+        $ref: '#/components/DependencyUnavailable'
 
 /auth/refresh:
   post:
@@ -137,9 +179,16 @@
               refreshToken: { type: string }
     responses:
       '200':
-        description: '{status: refreshed, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt}'
-      '401': { description: The refresh token is not valid (generic; includes the reuse case) }
-      '429': { description: Refresh budget exhausted (60/15m per token) }
+        description: >-
+          A fresh access token and the SUCCESSOR refresh token. The presented
+          token is dead from here; storing the successor is not optional.
+        content:
+          application/json:
+            schema: { $ref: '#/components/RefreshedSession' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '429':
+        $ref: '#/components/RateLimited'
 
 /auth/logout:
   post:
@@ -147,8 +196,13 @@
     summary: Revoke the current session
     security: [{ bearerAuth: [] }]
     responses:
-      '200': { description: '{status: logged_out} (idempotent)' }
-      '401': { description: Authentication required }
+      '200':
+        description: The session and its refresh families are revoked (idempotent).
+        content:
+          application/json:
+            schema: { $ref: '#/components/LoggedOutResult' }
+      '401':
+        $ref: '#/components/Unauthorized'
 
 /auth/forgot-password:
   post:
@@ -168,9 +222,15 @@
             properties:
               email: { type: string }
     responses:
-      '202': { description: 'Accepted: {status: accepted, detail}' }
-      '429': { description: Reset-send budget exhausted (3/h per address) }
-      '503': { description: Rate limiting unavailable — the flow fails closed }
+      '202':
+        description: Accepted. The same neutral receipt in every case.
+        content:
+          application/json:
+            schema: { $ref: '#/components/NeutralReceipt' }
+      '429':
+        $ref: '#/components/RateLimited'
+      '503':
+        $ref: '#/components/DependencyUnavailable'
 
 /auth/reset-password:
   post:
@@ -190,9 +250,17 @@
               token: { type: string }
               newPassword: { type: string, minLength: 8, maxLength: 512 }
     responses:
-      '200': { description: '{status: reset}' }
-      '400': { description: New password outside the length policy }
-      '401': { description: The reset token is not valid (generic) }
+      '200':
+        description: >-
+          The password is set. Every session is gone, including the caller's —
+          sign in again.
+        content:
+          application/json:
+            schema: { $ref: '#/components/PasswordResetResult' }
+      '400':
+        $ref: '#/components/BadRequest'
+      '401':
+        $ref: '#/components/Unauthorized'
 
 /auth/change-password:
   post:
@@ -214,9 +282,17 @@
               currentPassword: { type: string }
               newPassword: { type: string, minLength: 8, maxLength: 512 }
     responses:
-      '200': { description: '{status: changed}' }
-      '400': { description: New password outside the length policy }
-      '401': { description: Authentication required, or the current password is not correct }
+      '200':
+        description: >-
+          The password is changed. The token version moved, so the caller's
+          access token is stale — refresh before the next authenticated call.
+        content:
+          application/json:
+            schema: { $ref: '#/components/PasswordChangedResult' }
+      '400':
+        $ref: '#/components/BadRequest'
+      '401':
+        $ref: '#/components/Unauthorized'
 
 /auth/mfa/enroll:
   post:
@@ -227,9 +303,17 @@
       stored encrypted (key-version provenance) and never retrievable again.
     security: [{ bearerAuth: [] }]
     responses:
-      '200': { description: '{status: enrolment_started, secret, otpauthUrl}' }
-      '401': { description: Authentication required }
-      '409': { description: MFA is already enrolled }
+      '200':
+        description: >-
+          Enrolment started. This is the ONLY response that ever carries the
+          shared secret; enrolment is not active until it is confirmed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/MfaEnrolmentStarted' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '409':
+        $ref: '#/components/Conflict'
 
 /auth/mfa/confirm:
   post:
@@ -247,9 +331,17 @@
             properties:
               code: { type: string, description: current 6-digit TOTP code }
     responses:
-      '200': { description: '{status: confirmed, recoveryCodes: [10 one-time codes]}' }
-      '401': { description: That code did not verify }
-      '409': { description: No pending enrolment }
+      '200':
+        description: >-
+          MFA is active. This is the ONLY response that ever carries the
+          recovery codes; the platform keeps only their digests.
+        content:
+          application/json:
+            schema: { $ref: '#/components/MfaConfirmed' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '409':
+        $ref: '#/components/Conflict'
 
 /auth/mfa/challenge:
   post:
@@ -269,9 +361,15 @@
               challengeToken: { type: string }
               code: { type: string }
     responses:
-      '200': { description: 'Session payload (as /auth/login authenticated)' }
-      '401': { description: The challenge did not verify (generic) }
-      '429': { description: MFA verification budget exhausted }
+      '200':
+        description: The same session payload /auth/login returns when it authenticates outright.
+        content:
+          application/json:
+            schema: { $ref: '#/components/AuthenticatedSession' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '429':
+        $ref: '#/components/RateLimited'
 
 /auth/mfa/recovery:
   post:
@@ -292,9 +390,15 @@
               challengeToken: { type: string }
               recoveryCode: { type: string }
     responses:
-      '200': { description: 'Session payload (as /auth/login authenticated)' }
-      '401': { description: The challenge did not verify (generic; includes the locked case) }
-      '429': { description: MFA verification budget exhausted }
+      '200':
+        description: The same session payload /auth/login returns when it authenticates outright.
+        content:
+          application/json:
+            schema: { $ref: '#/components/AuthenticatedSession' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '429':
+        $ref: '#/components/RateLimited'
 
 /auth/mfa/disable:
   post:
@@ -312,9 +416,15 @@
             properties:
               code: { type: string, description: TOTP code or an unused recovery code }
     responses:
-      '200': { description: '{status: disabled}' }
-      '401': { description: That code did not verify }
-      '409': { description: MFA is not enrolled }
+      '200':
+        description: MFA is off and the recovery-code set is destroyed.
+        content:
+          application/json:
+            schema: { $ref: '#/components/MfaDisabledResult' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '409':
+        $ref: '#/components/Conflict'
 
 /auth/sessions:
   get:
@@ -326,8 +436,14 @@
     security: [{ bearerAuth: [] }]
     responses:
       '200':
-        description: '{sessions: [{sessionId, createdAt, lastSeenAt, absoluteExpiresAt, current, userAgentSummary}]}'
-      '401': { description: Authentication required }
+        description: >-
+          Every live session of the calling account, the current one flagged.
+          Never empty in practice — the calling session is always in it.
+        content:
+          application/json:
+            schema: { $ref: '#/components/SessionListing' }
+      '401':
+        $ref: '#/components/Unauthorized'
 
 /auth/sessions/{sessionId}:
   delete:
@@ -340,9 +456,15 @@
         required: true
         schema: { type: string, format: uuid }
     responses:
-      '200': { description: '{status: revoked} — the session and its refresh families are dead' }
-      '401': { description: Authentication required }
-      '404': { description: No live session with that id belongs to this account }
+      '200':
+        description: The session and its refresh families are dead.
+        content:
+          application/json:
+            schema: { $ref: '#/components/SessionRevokedResult' }
+      '401':
+        $ref: '#/components/Unauthorized'
+      '404':
+        $ref: '#/components/NotFound'
 
 /auth/sessions/revoke-others:
   post:
@@ -350,5 +472,351 @@
     summary: Revoke every session except the current one
     security: [{ bearerAuth: [] }]
     responses:
-      '200': { description: '{status: revoked, revokedCount}' }
-      '401': { description: Authentication required }
+      '200':
+        description: >-
+          Every other session is dead. `revokedCount` is 0 when there was
+          nothing else to revoke — a real answer, not a failure.
+        content:
+          application/json:
+            schema: { $ref: '#/components/OtherSessionsRevoked' }
+      '401':
+        $ref: '#/components/Unauthorized'
+
+components:
+  # --- failures -------------------------------------------------------------
+  #
+  # ONE problem shape for the whole surface. Every identity failure leaves
+  # through the platform error model (apps/api/src/errors), so the document is
+  # the same on all of them and the STATUS is what distinguishes them; a
+  # per-status copy of this object would be five near-identical schemas that
+  # could drift from the one mapper that produces them.
+  Problem:
+    type: object
+    required: [type, title, status, detail, code]
+    # CLOSED, unlike the older fragments' Problem. The producer is a single
+    # pure function (`toProblemDetails`) whose output fields are known
+    # exactly, so closure here is enforceable — and it is what would catch a
+    # stack, a cause chain, or a driver message being added to an error body.
+    additionalProperties: false
+    properties:
+      type:
+        type: string
+        pattern: '^urn:karar:error:[A-Z_]+$'
+        description: Stable machine-readable identity, mirroring `code`.
+      title:
+        type: string
+        description: Fixed per code; safe to show, but not a localized string.
+      status:
+        type: integer
+        minimum: 400
+        maximum: 599
+      detail:
+        type: string
+        description: >-
+          The safe, caller-facing message. Generic by design on the identity
+          surface — one invalid-credentials answer, whatever the cause.
+      instance:
+        type: string
+        description: The route TEMPLATE this occurrence concerns, never the raw URL.
+      code:
+        type: string
+        enum:
+          [
+            VALIDATION_ERROR,
+            AUTHENTICATION_REQUIRED,
+            NOT_FOUND,
+            CONFLICT,
+            RATE_LIMITED,
+            DEPENDENCY_UNAVAILABLE,
+            OPERATION_RESTRICTED,
+          ]
+        description: The platform error code; clients branch on THIS, never on `detail`.
+      traceId:
+        type: string
+        description: Present when tracing is enabled; joins the response to the server span.
+      correlationId:
+        type: string
+      details:
+        type: object
+        additionalProperties:
+          type: [string, number, boolean]
+        description: >-
+          Safe, allow-listed context — JSON primitives only, never nested
+          state. `retryAfterSeconds` and `policy` on a 429; `switchId` on an
+          operator-restricted 503.
+  BadRequest:
+    description: >-
+      RFC 7807. The request was understood and refused on its content — a
+      malformed address, or a password outside the length policy.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+  Unauthorized:
+    description: >-
+      RFC 7807, deliberately generic. Unknown address, wrong password,
+      disabled account, engaged lockout, expired code, invalid or reused
+      token, and a missing bearer token are ONE answer; telling them apart is
+      the enumeration oracle this surface exists to withhold.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+  NotFound:
+    description: RFC 7807. No such resource belongs to this caller.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+  Conflict:
+    description: RFC 7807. The request conflicts with the account's current MFA state.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+  RateLimited:
+    description: >-
+      RFC 7807 with `code: RATE_LIMITED`. `details.retryAfterSeconds` is the
+      wait; `details.policy` names the budget that refused. The attempt was
+      NOT processed.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+  DependencyUnavailable:
+    description: >-
+      RFC 7807 with `code: DEPENDENCY_UNAVAILABLE` (a fail-closed rate-limit
+      store) or `OPERATION_RESTRICTED` (an operator kill switch, naming the
+      switch in `details.switchId`). Either way the request was not processed
+      and retrying may succeed.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+
+  # --- pre-auth receipt -----------------------------------------------------
+  NeutralReceipt:
+    type: object
+    required: [status, detail]
+    # Closed on purpose: this body's whole job is to be IDENTICAL in every
+    # case. A field that varied with account state — even a null one — would
+    # be the enumeration oracle the 202 exists to deny.
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [accepted]
+      detail:
+        type: string
+        description: >-
+          Fixed, conditional prose ("if the address is eligible…"). It states
+          no fact about the address and never varies.
+
+  # --- session results ------------------------------------------------------
+  AuthenticatedSession:
+    type: object
+    required:
+      [status, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, sessionId]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [authenticated]
+      accessToken:
+        type: string
+        minLength: 1
+        description: ES256 JWT, 10 minutes. Carries no roles, permissions, or e-mail.
+      accessTokenExpiresAt:
+        type: string
+        format: date-time
+      refreshToken:
+        type: string
+        minLength: 1
+        description: >-
+          The RAW one-time refresh token — returned here and nowhere else;
+          only its SHA-256 digest is stored. Rotated on every use.
+      refreshTokenExpiresAt:
+        type: string
+        format: date-time
+      sessionId:
+        type: string
+        format: uuid
+  MfaChallengeRequired:
+    type: object
+    required: [status, challengeToken, challengeExpiresAt]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [mfa_required]
+      challengeToken:
+        type: string
+        minLength: 1
+        description: >-
+          Short-lived (5 minutes) proof that the password step passed. It
+          authenticates /auth/mfa/challenge and /auth/mfa/recovery and nothing
+          else; it is not a session.
+      challengeExpiresAt:
+        type: string
+        format: date-time
+  RefreshedSession:
+    type: object
+    required: [status, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt]
+    # No `sessionId`: rotation stays inside the session the presented token
+    # belonged to, and the client already holds it.
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [refreshed]
+      accessToken:
+        type: string
+        minLength: 1
+      accessTokenExpiresAt:
+        type: string
+        format: date-time
+      refreshToken:
+        type: string
+        minLength: 1
+        description: The SUCCESSOR token. The presented one is consumed and will not work again.
+      refreshTokenExpiresAt:
+        type: string
+        format: date-time
+  LoggedOutResult:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [logged_out]
+
+  # --- verification and password results ------------------------------------
+  EmailVerifiedResult:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [verified]
+  PasswordResetResult:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [reset]
+  PasswordChangedResult:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [changed]
+
+  # --- MFA results ----------------------------------------------------------
+  MfaEnrolmentStarted:
+    type: object
+    required: [status, secret, otpauthUrl]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [enrolment_started]
+      secret:
+        type: string
+        minLength: 1
+        description: >-
+          The base32 TOTP shared secret, delivered exactly once. It rests
+          encrypted under a versioned key and is never readable again — a
+          client that loses it must restart enrolment.
+      otpauthUrl:
+        type: string
+        pattern: '^otpauth://totp/'
+        description: >-
+          The same secret in otpauth form, for a QR code. It EMBEDS the
+          secret: treat it as the credential it is.
+  MfaConfirmed:
+    type: object
+    required: [status, recoveryCodes]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [confirmed]
+      recoveryCodes:
+        type: array
+        # EXACTLY ten, stated as a bound rather than as prose: a response that
+        # returned nine would satisfy every per-element rule while quietly
+        # short-changing the only account-recovery path there is.
+        minItems: 10
+        maxItems: 10
+        items:
+          type: string
+          minLength: 1
+        description: >-
+          Ten single-use recovery codes, delivered exactly once. The platform
+          keeps only their digests; there is no route that re-issues them.
+  MfaDisabledResult:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [disabled]
+
+  # --- session management results -------------------------------------------
+  SessionSummary:
+    type: object
+    required: [sessionId, createdAt, lastSeenAt, absoluteExpiresAt, current, userAgentSummary]
+    # CLOSED: this is minimized session metadata, and the closure is what
+    # keeps the raw address digest, the tenant binding, and the revocation
+    # reason on the server side of the edge.
+    additionalProperties: false
+    properties:
+      sessionId:
+        type: string
+        format: uuid
+      createdAt:
+        type: string
+        format: date-time
+      lastSeenAt:
+        type: string
+        format: date-time
+      absoluteExpiresAt:
+        type: string
+        format: date-time
+      current:
+        type: boolean
+        description: True for the session whose access token made this request.
+      userAgentSummary:
+        type: [string, 'null']
+        description: >-
+          A coarse summary ("Chrome on macOS"), never the raw user-agent
+          string. Null when the client sent none — stated rather than omitted,
+          so a client can tell "unknown" from "the server forgot".
+  SessionListing:
+    type: object
+    required: [sessions]
+    additionalProperties: false
+    properties:
+      sessions:
+        type: array
+        items: { $ref: '#/components/SessionSummary' }
+  SessionRevokedResult:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [revoked]
+  OtherSessionsRevoked:
+    type: object
+    required: [status, revokedCount]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [revoked]
+      revokedCount:
+        type: integer
+        minimum: 0

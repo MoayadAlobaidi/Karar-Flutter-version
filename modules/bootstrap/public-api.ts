@@ -24,6 +24,7 @@ export type {
   InvalidTenantSelection,
   MembershipRequired,
   MembershipRevokedConcurrently,
+  ResolutionUnavailable,
   SetTenantBindingError,
   Unauthenticated,
 } from './application/errors.js';
@@ -44,14 +45,19 @@ export type {
 export type {
   BootstrapSubject,
   ClientCapabilitiesPort,
+  ClientCapabilitiesResolution,
   ClientCapabilityRequirementView,
   ClientCapabilityView,
   EnrichmentSubject,
+  EnrichmentUnavailable,
   JurisdictionAssignmentView,
   JurisdictionContextPort,
+  JurisdictionResolution,
   JurisdictionStateView,
   OperatingEntityReferencePort,
-  OperatingEntityReferenceView,
+  OperatingEntityStateView,
+  OperatingEntitySummaryView,
+  PolicyPackResolution,
   PolicyPackStatusPort,
   PolicyPackStatusView,
 } from './application/ports/context-enrichment.js';
@@ -66,6 +72,7 @@ export {
   GetBootstrap,
   type BootstrapView,
   type GetBootstrapDependencies,
+  type ResolvedCapabilitiesView,
 } from './application/use-cases/get-bootstrap.js';
 export {
   SetTenantBinding,

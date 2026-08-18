@@ -68,29 +68,42 @@ jobs:
       # The Phase 2 platform suites (migrations, audit immutability, outbox,
       # jobs) run against a real local PostgreSQL. Compose is used instead of a
       # GitHub service container so the same stack runs locally and in CI, and
-      # so suites that stop/start postgres (readiness recovery tests) work.
-      - name: Start local PostgreSQL (compose)
-        run: docker compose up -d postgres --wait
+      # so suites that stop/start a container (readiness recovery tests) work.
+      #
+      # REDIS IS STARTED HERE TOO, AND IT WAS NOT BEFORE.
+      #
+      # The rate-limiter suites do not fail when Redis is absent — they print a
+      # banner and SKIP, and the banner says why that is unacceptable: "a
+      # skipped run proves nothing". Because this job only ever started
+      # postgres, every distributed rate-limiter test and every rate-limit
+      # store readiness test has been skipped in CI since it was written. The
+      # startup-race regression test is the one that matters most: it exists to
+      # prove the first fail-closed request after /readyz turns 200 is not
+      # answered 503, and a skipped assertion cannot prove that.
+      - name: Start local PostgreSQL and Redis (compose)
+        run: docker compose up -d postgres redis --wait
 
       - name: Test
         env:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
+          REDIS_PORT: '6379'
         run: pnpm test
 
-      # The readiness suite STOPS AND RESTARTS the compose postgres container
-      # to prove recovery (EV-216). It must own the container alone: run
+      # The readiness suite STOPS AND RESTARTS the compose postgres and redis
+      # containers to prove recovery (EV-216). It must own them alone: run
       # concurrently with the other 80+ database suites it kills their
       # connections mid-test (observed on the Phase 3 PR), so it runs as its
       # own step after the main suite, gated by KARAR_INTEGRATION as before.
-      - name: Readiness recovery suite (restarts postgres)
+      - name: Readiness recovery suite (restarts postgres and redis)
         env:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
+          REDIS_PORT: '6379'
           KARAR_INTEGRATION: '1'
         run: pnpm --filter @karar/api exec vitest run src/readiness.integration.test.ts
 
-      - name: Stop local PostgreSQL
+      - name: Stop local PostgreSQL and Redis
         if: always()
         run: docker compose down -v
 
@@ -134,6 +147,14 @@ jobs:
           path: reports/
           if-no-files-found: warn
 
+  # The mobile gate. Everything here is enforced TODAY, because `mobile` is
+  # already a required status check — adding a step tightens the gate without a
+  # repository-settings change, whereas a new job would sit unenforced until
+  # someone adds it to branch protection.
+  #
+  # The platform build jobs (mobile-android, mobile-ios) are separate because
+  # they need a JDK and a macOS runner respectively, and because a toolchain
+  # failure there should read differently from a failing test.
   mobile:
     name: mobile
     runs-on: ubuntu-latest
@@ -154,10 +175,648 @@ jobs:
           cache: true
 
       - name: Resolve packages
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         run: flutter analyze
 
+      # Cheap and highly diagnostic, so it runs before the suite: a drifted
+      # client makes every downstream failure a red herring. `--check`
+      # regenerates in memory and exits non-zero on any difference, so it needs
+      # no git working tree and cannot be fooled by an uncommitted file.
+      - name: Generated API client drift
+        run: dart run tool/generate_api_client.dart --check
+
+      # Localisation and translation completeness, owned by the localisation
+      # workstream. Covers ARB inventory, key parity in both directions, blank
+      # messages, translator descriptions, placeholder parity, Arabic plural
+      # correctness, and that the committed generated Dart still matches the
+      # ARB. Also enforces the repo-wide rules that no literal string appears
+      # in Text() and no direction-hostile layout is used.
+      - name: Localisation and translations
+        run: flutter test test/l10n
+
+      # GOLDEN BASELINES ARE EXCLUDED HERE, DELIBERATELY.
+      #
+      # The four baselines under test/shared/design_system/goldens/ were
+      # rasterised on macOS arm64. Font rendering differs across platforms, so
+      # they cannot match on ubuntu-latest and would fail this required check
+      # for a reason unrelated to any change. The `golden` tag exists in
+      # apps/mobile/dart_test.yaml precisely so this job can opt out.
+      #
+      # Consequence, stated plainly: goldens are a LOCAL guard only. They are
+      # not enforced by CI. Enforcing them needs a macOS job whose baselines
+      # were generated on that same runner image; regenerating them on Linux
+      # would silently rebaseline another workstream's invariants.
       - name: Test
-        run: flutter test
+        run: flutter test --exclude-tags golden
+
+  # Proves the Android application actually assembles, and that the manifest
+  # and network policy survive the merge into a real artifact. A source-level
+  # assertion cannot catch a manifest merger conflict or a resource that fails
+  # to link.
+  #
+  # Debug AND release are assembled. The comment here used to say "Debug only",
+  # and that was the whole defect: `lintVitalRelease` runs only on a release
+  # assembly, so a resource that made the release build impossible sat on the
+  # branch for several commits with every check green.
+  #
+  # Neither artifact is signed. No signing material is used, needed, or
+  # available: the release build type gets no signing configuration unless one
+  # is supplied externally, and no CI job supplies one. The release artifact is
+  # asserted to be UNSIGNED rather than merely built, because a signature would
+  # mean the debug key had been substituted.
+  mobile-android:
+    name: mobile-android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # AGP 9 requires JDK 17. The ubuntu runner's default JDK moves over time,
+      # so it is pinned rather than inherited.
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Resolve packages
+        run: flutter pub get --enforce-lockfile
+
+      # LOCAL is the profile whose configuration needs no secrets and no
+      # reachable host. The Gradle property and the dart-define must agree;
+      # app/build.gradle.kts fails the build if they do not.
+      - name: Build debug APK
+        run: |
+          flutter build apk --debug \
+            -Pkarar.env=LOCAL \
+            --dart-define=KARAR_ENV=LOCAL
+
+      # A RELEASE ASSEMBLY, BECAUSE DEBUG DOES NOT RUN THE SAME CHECKS.
+      #
+      # `lintVitalRelease` runs only on a release assembly. Building debug
+      # alone left a release build BROKEN across several commits without a
+      # single red check: `data_extraction_rules.xml` was missing an attribute
+      # that a debug parse accepts and lint rejects, so the security resource
+      # closing the device-transfer path made the shippable artifact
+      # unbuildable, and nothing here noticed.
+      #
+      # LOCAL is used because it needs no endpoint and no secret. The artifact
+      # is unsigned by construction — see the signing check below, which is the
+      # assertion that no debug key was substituted.
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            -Pkarar.env=LOCAL \
+            --dart-define=KARAR_ENV=LOCAL
+
+      # THE RELEASE ARTIFACT IS THE THING UNDER TEST, NOT THE SOURCE XML.
+      #
+      # Source assertions live in the Dart security suite and are worth having,
+      # but they cannot see what the merger, the resource compiler and the
+      # shrinker actually produced. Everything below reads the packaged APK.
+      # A missing artifact FAILS here; it never skips.
+      - name: Verify the packaged release artifact
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$apk" || { echo "FAIL: no release APK was produced"; exit 1; }
+
+          aapt2="$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -1)"
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)"
+          manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
+
+          # Unsigned, and specifically not debug-signed.
+          if "$apksigner" verify --print-certs "$apk" 2>/dev/null; then
+            echo "FAIL: the release artifact carries a signature. No signing"
+            echo "material exists in this repository, so a signature means the"
+            echo "debug key was substituted, which would make an unsigned"
+            echo "release silently installable."
+            exit 1
+          fi
+
+          require() {
+            echo "$manifest" | grep -q "$1" \
+              || { echo "FAIL: $2"; exit 1; }
+          }
+          refuse() {
+            echo "$manifest" | grep -q "$1" \
+              && { echo "FAIL: $2"; exit 1; }
+            return 0
+          }
+
+          refuse 'debuggable'                       "the release manifest is debuggable"
+          require 'usesCleartextTraffic.*=false'    "cleartext traffic is not disabled"
+          require 'allowBackup.*=false'             "auto-backup is not disabled"
+          require 'fullBackupContent.*=false'       "the pre-API-31 backup policy is absent; devices below 31 are not covered by the data-extraction resource"
+          require 'dataExtractionRules'             "the API 31+ data-extraction resource is not referenced"
+
+          # The packaged transfer rules, under whatever name the shrinker gave
+          # them. Resolved through the manifest reference rather than guessed.
+          rules="$("$aapt2" dump resources "$apk" | grep -A2 data_extraction_rules \
+            | grep -oE 'res/[A-Za-z0-9_.-]+\.xml' | head -1)"
+          test -n "$rules" || { echo "FAIL: no data-extraction resource is packaged"; exit 1; }
+          tree="$("$aapt2" dump xmltree --file "$rules" "$apk")"
+          echo "$tree"
+
+          for section in cloud-backup device-transfer cross-platform-transfer; do
+            echo "$tree" | grep -q "E: $section" \
+              || { echo "FAIL: the packaged rules declare no <$section>; a missing section is documented as fully enabled, not off"; exit 1; }
+          done
+          echo "$tree" | grep -q 'A: platform="ios"' \
+            || { echo "FAIL: cross-platform-transfer does not name platform=\"ios\". Any other value is accepted silently and addresses a platform nobody transfers to."; exit 1; }
+          echo "$tree" | grep -q 'apple_icloud' \
+            && { echo "FAIL: apple_icloud is not a real platform value"; exit 1; }
+          echo "$tree" | grep -q 'E: include' \
+            && { echo "FAIL: an include rule re-admits content these sections exist to empty"; exit 1; }
+
+          excludes="$(echo "$tree" | grep -c 'E: exclude')"
+          test "$excludes" -eq 27 \
+            || { echo "FAIL: $excludes exclusions packaged, expected 27 (9 domains x 3 modes)"; exit 1; }
+
+          # Exactly the reviewed permission set, no more and no fewer.
+          #
+          # The fourth is app-defined and carries the applicationId, which
+          # differs per environment (`.local` here), so it is derived from the
+          # artifact's own package name rather than hardcoded — otherwise this
+          # check would only ever hold for one build profile.
+          pkg="$("$aapt2" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
+          test -n "$pkg" || { echo "FAIL: could not read the package name"; exit 1; }
+          actual="$("$aapt2" dump badging "$apk" | sed -n "s/^uses-permission: name='\([^']*\)'.*/\1/p" | sort)"
+          expected="$(printf '%s\n' \
+            'android.permission.INTERNET' \
+            'android.permission.USE_BIOMETRIC' \
+            'android.permission.USE_FINGERPRINT' \
+            "${pkg}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" | sort)"
+          if [ "$actual" != "$expected" ]; then
+            echo "FAIL: the packaged permission set is not the reviewed one."
+            diff <(echo "$expected") <(echo "$actual") || true
+            exit 1
+          fi
+
+          # The generated rules resource, in the artifact. Source assertions
+          # cannot see what the generator produced or what survived resource
+          # compilation.
+          echo "$tree" | grep -q 'E: platform-specific-params' \
+            || { echo "FAIL: cross-platform-transfer declares no platform-specific-params"; exit 1; }
+          for attr in bundleId teamId contentVersion; do
+            echo "$tree" | grep -q "A: $attr=" \
+              || { echo "FAIL: platform-specific-params declares no $attr"; exit 1; }
+          done
+
+          paths="$(echo "$tree" | grep -c 'A: path="\."')"
+          test "$paths" -eq 27 \
+            || { echo "FAIL: $paths exclusions carry path=\".\", expected 27"; exit 1; }
+
+          # A LOCAL artifact must carry the test-only identity, and that value
+          # is deliberately shaped so it can never satisfy the Apple Team ID
+          # form a deployed assembly is checked against.
+          team="$("$aapt2" dump xmltree --file "$rules" "$apk" | sed -n 's/.*A: teamId="\([^"]*\)".*/\1/p')"
+          case "$team" in
+            TEST-ONLY-NOT-AN-APPLE-TEAM-ID) ;;
+            *) echo "FAIL: a LOCAL artifact carries teamId='$team'. Only the test-only sentinel belongs in an unsigned local build."; exit 1 ;;
+          esac
+          if printf '%s' "$team" | grep -qE '^[A-Z0-9]{10}$'; then
+            echo "FAIL: the LOCAL teamId is shaped like a real Apple Team ID."
+            exit 1
+          fi
+
+          echo "OK: packaged release artifact verified."
+
+      # THE ENVIRONMENT GUARD, PROVEN BY INVOCATION RATHER THAN BY INSPECTION.
+      #
+      # The Dart suite asserts each guard rule is PRESENT in the build script.
+      # That is not the same as the rule holding, and the difference was not
+      # hypothetical: the script contained a "::1" rule, the test asserted the
+      # string was there and passed, and a PRODUCTION build with an
+      # `https://[::1]:8443` endpoint still succeeded — because the host was
+      # parsed by splitting on the first colon, which yields '[' for a
+      # bracketed IPv6 literal. A presence check certified a rule that did not
+      # hold.
+      #
+      # This lane already installs JDK 17 and already runs Gradle, so there is
+      # no reason not to invoke it. Each case must be REFUSED, and refused for
+      # the stated reason.
+      - name: A deployed build with an unusable endpoint must be refused
+        working-directory: apps/mobile/android
+        run: |
+          set -uo pipefail
+          refuse() {
+            defines="$(printf 'KARAR_ENV=PRODUCTION' | base64),$(printf 'KARAR_API_BASE_URL=%s' "$1" | base64)"
+            if output="$(./gradlew -q :app:tasks -Pkarar.env=PRODUCTION \
+              -Pdart-defines="$defines" 2>&1)"; then
+              echo "FAIL: '$1' was accepted for a PRODUCTION build"; exit 1
+            fi
+            echo "$output" | grep -q "$2" \
+              || { echo "FAIL: '$1' was refused, but not for '$2':"; echo "$output" | tail -5; exit 1; }
+            echo "  refused: $1"
+          }
+          refuse 'https://[::1]:8443'          'Local-only endpoint'
+          refuse 'https://[0:0:0:0:0:0:0:1]'   'Local-only endpoint'
+          refuse 'https://localhost.'          'Local-only endpoint'
+          refuse 'https://localhost'           'Local-only endpoint'
+          refuse 'https://127.0.0.1'           'Local-only endpoint'
+          refuse 'https://10.0.2.2:8080'       'Local-only endpoint'
+          refuse 'https://api.internal'        'Local-only endpoint'
+          refuse 'http://api.karar.qa'         'Insecure endpoint'
+          refuse 'https://user:pw@api.karar.qa' 'Credentials in endpoint'
+          echo "OK: every unusable endpoint was refused."
+
+      - name: A deployed build with no configuration at all must be refused
+        working-directory: apps/mobile/android
+        run: |
+          set -uo pipefail
+          if output="$(./gradlew -q :app:tasks -Pkarar.env=PRODUCTION 2>&1)"; then
+            echo "FAIL: a PRODUCTION build with no dart-defines succeeded"; exit 1
+          fi
+          echo "$output" | grep -q 'Unconfigured PRODUCTION build' \
+            || { echo "FAIL: refused for another reason:"; echo "$output" | tail -5; exit 1; }
+          echo "OK: the direct-Gradle path is guarded too."
+
+      # A routable endpoint must still build, so the guard is not simply
+      # refusing everything.
+      # THE TEAM ID REFUSAL, PROVEN BY INVOCATION.
+      #
+      # <platform-specific-params> is required on the cross-platform section
+      # and its teamId identifies the iOS counterpart this application's data
+      # may be matched to. No Apple Team ID is configured or committed here, so
+      # a deployed assembly must refuse rather than invent one — and the
+      # test-only sentinel LOCAL uses is shaped so it cannot satisfy the check.
+      - name: A deployed assembly without an Apple Team ID must be refused
+        working-directory: apps/mobile/android
+        run: |
+          set -uo pipefail
+          # The ENDPOINT guard runs at configuration time and fires first, so a
+          # bare `-Pkarar.env=PRODUCTION` never reaches the Team ID check. These
+          # invocations supply a compiled configuration exactly as the Flutter
+          # tool would, which is the only way to exercise the later guard.
+          defines="$(printf 'KARAR_ENV=PRODUCTION' | base64),$(printf 'KARAR_API_BASE_URL=https://api.karar.qa' | base64)"
+          gen() {
+            ./gradlew -q :app:generateReleaseDataExtractionRules \
+              -Pkarar.env=PRODUCTION -Pdart-defines="$defines" "$@" 2>&1
+          }
+
+          if out="$(gen)"; then
+            echo "FAIL: a PRODUCTION rules resource was generated with no Team ID"; exit 1
+          fi
+          echo "$out" | grep -q 'Missing Apple Team ID' \
+            || { echo "FAIL: refused for another reason:"; echo "$out" | tail -5; exit 1; }
+
+          if out="$(gen -Pkarar.ios.teamId=TEST-ONLY-NOT-AN-APPLE-TEAM-ID)"; then
+            echo "FAIL: the test-only sentinel was accepted for PRODUCTION"; exit 1
+          fi
+          echo "$out" | grep -q 'Malformed Apple Team ID' \
+            || { echo "FAIL: the sentinel was refused for another reason"; exit 1; }
+
+          gen -Pkarar.ios.teamId=ABCDE12345 >/dev/null \
+            || { echo "FAIL: a shape-valid Team ID was refused"; exit 1; }
+          echo "OK: refused without a Team ID, refused the sentinel, accepted a real shape."
+
+      - name: A deployed build with a usable endpoint is accepted
+        working-directory: apps/mobile/android
+        run: |
+          set -euo pipefail
+          defines="$(printf 'KARAR_ENV=PRODUCTION' | base64),$(printf 'KARAR_API_BASE_URL=https://api.karar.qa' | base64)"
+          ./gradlew -q :app:tasks -Pkarar.env=PRODUCTION -Pdart-defines="$defines" >/dev/null
+          echo "OK: a routable https endpoint is accepted."
+
+      # The merged manifest only exists once something has been built, so these
+      # assertions skip on every lane that runs the suite without building —
+      # which is every other lane. This is the one place they can actually run.
+      # The gate variable turns a missing artifact into a failure here, so the
+      # step cannot pass by having nothing to look at.
+      - name: Verify the merged manifest
+        env:
+          KARAR_VERIFY_ANDROID_ARTIFACT: '1'
+        run: flutter test test/security/platform_hardening_test.dart
+
+      # What the manifest says AFTER merging, which is the only version that
+      # ships. Source assertions live in the Dart security suite; this checks
+      # the artifact.
+      - name: Verify the built artifact's network policy
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          aapt2="$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -1)"
+          echo "Using $aapt2"
+
+          manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
+
+          echo "$manifest" | grep -q 'usesCleartextTraffic(0x010104ec)=false' \
+            || { echo "FAIL: cleartext traffic is not disabled in the merged manifest"; exit 1; }
+          echo "$manifest" | grep -q 'networkSecurityConfig' \
+            || { echo "FAIL: no network security config in the merged manifest"; exit 1; }
+          echo "$manifest" | grep -q 'allowBackup(0x01010280)=false' \
+            || { echo "FAIL: auto-backup is not disabled in the merged manifest"; exit 1; }
+          echo "$manifest" | grep -q 'android.permission.INTERNET' \
+            || { echo "FAIL: INTERNET permission missing; release networking would not work"; exit 1; }
+
+          # The debug artifact must carry the loopback-only exception, and the
+          # exception must name nothing but loopback hosts.
+          config="$("$aapt2" dump xmltree --file res/xml/network_security_config.xml "$apk")"
+          echo "$config"
+
+          # Read line by line rather than relying on word splitting: hosts are
+          # newline-separated, and `for host in $hosts` behaves differently
+          # across shells.
+          hosts="$(echo "$config" | sed -n "s/.*T: '\\(.*\\)'.*/\\1/p" | sort -u)"
+          while IFS= read -r host; do
+            [ -n "$host" ] || continue
+            case "$host" in
+              localhost|127.0.0.1|10.0.2.2) ;;
+              *) echo "FAIL: '$host' is not a loopback host but is permitted cleartext"; exit 1 ;;
+            esac
+          done <<< "$hosts"
+
+          # `if` rather than `cmd && { ...; }`: under `set -e` the latter makes
+          # the whole step fail when grep finds nothing, which is the passing
+          # case.
+          if echo "$config" | grep -q 'src="user"'; then
+            echo "FAIL: user-installed certificate authorities are trusted"
+            exit 1
+          fi
+
+          echo "OK: merged manifest and network policy verified."
+
+      # Source scanning cannot see a built binary. This scans the artifact that
+      # would actually be distributed.
+      - name: Scan the built artifact for credential material
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          work="$(mktemp -d)"
+          unzip -qq -o "$apk" -d "$work"
+
+          findings=0
+          # --binary-files=text is the point: classes.dex and the bundled
+          # libraries are binary, and a credential compiled into them is
+          # exactly what this step exists to find.
+          scan() {
+            if grep -rl --binary-files=text -E "$2" "$work" > /tmp/hits 2>/dev/null \
+               && [ -s /tmp/hits ]; then
+              echo "FAIL [$1]:"; cat /tmp/hits; findings=1
+            fi
+          }
+
+          scan private-key-block '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+          scan service-account-document '"type"[[:space:]]*:[[:space:]]*"service_account"'
+          scan database-credentials '(postgres|postgresql|mysql|mongodb|redis|amqp)://[^[:space:]:@/]+:[^[:space:]@/]+@'
+          scan aws-access-key-id 'AKIA[0-9A-Z]{16}'
+          scan google-api-key 'AIza[0-9A-Za-z_-]{35}'
+          scan cloudflare-api-token 'v1\.0-[A-Za-z0-9_-]{20,}'
+          scan github-token 'gh[pousr]_[A-Za-z0-9]{36}'
+          scan slack-token 'xox[baprs]-[0-9A-Za-z-]{10,}'
+          scan stripe-secret-key 'sk_(live|test)_[A-Za-z0-9]{16,}'
+
+          if [ "$findings" -ne 0 ]; then
+            echo "Credential material found in the built artifact."
+            exit 1
+          fi
+          echo "OK: no credential material in the built artifact."
+
+      # Confirms the packaged identity, so a suffix regression is caught here
+      # rather than at a store upload.
+      - name: Report packaged identity
+        run: |
+          set -euo pipefail
+          aapt2="$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort | tail -1)"
+          "$aapt2" dump badging build/app/outputs/flutter-apk/app-debug.apk | head -3
+          "$aapt2" dump badging build/app/outputs/flutter-apk/app-debug.apk \
+            | grep -q "package: name='com.kararfinance.app.local'" \
+            || { echo "FAIL: unexpected application id for a LOCAL build"; exit 1; }
+
+      # THE CROSS-PLATFORM COMPARISON NEEDS BOTH ARTIFACTS ON ONE RUNNER.
+      #
+      # The Android data-extraction rules NAME the iOS counterpart by bundle
+      # identifier. Whether that element identifies the application it claims
+      # to is a property of two artifacts, and the two are built on different
+      # runners, so neither lane can check it alone. Publishing the merged
+      # manifest is the cheap half of the fix: it carries the Android package
+      # name, which is the only thing the iOS lane needs from this one.
+      # Building an APK on the macOS runner would also work and costs far more.
+      - name: Publish the Android build outputs the iOS lane asserts against
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-build-outputs
+          # BOTH paths, because the suite reads both and the gate variable
+          # turns a missing one into a failure rather than a skip. The merged
+          # manifest carries the packaged application id, which is the half the
+          # cross-platform identity comparison needs. The generated
+          # data-extraction rules are a separate Gradle output under
+          # build/app/generated, and every assertion about exclusion domains,
+          # the platform attribute and the test-only identity reads those.
+          # Publishing only the manifest made the iOS lane fail its own
+          # verification step the first time it ran.
+          path: |
+            apps/mobile/build/app/intermediates/merged_manifest/**/AndroidManifest.xml
+            apps/mobile/build/app/generated/res/**/data_extraction_rules.xml
+          if-no-files-found: error
+          retention-days: 1
+
+  # iOS builds need macOS. GitHub-hosted macOS runners are free for public
+  # repositories, which this one is; if the repository is ever made private
+  # this job starts consuming minutes at the macOS multiplier and should be
+  # reconsidered.
+  #
+  # SIMULATOR ONLY, which is what makes it credential-free: a simulator build
+  # is never code-signed, so no certificate, provisioning profile, team
+  # identifier or App Store credential is involved.
+  mobile-ios:
+    name: mobile-ios
+    runs-on: macos-latest
+    # Four builds: LOCAL, DEV and STAGING for the simulator, PRODUCTION for
+    # device. DEV is built because the environment matrix has four entries and
+    # a matrix with an unobserved row is a matrix nobody checked — every iOS
+    # build produced the production identifier until this phase, and a lane
+    # that skips DEV would not have caught it.
+    #
+    # Serialised behind mobile-android, which is the cost of comparing two
+    # artifacts that are built on different runners. The Android lane is the
+    # fast one, so this adds its duration rather than doubling the slow one.
+    needs: mobile-android
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Resolve packages
+        run: flutter pub get --enforce-lockfile
+
+      # Restored to the exact path the suite reads, so the comparison runs
+      # against the manifest the Android lane actually produced rather than a
+      # value re-derived on this runner.
+      - name: Fetch the Android build outputs from the Android lane
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: android-build-outputs
+          # Restored at the common ancestor of the two published paths, so the
+          # tree the suite reads is the one Gradle produced:
+          # app/intermediates/merged_manifest/... and app/generated/res/...
+          path: apps/mobile/build/app
+
+      - name: Build for the simulator (no code signing)
+        run: |
+          flutter build ios --simulator --debug \
+            --dart-define=KARAR_ENV=LOCAL
+
+      # Asserts against the Info.plist inside the BUILT app bundle, which is
+      # the one that would ship. plutil reads the binary plist the build
+      # produced, not the source XML.
+      - name: Verify App Transport Security in the built bundle
+        run: |
+          set -euo pipefail
+          plist=build/ios/iphonesimulator/Runner.app/Info.plist
+          test -f "$plist" || { echo "FAIL: no Info.plist in the built bundle"; exit 1; }
+          plutil -p "$plist" | sed -n '/NSAppTransportSecurity/,/^  }/p'
+
+          arbitrary="$(plutil -extract NSAppTransportSecurity.NSAllowsArbitraryLoads raw -o - "$plist" 2>/dev/null || echo missing)"
+          if [ "$arbitrary" != "false" ] && [ "$arbitrary" != "0" ] && [ "$arbitrary" != "missing" ]; then
+            echo "FAIL: NSAllowsArbitraryLoads is $arbitrary"; exit 1
+          fi
+
+          for key in NSAllowsArbitraryLoadsInWebContent NSAllowsArbitraryLoadsForMedia NSAllowsLocalNetworking; do
+            if plutil -extract "NSAppTransportSecurity.$key" raw -o - "$plist" >/dev/null 2>&1; then
+              echo "FAIL: blanket ATS key $key is present"; exit 1
+            fi
+          done
+
+          # The only permitted exception domain is loopback.
+          domains="$(plutil -extract NSAppTransportSecurity.NSExceptionDomains xml1 -o - "$plist" 2>/dev/null \
+            | sed -n 's/.*<key>\(.*\)<\/key>.*/\1/p' | grep -v '^NS' || true)"
+          for domain in $domains; do
+            if [ "$domain" != "localhost" ]; then
+              echo "FAIL: '$domain' is an ATS exception but is not loopback"; exit 1
+            fi
+          done
+
+          echo "OK: App Transport Security verified in the built bundle."
+
+      - name: Confirm no code signing was involved
+        run: |
+          set -euo pipefail
+          bundle=build/ios/iphonesimulator/Runner.app
+          if [ -d "$bundle/_CodeSignature" ]; then
+            echo "NOTE: simulator bundles may carry an ad-hoc signature; no identity is used."
+          fi
+          test ! -f "$bundle/embedded.mobileprovision" \
+            || { echo "FAIL: a provisioning profile was embedded"; exit 1; }
+          echo "OK: no provisioning profile, no signing identity."
+
+      # The artifact-level suite, against the LOCAL bundle just built. The gate
+      # variable makes a missing bundle a failure rather than a skip.
+      - name: Verify the packaged LOCAL bundle
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # BUILDING ONLY LOCAL WOULD TEST THE WRONG THING.
+      #
+      # LOCAL is the one environment permitted to carry the loopback exception,
+      # so a lane that builds nothing else can never observe the property that
+      # matters: that a DEPLOYED artifact carries no transport-security key at
+      # all. These two builds are that observation.
+      #
+      # STAGING is built with the SAME Xcode configuration as LOCAL above, which
+      # is the point — it proves the exception is gated on the environment
+      # rather than on Debug-vs-Release, so `--debug` against a deployed
+      # environment cannot smuggle it in.
+      # THE GUARD IS PROVEN BY A BUILD THAT MUST FAIL.
+      #
+      # A guard is only worth what its negative case proves. This asserts the
+      # build is REFUSED, and checks the reason so that an unrelated failure
+      # cannot be mistaken for the guard working.
+      - name: A deployed build with no endpoint must be refused
+        run: |
+          set -uo pipefail
+          if output="$(flutter build ios --release --no-codesign \
+            --dart-define=KARAR_ENV=PRODUCTION 2>&1)"; then
+            echo "FAIL: a PRODUCTION build with no endpoint succeeded"; exit 1
+          fi
+          echo "$output" | grep -q 'Missing endpoint' \
+            || { echo "FAIL: build failed for some other reason:"; echo "$output" | tail -20; exit 1; }
+          echo "OK: refused, and refused for the stated reason."
+
+      # The endpoint below is a syntactically valid host used only to satisfy
+      # the build-time guard. Nothing contacts it, the artifact is unsigned and
+      # never distributed, and no DNS record is implied by it.
+      - name: Build the simulator app for STAGING
+        run: |
+          flutter build ios --simulator --debug \
+            --dart-define=KARAR_ENV=STAGING \
+            --dart-define=KARAR_API_BASE_URL=https://api.invalid-for-ci.example
+
+      - name: Verify the packaged STAGING bundle carries no exception
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # DEV IS BUILT BECAUSE THE MATRIX HAS FOUR ROWS.
+      #
+      # An environment matrix with a row nobody builds is a row nobody checks.
+      # Every iOS build produced `com.kararfinance.app` regardless of the
+      # environment it was compiled for until this phase, and a lane that
+      # observed only LOCAL, STAGING and PRODUCTION would not have caught it —
+      # PRODUCTION is the one row where the wrong answer and the right answer
+      # are the same string.
+      - name: Build the simulator app for DEV
+        run: |
+          flutter build ios --simulator --debug \
+            --dart-define=KARAR_ENV=DEV \
+            --dart-define=KARAR_API_BASE_URL=https://api.invalid-for-ci.example
+
+      - name: Verify the packaged DEV bundle carries no exception
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # The artifact that would actually ship. Unsigned, because no identity
+      # exists in CI and none is needed to read the packaged plist.
+      - name: Build the device app for PRODUCTION (no code signing)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=KARAR_ENV=PRODUCTION \
+            --dart-define=KARAR_API_BASE_URL=https://api.invalid-for-ci.example
+
+      - name: Verify the packaged PRODUCTION bundle carries no exception
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+        run: flutter test test/security/ios_packaged_bundle_test.dart
+
+      # THE ONLY PLACE THE TWO PLATFORMS MEET.
+      #
+      # The cross-platform group in this suite compares the identifier the
+      # Android data-extraction rules NAME as the iOS counterpart against the
+      # identifier an iOS artifact actually carries. On the Linux lane it skips:
+      # there is no iOS bundle there and no plutil to read one. Here both halves
+      # exist — the iOS bundles were just built, and the Android merged manifest
+      # was fetched from the Android lane above — so the comparison is between
+      # two real artifacts rather than between a rule and itself.
+      - name: Verify the Android and iOS identities agree
+        env:
+          KARAR_VERIFY_IOS_ARTIFACT: '1'
+          KARAR_VERIFY_ANDROID_ARTIFACT: '1'
+        run: flutter test test/security/platform_hardening_test.dart

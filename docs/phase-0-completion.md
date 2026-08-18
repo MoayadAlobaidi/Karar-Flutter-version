@@ -10,15 +10,15 @@
 
 | § | Deliverable | Status |
 |---|---|---|
-| **0.1** | Preserve state | ✅ Recorded in [`legacy/qarar-audit.md`](legacy/qarar-audit.md) §2, **with a correction** — see §3 below |
-| **0.2** | Legacy audit | ✅ **Ungated and complete.** 4 documents under [`legacy/`](legacy/) |
-| **0.3** | Architecture docs | ✅ 22 documents + `plan-v2-deltas.md` under [`architecture/`](architecture/) |
-| **0.4** | Diagrams | ✅ Mermaid sources embedded in the documents they explain |
-| **0.5** | ADRs | ✅ **26** under [`adr/`](adr/README.md) |
-| **0.6** | Security docs | ✅ 5 under [`security/`](security/) |
-| **0.7** | Module ownership | ✅ [`MODULE_TEMPLATE.md`](MODULE_TEMPLATE.md) + **20 `MODULE.md` files** + [`capability-map.md`](architecture/capability-map.md) |
-| **0.8** | Repository skeleton | ✅ Directory tree, **98 READMEs**, root files, onboarding, glossary |
-| **0.9** | Exit criteria | ✅ Verified below |
+| **0.1** | Preserve state | COMPLETE — Recorded in [`legacy/qarar-audit.md`](legacy/qarar-audit.md) §2, **with a correction** — see §3 below |
+| **0.2** | Legacy audit | COMPLETE — **Ungated and complete.** 4 documents under [`legacy/`](legacy/) |
+| **0.3** | Architecture docs | COMPLETE — 22 documents + `plan-v2-deltas.md` under [`architecture/`](architecture/) |
+| **0.4** | Diagrams | COMPLETE — Mermaid sources embedded in the documents they explain |
+| **0.5** | ADRs | COMPLETE — **26** under [`adr/`](adr/README.md) |
+| **0.6** | Security docs | COMPLETE — 5 under [`security/`](security/) |
+| **0.7** | Module ownership | COMPLETE — [`MODULE_TEMPLATE.md`](MODULE_TEMPLATE.md) + **20 `MODULE.md` files** + [`capability-map.md`](architecture/capability-map.md) |
+| **0.8** | Repository skeleton | COMPLETE — Directory tree, **98 READMEs**, root files, onboarding, glossary |
+| **0.9** | Exit criteria | COMPLETE — Verified below |
 
 ## 2. Blocker 1 — CLOSED
 
@@ -38,41 +38,41 @@ Plan v2's blocking fact #1 states the target repository is empty — *"zero comm
 
 ### 4.1 Every §93 question plus the five new ones answerable from docs alone
 
-✅ [`onboarding/developer.md`](onboarding/developer.md) — 30 questions.
+PASS — [`onboarding/developer.md`](onboarding/developer.md) — 30 questions.
 
 **Documented gap:** §93 is a question list defined in **Plan v1**, which is not reproduced in the v2 document, and the v1 list was unavailable. The questions were reconstructed to cover §93-equivalent ground; **the five new questions are quoted verbatim from Plan v2 §0.8**. This is flagged in the document itself and should be reconciled if the v1 list surfaces.
 
 ### 4.2 Scenarios A–D reproducible from the docs
 
-✅ [`scenarios/`](scenarios/) — four documents, each self-contained, each ending with a verifiable `git diff` check for its untouched-module claim.
+PASS — [`scenarios/`](scenarios/) — four documents, each self-contained, each ending with a verifiable `git diff` check for its untouched-module claim.
 
 ### 4.3 All ADRs present
 
-✅ **26** — at Phase 0 sign-off, numbered 0001–0025 plus 0027, with 0026 deliberately unused (subject-elected policy was folded into ADR-0015 per the one-rule-per-decision principle). Each records context, decision, consequences, and **alternatives rejected**.
+PASS — **26** — at Phase 0 sign-off, numbered 0001–0025 plus 0027, with 0026 deliberately unused (subject-elected policy was folded into ADR-0015 per the one-rule-per-decision principle). Each records context, decision, consequences, and **alternatives rejected**.
 
 *Phase 0.5 note: the data-lifecycle ADR was subsequently renumbered 0027 → 0026, making the sequence continuous at 0001–0026. See [`phase-05-consolidation.md`](phase-05-consolidation.md).*
 
 ### 4.4 Feature inventory complete
 
-✅ **SOURCE-VERIFIED.** Every capability with its legacy status and Karar disposition (BUILD ‹phase› / DEFER → ‹seam› / DROP / NEW). Phase 9 scope stated.
+PASS — **SOURCE-VERIFIED.** Every capability with its legacy status and Karar disposition (BUILD ‹phase› / DEFER → ‹seam› / DROP / NEW). Phase 9 scope stated.
 
 ### 4.5 Committed and pushed
 
-✅ Branch `claude/karar-v2-architecture-plan-5tif8e`.
+PASS — Branch `claude/karar-v2-architecture-plan-5tif8e`.
 
 ## 5. Verification method
 
 | # | Check | Result |
 |---|---|---|
-| 1 | Onboarding questions answerable from `docs/` alone | ✅ 30 questions, each linking its source |
-| 2 | §92 clause check — each "clean only if" clause maps to an **enforceable mechanism** | ✅ [`testing/architecture-tests.md`](testing/architecture-tests.md) — 26 CI-blocking tests |
-| 3 | Extension test — a reader can trace Amanat end to end and confirm the untouched list | ✅ [`scenarios/b-add-amanat.md`](scenarios/b-add-amanat.md), with a `git diff` verification |
-| 4 | Scenarios derivable without the plan file | ✅ No scenario document references the plan as a source |
-| 5 | ADR completeness — each records rejected alternatives | ✅ All 26 |
-| 6 | Traceability — every phase marked BUILD or DEFER, each DEFER naming its seam | ✅ [`legacy/feature-inventory.md`](legacy/feature-inventory.md), [`roadmap.md`](roadmap.md) |
-| 7 | Consistency — exactly one authoritative rule per decision | ✅ See §6 |
-| 8 | Internal links resolve | ✅ **254 links checked, 0 broken** |
-| 9 | Every module directory has `MODULE.md` | ✅ 20/20 |
+| 1 | Onboarding questions answerable from `docs/` alone | PASS — 30 questions, each linking its source |
+| 2 | §92 clause check — each "clean only if" clause maps to an **enforceable mechanism** | PASS — [`testing/architecture-tests.md`](testing/architecture-tests.md) — 26 CI-blocking tests |
+| 3 | Extension test — a reader can trace Amanat end to end and confirm the untouched list | PASS — [`scenarios/b-add-amanat.md`](scenarios/b-add-amanat.md), with a `git diff` verification |
+| 4 | Scenarios derivable without the plan file | PASS — No scenario document references the plan as a source |
+| 5 | ADR completeness — each records rejected alternatives | PASS — All 26 |
+| 6 | Traceability — every phase marked BUILD or DEFER, each DEFER naming its seam | PASS — [`legacy/feature-inventory.md`](legacy/feature-inventory.md), [`roadmap.md`](roadmap.md) |
+| 7 | Consistency — exactly one authoritative rule per decision | PASS — See §6 |
+| 8 | Internal links resolve | PASS — **254 links checked, 0 broken** |
+| 9 | Every module directory has `MODULE.md` | PASS — 20/20 |
 
 ## 6. Consistency — one authoritative rule per decision
 

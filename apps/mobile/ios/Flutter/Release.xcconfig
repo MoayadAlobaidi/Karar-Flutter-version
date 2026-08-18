@@ -1,1 +1,77 @@
 #include "Generated.xcconfig"
+
+// ---------------------------------------------------------------------------
+// Bundle identity — the CONFIGURATION's default, not the artifact's identity
+// ---------------------------------------------------------------------------
+//
+// PRODUCT_BUNDLE_IDENTIFIER is `com.kararfinance.app$(KARAR_BUNDLE_ID_SUFFIX)`.
+// The suffix is empty HERE, which makes the seed the production identifier —
+// correct for this file, because Release and Profile are the configurations a
+// production artifact is cut from and PRODUCT_BUNDLE_IDENTIFIER is what a
+// provisioning profile is ever selected by. It is not, on its own, what the
+// artifact ends up called.
+//
+// THE ASYMMETRY WITH ANDROID THAT USED TO LIVE HERE IS CLOSED.
+//
+// Android derives its suffix from `-Pkarar.env` and cross-checks it against the
+// compiled `--dart-define=KARAR_ENV`, so a DEV package cannot claim production
+// identity. iOS could not do the same in an xcconfig, and for a real reason:
+// PRODUCT_BUNDLE_IDENTIFIER is resolved by Xcode from build settings before any
+// script runs, and while the Flutter tool DOES forward the dart-defines into
+// the Xcode build, it forwards them as DART_DEFINES — one comma-separated list
+// of base64-encoded KEY=VALUE entries — which xcconfig has no string function
+// capable of decoding. The conclusion drawn from that was that the suffix had
+// to wait for per-environment Xcode configurations and schemes; the consequence
+// was that LOCAL, DEV, STAGING and PRODUCTION all produced
+// `com.kararfinance.app`.
+//
+// What actually follows from it is narrower: the rule cannot live in an
+// xcconfig, so it lives in Scripts/bundle_identity.sh, and the `Verify Packaged
+// Bundle` build phase — which can decode DART_DEFINES, and already does, to
+// decide the App Transport Security exception — applies it to the packaged
+// plist and fails the build when the compiled environment and the packaged
+// identity cannot be made to agree. A LOCAL, DEV or STAGING artifact now
+// carries `.local`, `.dev` or `.staging`, and a PRODUCTION artifact is the only
+// unsuffixed one.
+//
+// Per-environment Xcode configurations remain the right long-term mechanism and
+// remain BLOCKED: they need per-environment App Store records and a real Apple
+// Team ID, and this repository holds none and invents none. The build phase
+// refuses to narrow an identifier on any build that has a DEVELOPMENT_TEAM or a
+// PROVISIONING_PROFILE_SPECIFIER, so the day that work is real, the shortcut
+// fails loudly rather than shipping an artifact whose identity its own profile
+// does not cover. No App Store record exists for any of these identifiers and
+// this phase creates none, so nothing is reserved and nothing is squatted.
+//
+// The canonical per-environment build commands are in Scripts/bundle_identity.sh
+// beside the rule they produce.
+
+KARAR_BUNDLE_ID_SUFFIX =
+
+// ---------------------------------------------------------------------------
+// App Transport Security
+// ---------------------------------------------------------------------------
+//
+// A Release or Profile artifact carries no NSAppTransportSecurity key at all
+// and gets the unmodified platform transport policy: TLS validated normally,
+// no exception domain, no arbitrary-load key of any kind.
+//
+// That is not achieved by a setting in this file. Runner/Info.plist has no
+// such key in any configuration, and the local-development exception in
+// Runner/ATSLocalDevelopment.plist is merged into the packaged plist only by
+// the `Verify Packaged Bundle` build phase, only for a Debug build whose
+// compiled KARAR_ENV is LOCAL. There is deliberately nothing here to switch
+// off, because a switch is a thing that can be left in the wrong position.
+
+// ---------------------------------------------------------------------------
+// Release signing
+// ---------------------------------------------------------------------------
+//
+// No signing identity, team identifier or provisioning profile is set here,
+// and no certificate or profile is committed anywhere in this repository.
+// Release signing material is supplied EXTERNALLY at release time by the
+// release operator or a release pipeline, and is never checked in.
+//
+// Every artifact this repository's CI produces is a simulator or debug build,
+// which requires no signing material at all. No CI job holds an Apple
+// credential, and none needs one.

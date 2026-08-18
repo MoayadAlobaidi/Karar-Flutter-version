@@ -15,6 +15,17 @@ Secrets are `SECRET`: **never in events, never in projections, never in logs, ne
 
 **Every environment has its own secrets.**
 
+### The mobile client holds none of them
+
+Since Phase 4 there is a second place a secret could be misplaced, and the rule is that it cannot go there at all. **A shipped mobile artifact is a public artifact**: anything compiled into it is readable by anyone who has the file, so "the client needs a credential" always means the platform needs an endpoint instead.
+
+Three mechanisms hold it, and none of them is review:
+
+- **Build configuration refuses a secret-shaped name.** The client's configuration loader rejects any compile-time define whose *name* contains `secret`, `password`, `private`, `credential`, `token`, `apikey`, `service_account`, `kms`, `signing`, or `keystore`, and reports the violation **by key name, never by value**. What the client legitimately holds is the API base URL, the environment identifier, public build metadata, and a public brand identifier.
+- **The built artifact is scanned, not just the source.** A CI step unzips the built APK and greps it for credential material, and the Security workflow's mobile secret scan runs **before Flutter is installed** — deliberately, so a scan cannot be influenced by what a package resolution pulled in. Signing material is supplied through environment variables or an ignored properties file, never committed, and its absence is asserted for iOS by test.
+- **An absent signing input fails the build rather than defaulting.** The Android release signing configuration is created only when all four pieces of material are present, so **an unsigned release is the intended failure** and there is no debug-key fallback — a release artifact is asserted to be unsigned rather than debug-signed, because a signature here would mean the debug key had been substituted. On iOS the Apple Team ID is a build input (`KARAR_IOS_TEAM_ID`) consumed by the generated data-extraction rules; LOCAL uses a test-only sentinel and **any deployed profile without a configured value is refused**. **No real Apple Team ID exists, none is invented, and none is committed** — which is why the cross-platform transfer path is configured but unverified on a device ([`../phases/phase-04.md`](../phases/phase-04.md)).
+- **Only one thing is written to secure storage.** The session's tokens, their expiries, and the session id — nothing else. A failure to read that store is a typed failure the application treats as "no credential", never as an empty store, and on failure only the key name is logged, never the value and never the platform's error message, which can echo the entry. Non-sensitive preferences live in a separate unencrypted store whose key type refuses a credential-shaped name at construction. See [`../architecture/flutter.md` §7](../architecture/flutter.md).
+
 > **Never reuse production's encryption key anywhere.** A staging leak would otherwise decrypt production data.
 
 **Application code holds `SecretRef` and `KeyRef` — never a provider's secret ID or key resource name.** The opaque reference resolves through the active deployment profile's secret and key-management adapters, so moving a deployment between providers re-points references without touching application code or stored data ([`../architecture/infrastructure-portability.md`](../architecture/infrastructure-portability.md)).

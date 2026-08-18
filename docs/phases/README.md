@@ -12,6 +12,7 @@ Every phase closes with a single documentation pass, in the phase's closing PR. 
 |---|---|
 | Root [`README.md`](../../README.md) | Status block: current phase, last completed phase |
 | [`../roadmap.md`](../roadmap.md) | The phase row's status |
+| This file's [report index](#reports) | The phase's row, so the index does not disagree with the roadmap about the same phase |
 | `phase-NN.md` (this directory) | The report, complete — no template section left empty (write "none" where true) |
 | [`../onboarding/developer.md`](../onboarding/developer.md) | Only if commands, workflows, or answers changed |
 | [`../compliance/evidence-register.md`](../compliance/evidence-register.md) | Every piece of evidence the phase produced, registered |
@@ -27,6 +28,14 @@ A phase has two gates, and both must pass:
 
 The two gates are deliberately separate documents with separate owners: engineering completion does not imply compliance completion, and neither implies any certification — see the honest-status rule in the [style guide §4](../documentation-style-guide.md).
 
+## What "COMPLETE" means on a phase row
+
+Stated once here, because it is the word most easily misread and every phase row and status block relies on it.
+
+**COMPLETE means:** the phase's deliverables exist in this repository, its tests and builds were executed with recorded results, both of its gates passed, and the update ritual above is done.
+
+**COMPLETE does not mean** merged, deployed, running anywhere, production ready, app-store ready, signed, penetration-tested, legally reviewed, or certified against any framework. A phase report that reads as though it does is a defect in the report. Where a phase's claim rests on static or artifact inspection rather than on a running system or a real device, its report says so in its own words — [`phase-04.md`](phase-04.md) is the worked example, because a mobile client is where the gap between "the mechanism exists" and "it was seen to work" is widest.
+
 ## Reports
 
 | Report | Phase |
@@ -35,5 +44,6 @@ The two gates are deliberately separate documents with separate owners: engineer
 | [`phase-02.md`](phase-02.md) | 2 — Platform and data foundation: PostgreSQL, kernel, audit, events/outbox/jobs, observability |
 | [`phase-03.md`](phase-03.md) | 3 — Identity, tenancy and access control: authentication, sessions, users, tenancy, RLS, RBAC, consent, kill switches |
 | [`phase-03-5.md`](phase-03-5.md) | 3.5 — Jurisdiction and capability foundation: Country/Jurisdiction, PolicyPacks, availability, entitlements, tenant binding, bootstrap |
+| [`phase-04.md`](phase-04.md) | 4 — Flutter and mobile security foundation: app architecture and startup state machine, generated API client with drift detection, authentication and session UX, secure storage, application lock, tenant selection, jurisdiction self-declaration, capability-aware navigation, consent surface, design system, Arabic RTL, accessibility, Android and iOS build guards, runtime response conformance. **COMPLETE — PR open, not merged** |
 
 Phases 0 and 0.5 predate this template; their records are [`../phase-0-completion.md`](../phase-0-completion.md) and [`../phase-05-consolidation.md`](../phase-05-consolidation.md).

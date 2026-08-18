@@ -89,6 +89,69 @@ lifecycle administration (create/draft/classify/publish) ships as authorized use
 its HTTP surface is a Super Admin concern and follows the operating-entity module's
 control-plane deferral (ADR-0021).
 
+**Document CONTENT (Phase 4).** `ConsentDocumentContentApiModule` mounts
+`GET /consent/documents/{documentId}/content`, which returns the text of the version in force
+together with the LANGUAGE of that text. It exists because the listing previously returned
+`storage_ref` — an internal locator no client can fetch — which the listing no longer emits:
+a consent gate that cannot show its document fails closed into uselessness, so the subject
+needs the text itself, and the platform must be the one supplying it.
+
+Why a route rather than a field on the listing: the catalogue records no language, so a
+`language` field on the listing could only be invented, whereas content and its language are
+retrieved together and cannot disagree; the listing is a control-flow surface consulted far
+more often than the text is read; and the bytes are verified against the version's pinned
+`content_hash` before anything is served, a guarantee that belongs where the bytes are handled.
+The caller names a document, never a version — the server chooses the one in force — and a
+document outside the caller's effective entity answers exactly as an unknown id does.
+
+**No real bytes exist yet, and the module says so.** `LegalDocumentContentSource` is declared
+inward. For every deployed environment the bound implementation is `NoContentSourceConfigured`,
+which retrieves nothing: no document store exists this phase and no legal text has been drafted
+or reviewed to place in one. The endpoint reports that absence as a typed
+`DOCUMENT_CONTENT_UNAVAILABLE`; it never approximates, substitutes, or generates legal prose,
+and neither may a client. A real source arrives with the document store and a reviewed
+publication path that records content alongside the version it belongs to.
+
+**LOCAL and TEST get one synthetic fixture, so the path can be walked.** With nothing
+retrievable anywhere, the read-then-accept sequence the whole design is built around could not
+be exercised by a developer, and a path nobody can exercise is a path nobody can find defects
+in. The fixture supplies the bytes for the single version `scripts/db/seed-local-consent.mjs`
+publishes — one paragraph that states on its own face that it is not a legal document, has been
+reviewed by nobody, and has no legal effect.
+
+**The fixture is not in this module, and that is the control.** Its bytes, its storage
+reference and its ids live in `@karar/consent-local-fixtures`, a private package that appears
+in no package's `dependencies` — only as a devDependency — and therefore in no production
+dependency closure and no production `dist/`. It used to live here, guarded by an environment
+check in the same file; the check was real, but the text shipped anyway, in the emitted
+JavaScript and declaration files of a package production installs. Protection that consists
+only of a deployed process declining to read bytes it is holding is one composition change away
+from being none. A deployed environment now cannot serve synthetic text because it does not
+have synthetic text.
+
+What stays in this module is the decision and the generic behaviour.
+`legalDocumentContentSourceFor(environment)` hands every environment but `local` and `test`
+`NoContentSourceConfigured`, without naming, resolving or loading the fixture package at all;
+`local` and `test` get a `StaticLegalDocumentContentSource` over whatever the fixture package
+supplies, resolved optionally at runtime so an installation without it reports the same honest
+absence rather than failing to boot. That class holds no content of its own: it serves exactly
+what it was constructed with, resolving ONE storage reference by equality and answering null
+for every other version — a source that answered for anything would show one document's text
+under another's identity. The fixture package applies its own environment gate next to the
+bytes (an unstated environment is refused, never defaulted), so a caller that reaches the
+fixture without coming through the selector still meets a refusal. Two independent controls:
+one physical, one behavioural, and `__tests__/production-closure.test.ts` asserts the physical
+one against the built output and the manifests rather than against the intention.
+
+**The fixture satisfies the integrity check rather than avoiding it.** The seed hashes the same
+constant the fixture package holds and pins that sha256 into
+`legal_document_versions.content_hash`, which is immutable once published (migration 0064's
+trigger). `GetLegalDocumentContent` then
+hashes whatever the source returned and compares. The two agree because they are the same
+bytes, not because anything is skipped — change either side alone and the route answers 503
+with nothing served, which the integration suite proves by publishing a version that names the
+fixture's locator while pinning different text.
+
 ## Dependencies
 
 Cross-module dependencies resolve through `public-api.ts` only. Cross-module references

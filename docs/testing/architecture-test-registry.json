@@ -1,6 +1,6 @@
 {
   "description": "Machine-readable registry of the 26 architecture tests (docs/testing/architecture-tests.md) plus the canary-purity test. Read by scripts/checks/architecture.mjs, which enforces the activation gate: a test whose activationPhase has been reached without an implementation fails the run.",
-  "currentPhase": 3.5,
+  "currentPhase": 4,
   "source": "docs/testing/architecture-tests.md",
   "statusValues": {
     "ACTIVE": "The guarded structure exists now; the check runs on every invocation and must pass.",

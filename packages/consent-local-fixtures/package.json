@@ -1,0 +1,14 @@
+{
+  "name": "@karar/consent-local-fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "description": "LOCAL/TEST ONLY. The synthetic consent-document fixture — bytes, storage reference and ids — held OUTSIDE @karar/consent so no production build, package or dependency closure can contain it. Never list this package under `dependencies`: it is a devDependency of its consumers and nothing else, and its own environment gate refuses every environment but local and test.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  }
+}

@@ -1,6 +1,6 @@
 # Karar Documentation
 
-**Phase 3.5 complete — jurisdiction and capability foundation; Phase 4 not started.** Identity, tenancy and access control (Phase 3) plus Country and Jurisdiction, PolicyPacks, capability availability, subject policy selection, and session tenant binding; no consumer product capability is implemented. Current status lives in the [root README status block](../README.md#status).
+**Phase 4 — Flutter and mobile security foundation in progress.** Identity, tenancy and access control (Phase 3) plus Country and Jurisdiction, PolicyPacks, capability availability, subject policy selection, and session tenant binding; no consumer product capability is implemented. Current status lives in the [root README status block](../README.md#status).
 
 ---
 
@@ -100,6 +100,7 @@ Reproducible from the documentation alone — a Phase 0 exit criterion.
 | [phases/phase-02](phases/phase-02.md) | Phase 2 report — platform and data foundation |
 | [phases/phase-03](phases/phase-03.md) | Phase 3 report — identity, tenancy and access control |
 | [phases/phase-03-5](phases/phase-03-5.md) | Phase 3.5 report — jurisdiction and capability foundation |
+| [phases/phase-04](phases/phase-04.md) | Phase 4 report — Flutter and mobile security foundation (in progress) |
 | [MODULE_TEMPLATE](MODULE_TEMPLATE.md) | Required for every module |
 | [phase-0-completion](phase-0-completion.md) | Phase 0 exit-criteria verification |
 | [phase-05-consolidation](phase-05-consolidation.md) | Phase 0.5 consolidation record — D1–D6 resolved, portability canonical |

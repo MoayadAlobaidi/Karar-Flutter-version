@@ -8,7 +8,7 @@
 openapi: 3.1.0
 info:
   title: Karar API
-  version: 0.4.0
+  version: 0.5.0
   description: >-
     Contract-first API surface for the Karar platform. Phase 3 exposes
     authentication and session lifecycle (identity), own-profile management
@@ -62,6 +62,10 @@ paths:
     $ref: './paths/users.yaml#/~1users~1me~1disable-request'
   /tenancy/tenant:
     $ref: './paths/tenancy.yaml#/~1tenancy~1tenant'
+  # The caller's OWN memberships, deliberately not tenant-bound: a session
+  # already bound to one tenant cannot otherwise discover what it may switch to.
+  /tenancy/memberships:
+    $ref: './paths/tenancy.yaml#/~1tenancy~1memberships'
   /tenancy/members:
     $ref: './paths/tenancy.yaml#/~1tenancy~1members'
   /tenancy/invitations:
@@ -72,6 +76,12 @@ paths:
     $ref: './paths/tenancy.yaml#/~1tenancy~1invitations~1redeem'
   /consent/documents:
     $ref: './paths/consent.yaml#/~1consent~1documents'
+  # The text itself, addressed by DOCUMENT rather than by version: the server
+  # picks the version in force, so no draft or superseded text is reachable, and
+  # the bytes are checked against that version's pinned hash before they are
+  # served. The listing carries no internal storage locator as a result.
+  /consent/documents/{documentId}/content:
+    $ref: './paths/consent.yaml#/~1consent~1documents~1{documentId}~1content'
   /consent/acceptances:
     $ref: './paths/consent.yaml#/~1consent~1acceptances'
   /consent/withdrawals:
@@ -82,3 +92,9 @@ paths:
     $ref: './paths/platform.yaml#/~1platform~1bootstrap'
   /platform/tenant-binding:
     $ref: './paths/platform.yaml#/~1platform~1tenant-binding'
+  # What a caller may declare, derived from the same predicate the write path
+  # enforces, so the offered set and the accepted set cannot drift apart.
+  /jurisdiction/declarable-references:
+    $ref: './paths/jurisdiction.yaml#/~1jurisdiction~1declarable-references'
+  /jurisdiction/self-declaration:
+    $ref: './paths/jurisdiction.yaml#/~1jurisdiction~1self-declaration'

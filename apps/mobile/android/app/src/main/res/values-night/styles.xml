@@ -1,7 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- AppCompat parents are REQUIRED, not cosmetic. The affected range is
+         Android 8.1 and earlier — API 27 and below. NOT API 28: at API 28 the
+         requirement stops.
+
+         androidx.biometric takes two paths. From API 28, BiometricFragment
+         hands off to the framework's system-drawn prompt and touches no
+         AppCompat class at all. Below API 28 the library draws the dialog
+         itself, through androidx.appcompat.app.AlertDialog, which throws when
+         the hosting activity's theme does not descend from Theme.AppCompat.
+         minSdk is 24, so API 24-27 ships inside the affected range and the
+         parents below are load-bearing there.
+
+         Evidence, not recollection: the local_auth_android README ("Android
+         theme") requires a valid Theme.AppCompat parent "to prevent crashes on
+         Android 8 and below"; in androidx.biometric 1.1.0 the pre-API-28 dialog
+         class carries a reference to androidx/appcompat/app/AlertDialog and
+         BiometricFragment carries none. Checked in the built release APK:
+         LaunchTheme and NormalTheme each resolve to an AppCompat parent in both
+         the default and night configurations.
+
+         NormalTheme is the theme in effect when the prompt appears, so both
+         themes carry the parent. The README's single Theme.AppCompat.DayNight
+         is not used because values/ and values-night/ already select day from
+         night by resource qualifier; the constraint is an AppCompat root, which
+         both branches have. androidx.appcompat arrives transitively with
+         androidx.biometric; no Gradle change is needed. -->
     <!-- Theme applied to the Android Window while the process is starting when the OS's Dark Mode setting is on -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <style name="LaunchTheme" parent="Theme.AppCompat.NoActionBar">
         <!-- Show a splash screen on the activity. Automatically removed when
              the Flutter engine draws its first frame -->
         <item name="android:windowBackground">@drawable/launch_background</item>
@@ -12,7 +38,7 @@
          running.
 
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
-    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+    <style name="NormalTheme" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
 </resources>

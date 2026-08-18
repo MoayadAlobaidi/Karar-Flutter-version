@@ -1,0 +1,10 @@
+# Test tags.
+#
+# Golden baselines are rasterised images. They are committed from one platform
+# and are the only part of the suite that can fail for a reason unrelated to the
+# code under test, so they carry a tag: a CI job on a platform whose baselines
+# have not been generated runs `flutter test --exclude-tags golden` rather than
+# regenerating images it cannot review.
+tags:
+  golden:
+    description: Renders and compares a committed image baseline.

@@ -233,12 +233,13 @@ The legacy's finding, quoted because it is the clearest statement of the problem
 
 ## 11. The client bootstrap surface
 
-**Implemented in Phase 3.5** ([`modules/bootstrap`](../../modules/bootstrap/MODULE.md)). Two routes, authored OpenAPI-first in `packages/api-contracts/openapi/paths/platform.yaml`, both session-scoped self-service — the caller reads and mutates only their own session's context, and tenant selection is authorized by **membership**, not by a permission:
+**Implemented in Phase 3.5** ([`modules/bootstrap`](../../modules/bootstrap/MODULE.md)), and extended by one route in Phase 4. All three are authored OpenAPI-first — the first two in `packages/api-contracts/openapi/paths/platform.yaml`, the third in `tenancy.yaml` — and all three are session-scoped self-service: the caller reads and mutates only their own session's context, and tenant selection is authorized by **membership**, not by a permission:
 
 | Route | Does |
 |---|---|
 | `GET /platform/bootstrap` | Returns who the caller is, their binding state, and the client-safe jurisdiction / operating-entity / PolicyPack / capability view |
 | `POST /platform/tenant-binding` | First bind (no rotation) or switch (full rotation, new tokens in the response) |
+| `GET /tenancy/memberships` | **Phase 4.** The caller's own active memberships, so an unbound session can present a choice. Deliberately **tenantless** — mounted through its own module whose principal source drops the tenant id, so it cannot be handed the tenant-bound principal by wiring accident |
 
 The GET carries **one documented side effect**: an unbound session with exactly one usable membership is auto-bound to it, without token rotation, verified again afterwards, and compensated by revoking the session if the membership vanished in the race window. Both outcomes are audited, and the side effect is declared in the OpenAPI contract rather than discovered.
 
@@ -249,3 +250,12 @@ This module owns **no persistent data**. It composes views over state owned by i
 The response serializer emits a **closed field set**: each field is picked by name, so anything extra an upstream port attaches is dropped at the edge rather than shipped. Hidden capabilities, unimplemented or pending-legal capabilities, Amanat's existence, internal licence detail, full PolicyPack content (version and status only), raw consent evidence, and internal audit or configuration data are all outside that set. Capability output passes through the capability module's **client-safe** resolver unenriched — bootstrap never re-filters ids, so the filter cannot drift into two implementations ([`capability-registry.md` §5](capability-registry.md)). A leak-regression suite drives fakes that try to leak through every port and asserts the serialized output carries exactly the declared fields.
 
 Enrichment ports may legitimately return null while a dimension is unresolved; the response carries explicit nulls rather than fabricated defaults, and the jurisdiction state is the typed three-arm value whose `NONE` arm is the fail-closed case.
+
+### Phase 4: unresolved and unavailable became different answers
+
+In Phase 3.5 the enrichment ports returned bare values and **could not express failure at all**, so a store fault and a user with no services produced the same response. Phase 4 made each port return a tagged outcome, and the two response sections that a client acts on became discriminated shapes:
+
+- `capabilities` is `{state, items}`. `RESOLVED` with an empty list is an answer; an unavailable resolution is a `503 BOOTSTRAP_UNAVAILABLE` carrying a retryable flag and no detail. **Both changes are breaking** for a client written against Phase 3.5.
+- `operatingEntity` is `{state, entity}` with `ASSIGNED` / `UNASSIGNED` / `UNAVAILABLE`, and `entity` is explicitly `null` rather than omitted in the latter two. Unassigned is a legitimate state, not an error.
+
+The operating-entity summary is new in Phase 4 and is client-safe **by its SELECT**: the reader fetches four columns, so licence evidence, contract references, registration internals, role assignments and administrative metadata never enter the process. Authorization is resolution-scoped — a caller cannot name an entity or enumerate the register, only receive the one derived from their own binding ([`operating-entity.md` §8a](operating-entity.md)).

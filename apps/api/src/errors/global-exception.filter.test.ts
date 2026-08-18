@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { Controller, Get, Module, NotFoundException } from '@nestjs/common';
+import { Controller, Get, HttpException, Module, NotFoundException } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -33,6 +33,49 @@ class ThrowingController {
   @Get('missing-thing')
   missing(): never {
     throw new NotFoundException('thing not found');
+  }
+
+  /** A module answering with the RFC 7807 document IT authored. */
+  @Get('module-problem')
+  moduleProblem(): never {
+    throw new HttpException(
+      {
+        type: 'about:blank',
+        title: 'Profile not found',
+        status: 404,
+        code: 'PROFILE_NOT_FOUND',
+        detail: 'no profile exists for this caller in the bound tenant',
+      },
+      404,
+    );
+  }
+
+  /** The same channel on a module's own dependency failure. */
+  @Get('module-outage')
+  moduleOutage(): never {
+    throw new HttpException(
+      {
+        type: 'about:blank',
+        title: 'Bootstrap unavailable',
+        status: 503,
+        code: 'BOOTSTRAP_UNAVAILABLE',
+        retryable: true,
+        requestId: 'req-0001',
+      },
+      503,
+    );
+  }
+
+  /**
+   * A body whose `status` disagrees with the status it is being sent under.
+   * Not a module-authored problem as far as this boundary is concerned.
+   */
+  @Get('mismatched-problem')
+  mismatched(): never {
+    throw new HttpException(
+      { type: 'about:blank', title: 'Conflict', status: 409, code: 'SOMETHING' },
+      400,
+    );
   }
 }
 
@@ -142,6 +185,67 @@ describe('GlobalExceptionFilter — the single error boundary', () => {
     expect((JSON.parse(response.body) as CapturedLine)['status']).toBe(404);
     expect(lines.filter((line) => line['level'] === 'error')).toHaveLength(0);
     expect(lines.filter((line) => line['level'] === 'warn')).toHaveLength(1);
+  });
+
+  it('forwards a MODULE-authored problem verbatim, under application/problem+json', async () => {
+    // The defect this closes: tenancy, users, bootstrap, jurisdiction and the
+    // consent content route used to write these bodies straight to the reply,
+    // so 25 (operation, status) pairs shipped an RFC 7807 body labelled
+    // application/json. They throw now, and this boundary — the ONE writer —
+    // supplies the media type. What it must NOT do is rewrite the document:
+    // the module's own code is its contract with its clients.
+    const response = await app
+      .getHttpAdapter()
+      .getInstance()
+      .inject({ method: 'GET', url: '/module-problem' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(JSON.parse(response.body)).toEqual({
+      type: 'about:blank',
+      title: 'Profile not found',
+      status: 404,
+      code: 'PROFILE_NOT_FOUND',
+      detail: 'no profile exists for this caller in the bound tenant',
+    });
+  });
+
+  it('keeps a module problem’s extensions, and logs its 5xx as a failure', async () => {
+    lines.length = 0;
+    const response = await app
+      .getHttpAdapter()
+      .getInstance()
+      .inject({ method: 'GET', url: '/module-outage' });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    const body = JSON.parse(response.body) as CapturedLine;
+    // The correlation id the module echoed, and the retry hint — both would
+    // be lost if this boundary re-derived the document from the platform
+    // error model, which knows neither.
+    expect(body['requestId']).toBe('req-0001');
+    expect(body['retryable']).toBe(true);
+    expect(body['code']).toBe('BOOTSTRAP_UNAVAILABLE');
+
+    const errorLines = lines.filter((line) => line['level'] === 'error');
+    expect(errorLines).toHaveLength(1);
+    expect(errorLines[0]!['code']).toBe('BOOTSTRAP_UNAVAILABLE');
+  });
+
+  it('refuses to forward a document that disagrees with the status it is sent under', async () => {
+    // Recognition is strict on purpose. A body claiming 409 inside a 400
+    // response is a defect to surface, not one to relay, so it falls through
+    // to the platform error model like any other framework exception.
+    const response = await app
+      .getHttpAdapter()
+      .getInstance()
+      .inject({ method: 'GET', url: '/mismatched-problem' });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    const body = JSON.parse(response.body) as CapturedLine;
+    expect(body['code']).toBe('VALIDATION_ERROR');
+    expect(body['type']).toBe('urn:karar:error:VALIDATION_ERROR');
   });
 
   it('emits the access line with method, route and duration for successful-looking requests too', async () => {

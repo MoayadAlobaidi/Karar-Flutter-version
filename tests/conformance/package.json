@@ -1,0 +1,29 @@
+{
+  "name": "@karar/conformance-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runtime contract conformance: REAL responses from the composed Fastify application, validated against the OpenAPI document that describes them. The drift check binds the contract to the generated client; this binds the SERVER to the contract.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/api": "workspace:*",
+    "@karar/consent": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*",
+    "@nestjs/common": "^11.2.0",
+    "@nestjs/platform-fastify": "^11.2.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@karar/consent-local-fixtures": "workspace:*",
+    "@nestjs/testing": "^11.2.0",
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0",
+    "yaml": "2.9.0"
+  }
+}

@@ -5,12 +5,11 @@ import { ErrorCode, PlatformError, toProblemDetails } from '@karar/platform/dist
 import type { ProblemDetails } from '@karar/platform/dist/errors/index.js';
 import type { PlatformLogger } from '@karar/platform/dist/observability/index.js';
 import { APP_LOGGER } from '../di-tokens.js';
-
-interface ReplyLike {
-  status(code: number): ReplyLike;
-  header(name: string, value: string): ReplyLike;
-  send(body: unknown): unknown;
-}
+import {
+  authoredProblemOf,
+  writeProblemResponse,
+  type ProblemReplyLike,
+} from './problem-response.js';
 
 interface RequestLike {
   method: string;
@@ -55,15 +54,31 @@ function operationDeniedBodyOf(exception: HttpException): OperationDeniedBody | 
   return null;
 }
 
+/** What leaves this boundary: the status, the body, and the code it logs under. */
+interface ProblemAnswer {
+  readonly status: number;
+  readonly code: string;
+  readonly body: unknown;
+}
+
 /**
  * The single error boundary of the HTTP entrypoint.
  *
- * Every thrown value leaves as an RFC 7807 problem document produced by the
- * platform error model's `toProblemDetails` (`application/problem+json`):
- * `PlatformError` contributes its code/safe message/safe details; framework
- * `HttpException`s are mapped onto platform codes; anything else becomes the
- * generic `INTERNAL_ERROR` problem. The response NEVER carries stacks,
- * causes, driver errors or connection details.
+ * Every thrown value leaves as an RFC 7807 problem document
+ * (`application/problem+json`, written by `writeProblemResponse` — the one
+ * writer). Two kinds of document reach the wire:
+ *
+ *   * a document the platform error model produced from the throw
+ *     (`toProblemDetails`): `PlatformError` contributes its code/safe
+ *     message/safe details, framework `HttpException`s are mapped onto
+ *     platform codes, and anything else becomes the generic `INTERNAL_ERROR`
+ *     problem;
+ *   * a document a MODULE authored and threw for itself, forwarded verbatim
+ *     (`authoredProblemOf`) so its own machine-readable code, its `reason` /
+ *     `retryable` and its echoed `requestId` survive the boundary.
+ *
+ * The response NEVER carries stacks, causes, driver errors or connection
+ * details either way.
  *
  * The error is logged here ONCE, server-side, with its stack — and nowhere
  * else (no-duplicate-error-logging rule, see platform observability/logger.ts).
@@ -74,39 +89,54 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
-    const reply = http.getResponse<ReplyLike>();
+    const reply = http.getResponse<ProblemReplyLike>();
     const request = http.getRequest<RequestLike>();
     const route = request.routeOptions?.url ?? request.url.split('?')[0] ?? '/';
     const traceId = trace.getActiveSpan()?.spanContext().traceId;
 
-    const problem = this.toProblem(exception, route, traceId);
+    const answer = this.toAnswer(exception, route, traceId);
 
     // Log ONCE, at this boundary. Stack and cause stay SERVER-SIDE only.
     // An operator-set kill-switch restriction is an intentional denial, not a
     // failure: it logs as a rejection so an incident does not flood the error
-    // signal. A switch-store outage stays in the error branch — it is real.
-    if (problem.status >= 500 && problem.code !== ErrorCode.OPERATION_RESTRICTED) {
+    // signal. A switch-store outage stays in the error branch — it is real,
+    // and so is a module's own dependency-unavailable answer.
+    if (answer.status >= 500 && answer.code !== ErrorCode.OPERATION_RESTRICTED) {
       this.logger.error(
         {
           err: exception instanceof Error ? exception : new Error(String(exception)),
           method: request.method,
           route,
-          status: problem.status,
-          code: problem.code,
+          status: answer.status,
+          code: answer.code,
         },
         'request failed',
       );
     } else {
       this.logger.warn(
-        { method: request.method, route, status: problem.status, code: problem.code },
+        { method: request.method, route, status: answer.status, code: answer.code },
         'request rejected',
       );
     }
 
-    reply
-      .status(problem.status)
-      .header('content-type', 'application/problem+json; charset=utf-8')
-      .send(problem);
+    writeProblemResponse(reply, answer.status, answer.body);
+  }
+
+  private toAnswer(
+    exception: unknown,
+    instance: string,
+    traceId: string | undefined,
+  ): ProblemAnswer {
+    // A module-authored document is already the answer; this boundary adds
+    // the media type and the log line and changes nothing else.
+    if (!(exception instanceof PlatformError)) {
+      const authored = authoredProblemOf(exception);
+      if (authored !== null) {
+        return { status: authored.status, code: authored.body.code, body: authored.body };
+      }
+    }
+    const problem = this.toProblem(exception, instance, traceId);
+    return { status: problem.status, code: problem.code, body: problem };
   }
 
   private toProblem(

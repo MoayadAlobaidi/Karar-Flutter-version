@@ -7,6 +7,7 @@ import type {
   CreateInvitationError,
   GetOwnTenantError,
   ListMembersError,
+  ListOwnMembershipsError,
   RedeemInvitationError,
   RevokeInvitationError,
 } from '../../application/errors.js';
@@ -41,6 +42,7 @@ export function authenticationRequiredProblem(): ProblemResponse {
 type TenancyError =
   | GetOwnTenantError
   | ListMembersError
+  | ListOwnMembershipsError
   | CreateInvitationError
   | RevokeInvitationError
   | RedeemInvitationError;

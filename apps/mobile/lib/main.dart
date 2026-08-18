@@ -1,26 +1,9 @@
-import 'package:flutter/material.dart';
+// The entrypoint. Everything it does is in `app/bootstrap/app_bootstrap.dart`;
+// keeping this file to one line of behaviour means the startup sequence is
+// testable without invoking `main`. The feature surface is merged in
+// `app/composition/feature_surface.dart` — see that file for why the two
+// contributing workstreams cannot simply both apply their own overrides.
+import 'app/bootstrap/app_bootstrap.dart';
+import 'app/composition/feature_surface.dart';
 
-void main() {
-  runApp(const KararApp());
-}
-
-/// Phase 1 shell: boots, renders a placeholder, and nothing else.
-/// No product features, no financial math on the client (ADR-0007).
-class KararApp extends StatelessWidget {
-  const KararApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Karar',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F3D3E)),
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text('Karar — Phase 1 shell'),
-        ),
-      ),
-    );
-  }
-}
+Future<void> main() => bootstrapKararApp(overrides: featureSurfaceOverrides());

@@ -214,7 +214,7 @@ Items 5 and 6 rank immediately after clear architecture, and **neither justifies
 |---|---|
 | [`clean-architecture.md`](clean-architecture.md) | Layers, the dependency rule, enforcement |
 | [`backend.md`](backend.md) | NestJS structure, module anatomy, entrypoints |
-| [`flutter.md`](flutter.md) | Client architecture, RTL, capability-aware navigation |
+| [`flutter.md`](flutter.md) | Client architecture, the startup state machine, capability-aware navigation, RTL, storage, build guards |
 | [`data-model.md`](data-model.md) | Schemas, pinning, money, IDs |
 | [`tenancy.md`](tenancy.md) | Tenant isolation, RLS, the four layers |
 | [`jurisdiction-policy.md`](jurisdiction-policy.md) | PolicyPacks, settings, resolution strategies, subject profiles |
@@ -241,8 +241,12 @@ Items 5 and 6 rank immediately after clear architecture, and **neither justifies
 
 ## 12. Status
 
-Phases 0–3 are complete and Phase 3.5 delivered the jurisdiction and capability foundation. What exists is the platform substrate — identity, users, tenancy, operating entities, RBAC, consent, kill switches, PostgreSQL RLS, and now Country/Jurisdiction with typed PolicyPacks, the capability registry with deny-by-default availability and tenant entitlements, `SubjectPolicySelection`, session tenant binding, and the authenticated client bootstrap surface.
+Phases 0–3.5 are complete. Phase 4 is IN PROGRESS, its implementation and internal gates are done, and **it is not merged**. What exists is the platform substrate — identity, users, tenancy, operating entities, RBAC, consent, kill switches, PostgreSQL RLS, Country/Jurisdiction with typed PolicyPacks, the capability registry with deny-by-default availability and tenant entitlements, `SubjectPolicySelection`, session tenant binding, and the authenticated client bootstrap surface — plus a Flutter client that consumes it: a startup state machine, a generated Dart API client with contract drift detection, authentication and session flows, secure token storage with single-flight refresh, application lock, tenant selection, jurisdiction self-declaration, capability-aware navigation, the consent surface, and a design system with Arabic and RTL first-class ([`flutter.md`](flutter.md)).
 
-**No consumer product capability is implemented.** Every entry in the capability registry is `NOT_IMPLEMENTED` and deployed nowhere, no jurisdiction is approved, no PolicyPack is approved, and no capability is reachable anywhere. The rest of this document remains largely a set of decisions; the per-document phase headers and the implemented-state notes inside them say which parts have landed.
+Phase 4 also hardened the contracts the client depends on: a bootstrap resolution failure and a legitimately empty capability set became different types on the wire, the bootstrap response gained a client-safe operating-entity summary enforced by its SELECT, every problem document now leaves through one writer under the declared media type, the seventeen `/auth` operations acquired response schemas, and real server responses are validated against the OpenAPI document rather than only the generated client ([`backend.md` §9](backend.md)).
+
+**No consumer product capability is implemented.** Every entry in the capability registry is `NOT_IMPLEMENTED` and deployed nowhere, no jurisdiction is approved, no PolicyPack is approved, and no capability is reachable anywhere. The client renders that state honestly rather than hiding it: its authenticated home is an account and security surface whose services section is a stated empty state.
+
+**Nothing is deployed, nothing is signed, and nothing has run on a device.** No environment is provisioned and no endpoint exists — the client's build guards refuse to produce a package for any environment other than `LOCAL`, which is what makes that claim checkable rather than asserted. No signed build exists and no signing material is in the repository; the biometric prompt has been verified statically and against built artifacts, never on hardware. The rest of this document remains largely a set of decisions; the per-document phase headers and the implemented-state notes inside them say which parts have landed, and [`../phases/phase-04.md`](../phases/phase-04.md) is the honest-status source for the client.
 
 The roadmap is in `docs/roadmap.md`. **The critical path to a shippable Qatar B2C v1 is Phases 0–9.** Phases 10–21 are an architectural *option*, not a schedule — the seams are what keep that option cheap.

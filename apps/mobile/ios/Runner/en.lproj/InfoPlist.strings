@@ -1,0 +1,16 @@
+/*
+  English purpose strings for the packaged Info.plist.
+
+  iOS shows the value from the .lproj matching the device language and falls
+  back to Runner/Info.plist when none matches. This English value is identical
+  to the one in Runner/Info.plist, so the fallback and the localization cannot
+  say different things.
+
+  The sentence is bound by what the lock actually is. Face ID here is a LOCAL
+  privacy control: the device performs the comparison and answers yes or no,
+  Karar receives no template, image or derived representation, stores none and
+  transmits none, and unlocking proves presence to the device rather than
+  granting a session. Every clause below carries one of those facts. Shortening
+  it means dropping one of them, which is why it is this long and no longer.
+*/
+"NSFaceIDUsageDescription" = "Face ID unlocks Karar on this device. Your device performs the check and Karar never receives or stores your face data. Unlocking the app does not replace signing in.";

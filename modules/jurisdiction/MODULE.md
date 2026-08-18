@@ -95,14 +95,43 @@ _None._
 
 | Route | Audience | Capability required |
 |---|---|---|
-| _none_ | — | — |
+| `GET /jurisdiction/declarable-references` | authenticated caller (no binding required) | _none — reference data only_ |
+| `POST /jurisdiction/self-declaration` | authenticated subject (own record) | _none — this route grants no capability access_ |
 
-**This module deliberately exposes NO HTTP surface in Phase 3.5.** Assignments and pack
-activations are operator/system/seed-side use cases, and the client reads its jurisdiction
-context through the authenticated bootstrap endpoint another Phase 3.5 workstream owns, which
-consumes this module's public API server-side. Operator surfaces (assignment administration,
-settings writes, activation control) arrive with the control plane in Phase 8, behind the
-permissions below — the same deferral the operating-entity module records (ADR-0021).
+**The listing exists so the declaration is usable.** Without it a client could only offer a
+free-text field, inviting an identifier the register does not hold; the screen instead rendered
+an honest "selection unavailable" state. The listing and the declaration decide declarability
+through ONE shared domain predicate (`declarabilityRefusalAt`), so an entry offered is an entry
+accepted: retired entries, entries outside their reviewed effective window, and entries whose
+country does not resolve are omitted from both. It is a read — it writes nothing, activates no
+pack, and approves nothing.
+
+**Safe fields only.** The response carries the identifier, the register's code, the country code
+and its localisation key, the structural type, and one derived fact — `approvalRecorded`, false
+for every entry, stated rather than left silent so a chooser cannot read as an approved list.
+The register's governance record (provenance, lifecycle stage, review status, reviewed effective
+window) is INTERNAL and appears nowhere on the wire. No display NAME is emitted: the register
+holds none, and inventing one would be fabricating reference data.
+
+**One narrow write, added in Phase 4.** A subject declares its own jurisdiction so that
+onboarding can proceed: without an assignment there is no governing jurisdiction, no PolicyPack
+resolves, and consent acceptance can pin no provenance — and every other write path here is
+gated on `jurisdiction.assignment.manage`, deliberately unseeded, so no assignment could come
+into existence at runtime at all.
+
+The declaration records source `USER_DECLARED` and verification status `UNVERIFIED`, both fixed
+by the use case rather than accepted from the caller, and both independently CHECK-enforced by
+migration `0072`. **It widens nothing:** an UNVERIFIED effective state is a first-class denial
+in the capability ceiling (`UNVERIFIED_ASSIGNMENT` → `JURISDICTION_UNVERIFIED`), so declaring
+changes the denial reason a subject sees and clears no capability. It creates no legal approval,
+activates no pack, verifies nothing, and never supersedes an existing VERIFIED assignment — a
+subject cannot erase its own verification. History is preserved: the open row is ended and a
+successor inserted, exactly as the schema trigger permits.
+
+**Still deliberately absent:** operator assignment administration, verification writes, settings
+writes, and activation control. Those are Super Admin surfaces and mount behind the
+control-plane gateway in Phase 8, behind the permissions below — the same deferral the
+operating-entity module records (ADR-0021).
 
 ## Permissions
 
@@ -248,10 +277,12 @@ stricter fix and is deliberately not added, because it is outside the Prisma sch
 would break the exactness the drift gate depends on — the same trade-off the consent module
 records for single-ACTIVE-per-triple.
 
-**Deliberately not built:** any HTTP surface (see APIs exposed), any register-editing use case,
-any settings write path (Phase 8), and any cross-subject assignment read — an operator learns a
-subject's assignment by acting in that subject's principal context, not by enumerating the
-table.
+**Deliberately not built:** any HTTP surface beyond the single self-declaration route (see APIs
+exposed), any register-editing use case, any settings write path (Phase 8), and any
+cross-subject assignment read — an operator learns a subject's assignment by acting in that
+subject's principal context, not by enumerating the table. `DeclareOwnJurisdiction` carries no
+subject parameter for the same reason: the authenticated principal is the target, and the
+repository writes inside that principal's own RLS context.
 
 ---
 

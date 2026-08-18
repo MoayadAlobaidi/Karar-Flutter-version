@@ -9,9 +9,25 @@
 #   iac-and-containers blocking     trivy misconfiguration scan, gates on HIGH/CRITICAL
 #   sbom               blocking     SPDX SBOM generation (artifact: sbom)
 #   licenses           report-only  license inventory (artifact: licenses)
+#   mobile-supply-chain report-only Flutter/Dart dependency report and mobile
+#                                   SBOM (artifacts: mobile-dependency-audit,
+#                                   mobile-sbom), plus a mobile secret scan
 #
 # Every action is pinned to a commit SHA. No cloud (GCP/AWS) credentials are
 # used anywhere in this workflow; the only secret is the read-only GITHUB_TOKEN.
+#
+# WHERE MOBILE SECRET SCANNING HAPPENS, AND WHY IN MORE THAN ONE PLACE
+#   1. `secrets` (this workflow) — gitleaks over the full git history of the
+#      whole repository, apps/mobile included. Catches a credential that was
+#      committed and later removed.
+#   2. The Dart security suite inside the required `mobile` check in ci.yml —
+#      the working tree, with rules specific to this product.
+#   3. `mobile-android` in ci.yml — the built APK, which is what would actually
+#      be distributed and which no source scan can see.
+#   4. `mobile-supply-chain` below — apps/mobile, in shell, with no dependency
+#      on the Flutter toolchain resolving. (2) silently stops running if the
+#      mobile package fails to compile; this one does not, which is the reason
+#      it is kept separate rather than trusting a single scanner.
 
 name: Security
 
@@ -218,6 +234,129 @@ jobs:
         with:
           name: sbom
           path: sbom.spdx.json
+          if-no-files-found: error
+
+  # Supply-chain reporting for the Flutter client.
+  #
+  # Report-only, matching how `dependency-audit` and `licenses` treat the Node
+  # workspace: there is no advisory baseline for the pub ecosystem yet, and a
+  # gate without a baseline blocks on noise. The tightening criterion belongs
+  # beside the existing ones in
+  # docs/operations/repository-security-settings.md.
+  #
+  # The secret scan in this job is NOT report-only. It fails the job.
+  mobile-supply-chain:
+    name: mobile-supply-chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Runs before the toolchain is set up, deliberately: this scan must not
+      # depend on Flutter resolving. See the header for why.
+      - name: Mobile secret scan (blocking)
+        run: |
+          set -uo pipefail
+          root=apps/mobile
+          findings=0
+
+          scan() {
+            local rule="$1" pattern="$2"
+            local hits
+            hits="$(grep -rInE --binary-files=without-match \
+                      --exclude-dir=build \
+                      --exclude-dir=.dart_tool \
+                      --exclude-dir=.gradle \
+                      --exclude-dir=Pods \
+                      --exclude-dir=ephemeral \
+                      "$pattern" "$root" 2>/dev/null || true)"
+            if [ -n "$hits" ]; then
+              echo "FAIL [$rule]"
+              echo "$hits"
+              findings=1
+            fi
+          }
+
+          # Shapes that are never legitimate. The mirror of the rule table in
+          # apps/mobile/test/security/embedded_secrets_test.dart; the two are
+          # intentionally duplicated so neither is a single point of failure.
+          scan private-key-block '\-\-\-\-\-BEGIN [A-Z ]*PRIVATE KEY\-\-\-\-\-'
+          scan service-account-document '"type"[[:space:]]*:[[:space:]]*"service_account"'
+          scan database-credentials '(postgres|postgresql|mysql|mongodb|redis|amqp)://[^[:space:]:@/"]+:[^[:space:]@/"]+@'
+          scan aws-access-key-id 'AKIA[0-9A-Z]{16}'
+          scan google-api-key 'AIza[0-9A-Za-z_-]{35}'
+          scan cloudflare-api-token 'v1\.0-[A-Za-z0-9_-]{20,}'
+          scan github-token 'gh[pousr]_[A-Za-z0-9]{36}'
+          scan slack-token 'xox[baprs]-[0-9A-Za-z-]{10,}'
+          scan stripe-secret-key 'sk_(live|test)_[A-Za-z0-9]{16,}'
+          scan json-web-token '\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}'
+
+          # Signing and provider credential files, which must be supplied
+          # externally at release time and never committed.
+          tracked="$(git ls-files "$root" \
+            | grep -Ei '\.(jks|keystore|p12|pfx|pem|key|cer|crt|der|mobileprovision|provisionprofile)$|(^|/)(google-services\.json|GoogleService-Info\.plist|key\.properties)$' \
+            || true)"
+          if [ -n "$tracked" ]; then
+            echo "FAIL [committed-signing-or-provider-credential]"
+            echo "$tracked"
+            findings=1
+          fi
+
+          if [ "$findings" -ne 0 ]; then
+            echo "Mobile secret scan found credential material."
+            exit 1
+          fi
+          echo "OK: mobile secret scan clean."
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: '3.47.0'
+          cache: true
+
+      - name: Resolve packages
+        working-directory: apps/mobile
+        run: flutter pub get --enforce-lockfile
+
+      - name: Dart dependency report (report-only)
+        working-directory: apps/mobile
+        continue-on-error: true
+        run: |
+          mkdir -p ../../reports
+          dart pub outdated --json > ../../reports/mobile-dependency-audit.json
+          # Human-readable copy for the job log.
+          dart pub outdated || true
+
+      - name: Upload dependency report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-dependency-audit
+          path: reports/mobile-dependency-audit.json
+          if-no-files-found: warn
+
+      # A mobile-scoped SBOM. The repository-wide `sbom` job runs syft over the
+      # whole tree and does catalogue pubspec.lock, but its output is one
+      # document covering everything. A store submission, a customer security
+      # questionnaire and a vulnerability triage all want the client's
+      # dependencies on their own, so this produces that separately rather than
+      # asking the consumer to filter the monorepo SBOM.
+      - name: Generate mobile SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: apps/mobile
+          format: spdx-json
+          output-file: mobile-sbom.spdx.json
+          upload-artifact: false # uploaded below under a stable artifact name
+          dependency-snapshot: false # the submission API needs contents: write
+
+      - name: Upload mobile SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-sbom
+          path: mobile-sbom.spdx.json
           if-no-files-found: error
 
   licenses:

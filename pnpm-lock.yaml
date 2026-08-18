@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  deepmerge-ts: 8.0.1
+
 importers:
 
   .:
@@ -345,6 +348,9 @@ importers:
         specifier: ^11.2.0
         version: 11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
     devDependencies:
+      '@karar/consent-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/consent-local-fixtures
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
@@ -458,7 +464,16 @@ importers:
       '@karar/shared-kernel':
         specifier: workspace:*
         version: link:../../packages/shared-kernel
+      '@nestjs/common':
+        specifier: ^11.2.0
+        version: 11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
     devDependencies:
+      '@nestjs/platform-fastify':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@nestjs/testing':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
       '@types/node':
         specifier: ^25.9.5
         version: 25.9.5
@@ -468,6 +483,12 @@ importers:
       pg:
         specifier: ^8.16.0
         version: 8.23.0
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
 
   modules/operating-entity:
     dependencies:
@@ -612,6 +633,8 @@ importers:
         specifier: ^25.9.5
         version: 25.9.5
 
+  packages/consent-local-fixtures: {}
+
   packages/financial-engine:
     dependencies:
       '@karar/shared-kernel':
@@ -664,6 +687,49 @@ importers:
   packages/shared-kernel: {}
 
   packages/state-machine: {}
+
+  tests/conformance:
+    dependencies:
+      '@karar/api':
+        specifier: workspace:*
+        version: link:../../apps/api
+      '@karar/consent':
+        specifier: workspace:*
+        version: link:../../modules/consent
+      '@karar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+      '@nestjs/common':
+        specifier: ^11.2.0
+        version: 11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+    devDependencies:
+      '@karar/consent-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/consent-local-fixtures
+      '@nestjs/testing':
+        specifier: ^11.2.0
+        version: 11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.0(@nestjs/common@11.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.21.0
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.0
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
   tests/security:
     dependencies:
@@ -1717,8 +1783,8 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
-  deepmerge-ts@7.1.5:
-    resolution: {integrity: sha512-HOJkrhaYsweh+W+e74Yn7YStZOilkoPb6fycpwNLKzSPtruFs48nYis0zy5yJz1+ktUhHxoRDJ27RQAWLIJVJw==}
+  deepmerge-ts@8.0.1:
+    resolution: {integrity: sha512-szCXE7YLCvLKR9bFPJcvsezOShdalctSvrgN/LM/QGUEPZQajwjmsMObZ6/DuANT5lxzM/wtO8Feubwdkz8myA==}
     engines: {node: '>=16.0.0'}
 
   defu@6.1.7:
@@ -3135,7 +3201,7 @@ snapshots:
   '@prisma/config@7.9.1':
     dependencies:
       c12: 3.3.4
-      deepmerge-ts: 7.1.5
+      deepmerge-ts: 8.0.1
       effect: 3.20.0
       empathic: 2.0.0
     transitivePeerDependencies:
@@ -3789,7 +3855,7 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  deepmerge-ts@7.1.5: {}
+  deepmerge-ts@8.0.1: {}
 
   defu@6.1.7: {}
 

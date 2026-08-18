@@ -28,6 +28,7 @@ function fakeProbes(overrides: Partial<ReadinessProbes> = {}): ReadinessProbes {
   return {
     pingDatabase: () => Promise.resolve(),
     migrationsStatus: () => Promise.resolve<MigrationsStatus>('ok'),
+    pingRedis: () => Promise.resolve(),
     close: () => Promise.resolve(),
     ...overrides,
   };
@@ -86,7 +87,10 @@ describe('readyz — real checks', () => {
     const sent: SentReply = {};
     await controller.readyz(fakeReply(sent));
     expect(sent.statusCode).toBe(200);
-    expect(sent.body).toEqual({ status: 'ok', checks: { postgres: 'up', migrations: 'ok' } });
+    expect(sent.body).toEqual({
+      status: 'ok',
+      checks: { postgres: 'up', migrations: 'ok', redis: 'up' },
+    });
     await moduleRef.close();
   });
 
@@ -102,8 +106,47 @@ describe('readyz — real checks', () => {
     expect(sent.statusCode).toBe(503);
     expect(sent.body).toEqual({
       status: 'unavailable',
-      checks: { postgres: 'down', migrations: 'ok' },
+      checks: { postgres: 'down', migrations: 'ok', redis: 'up' },
     });
+    await moduleRef.close();
+  });
+
+  it('answers 503 with redis=down when the rate-limit store does not answer', async () => {
+    const moduleRef = await compileApp(
+      fakeProbes({
+        pingRedis: () =>
+          Promise.reject(
+            new Error("Stream isn't writeable and enableOfflineQueue options is false"),
+          ),
+      }),
+    );
+    const controller = moduleRef.get(HealthController);
+    const sent: SentReply = {};
+    await controller.readyz(fakeReply(sent));
+    // Postgres and the schema are fine, but the endpoints that fail closed on
+    // the limiter cannot be served — an instance in that state is not ready.
+    expect(sent.statusCode).toBe(503);
+    expect(sent.body).toEqual({
+      status: 'unavailable',
+      checks: { postgres: 'up', migrations: 'ok', redis: 'down' },
+    });
+    await moduleRef.close();
+  });
+
+  it('never leaks the rate-limit store endpoint or its driver error in the body', async () => {
+    const moduleRef = await compileApp(
+      fakeProbes({
+        pingRedis: () => Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:6379')),
+      }),
+    );
+    const controller = moduleRef.get(HealthController);
+    const sent: SentReply = {};
+    await controller.readyz(fakeReply(sent));
+    const serialized = JSON.stringify(sent.body);
+    for (const leaked of ['127.0.0.1', '6379', 'ECONNREFUSED', 'redis://', 'ioredis', 'Stream']) {
+      expect(serialized).not.toContain(leaked);
+    }
+    expect(serialized).toContain('"redis":"down"');
     await moduleRef.close();
   });
 
@@ -119,7 +162,7 @@ describe('readyz — real checks', () => {
       expect(sent.statusCode).toBe(503);
       expect(sent.body).toEqual({
         status: 'unavailable',
-        checks: { postgres: 'up', migrations: status },
+        checks: { postgres: 'up', migrations: status, redis: 'up' },
       });
       await moduleRef.close();
     },
@@ -158,11 +201,14 @@ describe('readyz — real checks', () => {
     const service = new ReadinessService({
       pingDatabase: (budgetMs) => withBudget(budgetMs, never),
       migrationsStatus: () => Promise.resolve('ok'),
+      pingRedis: (budgetMs) => withBudget(budgetMs, never),
       close: () => Promise.resolve(),
     });
     const startedAt = Date.now();
     const report = await service.check();
     expect(report.checks.postgres).toBe('down');
+    expect(report.checks.redis).toBe('down');
+    // Both budgets run concurrently: one budget, not two, end to end.
     expect(Date.now() - startedAt).toBeLessThan(CHECK_BUDGET_MS + 1_000);
   });
 });

@@ -1,0 +1,17 @@
+# Localization generation contract.
+#
+# The generated Dart is committed so a clean clone analyzes and tests without a
+# generation step. Regenerate with `flutter gen-l10n` after editing any ARB file.
+#
+# `required-resource-attributes` forces every message in the template to carry a
+# description, so a translator never guesses at intent.
+arb-dir: lib/l10n/arb
+template-arb-file: app_en.arb
+output-dir: lib/l10n/generated
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+required-resource-attributes: true
+use-escaping: true
+format: true
+header: "// GENERATED FILE — do not edit by hand.\n// Source of truth: lib/l10n/arb/*.arb. Regenerate with `flutter gen-l10n`.\n// ignore_for_file: type=lint"

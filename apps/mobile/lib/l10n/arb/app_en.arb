@@ -1,0 +1,1851 @@
+{
+  "@@locale": "en",
+
+  "appName": "Karar",
+  "@appName": {
+    "description": "Product name shown in the task switcher and the about screen."
+  },
+
+  "actionContinue": "Continue",
+  "@actionContinue": {
+    "description": "Primary action that advances a multi-step flow."
+  },
+  "actionCancel": "Cancel",
+  "@actionCancel": {
+    "description": "Action that abandons the current flow without saving."
+  },
+  "actionConfirm": "Confirm",
+  "@actionConfirm": {
+    "description": "Action that accepts a destructive or irreversible dialog."
+  },
+  "actionSave": "Save",
+  "@actionSave": {
+    "description": "Action that commits edits in a form."
+  },
+  "actionClose": "Close",
+  "@actionClose": {
+    "description": "Action that dismisses a dialog, sheet, or banner."
+  },
+  "actionBack": "Back",
+  "@actionBack": {
+    "description": "Action that returns to the previous screen."
+  },
+  "actionNext": "Next",
+  "@actionNext": {
+    "description": "Action that moves to the next step."
+  },
+  "actionDone": "Done",
+  "@actionDone": {
+    "description": "Action that completes a flow."
+  },
+  "actionRetry": "Try again",
+  "@actionRetry": {
+    "description": "Action that re-runs a request that failed."
+  },
+  "actionDismiss": "Dismiss",
+  "@actionDismiss": {
+    "description": "Action that hides a banner without taking its offered action."
+  },
+  "actionEdit": "Edit",
+  "@actionEdit": {
+    "description": "Action that opens an item for modification."
+  },
+  "actionRemove": "Remove",
+  "@actionRemove": {
+    "description": "Action that detaches an item from a list."
+  },
+  "actionSubmit": "Submit",
+  "@actionSubmit": {
+    "description": "Action that sends a completed form."
+  },
+  "actionRefresh": "Refresh",
+  "@actionRefresh": {
+    "description": "Action that reloads the current screen from the server."
+  },
+  "actionCopy": "Copy",
+  "@actionCopy": {
+    "description": "Action that copies a value to the clipboard."
+  },
+  "actionSelectAll": "Select all",
+  "@actionSelectAll": {
+    "description": "Action that selects every item in a list."
+  },
+
+  "fieldOptionalSuffix": "{label} (optional)",
+  "@fieldOptionalSuffix": {
+    "description": "Field label marked as not required. Composed with a placeholder so the parenthetical can move or change form per language.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Middle name"
+      }
+    }
+  },
+  "fieldRequiredMarker": "Required",
+  "@fieldRequiredMarker": {
+    "description": "Screen-reader announcement appended to a required field label."
+  },
+  "fieldRequiredIndicator": "*",
+  "@fieldRequiredIndicator": {
+    "description": "The visible mark next to a required field label. A key rather than a literal because not every typographic convention uses an asterisk."
+  },
+  "fieldClear": "Clear {label}",
+  "@fieldClear": {
+    "description": "Accessibility label for the button that empties a text field.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Email address"
+      }
+    }
+  },
+  "fieldShowValue": "Show {label}",
+  "@fieldShowValue": {
+    "description": "Accessibility label for the control that reveals an obscured field.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Password"
+      }
+    }
+  },
+  "fieldHideValue": "Hide {label}",
+  "@fieldHideValue": {
+    "description": "Accessibility label for the control that obscures a revealed field.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Password"
+      }
+    }
+  },
+  "fieldCharacterCount": "{used} of {limit} characters",
+  "@fieldCharacterCount": {
+    "description": "Character budget shown under a length-limited field.",
+    "placeholders": {
+      "used": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "fieldErrorAnnouncement": "{label} has an error. {message}",
+  "@fieldErrorAnnouncement": {
+    "description": "Live announcement made when a field transitions into an error state.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Email address"
+      },
+      "message": {
+        "type": "String",
+        "example": "Enter a valid email address."
+      }
+    }
+  },
+
+  "statusSuccess": "Success",
+  "@statusSuccess": {
+    "description": "Text label for a successful status. Status is never conveyed by colour alone."
+  },
+  "statusWarning": "Warning",
+  "@statusWarning": {
+    "description": "Text label for a warning status."
+  },
+  "statusError": "Error",
+  "@statusError": {
+    "description": "Text label for an error status."
+  },
+  "statusInfo": "Information",
+  "@statusInfo": {
+    "description": "Text label for an informational status."
+  },
+  "statusPending": "Pending",
+  "@statusPending": {
+    "description": "Text label for work the platform has accepted but not finished."
+  },
+  "statusNeutral": "Not started",
+  "@statusNeutral": {
+    "description": "Text label for an inactive or not-yet-begun status."
+  },
+
+  "stateLoading": "Loading",
+  "@stateLoading": {
+    "description": "Accessible label announced while content is being fetched."
+  },
+  "stateLoadingWithSubject": "Loading {subject}",
+  "@stateLoadingWithSubject": {
+    "description": "Accessible label announced while a named section is being fetched.",
+    "placeholders": {
+      "subject": {
+        "type": "String",
+        "example": "your profile"
+      }
+    }
+  },
+  "stateEmptyTitle": "Nothing here yet",
+  "@stateEmptyTitle": {
+    "description": "Default heading for an empty list. The client shows an empty state rather than invented content."
+  },
+  "stateEmptyDescription": "There is nothing to show on this screen right now.",
+  "@stateEmptyDescription": {
+    "description": "Default body copy for an empty list."
+  },
+  "stateErrorTitle": "Something went wrong",
+  "@stateErrorTitle": {
+    "description": "Default heading for a failed request."
+  },
+  "stateErrorDescription": "We could not load this screen. Check your connection and try again.",
+  "@stateErrorDescription": {
+    "description": "Default body copy for a failed request."
+  },
+  "stateOfflineTitle": "You are offline",
+  "@stateOfflineTitle": {
+    "description": "Heading shown when the device has no usable network connection."
+  },
+  "stateOfflineDescription": "Reconnect to load the latest information.",
+  "@stateOfflineDescription": {
+    "description": "Body copy shown when the device has no usable network connection."
+  },
+  "stateErrorReference": "Reference {reference}",
+  "@stateErrorReference": {
+    "description": "Support reference identifier shown under an error so a report can be traced.",
+    "placeholders": {
+      "reference": {
+        "type": "String",
+        "example": "b7f1c2"
+      }
+    }
+  },
+
+  "a11yDialog": "Dialog",
+  "@a11yDialog": {
+    "description": "Role announced when a modal dialog opens."
+  },
+  "a11ySheet": "Sheet",
+  "@a11ySheet": {
+    "description": "Role announced when a bottom sheet opens."
+  },
+  "a11yBanner": "Notice",
+  "@a11yBanner": {
+    "description": "Role announced when an inline banner appears."
+  },
+  "a11yNavigationBar": "Main navigation",
+  "@a11yNavigationBar": {
+    "description": "Accessible label for the bottom navigation bar."
+  },
+  "a11yTabPosition": "Tab {position} of {total}",
+  "@a11yTabPosition": {
+    "description": "Position announcement for a navigation destination.",
+    "placeholders": {
+      "position": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "a11yBusy": "Busy",
+  "@a11yBusy": {
+    "description": "Announced on a control that is running an action and cannot be pressed again."
+  },
+  "a11ySelected": "Selected",
+  "@a11ySelected": {
+    "description": "Announced on the currently selected item."
+  },
+  "a11yDragHandle": "Drag to resize",
+  "@a11yDragHandle": {
+    "description": "Accessible label for the grab handle at the top of a sheet."
+  },
+  "a11yFieldWithRequired": "{label}, required",
+  "@a11yFieldWithRequired": {
+    "description": "Spoken name of a required field. A placeholder rather than concatenation, because the separator between the two parts is not a comma in every language.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Email address"
+      }
+    }
+  },
+  "a11yControlBusy": "{label}, busy",
+  "@a11yControlBusy": {
+    "description": "Spoken name of a control that is running an action.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Continue"
+      }
+    }
+  },
+  "a11yTitleWithSubtitle": "{title}. {subtitle}",
+  "@a11yTitleWithSubtitle": {
+    "description": "Joins a row title and its supporting line into one spoken phrase.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Language"
+      },
+      "subtitle": {
+        "type": "String",
+        "example": "English"
+      }
+    }
+  },
+  "a11yBannerTitled": "{role}: {title}",
+  "@a11yBannerTitled": {
+    "description": "Spoken name of a titled inline banner, combining its role and its heading.",
+    "placeholders": {
+      "role": {
+        "type": "String",
+        "example": "Notice"
+      },
+      "title": {
+        "type": "String",
+        "example": "Verification pending"
+      }
+    }
+  },
+
+  "selectionCount": "{count, plural, =0{No items selected} =1{1 item selected} other{{count} items selected}}",
+  "@selectionCount": {
+    "description": "Count of selected list items. Uses a plural so no language has to concatenate a number onto a noun.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "paginationPosition": "Page {page} of {total}",
+  "@paginationPosition": {
+    "description": "Pager position indicator.",
+    "placeholders": {
+      "page": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "retryCountdown": "{seconds, plural, =1{Try again in 1 second} other{Try again in {seconds} seconds}}",
+  "@retryCountdown": {
+    "description": "Cooldown message before a rate-limited action can be repeated.",
+    "placeholders": {
+      "seconds": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "lastUpdatedAt": "Last updated {timestamp}",
+  "@lastUpdatedAt": {
+    "description": "Freshness stamp for server-provided content.",
+    "placeholders": {
+      "timestamp": {
+        "type": "DateTime",
+        "format": "yMMMd Hm",
+        "isCustomDateFormat": "true"
+      }
+    }
+  },
+
+  "languageSettingTitle": "Language",
+  "@languageSettingTitle": {
+    "description": "Title of the app language setting."
+  },
+  "languageSystemDefault": "System default",
+  "@languageSystemDefault": {
+    "description": "Language option that follows the device setting."
+  },
+  "languageEnglish": "English",
+  "@languageEnglish": {
+    "description": "Name of the English language, always written in English."
+  },
+  "languageArabic": "العربية",
+  "@languageArabic": {
+    "description": "Name of the Arabic language, always written in Arabic."
+  },
+
+  "legalDocumentLanguageNotice": "This document is provided by Karar in {language}.",
+  "@legalDocumentLanguageNotice": {
+    "description": "Shown above a legal document that the server supplied in a language other than the current interface language. Legal documents are never translated on the device.",
+    "placeholders": {
+      "language": {
+        "type": "String",
+        "example": "English"
+      }
+    }
+  },
+  "legalDocumentUnavailable": "This document is not available right now.",
+  "@legalDocumentUnavailable": {
+    "description": "Shown when a legal document could not be fetched. No cached or substituted text is displayed."
+  },
+
+  "signInTitle": "Sign in",
+  "@signInTitle": {
+    "description": "Heading of the sign-in screen."
+  },
+  "signInSubtitle": "Use the email address and password for your Karar account.",
+  "@signInSubtitle": {
+    "description": "Supporting line under the sign-in heading."
+  },
+  "signInAction": "Sign in",
+  "@signInAction": {
+    "description": "Button that submits the sign-in form."
+  },
+  "signInEmailLabel": "Email address",
+  "@signInEmailLabel": {
+    "description": "Label of the email address field on the sign-in and registration forms."
+  },
+  "signInPasswordLabel": "Password",
+  "@signInPasswordLabel": {
+    "description": "Label of the password field on the sign-in form."
+  },
+  "signInForgotPassword": "Forgot your password?",
+  "@signInForgotPassword": {
+    "description": "Link from sign-in to password recovery."
+  },
+  "signInCreateAccount": "Create an account",
+  "@signInCreateAccount": {
+    "description": "Link from sign-in to registration."
+  },
+  "signInInvalidCredentials": "That email address and password did not match an account you can sign in to. Check both and try again.",
+  "@signInInvalidCredentials": {
+    "description": "The only message shown for a refused sign-in. It answers an unknown address, a wrong password, a disabled account and an engaged lockout identically, because the platform answers all four with one generic 401. It must not be split into more specific wording: a message that distinguishes them tells an attacker which addresses are registered."
+  },
+  "signInSecureStorageNotice": "This device could not open its secure storage, so you have been signed out. Sign in again to continue.",
+  "@signInSecureStorageNotice": {
+    "description": "Shown on the sign-in screen after the device failed to open its secure storage and the session was discarded."
+  },
+  "signOutAction": "Sign out",
+  "@signOutAction": {
+    "description": "Action that signs the account out on this device."
+  },
+  "signOutConfirmTitle": "Sign out?",
+  "@signOutConfirmTitle": {
+    "description": "Title of the sign-out confirmation dialog."
+  },
+  "signOutConfirmMessage": "You will need your email address and password to sign in again on this device.",
+  "@signOutConfirmMessage": {
+    "description": "Body of the sign-out confirmation dialog."
+  },
+  "signOutIncompleteNotice": "You are signed out on this device. We could not reach Karar to end the session everywhere, so review your active sessions when you are back online.",
+  "@signOutIncompleteNotice": {
+    "description": "Shown after a local sign-out that could not reach the platform, so other devices may still hold a session."
+  },
+
+  "registerTitle": "Create an account",
+  "@registerTitle": {
+    "description": "Heading of the registration screen."
+  },
+  "registerSubtitle": "We will email a verification code to the address you enter.",
+  "@registerSubtitle": {
+    "description": "Supporting line under the registration heading."
+  },
+  "registerAction": "Create account",
+  "@registerAction": {
+    "description": "Button that submits the registration form."
+  },
+  "registerConfirmPasswordLabel": "Confirm password",
+  "@registerConfirmPasswordLabel": {
+    "description": "Label of the field that repeats the chosen password."
+  },
+  "registerPasswordHelp": "At least 8 characters.",
+  "@registerPasswordHelp": {
+    "description": "Helper line under the password field on the registration form."
+  },
+  "registerAcknowledgementTitle": "Check your email",
+  "@registerAcknowledgementTitle": {
+    "description": "Title of the screen shown after a registration attempt."
+  },
+  "registerAcknowledgementMessage": "If that address can be registered, a verification code is on its way. Enter it on the next screen to finish setting up your account.",
+  "@registerAcknowledgementMessage": {
+    "description": "The only message shown after a registration attempt. It is identical for an address that can be registered and for one that is already registered, and it must stay identical to forgotPasswordAcknowledgementMessage in kind: wording that reveals whether the account exists is a security defect, not a copy improvement."
+  },
+  "registerBackToSignIn": "Back to sign in",
+  "@registerBackToSignIn": {
+    "description": "Link back to sign-in from the registration acknowledgement."
+  },
+
+  "verifyEmailTitle": "Verify your email",
+  "@verifyEmailTitle": {
+    "description": "Heading of the email verification screen."
+  },
+  "verifyEmailSubtitle": "Enter the 8-character code we emailed you. It is not shown anywhere else.",
+  "@verifyEmailSubtitle": {
+    "description": "Supporting line under the email verification heading. States the code length."
+  },
+  "verifyEmailCodeLabel": "Verification code",
+  "@verifyEmailCodeLabel": {
+    "description": "Label of the emailed verification code field."
+  },
+  "verifyEmailCodeHint": "8 characters",
+  "@verifyEmailCodeHint": {
+    "description": "Placeholder text inside the emailed verification code field."
+  },
+  "verifyEmailAction": "Verify",
+  "@verifyEmailAction": {
+    "description": "Button that submits the emailed verification code."
+  },
+  "verifyEmailResendAction": "Send another code",
+  "@verifyEmailResendAction": {
+    "description": "Action that asks for another verification code."
+  },
+  "verifyEmailResendAcknowledgement": "If that address needs a code, another one is on its way.",
+  "@verifyEmailResendAcknowledgement": {
+    "description": "The only message shown after a resend request, for every outcome. It must not state whether the address exists or already needed a code."
+  },
+  "verifyEmailInvalidCode": "That code did not verify. It may have expired or already been used.",
+  "@verifyEmailInvalidCode": {
+    "description": "Shown when the emailed verification code was refused."
+  },
+  "verifyEmailSuccess": "Your email address is verified.",
+  "@verifyEmailSuccess": {
+    "description": "Shown once the email address has been verified."
+  },
+
+  "forgotPasswordTitle": "Reset your password",
+  "@forgotPasswordTitle": {
+    "description": "Heading of the password recovery request screen."
+  },
+  "forgotPasswordSubtitle": "Enter your email address and we will send a reset link if the address can receive one.",
+  "@forgotPasswordSubtitle": {
+    "description": "Supporting line under the password recovery heading."
+  },
+  "forgotPasswordAction": "Send reset instructions",
+  "@forgotPasswordAction": {
+    "description": "Button that requests password reset instructions."
+  },
+  "forgotPasswordAcknowledgementTitle": "Check your email",
+  "@forgotPasswordAcknowledgementTitle": {
+    "description": "Title of the screen shown after a password recovery request."
+  },
+  "forgotPasswordAcknowledgementMessage": "If that address can receive a reset, instructions are on their way. The link expires 30 minutes after it is sent.",
+  "@forgotPasswordAcknowledgementMessage": {
+    "description": "The only message shown after a password recovery request. It is identical for a known address, an unknown one, a disabled account and one still cooling down. Wording that distinguishes them would confirm which addresses are registered."
+  },
+
+  "resetPasswordTitle": "Set a new password",
+  "@resetPasswordTitle": {
+    "description": "Heading of the screen that consumes a reset token."
+  },
+  "resetPasswordSubtitle": "Paste the reset token from your email, then choose a new password.",
+  "@resetPasswordSubtitle": {
+    "description": "Supporting line under the password reset heading."
+  },
+  "resetPasswordTokenLabel": "Reset token",
+  "@resetPasswordTokenLabel": {
+    "description": "Label of the reset token field."
+  },
+  "resetPasswordTokenHint": "From the email we sent you",
+  "@resetPasswordTokenHint": {
+    "description": "Placeholder text inside the reset token field."
+  },
+  "resetPasswordNewLabel": "New password",
+  "@resetPasswordNewLabel": {
+    "description": "Label of the new password field on the password reset form."
+  },
+  "resetPasswordAction": "Set new password",
+  "@resetPasswordAction": {
+    "description": "Button that submits the new password with the reset token."
+  },
+  "resetPasswordInvalidToken": "That reset token is not valid. It may have expired or already been used. Request a new one.",
+  "@resetPasswordInvalidToken": {
+    "description": "Shown when the reset token was refused."
+  },
+  "resetPasswordSuccessTitle": "Password changed",
+  "@resetPasswordSuccessTitle": {
+    "description": "Title shown after a password reset succeeded."
+  },
+  "resetPasswordSuccessMessage": "Every session has been signed out, on this device and on any other. Sign in with your new password.",
+  "@resetPasswordSuccessMessage": {
+    "description": "Body shown after a password reset succeeded. States that every session was ended."
+  },
+
+  "changePasswordTitle": "Change password",
+  "@changePasswordTitle": {
+    "description": "Heading of the change-password screen."
+  },
+  "changePasswordSubtitle": "Changing your password signs out every other device. This one stays signed in.",
+  "@changePasswordSubtitle": {
+    "description": "Supporting line under the change-password heading. States which devices are signed out."
+  },
+  "changePasswordCurrentLabel": "Current password",
+  "@changePasswordCurrentLabel": {
+    "description": "Label of the current password field."
+  },
+  "changePasswordNewLabel": "New password",
+  "@changePasswordNewLabel": {
+    "description": "Label of the new password field on the change-password form."
+  },
+  "changePasswordAction": "Change password",
+  "@changePasswordAction": {
+    "description": "Button that submits a password change."
+  },
+  "changePasswordIncorrectCurrent": "That did not match your current password.",
+  "@changePasswordIncorrectCurrent": {
+    "description": "Shown when the current password did not match."
+  },
+  "changePasswordSuccessTitle": "Password changed",
+  "@changePasswordSuccessTitle": {
+    "description": "Title shown after a password change succeeded."
+  },
+  "changePasswordSuccessMessage": "Every other device has been signed out.",
+  "@changePasswordSuccessMessage": {
+    "description": "Body shown after a password change succeeded."
+  },
+
+  "confirmPasswordMismatch": "The two passwords do not match.",
+  "@confirmPasswordMismatch": {
+    "description": "Field error when the two password fields differ."
+  },
+  "passwordEmpty": "Enter a password.",
+  "@passwordEmpty": {
+    "description": "Field error when the password field was left empty."
+  },
+  "passwordTooShort": "Use at least {count} characters.",
+  "@passwordTooShort": {
+    "description": "Field error when the password is shorter than the platform's minimum. The minimum is a placeholder because the platform states it; it is not fixed in the copy.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "passwordTooLong": "Use no more than {count} characters.",
+  "@passwordTooLong": {
+    "description": "Field error when the password is longer than the platform's maximum. The maximum is a placeholder because the platform states it; it is not fixed in the copy.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "emailEmpty": "Enter your email address.",
+  "@emailEmpty": {
+    "description": "Field error when the email address field was left empty."
+  },
+  "emailMalformed": "Enter a complete email address.",
+  "@emailMalformed": {
+    "description": "Field error when the email address is not a complete address."
+  },
+  "codeEmpty": "Enter the code.",
+  "@codeEmpty": {
+    "description": "Field error when a verification code field was left empty."
+  },
+  "tokenEmpty": "Enter the reset token.",
+  "@tokenEmpty": {
+    "description": "Field error when the reset token field was left empty."
+  },
+
+  "mfaSecurityTitle": "Two-step verification",
+  "@mfaSecurityTitle": {
+    "description": "Name of the two-step verification feature, used as a section heading."
+  },
+  "mfaEnrolTitle": "Set up two-step verification",
+  "@mfaEnrolTitle": {
+    "description": "Heading of the two-step verification setup screen."
+  },
+  "mfaEnrolIntro": "Two-step verification asks for a code from your authenticator app each time you sign in.",
+  "@mfaEnrolIntro": {
+    "description": "Explains what two-step verification will ask for after it is turned on."
+  },
+  "mfaEnrolStepScan": "Add this key to an authenticator app. It is shown once and cannot be retrieved again.",
+  "@mfaEnrolStepScan": {
+    "description": "Instruction for the step that hands over the setup key. States that the key is shown once."
+  },
+  "mfaEnrolStepConfirm": "Enter the 6-digit code your app shows now.",
+  "@mfaEnrolStepConfirm": {
+    "description": "Instruction for the step that confirms a generated code."
+  },
+  "mfaEnrolSecretLabel": "Setup key",
+  "@mfaEnrolSecretLabel": {
+    "description": "Label of the one-time setup key shown during enrolment."
+  },
+  "mfaEnrolSecretWarning": "Anyone with this key can generate your codes. Do not photograph it or share it.",
+  "@mfaEnrolSecretWarning": {
+    "description": "Warning shown beside the setup key. Security wording: it tells the reader that the key is equivalent to their codes."
+  },
+  "mfaEnrolStartAction": "Begin setup",
+  "@mfaEnrolStartAction": {
+    "description": "Button that begins two-step verification setup."
+  },
+  "mfaCodeLabel": "Verification code",
+  "@mfaCodeLabel": {
+    "description": "Label of the authenticator code field."
+  },
+  "mfaCodeHint": "6 digits",
+  "@mfaCodeHint": {
+    "description": "Placeholder text inside the authenticator code field."
+  },
+  "mfaConfirmAction": "Turn on two-step verification",
+  "@mfaConfirmAction": {
+    "description": "Button that completes two-step verification setup."
+  },
+  "mfaInvalidCode": "That code did not verify. Check your authenticator app and try again.",
+  "@mfaInvalidCode": {
+    "description": "The only message shown for a refused authenticator code. It covers a wrong code, an expired one and a lockout without distinguishing them."
+  },
+  "mfaAlreadyEnrolled": "Two-step verification is already set up on this account.",
+  "@mfaAlreadyEnrolled": {
+    "description": "Shown when two-step verification was already set up on the account."
+  },
+  "mfaNoPendingEnrolment": "That setup is no longer pending. Start again.",
+  "@mfaNoPendingEnrolment": {
+    "description": "Shown when the enrolment being confirmed is no longer pending."
+  },
+
+  "mfaRecoveryCodesTitle": "Your recovery codes",
+  "@mfaRecoveryCodesTitle": {
+    "description": "Heading of the screen that shows the one-time recovery codes."
+  },
+  "mfaRecoveryCodesWarning": "These codes are shown once and never again. Each one signs you in a single time if you lose your authenticator app. Write them down and keep them somewhere only you can reach.",
+  "@mfaRecoveryCodesWarning": {
+    "description": "Warning shown above the recovery codes. Security wording: it states that the codes are shown once, are single-use, and must be stored by the reader."
+  },
+  "mfaRecoveryCodesAcknowledge": "I have saved these codes somewhere safe",
+  "@mfaRecoveryCodesAcknowledge": {
+    "description": "Checkbox the reader ticks to confirm the recovery codes have been stored."
+  },
+
+  "mfaChallengeTitle": "Enter your code",
+  "@mfaChallengeTitle": {
+    "description": "Heading of the screen that asks for a code during sign-in."
+  },
+  "mfaChallengeSubtitle": "Open your authenticator app and enter the 6-digit code.",
+  "@mfaChallengeSubtitle": {
+    "description": "Supporting line under the two-step verification challenge heading."
+  },
+  "mfaChallengeUseRecovery": "Use a recovery code instead",
+  "@mfaChallengeUseRecovery": {
+    "description": "Switches the challenge from an authenticator code to a recovery code."
+  },
+  "mfaChallengeUseTotp": "Use your authenticator app instead",
+  "@mfaChallengeUseTotp": {
+    "description": "Switches the challenge from a recovery code back to an authenticator code."
+  },
+  "mfaChallengeExpired": "This sign-in attempt timed out. Sign in again to get a new code prompt.",
+  "@mfaChallengeExpired": {
+    "description": "Shown when the sign-in attempt timed out before the code was entered."
+  },
+  "mfaChallengeAbandon": "Back to sign in",
+  "@mfaChallengeAbandon": {
+    "description": "Link that abandons the challenge and returns to sign-in."
+  },
+  "mfaRecoveryCodeLabel": "Recovery code",
+  "@mfaRecoveryCodeLabel": {
+    "description": "Label of the recovery code field."
+  },
+  "mfaRecoveryCodeHint": "One of the codes you saved",
+  "@mfaRecoveryCodeHint": {
+    "description": "Placeholder text inside the recovery code field."
+  },
+  "mfaRecoveryCodeSubtitle": "Enter one of the recovery codes you saved when you turned on two-step verification. Each code works once.",
+  "@mfaRecoveryCodeSubtitle": {
+    "description": "Supporting line shown when a recovery code is being asked for."
+  },
+
+  "mfaDisableTitle": "Turn off two-step verification",
+  "@mfaDisableTitle": {
+    "description": "Heading of the screen that turns two-step verification off."
+  },
+  "mfaDisableWarning": "Your recovery codes will be destroyed and your account will be protected by your password alone.",
+  "@mfaDisableWarning": {
+    "description": "Warning shown before two-step verification is turned off. Security wording: it states what protection is lost."
+  },
+  "mfaDisableAction": "Turn off",
+  "@mfaDisableAction": {
+    "description": "Button that turns two-step verification off."
+  },
+  "mfaDisableConfirmTitle": "Turn off two-step verification?",
+  "@mfaDisableConfirmTitle": {
+    "description": "Title of the dialog confirming that two-step verification is turned off."
+  },
+  "mfaDisableSuccess": "Two-step verification is off.",
+  "@mfaDisableSuccess": {
+    "description": "Shown after two-step verification was turned off."
+  },
+  "mfaNotEnrolled": "Two-step verification is not set up on this account.",
+  "@mfaNotEnrolled": {
+    "description": "Shown when two-step verification is not set up on the account."
+  },
+
+  "sessionsTitle": "Active sessions",
+  "@sessionsTitle": {
+    "description": "Heading of the active sessions screen."
+  },
+  "sessionsSubtitle": "Every device currently signed in to your account. Sign out any you do not recognise.",
+  "@sessionsSubtitle": {
+    "description": "Supporting line under the active sessions heading."
+  },
+  "sessionsCurrentBadge": "This device",
+  "@sessionsCurrentBadge": {
+    "description": "Marks the session belonging to the device in the reader's hand."
+  },
+  "sessionsEmptyTitle": "No other sessions",
+  "@sessionsEmptyTitle": {
+    "description": "Heading shown when no other device holds a session."
+  },
+  "sessionsEmptyMessage": "This device is the only one signed in.",
+  "@sessionsEmptyMessage": {
+    "description": "Body shown when no other device holds a session."
+  },
+  "sessionsStartedAt": "Signed in {time}",
+  "@sessionsStartedAt": {
+    "description": "When a listed session began. The time is already formatted for the locale and is passed in as a placeholder rather than joined onto the sentence.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "16 Aug 2026 09:41"
+      }
+    }
+  },
+  "sessionsLastSeenAt": "Last active {time}",
+  "@sessionsLastSeenAt": {
+    "description": "When a listed session was last used. The time is already formatted for the locale.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "16 Aug 2026 09:41"
+      }
+    }
+  },
+  "sessionsExpiresAt": "Expires {time}",
+  "@sessionsExpiresAt": {
+    "description": "When a listed session expires. The time is already formatted for the locale.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "16 Aug 2026 09:41"
+      }
+    }
+  },
+  "sessionsUnknownDevice": "Unrecognised device",
+  "@sessionsUnknownDevice": {
+    "description": "Stands in for a listed session whose device the platform did not name."
+  },
+  "sessionsRevokeAction": "Sign out this device",
+  "@sessionsRevokeAction": {
+    "description": "Action that signs out one listed device."
+  },
+  "sessionsRevokeConfirmTitle": "Sign out this device?",
+  "@sessionsRevokeConfirmTitle": {
+    "description": "Title of the dialog confirming that one device is signed out."
+  },
+  "sessionsRevokeConfirmMessage": "That device will need the account password to sign in again.",
+  "@sessionsRevokeConfirmMessage": {
+    "description": "Body of the dialog confirming that one device is signed out."
+  },
+  "sessionsRevokeOthersAction": "Sign out all other devices",
+  "@sessionsRevokeOthersAction": {
+    "description": "Action that signs out every device except this one."
+  },
+  "sessionsRevokeOthersConfirmTitle": "Sign out all other devices?",
+  "@sessionsRevokeOthersConfirmTitle": {
+    "description": "Title of the dialog confirming that every other device is signed out."
+  },
+  "sessionsRevokeOthersConfirmMessage": "Every device except this one will be signed out immediately.",
+  "@sessionsRevokeOthersConfirmMessage": {
+    "description": "Body of the dialog confirming that every other device is signed out."
+  },
+  "sessionsRevokedNotice": "That device has been signed out.",
+  "@sessionsRevokedNotice": {
+    "description": "Shown after one device was signed out."
+  },
+  "sessionsRevokedOthersNotice": "Other devices signed out ({count}).",
+  "@sessionsRevokedOthersNotice": {
+    "description": "Shown after the other devices were signed out. The count is a placeholder so no language has to join a number onto the sentence.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "sessionsRevokeUnavailable": "That session is no longer active, so there was nothing to sign out.",
+  "@sessionsRevokeUnavailable": {
+    "description": "Shown when the session to sign out was already inactive."
+  },
+
+  "appLockTitle": "App lock",
+  "@appLockTitle": {
+    "description": "Name of the app lock feature, used as a screen and section heading."
+  },
+  "appLockSettingsTitle": "Lock this app",
+  "@appLockSettingsTitle": {
+    "description": "Title of the app lock row in settings."
+  },
+  "appLockSettingsDescription": "Ask for your device unlock before showing Karar. This is a privacy control on this device only. It never replaces signing in, and Karar never receives your fingerprint or face data.",
+  "@appLockSettingsDescription": {
+    "description": "Explains what the app lock does. Privacy wording: it states that the lock is local to the device, never replaces signing in, and that no biometric data reaches the product."
+  },
+  "appLockToggleLabel": "Require device unlock",
+  "@appLockToggleLabel": {
+    "description": "Label of the switch that turns the app lock on."
+  },
+  "appLockLockedTitle": "Karar is locked",
+  "@appLockLockedTitle": {
+    "description": "Heading shown while the app is locked."
+  },
+  "appLockLockedMessage": "Unlock with your device to continue.",
+  "@appLockLockedMessage": {
+    "description": "Body shown while the app is locked."
+  },
+  "appLockUnlockAction": "Unlock",
+  "@appLockUnlockAction": {
+    "description": "Button that starts the device unlock prompt."
+  },
+  "appLockPromptReason": "Unlock Karar",
+  "@appLockPromptReason": {
+    "description": "The reason string the operating system shows inside its own unlock prompt. It names no account and no data."
+  },
+  "appLockUnavailableTitle": "App lock is unavailable",
+  "@appLockUnavailableTitle": {
+    "description": "Heading shown when the device offers no unlock method."
+  },
+  "appLockUnavailableMessage": "This device does not offer an unlock method Karar can use, so the app lock cannot be turned on. Your account stays protected by your password.",
+  "@appLockUnavailableMessage": {
+    "description": "Body shown when the device offers no unlock method."
+  },
+  "appLockNotEnrolledMessage": "Set up a screen lock, fingerprint or face unlock in your device settings, then turn this on.",
+  "@appLockNotEnrolledMessage": {
+    "description": "Shown when the device supports an unlock method but none has been set up."
+  },
+  "appLockCancelled": "Unlock was cancelled.",
+  "@appLockCancelled": {
+    "description": "Shown when the reader dismissed the device unlock prompt."
+  },
+  "appLockNotRecognised": "That was not recognised. Try again.",
+  "@appLockNotRecognised": {
+    "description": "Shown when the device rejected the unlock attempt."
+  },
+  "appLockLockedOut": "Your device has blocked further unlock attempts. Sign in with your password instead.",
+  "@appLockLockedOut": {
+    "description": "Shown when the device blocked further unlock attempts."
+  },
+  "appLockSignInInstead": "Sign in with your password",
+  "@appLockSignInInstead": {
+    "description": "Action that abandons the app lock and signs in with a password."
+  },
+  "appLockRequiresSession": "Sign in before changing the app lock.",
+  "@appLockRequiresSession": {
+    "description": "Shown when the app lock is changed without a signed-in session."
+  },
+  "appLockEnableNotSaved": "Karar could not save the app lock on this device, so it is still off. Nothing changed. Try again.",
+  "@appLockEnableNotSaved": {
+    "description": "Shown when turning the app lock on failed because the device would not store the choice. It states plainly that the lock is still off, because showing the switch as on would promise a protection that would not survive a restart."
+  },
+  "appLockDisableNotSaved": "Karar could not save that change on this device, so the app lock is still on. Try again, or use your password on the lock screen if you cannot unlock.",
+  "@appLockDisableNotSaved": {
+    "description": "Shown when turning the app lock off failed because the device would not store the choice. It states that the lock remains on, and points at the password fallback so the user is not trapped."
+  },
+  "securityStateUnavailableTitle": "Karar cannot check its security settings",
+  "@securityStateUnavailableTitle": {
+    "description": "Heading for the startup screen shown when the device would not report whether the app lock is on, so no security gate can be evaluated."
+  },
+  "securityStateUnavailableMessage": "This device did not report whether your app lock is on. Karar will not open your account until it can tell, so nothing is shown for now. Try again, and restart the device if it keeps happening.",
+  "@securityStateUnavailableMessage": {
+    "description": "Body for the startup screen shown when local security state could not be read. It explains that the app is failing closed on purpose and offers the retry."
+  },
+  "securityRecoveryBlockedTitle": "That session could not be removed",
+  "@securityRecoveryBlockedTitle": {
+    "description": "Heading for the startup screen shown when a stored session was given up but could neither be erased nor durably recorded as abandoned."
+  },
+  "securityRecoveryBlockedMessage": "Karar could not delete the stored session on this device, and could not record that you gave it up. Signing in now would not make it safe, so Karar is waiting instead. Try again. If it keeps failing, sign out of this device from another one.",
+  "@securityRecoveryBlockedMessage": {
+    "description": "Body for the blocked security-recovery screen. It says why an ordinary sign-in is not offered, and points at server-side session revocation from another device, which is the only real remedy."
+  },
+
+  "sessionEndedTitle": "You have been signed out",
+  "@sessionEndedTitle": {
+    "description": "Heading of the screen shown after a session ended without the reader asking."
+  },
+  "sessionEndedExpired": "Your session expired. Sign in again to continue.",
+  "@sessionEndedExpired": {
+    "description": "Reason shown when the session simply expired."
+  },
+  "sessionEndedRevoked": "This session was signed out from another device. If that was not you, change your password after signing in.",
+  "@sessionEndedRevoked": {
+    "description": "Reason shown when the session was signed out from another device."
+  },
+  "sessionEndedReuseDetected": "For your security, Karar ended this session and cleared its credentials from this device, because a sign-in token was presented twice. If you did not cause this, change your password and review your active sessions as soon as you sign in.",
+  "@sessionEndedReuseDetected": {
+    "description": "Reason shown when a sign-in token was presented twice, which the platform treats as theft. Security wording: it states what was done, and what the reader should do."
+  },
+  "sessionEndedRefreshRejected": "Karar could not renew this session, so it has been ended and its credentials cleared from this device. Sign in again.",
+  "@sessionEndedRefreshRejected": {
+    "description": "Reason shown when the session could not be renewed."
+  },
+  "sessionEndedSignedOut": "You are signed out.",
+  "@sessionEndedSignedOut": {
+    "description": "Reason shown when the reader signed out."
+  },
+  "sessionEndedAction": "Sign in",
+  "@sessionEndedAction": {
+    "description": "Button that returns to sign-in after a session ended."
+  },
+
+  "failureOffline": "You appear to be offline. Check your connection and try again.",
+  "@failureOffline": {
+    "description": "Failure message when the device has no usable connection."
+  },
+  "failureTimeout": "That took too long to answer. Check your connection and try again.",
+  "@failureTimeout": {
+    "description": "Failure message when the platform did not answer in time."
+  },
+  "failureRateLimited": "Too many attempts. Wait a little and try again.",
+  "@failureRateLimited": {
+    "description": "Failure message when too many attempts were made."
+  },
+  "failureServiceUnavailable": "Karar could not complete that request. Try again in a moment.",
+  "@failureServiceUnavailable": {
+    "description": "Failure message when the platform could not serve the request."
+  },
+  "failureInvalidRequest": "Check the details you entered and try again.",
+  "@failureInvalidRequest": {
+    "description": "Failure message when the platform rejected the submitted details. It names no field value."
+  },
+  "failureNotPermitted": "You do not have permission to do that.",
+  "@failureNotPermitted": {
+    "description": "Failure message when the account may not perform the action."
+  },
+  "failureNotFound": "That is no longer available.",
+  "@failureNotFound": {
+    "description": "Failure message when the thing acted on no longer exists."
+  },
+  "failureConflict": "That has already changed. Reload and try again.",
+  "@failureConflict": {
+    "description": "Failure message when the thing acted on changed underneath the request."
+  },
+  "failureSecureStorage": "This device could not open its secure storage, so Karar stopped rather than continue without protecting your credentials. Try again.",
+  "@failureSecureStorage": {
+    "description": "Failure message when the device could not open its secure storage, so the request was abandoned rather than run without protecting credentials."
+  },
+  "failureLocalSecurityState": "This device could not confirm its security settings, so Karar stopped rather than continue without them. Try again.",
+  "@failureLocalSecurityState": {
+    "description": "Failure message when the local security-state store could not be read or written, so a security decision could not be established and the operation was abandoned."
+  },
+  "failureCancelled": "That request was cancelled.",
+  "@failureCancelled": {
+    "description": "Failure message when the request was cancelled before it finished."
+  },
+  "failureRetrySafe": "Your session was renewed. Try that again.",
+  "@failureRetrySafe": {
+    "description": "Failure message when the session was renewed and the action can be repeated."
+  },
+  "failureSessionEnded": "Your session ended. Sign in again to continue.",
+  "@failureSessionEnded": {
+    "description": "Failure message when the session ended during the request."
+  },
+  "failureConsentRequired": "There is an agreement to review before continuing.",
+  "@failureConsentRequired": {
+    "description": "Failure message when an agreement must be reviewed first."
+  },
+  "failureTenantSelection": "Choose an organisation before continuing.",
+  "@failureTenantSelection": {
+    "description": "Failure message when an organisation must be chosen first."
+  },
+  "failureConfiguration": "This build of Karar is not configured correctly and cannot continue.",
+  "@failureConfiguration": {
+    "description": "Failure message when this build of the application is misconfigured."
+  },
+  "failureUnexpected": "Something went wrong. Try again.",
+  "@failureUnexpected": {
+    "description": "Failure message for anything else. It carries no diagnostic, status code or field value."
+  },
+
+  "a11yPasswordRules": "Password. At least {count} characters.",
+  "@a11yPasswordRules": {
+    "description": "Spoken name of the password field, including the length rule, so the rule is announced rather than only shown.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "a11yRecoveryCodePosition": "Recovery code {position} of {total}",
+  "@a11yRecoveryCodePosition": {
+    "description": "Position announcement for one recovery code in the list.",
+    "placeholders": {
+      "position": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "a11ySensitiveScreen": "Sensitive information. Hidden when Karar is in the background.",
+  "@a11ySensitiveScreen": {
+    "description": "Announced on a screen whose contents are hidden while the application is in the background."
+  },
+
+  "consentScreenTitle": "Privacy and consent",
+  "@consentScreenTitle": {
+    "description": "Heading of the privacy and consent screen."
+  },
+  "consentScreenDescription": "What the platform has recorded about your decisions. The documents are published by the operating entity; this application writes none of their wording.",
+  "@consentScreenDescription": {
+    "description": "Supporting line under the consent heading. States that the documents are published by the operating entity, not written by the application."
+  },
+
+  "consentStateNotRequired": "No agreement is needed",
+  "@consentStateNotRequired": {
+    "description": "Consent state: no published document covers the purpose."
+  },
+  "consentStateRequired": "Your agreement is needed",
+  "@consentStateRequired": {
+    "description": "Consent state: a published version is in force and not yet agreed to."
+  },
+  "consentStateReconsentRequired": "A new version needs your agreement",
+  "@consentStateReconsentRequired": {
+    "description": "Consent state: a materially changed version needs a new agreement."
+  },
+  "consentStateActive": "In force",
+  "@consentStateActive": {
+    "description": "Consent state: the platform holds an agreement to the version shown."
+  },
+  "consentStateWithdrawn": "Withdrawn",
+  "@consentStateWithdrawn": {
+    "description": "Consent state: the agreement was withdrawn."
+  },
+  "consentStateUnavailable": "Could not be checked",
+  "@consentStateUnavailable": {
+    "description": "Consent state: the platform did not answer."
+  },
+  "consentStateDocumentUnavailable": "No document is published",
+  "@consentStateDocumentUnavailable": {
+    "description": "Consent state: no version of the document is published."
+  },
+  "consentStatePolicyNotApproved": "Cannot be recorded yet",
+  "@consentStatePolicyNotApproved": {
+    "description": "Consent state: the platform cannot record an agreement yet."
+  },
+
+  "consentDescribeNotRequired": "No published document covers this purpose, so nothing is being asked of you here.",
+  "@consentDescribeNotRequired": {
+    "description": "Explains the consent state where no published document applies."
+  },
+  "consentDescribeRequired": "A published version is in force and you have not agreed to it yet.",
+  "@consentDescribeRequired": {
+    "description": "Explains the consent state where an agreement is outstanding."
+  },
+  "consentDescribeReconsentRequired": "A materially changed version is in force. Your earlier agreement no longer covers it.",
+  "@consentDescribeReconsentRequired": {
+    "description": "Explains the consent state where an earlier agreement no longer covers the version in force."
+  },
+  "consentDescribeActive": "The platform holds your agreement to the version shown.",
+  "@consentDescribeActive": {
+    "description": "Explains the consent state where an agreement is held."
+  },
+  "consentDescribeWithdrawn": "You withdrew your agreement. The platform still permits nothing under it.",
+  "@consentDescribeWithdrawn": {
+    "description": "Explains the consent state where the agreement was withdrawn."
+  },
+  "consentDescribeUnavailable": "The platform did not answer, so nothing is shown and nothing can be agreed to here.",
+  "@consentDescribeUnavailable": {
+    "description": "Explains the consent state where the platform did not answer."
+  },
+  "consentDescribeDocumentUnavailable": "The document that would apply has no published version, so there is nothing to read and nothing to agree to.",
+  "@consentDescribeDocumentUnavailable": {
+    "description": "Explains the consent state where the document has no published version."
+  },
+  "consentDescribePolicyNotApproved": "The platform cannot record an agreement for this purpose yet, so no control is offered.",
+  "@consentDescribePolicyNotApproved": {
+    "description": "Explains the consent state where no agreement can be recorded yet, so no control is offered."
+  },
+
+  "consentNothingToAgreeTitle": "Nothing is waiting for your agreement",
+  "@consentNothingToAgreeTitle": {
+    "description": "Heading shown when no document is waiting for agreement."
+  },
+  "consentNothingToAgreeDescription": "The platform lists no document that applies to your account right now.",
+  "@consentNothingToAgreeDescription": {
+    "description": "Body shown when no document is waiting for agreement."
+  },
+
+  "consentPurposeLabel": "Purpose",
+  "@consentPurposeLabel": {
+    "description": "Label of the purpose a consent record covers."
+  },
+  "consentDocumentLabel": "Document",
+  "@consentDocumentLabel": {
+    "description": "Label of the document a consent record refers to."
+  },
+  "consentVersionLabel": "Version",
+  "@consentVersionLabel": {
+    "description": "Label of the document version a consent record refers to."
+  },
+  "consentEffectiveFromLabel": "In effect from",
+  "@consentEffectiveFromLabel": {
+    "description": "Label of the date a document version took effect."
+  },
+  "consentPublishedByLabel": "Published by",
+  "@consentPublishedByLabel": {
+    "description": "Label of the entity that published the document."
+  },
+  "consentRegimeLabel": "Regime",
+  "@consentRegimeLabel": {
+    "description": "Label of the regulatory regime a document belongs to."
+  },
+  "consentRequiredActionLabel": "Required action",
+  "@consentRequiredActionLabel": {
+    "description": "Label of what the platform requires of the reader."
+  },
+  "consentActionReacceptance": "A new agreement is required",
+  "@consentActionReacceptance": {
+    "description": "Required action: the reader must agree again."
+  },
+  "consentActionNotice": "For your information",
+  "@consentActionNotice": {
+    "description": "Required action: the reader is being informed only."
+  },
+  "consentActionNone": "Nothing is required of you",
+  "@consentActionNone": {
+    "description": "Required action: nothing is asked of the reader."
+  },
+  "consentActionUnstated": "Not stated by the platform",
+  "@consentActionUnstated": {
+    "description": "Required action: the platform stated none."
+  },
+
+  "consentAcceptAction": "Agree to this version",
+  "@consentAcceptAction": {
+    "description": "Button that records agreement to the version shown."
+  },
+  "consentWithdrawAction": "Withdraw agreement",
+  "@consentWithdrawAction": {
+    "description": "Button that records withdrawal of an agreement."
+  },
+  "consentAcceptedConfirmation": "The platform recorded your agreement.",
+  "@consentAcceptedConfirmation": {
+    "description": "Shown after the platform recorded an agreement."
+  },
+  "consentWithdrawnConfirmation": "The platform recorded your withdrawal.",
+  "@consentWithdrawnConfirmation": {
+    "description": "Shown after the platform recorded a withdrawal."
+  },
+  "consentHistoryPreservedNote": "The earlier record is kept as evidence and is not deleted.",
+  "@consentHistoryPreservedNote": {
+    "description": "States that an earlier consent record is kept as evidence."
+  },
+  "consentReconsentCreatesNewGrantNote": "Agreeing creates a new record against the new version. The earlier record is unchanged.",
+  "@consentReconsentCreatesNewGrantNote": {
+    "description": "States that agreeing again creates a new record rather than replacing the earlier one."
+  },
+  "consentNoticeRequiredNote": "A newer version has been published for your information. Your existing agreement still applies.",
+  "@consentNoticeRequiredNote": {
+    "description": "States that a newer version is published for information only and the existing agreement stands."
+  },
+
+  "consentBlockerJurisdiction": "No jurisdiction is assigned to your account, so no policy resolves for you yet.",
+  "@consentBlockerJurisdiction": {
+    "description": "Explains that no policy resolves because no jurisdiction is assigned."
+  },
+  "consentBlockerPolicy": "No approved policy is in effect, so the platform can record no agreement.",
+  "@consentBlockerPolicy": {
+    "description": "Explains that no agreement can be recorded because no policy is approved."
+  },
+  "consentBlockerEntity": "No operating entity is assigned, so an agreement would name no publisher.",
+  "@consentBlockerEntity": {
+    "description": "Explains that no agreement can name a publisher because no entity is assigned."
+  },
+  "consentSurfaceUnavailableTitle": "Consent could not be checked",
+  "@consentSurfaceUnavailableTitle": {
+    "description": "Heading shown when consent state could not be read."
+  },
+  "consentSurfaceUnavailableDescription": "The platform did not answer. Nothing has changed about what you have agreed to.",
+  "@consentSurfaceUnavailableDescription": {
+    "description": "Body shown when consent state could not be read."
+  },
+  "consentActionFailedTitle": "That was not recorded",
+  "@consentActionFailedTitle": {
+    "description": "Heading shown when the platform did not record an agreement or withdrawal."
+  },
+  "consentActionFailedDescription": "The platform did not record the change, so nothing about your agreement has changed.",
+  "@consentActionFailedDescription": {
+    "description": "Body shown when the platform did not record an agreement or withdrawal."
+  },
+  "consentGrantReferenceLabel": "Record reference",
+  "@consentGrantReferenceLabel": {
+    "description": "Label of the reference identifying a recorded consent."
+  },
+
+  "platformHomeTitle": "Your account",
+  "@platformHomeTitle": {
+    "description": "Heading of the signed-in home screen."
+  },
+  "platformSectionServices": "Services",
+  "@platformSectionServices": {
+    "description": "Home section heading for the services available to the account."
+  },
+  "platformSectionAccount": "Account and profile",
+  "@platformSectionAccount": {
+    "description": "Home section heading for the account and profile rows."
+  },
+  "platformSectionSession": "Security and session",
+  "@platformSectionSession": {
+    "description": "Home section heading for the security and session rows."
+  },
+  "platformSectionOrganisation": "Organisation",
+  "@platformSectionOrganisation": {
+    "description": "Home section heading for the organisation row."
+  },
+  "platformSectionJurisdiction": "Jurisdiction",
+  "@platformSectionJurisdiction": {
+    "description": "Home section heading for the jurisdiction row."
+  },
+  "platformSectionLegal": "Legal and operating entity",
+  "@platformSectionLegal": {
+    "description": "Home section heading for the legal and operating entity row."
+  },
+  "platformSectionConsent": "Privacy and consent",
+  "@platformSectionConsent": {
+    "description": "Home section heading for the privacy and consent row."
+  },
+  "platformSectionSettings": "Settings",
+  "@platformSectionSettings": {
+    "description": "Home section heading for the settings row."
+  },
+
+  "platformNoServicesTitle": "No services are available to you",
+  "@platformNoServicesTitle": {
+    "description": "Heading shown when the platform confirmed no service is enabled."
+  },
+  "platformNoServicesDescription": "Your account is in order. The platform has confirmed that no service is enabled for it yet, so there is nothing here to open.",
+  "@platformNoServicesDescription": {
+    "description": "Body shown when the platform confirmed no service is enabled."
+  },
+  "platformCapabilitiesUnresolvedTitle": "Services could not be checked",
+  "@platformCapabilitiesUnresolvedTitle": {
+    "description": "Heading shown when the platform did not confirm which services apply."
+  },
+  "platformCapabilitiesUnresolvedDescription": "The platform did not confirm which services apply to you, so none are shown. Nothing has changed on your account.",
+  "@platformCapabilitiesUnresolvedDescription": {
+    "description": "Body shown when the platform did not confirm which services apply."
+  },
+  "platformServiceUnavailableTitle": "The service is unavailable",
+  "@platformServiceUnavailableTitle": {
+    "description": "Heading of the screen shown when the platform context could not be loaded."
+  },
+  "platformServiceUnavailableDescription": "Your platform context could not be loaded, so nothing is shown rather than something that may be wrong. Your account and your data are unaffected.",
+  "@platformServiceUnavailableDescription": {
+    "description": "Body shown when the platform context could not be loaded and retrying may help."
+  },
+  "platformServiceUnavailableFinalDescription": "Your platform context could not be loaded, and the platform reported that trying again now will not change that. Close the application and open it again later.",
+  "@platformServiceUnavailableFinalDescription": {
+    "description": "Body shown when the platform context could not be loaded and the platform said retrying will not help."
+  },
+  "platformActionStartOver": "Start over",
+  "@platformActionStartOver": {
+    "description": "Action that restarts the loading of the platform context."
+  },
+
+  "platformProfileRowTitle": "Profile",
+  "@platformProfileRowTitle": {
+    "description": "Title of the profile row on the home screen."
+  },
+  "platformProfileRowSubtitle": "Your name, language and account status",
+  "@platformProfileRowSubtitle": {
+    "description": "Supporting line of the profile row on the home screen."
+  },
+  "platformSessionActive": "Signed in on this device",
+  "@platformSessionActive": {
+    "description": "States that this device holds a signed-in session."
+  },
+  "platformSessionReferenceLabel": "Session reference",
+  "@platformSessionReferenceLabel": {
+    "description": "Label of the opaque reference identifying the current session."
+  },
+  "platformUserReferenceLabel": "Account reference",
+  "@platformUserReferenceLabel": {
+    "description": "Label of the opaque reference identifying the account, on the home screen."
+  },
+  "platformOrganisationRowSubtitle": "The organisation this session is bound to",
+  "@platformOrganisationRowSubtitle": {
+    "description": "Supporting line of the organisation row on the home screen."
+  },
+  "platformOrganisationUnbound": "This session is not bound to an organisation",
+  "@platformOrganisationUnbound": {
+    "description": "States that the session is bound to no organisation, on the home screen."
+  },
+  "platformRoleHintLabel": "Role",
+  "@platformRoleHintLabel": {
+    "description": "Label of the role the platform reports for the session, on the home screen."
+  },
+
+  "platformJurisdictionNone": "Not assigned",
+  "@platformJurisdictionNone": {
+    "description": "Jurisdiction state: none is assigned to the account."
+  },
+  "platformJurisdictionUnverified": "Declared, not verified",
+  "@platformJurisdictionUnverified": {
+    "description": "Jurisdiction state: declared by the reader and not verified."
+  },
+  "platformJurisdictionVerified": "Verified",
+  "@platformJurisdictionVerified": {
+    "description": "Jurisdiction state: verified by the platform."
+  },
+  "platformJurisdictionUnrecognised": "Not recognised by this version",
+  "@platformJurisdictionUnrecognised": {
+    "description": "Jurisdiction state the platform reported that this version of the application does not know. Agrees with the word for jurisdiction, not with the word for status."
+  },
+  "platformJurisdictionRowSubtitle": "The regime that governs your account",
+  "@platformJurisdictionRowSubtitle": {
+    "description": "Supporting line of the jurisdiction row on the home screen."
+  },
+  "platformJurisdictionScreenTitle": "Jurisdiction",
+  "@platformJurisdictionScreenTitle": {
+    "description": "Heading of the jurisdiction screen."
+  },
+  "platformJurisdictionReferenceLabel": "Jurisdiction reference",
+  "@platformJurisdictionReferenceLabel": {
+    "description": "Label of the reference identifying the assigned jurisdiction."
+  },
+  "platformJurisdictionDeclareTitle": "Declare your jurisdiction",
+  "@platformJurisdictionDeclareTitle": {
+    "description": "Heading of the section where a jurisdiction is declared."
+  },
+  "platformJurisdictionDeclareDescription": "A declaration records where you say you are. It is not verified, and it grants no additional access on its own.",
+  "@platformJurisdictionDeclareDescription": {
+    "description": "Explains what a declaration is. States that it is unverified and grants no access."
+  },
+  "platformJurisdictionDeclareAction": "Record declaration",
+  "@platformJurisdictionDeclareAction": {
+    "description": "Button that records a declared jurisdiction."
+  },
+  "platformJurisdictionSelectionUnavailable": "The platform did not supply the jurisdictions available for selection, so none can be offered here.",
+  "@platformJurisdictionSelectionUnavailable": {
+    "description": "Shown when the platform supplied no jurisdictions to choose from."
+  },
+  "platformJurisdictionRecorded": "Your declaration was recorded.",
+  "@platformJurisdictionRecorded": {
+    "description": "Shown after a declaration was recorded."
+  },
+  "platformJurisdictionAlreadyInEffect": "That jurisdiction was already in effect, so nothing changed.",
+  "@platformJurisdictionAlreadyInEffect": {
+    "description": "Shown when the declared jurisdiction was already in effect."
+  },
+  "platformJurisdictionRemainsUnverified": "Recorded as declared by you, and unverified.",
+  "@platformJurisdictionRemainsUnverified": {
+    "description": "States that a recorded declaration is still unverified."
+  },
+
+  "platformLegalScreenTitle": "Legal",
+  "@platformLegalScreenTitle": {
+    "description": "Heading of the legal and operating entity screen."
+  },
+  "platformLegalRowSubtitle": "Who you contracted with, and the documents that apply",
+  "@platformLegalRowSubtitle": {
+    "description": "Supporting line of the legal row on the home screen."
+  },
+  "platformOperatingEntityHeading": "Operating entity",
+  "@platformOperatingEntityHeading": {
+    "description": "Section heading for the entity the account contracted with."
+  },
+  "platformOperatingEntityNameLabel": "Registered legal name",
+  "@platformOperatingEntityNameLabel": {
+    "description": "Label of the entity's registered legal name."
+  },
+  "platformOperatingEntityJurisdictionLabel": "Registered in",
+  "@platformOperatingEntityJurisdictionLabel": {
+    "description": "Label of where the entity is registered."
+  },
+  "platformOperatingEntityContactLabel": "Data protection contact",
+  "@platformOperatingEntityContactLabel": {
+    "description": "Label of the entity's data protection contact."
+  },
+  "platformOperatingEntityAssignedNote": "This is the legal person you contracted with, as recorded by the platform.",
+  "@platformOperatingEntityAssignedNote": {
+    "description": "States that the entity shown is the one the account contracted with."
+  },
+  "platformOperatingEntityUnassignedTitle": "No operating entity is assigned",
+  "@platformOperatingEntityUnassignedTitle": {
+    "description": "Heading shown when no operating entity is recorded."
+  },
+  "platformOperatingEntityUnassignedDescription": "No contracting entity is recorded for your account yet.",
+  "@platformOperatingEntityUnassignedDescription": {
+    "description": "Body shown when no operating entity is recorded."
+  },
+  "platformOperatingEntityUnavailableTitle": "The operating entity could not be read",
+  "@platformOperatingEntityUnavailableTitle": {
+    "description": "Heading shown when the operating entity could not be read."
+  },
+  "platformOperatingEntityUnavailableDescription": "The platform could not confirm which legal person you contracted with, so none is shown.",
+  "@platformOperatingEntityUnavailableDescription": {
+    "description": "Body shown when the operating entity could not be read."
+  },
+  "platformOperatingEntityUnrecognisedTitle": "The operating entity is not recognised",
+  "@platformOperatingEntityUnrecognisedTitle": {
+    "description": "Heading shown when the platform reported an operating entity state this version does not know."
+  },
+  "platformOperatingEntityUnrecognisedDescription": "The platform reported a state this version of the application does not recognise, so nothing is shown.",
+  "@platformOperatingEntityUnrecognisedDescription": {
+    "description": "Body shown when the platform reported an operating entity state this version does not know."
+  },
+  "platformPolicyPackHeading": "Governing policy",
+  "@platformPolicyPackHeading": {
+    "description": "Section heading for the policy governing the account."
+  },
+  "platformPolicyPackVersionLabel": "Version",
+  "@platformPolicyPackVersionLabel": {
+    "description": "Label of the governing policy's version."
+  },
+  "platformPolicyPackStatusLabel": "Status",
+  "@platformPolicyPackStatusLabel": {
+    "description": "Label of the governing policy's status."
+  },
+  "platformPolicyPackAbsent": "None in effect",
+  "@platformPolicyPackAbsent": {
+    "description": "States that no governing policy is in effect."
+  },
+  "platformConsentRowSubtitle": "What you have agreed to, and what is outstanding",
+  "@platformConsentRowSubtitle": {
+    "description": "Supporting line of the privacy and consent row on the home screen."
+  },
+  "platformSettingsRowSubtitle": "Language, appearance and account",
+  "@platformSettingsRowSubtitle": {
+    "description": "Supporting line of the settings row on the home screen."
+  },
+
+  "profileScreenTitle": "Profile",
+  "@profileScreenTitle": {
+    "description": "Heading of the profile screen."
+  },
+  "profileDisplayNameLabel": "Display name",
+  "@profileDisplayNameLabel": {
+    "description": "Label of the editable display name field."
+  },
+  "profileDisplayNameHelper": "The name shown to people in your organisation.",
+  "@profileDisplayNameHelper": {
+    "description": "Helper line under the display name field."
+  },
+  "profileLanguageLabel": "Language recorded on your account",
+  "@profileLanguageLabel": {
+    "description": "Label of the language the platform holds on the account, which is not the interface language."
+  },
+  "profileAccountStatusLabel": "Account status",
+  "@profileAccountStatusLabel": {
+    "description": "Label of the account status the platform reports."
+  },
+  "profileResidencyLabel": "Residency reference",
+  "@profileResidencyLabel": {
+    "description": "Label of the reference identifying the recorded residency."
+  },
+  "profileOrganisationLabel": "Organisation",
+  "@profileOrganisationLabel": {
+    "description": "Label of the organisation shown on the profile screen."
+  },
+  "profileAccountReferenceLabel": "Account reference",
+  "@profileAccountReferenceLabel": {
+    "description": "Label of the opaque reference identifying the account, on the profile screen."
+  },
+  "profileMemberSinceLabel": "Account created",
+  "@profileMemberSinceLabel": {
+    "description": "Label of the date the account was created."
+  },
+  "profileLastUpdatedLabel": "Last updated",
+  "@profileLastUpdatedLabel": {
+    "description": "Label of the date the profile was last changed."
+  },
+
+  "profileStatusActive": "Active",
+  "@profileStatusActive": {
+    "description": "Account status: active."
+  },
+  "profileStatusDisableRequested": "Disable requested",
+  "@profileStatusDisableRequested": {
+    "description": "Account status: a request to disable has been recorded."
+  },
+  "profileStatusDeletionRequested": "Deletion requested",
+  "@profileStatusDeletionRequested": {
+    "description": "Account status: a request to delete has been recorded."
+  },
+  "profileStatusDisabled": "Disabled",
+  "@profileStatusDisabled": {
+    "description": "Account status: disabled."
+  },
+  "profileStatusUnrecognised": "Not recognised by this version",
+  "@profileStatusUnrecognised": {
+    "description": "Account status the platform reported that this version of the application does not know. Agrees with the word for status, not with the word for jurisdiction."
+  },
+  "profileStatusDisableRequestedNote": "Your request has been recorded. Nothing has been disabled or removed by it yet.",
+  "@profileStatusDisableRequestedNote": {
+    "description": "States that a recorded disable request has by itself disabled and removed nothing."
+  },
+
+  "profileSaveConfirmation": "Your profile was updated.",
+  "@profileSaveConfirmation": {
+    "description": "Shown after the profile was updated."
+  },
+  "profileSaveFailedTitle": "Your profile was not updated",
+  "@profileSaveFailedTitle": {
+    "description": "Heading shown when the platform refused a profile change."
+  },
+  "profileSaveFailedDescription": "The platform did not accept the change. Nothing changed.",
+  "@profileSaveFailedDescription": {
+    "description": "Body shown when the platform refused a profile change."
+  },
+  "profileNoChangesTitle": "Nothing to save",
+  "@profileNoChangesTitle": {
+    "description": "Heading shown when saving was attempted with nothing changed."
+  },
+  "profileNoChangesDescription": "Change a field before saving.",
+  "@profileNoChangesDescription": {
+    "description": "Body shown when saving was attempted with nothing changed."
+  },
+  "profileUnavailableTitle": "Your profile could not be loaded",
+  "@profileUnavailableTitle": {
+    "description": "Heading shown when the profile could not be loaded."
+  },
+  "profileUnavailableDescription": "The platform did not answer. Nothing has changed.",
+  "@profileUnavailableDescription": {
+    "description": "Body shown when the profile could not be loaded."
+  },
+  "profileNotStated": "Not stated",
+  "@profileNotStated": {
+    "description": "Stands in for a profile value the platform did not state."
+  },
+
+  "settingsScreenTitle": "Settings",
+  "@settingsScreenTitle": {
+    "description": "Heading of the settings screen."
+  },
+  "settingsAppearanceTitle": "Appearance",
+  "@settingsAppearanceTitle": {
+    "description": "Settings section heading for the light and dark theme choice."
+  },
+  "settingsThemeSystem": "Follow the device",
+  "@settingsThemeSystem": {
+    "description": "Theme option that follows the device setting."
+  },
+  "settingsThemeLight": "Light",
+  "@settingsThemeLight": {
+    "description": "Theme option: light."
+  },
+  "settingsThemeDark": "Dark",
+  "@settingsThemeDark": {
+    "description": "Theme option: dark."
+  },
+  "settingsYourAccountTitle": "Your account",
+  "@settingsYourAccountTitle": {
+    "description": "Settings section heading for the rows leading to account surfaces."
+  },
+  "settingsProfileRow": "Profile",
+  "@settingsProfileRow": {
+    "description": "Settings row leading to the profile screen."
+  },
+  "settingsOrganisationRow": "Organisation",
+  "@settingsOrganisationRow": {
+    "description": "Settings row leading to the organisation screen."
+  },
+  "settingsJurisdictionRow": "Jurisdiction",
+  "@settingsJurisdictionRow": {
+    "description": "Settings row leading to the jurisdiction screen."
+  },
+  "settingsLegalRow": "Legal and operating entity",
+  "@settingsLegalRow": {
+    "description": "Settings row leading to the legal and operating entity screen."
+  },
+  "settingsConsentRow": "Privacy and consent",
+  "@settingsConsentRow": {
+    "description": "Settings row leading to the privacy and consent screen."
+  },
+
+  "settingsDangerTitle": "Closing your account",
+  "@settingsDangerTitle": {
+    "description": "Settings section heading for the account closure request."
+  },
+  "settingsDisableTitle": "Request that your account is disabled",
+  "@settingsDisableTitle": {
+    "description": "Title of the account disable request card."
+  },
+  "settingsDisableDescription": "This records your intention. Nothing is disabled or removed by the request itself, and you stay signed in.",
+  "@settingsDisableDescription": {
+    "description": "Explains that the request records an intention only. It must not imply that anything is disabled, removed or signed out by making it."
+  },
+  "settingsDisableAction": "Request account disable",
+  "@settingsDisableAction": {
+    "description": "Button that records a request to disable the account."
+  },
+  "settingsDisableConfirmTitle": "Record this request?",
+  "@settingsDisableConfirmTitle": {
+    "description": "Title of the dialog confirming the disable request."
+  },
+  "settingsDisableConfirmMessage": "Your request will be recorded against your account. Nothing is disabled or removed by recording it.",
+  "@settingsDisableConfirmMessage": {
+    "description": "Body of the dialog confirming the disable request."
+  },
+  "settingsDisableRecordedTitle": "Your request was recorded",
+  "@settingsDisableRecordedTitle": {
+    "description": "Heading shown after the disable request was recorded."
+  },
+  "settingsDisableRecordedMessage": "The platform has your request. Nothing has been disabled or removed.",
+  "@settingsDisableRecordedMessage": {
+    "description": "Body shown after the disable request was recorded."
+  },
+  "settingsDisableAuditWarning": "The request was recorded, but the platform could not write its audit entry. Quote this to support if you follow it up.",
+  "@settingsDisableAuditWarning": {
+    "description": "Appended when the request was recorded but its audit entry was not written."
+  },
+  "settingsDisableFailedTitle": "Your request was not recorded",
+  "@settingsDisableFailedTitle": {
+    "description": "Heading shown when the platform refused the disable request."
+  },
+  "settingsDisableFailedMessage": "The platform did not accept the request. Nothing changed.",
+  "@settingsDisableFailedMessage": {
+    "description": "Body shown when the platform refused the disable request."
+  },
+
+  "tenantSelectionTitle": "Choose an organisation",
+  "@tenantSelectionTitle": {
+    "description": "Heading of the organisation selection screen."
+  },
+  "tenantSelectionDescription": "Your account belongs to more than one organisation. Choose the one to use for this session. Only the organisations the platform listed for you appear here.",
+  "@tenantSelectionDescription": {
+    "description": "Supporting line under the organisation selection heading."
+  },
+  "tenantNoMembershipTitle": "You do not belong to an organisation yet",
+  "@tenantNoMembershipTitle": {
+    "description": "Heading shown when the account belongs to no organisation."
+  },
+  "tenantNoMembershipDescription": "Your account is in order, but no organisation has admitted it. Until one does, this session stays unbound and anything belonging to an organisation stays unavailable.",
+  "@tenantNoMembershipDescription": {
+    "description": "Body shown when the account belongs to no organisation."
+  },
+  "tenantOrganisationTitle": "Organisation",
+  "@tenantOrganisationTitle": {
+    "description": "Heading of the organisation screen."
+  },
+  "tenantCurrentOrganisationLabel": "Current organisation",
+  "@tenantCurrentOrganisationLabel": {
+    "description": "Label of the organisation the session is bound to."
+  },
+  "tenantRoleLabel": "Role",
+  "@tenantRoleLabel": {
+    "description": "Label of the role the platform reports within the organisation."
+  },
+  "tenantRoleValuePattern": "{label}: {value}",
+  "@tenantRoleValuePattern": {
+    "description": "Pairs the role label with the role the platform reported. A message rather than a joined string, because the separator between a label and its value is not a colon in every language.",
+    "placeholders": {
+      "label": {
+        "type": "String",
+        "example": "Role"
+      },
+      "value": {
+        "type": "String",
+        "example": "Approver"
+      }
+    }
+  },
+  "tenantUnboundTitle": "This session is not bound to an organisation",
+  "@tenantUnboundTitle": {
+    "description": "Heading shown when the session is bound to no organisation."
+  },
+  "tenantUnboundDescription": "Nothing that belongs to an organisation is available while the session is unbound.",
+  "@tenantUnboundDescription": {
+    "description": "Body shown when the session is bound to no organisation."
+  },
+
+  "tenantSwitchHeading": "Switch organisation",
+  "@tenantSwitchHeading": {
+    "description": "Section heading for switching to another organisation."
+  },
+  "tenantSwitchDescription": "Switching ends the current session and starts a new one in the other organisation. Everything loaded for the current organisation is discarded, and this device is signed in again automatically.",
+  "@tenantSwitchDescription": {
+    "description": "Explains what switching organisation does to the current session. States that the session ends and a new one begins."
+  },
+  "tenantSwitchAction": "Switch",
+  "@tenantSwitchAction": {
+    "description": "Button that switches to another organisation."
+  },
+  "tenantNoAlternativesTitle": "No other organisation is available",
+  "@tenantNoAlternativesTitle": {
+    "description": "Heading shown when the account has no other organisation to switch to."
+  },
+  "tenantNoAlternativesDescription": "The platform lists no other membership for your account, so there is nothing to switch to.",
+  "@tenantNoAlternativesDescription": {
+    "description": "Body shown when the account has no other organisation to switch to."
+  },
+  "tenantBoundConfirmation": "This session is now bound to the organisation.",
+  "@tenantBoundConfirmation": {
+    "description": "Shown after the session was bound to the chosen organisation."
+  },
+  "tenantSwitchedConfirmation": "You are now in the other organisation, in a new session. The previous session has ended.",
+  "@tenantSwitchedConfirmation": {
+    "description": "Shown after a switch to another organisation completed."
+  },
+  "tenantSelectionFailedTitle": "The organisation could not be selected",
+  "@tenantSelectionFailedTitle": {
+    "description": "Heading shown when the platform refused the organisation selection."
+  },
+  "tenantSelectionFailedDescription": "The platform refused the selection. Nothing changed.",
+  "@tenantSelectionFailedDescription": {
+    "description": "Body shown when the platform refused the organisation selection."
+  },
+  "tenantMembershipChangedTitle": "Your membership changed during the switch",
+  "@tenantMembershipChangedTitle": {
+    "description": "Heading shown when membership changed while a switch was running."
+  },
+  "tenantMembershipChangedDescription": "Your access to that organisation changed while the switch was in progress, so the session was ended rather than left without a membership. Sign in again.",
+  "@tenantMembershipChangedDescription": {
+    "description": "Body shown when membership changed while a switch was running."
+  },
+  "tenantMembershipRefusedTitle": "That organisation is not available to you",
+  "@tenantMembershipRefusedTitle": {
+    "description": "Heading shown when the chosen organisation is not available to the account."
+  },
+  "tenantMembershipRefusedDescription": "The platform did not accept the selection. Nothing about your session changed.",
+  "@tenantMembershipRefusedDescription": {
+    "description": "Body shown when the chosen organisation is not available to the account."
+  },
+  "tenantSelectSemanticPrefix": "Select organisation",
+  "@tenantSelectSemanticPrefix": {
+    "description": "Spoken name of the control that selects one organisation from the list."
+  },
+
+  "tenantInvitationHeading": "Redeem an invitation",
+  "@tenantInvitationHeading": {
+    "description": "Section heading for redeeming an organisation invitation."
+  },
+  "tenantInvitationDescription": "If an organisation invited you, enter the code from that invitation. The invitation itself decides which organisation you join.",
+  "@tenantInvitationDescription": {
+    "description": "Explains that the invitation itself decides which organisation is joined."
+  },
+  "tenantInvitationFieldLabel": "Invitation code",
+  "@tenantInvitationFieldLabel": {
+    "description": "Label of the invitation code field."
+  },
+  "tenantInvitationAction": "Redeem invitation",
+  "@tenantInvitationAction": {
+    "description": "Button that redeems an invitation code."
+  },
+  "tenantInvitationRedeemed": "The invitation was redeemed. Your memberships are being re-checked.",
+  "@tenantInvitationRedeemed": {
+    "description": "Shown after an invitation was redeemed."
+  },
+  "tenantInvitationFailedTitle": "The invitation could not be redeemed",
+  "@tenantInvitationFailedTitle": {
+    "description": "Heading shown when an invitation could not be redeemed."
+  },
+  "tenantInvitationFailedDescription": "The code was not accepted. It may have been used already, withdrawn, or issued for a different account.",
+  "@tenantInvitationFailedDescription": {
+    "description": "Body shown when an invitation could not be redeemed. It lists the possible reasons without stating which one applied."
+  }
+}

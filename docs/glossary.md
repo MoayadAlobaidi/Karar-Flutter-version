@@ -222,6 +222,36 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 ---
 
+## The client (Phase 4)
+
+**Startup state** — one of **fourteen** values the startup coordinator holds, each mapping to exactly one route and declaring one recovery action. **Protected content renders in `READY` and nowhere else**, and a feature never decides which state holds. There is exactly one router redirect, driven by these. Two of the fourteen are security states added late in Phase 4, each replacing a fail-open default: `LOCAL_SECURITY_STATE_UNAVAILABLE` (the lock choice could not be read, and an unknown lock choice is never spent as "off") and `SECURITY_RECOVERY_BLOCKED` (a session was abandoned without a confirmed credential deletion or durable invalidation).
+
+**Local security state** — the two security-relevant device flags, held in their own narrow store rather than in ordinary preferences: whether the application lock is on, and whether a persisted session was abandoned. Its key type is a closed enum, every operation returns a sealed outcome that keeps a value, a genuine absence, an unavailable store and a corrupt one apart, and **it has no in-memory fallback** — an unopenable store reports unavailability to every call rather than answering "absent". The ordinary preference store swallows a failed write and substitutes an in-memory one when the platform store will not open; correct for a theme choice, and a fail-open for a lock flag.
+
+**Application lock** — a local device gate over an already-issued session, opened by the platform authenticator. **An unlock grants no session and never substitutes for signing in.** Enabling applies only on a confirmed durable write; a disable that cannot be confirmed **retains the enabled state**, because the safe end of that failure is a lock the user must open rather than one that silently stopped existing. Never exercised on a device.
+
+**Per-environment application identifier** — the rule that each of the four environments ships under its own Android `applicationId` and iOS `CFBundleIdentifier`. Its practical consequence is that **`KARAR_ENV` has no default**: a build told nothing about its environment is refused rather than becoming a production-identified artifact, which is why `flutter run` and Xcode-IDE builds require the dart-define.
+
+**Runtime conformance** — validating real serialized responses from the *composed* application against the OpenAPI document that describes them, as opposed to the drift check, which binds the contract to the generated client. Covers 82 of 128 declared operation/status pairs. Distinct from a contract test in that nothing is mocked: real composition root, real guards, real serializer, live PostgreSQL and Redis.
+
+**Deviation ledger** — a test whose expected value is the **empty** set, replacing a list of known-and-tolerated exceptions. Phase 4 emptied two: problem documents served under the wrong media type, and operations describing their responses in prose with no schema. The point is that a new instance becomes a failing test rather than a silent addition to a list nobody re-reads.
+
+**Feature surface** — the single merge point where every feature's routes, startup screens and home builder are combined into provider overrides. It exists because a Riverpod override *replaces* a value: two workstreams overriding independently would leave only the last standing.
+
+**Navigable capability set** — the client's compile-time **allowlist** of capability ids that may become a destination. An **allowlist, never a denylist**: an id the server omitted produces no destination, no count and no readable state, and there is deliberately no collection of unrecognised ids, because such a collection would disclose the names it holds. Empty today, correctly — nothing is implemented.
+
+**Resolved-empty versus unavailable** — two different answers a client must not conflate. A bootstrap response whose capability section is `RESOLVED` with no items is an *answer*, rendered as a stated empty state inside the signed-in surface. A resolution that could not be performed is a 503, rendered as an outage screen that names no service, no entitlement and no dependency. Before Phase 4 the enrichment ports could not express the difference.
+
+**Client-safe entity summary** — the four fields of an `OperatingEntity` a client may be told: id, registered legal name, an optional jurisdiction reference, an optional published role mailbox. Enforced by the SELECT rather than by a mapper, and **resolution-scoped** — derived from the caller's own binding, so the register can be neither named into nor enumerated.
+
+**Self-declaration** — a subject recording their own jurisdiction. Always `USER_DECLARED` and `UNVERIFIED`, by module constant and by schema CHECK; it cannot supersede a verified assignment and **changes only which denial reason the subject sees**. It exists because both operator write paths are gated on a deliberately unseeded permission.
+
+**Build environment guard** — the build-time check that refuses to produce a package for any environment other than `LOCAL` without an HTTPS endpoint that carries no credentials and whose host is not a developer-machine address. A **build failure**, not a runtime warning: on Android at Gradle configuration time, on iOS in a build phase that runs before code signing.
+
+**Golden baseline** — a committed image compared pixel-for-pixel. Karar keeps four, of two design-system compositions in two locales, and they are **not CI-enforced**; they are banned outright under `test/features`, because a golden captures whatever was on screen and an MFA setup key or a recovery code must never end up in one.
+
+---
+
 ## Evidence labels
 
 Used on every factual claim about a system.
@@ -232,6 +262,8 @@ Used on every factual claim about a system.
 **ABSENT** — searched for and not found. The absence is the evidence.
 
 > An INFRASTRUCTURE claim must never be read as a verified one.
+
+**ARTIFACT** is used in the Phase 4 records as a narrowing of RUNTIME: an assertion that read a real build output — a merged manifest, an unzipped APK, a packaged iOS bundle — which is stronger than reading source and **weaker than observing a device**. Where it appears, no device was involved.
 
 ---
 

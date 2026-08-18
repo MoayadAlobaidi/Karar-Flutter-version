@@ -49,6 +49,21 @@ export interface VerificationSourceMismatch {
   readonly message: string;
 }
 
+/**
+ * A SUBJECT self-declaration was refused. Distinct from an operator
+ * assignment failing: the two cases here are a register entry that is not
+ * declarable (RETIRED — a regime nobody may newly enter) and an existing
+ * VERIFIED assignment, which a self-declaration must never supersede. A
+ * verified assignment was established by a provider; unwinding it is a
+ * provider or operator act, and letting a subject clear it by declaring
+ * something else would make verification self-erasable.
+ */
+export interface DeclarationNotPermitted {
+  readonly kind: 'DECLARATION_NOT_PERMITTED';
+  readonly reason: 'JURISDICTION_NOT_DECLARABLE' | 'VERIFIED_ASSIGNMENT_EXISTS';
+  readonly message: string;
+}
+
 /** The pure lifecycle predicate refused the activation (DRAFT or unapproved
  * outside local, retired pack, approval claim without evidence). */
 export interface ActivationDenied {
