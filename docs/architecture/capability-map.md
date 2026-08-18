@@ -56,7 +56,7 @@ Two entries that a reader may expect here and will not find in the registry:
 
 | Package | Contents | Framework deps |
 |---|---|---|
-| `shared-kernel` | The nine universals | **zero** |
+| `shared-kernel` | The ten universals | **zero** |
 | `financial-engine` | Calculators, ruleset registry | **zero** |
 | `jurisdiction-policy` | Country and Jurisdiction models, typed PolicyPacks, the decision union, lifecycle and validation predicates, the strategy registry, `EffectivePolicy` | **zero** |
 | `capability-registry` | The closed `CapabilityId` union, descriptors, the three state dimensions, registry validation | **zero** (depends only on `jurisdiction-policy`) |

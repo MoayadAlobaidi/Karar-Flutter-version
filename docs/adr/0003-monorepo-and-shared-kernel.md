@@ -12,13 +12,13 @@ Karar spans a backend, a Flutter client, generated SDKs, pure domain packages, a
 
 **All buildable or deployable application entrypoints live under `apps/`** — `apps/mobile/` (Flutter client), `apps/api/`, `apps/worker/`, `apps/admin/`. There is no singular `app/` directory; a client is an entrypoint like any other. `worker` remains a second entrypoint over the same module graph (ADR-0013), not a separate business application.
 
-**`shared-kernel` contains exactly nine universals:**
+**`shared-kernel` contains exactly ten universals:**
 
 ```
-Money · Currency · Percentage · ExchangeRate · Clock · Result · DomainEvent · TenantId · UserId
+Money · CalendarDay · Currency · Percentage · ExchangeRate · Clock · Result · DomainEvent · TenantId · UserId
 ```
 
-CI caps the export surface (architecture test 20). Additions require an ADR.
+CI caps the export surface (architecture test 20). Additions require an ADR. The tenth, `CalendarDay`, was added in [ADR-0027](0027-calendar-day-and-instant.md) and approved by the Platform Owner for one specific semantic distinction — a calendar day is not an instant. That approval does not widen the cap: an eleventh universal needs its own ADR, architecture justification, an architecture-test change and Platform Owner approval, exactly as the tenth did.
 
 **Removed from the v1 kernel:** `AccountId`, `TransactionId`, `BudgetId`, `GoalId`, `FinancialPeriod`.
 

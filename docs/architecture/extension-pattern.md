@@ -149,7 +149,7 @@ Platform services are **used, never modified**. If a capability needs a change t
 
 | Service | Provides |
 |---|---|
-| `shared-kernel` | The nine universals |
+| `shared-kernel` | The ten universals |
 | `identity`, `consent`, `audit` | Authentication, consent state, audit writing |
 | `documents` | Evidence and file references. **No domain touches object storage directly** (test 18) |
 | `notifications` | Delivery behind a channel port |

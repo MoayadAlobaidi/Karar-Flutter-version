@@ -164,7 +164,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkKernelSurface",
-      "notes": "packages/shared-kernel/src/index.ts must export exactly the nine universals: Money, Currency, Percentage, ExchangeRate, Clock, Result, DomainEvent, TenantId, UserId. Any tenth export, or a missing one, fails."
+      "notes": "packages/shared-kernel/src/index.ts must export exactly the ten universals: Money, CalendarDay, Currency, Percentage, ExchangeRate, Clock, Result, DomainEvent, TenantId, UserId. Any eleventh export, or a missing one, fails. The tenth (CalendarDay) was admitted by ADR-0027 with Platform Owner approval; the cap is ten and an eleventh requires the same route."
     },
     {
       "id": 21,

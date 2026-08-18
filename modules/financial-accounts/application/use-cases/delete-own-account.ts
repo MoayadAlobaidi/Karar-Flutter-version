@@ -123,16 +123,22 @@ export class DeleteOwnAccount {
     } catch (error) {
       // A throw is not a partial erasure — nothing is known to have been
       // removed — so the counts reported are zeroes and the account stands.
-      return Result.err({
-        kind: 'erasure_incomplete',
+      // The caught throw comes from the other module's store. Its text can
+      // carry a connection string, SQL, or a fragment of the very financial
+      // records this operation exists to erase, so it is attached
+      // non-enumerably for the boundary logger and never described here.
+      const failure = {
+        kind: 'erasure_incomplete' as const,
         deleted: NO_RECORDS_ERASED,
-        outcome: 'failed',
+        outcome: 'failed' as const,
         message:
-          `the account was NOT deleted: erasing the financial records scoped to it failed ` +
-          `(${error instanceof Error ? error.message : String(error)}). Deleting the account now ` +
-          'would orphan those records and report a completeness that did not happen; retry, because ' +
-          'the erasure is idempotent',
-      });
+          'the account was NOT deleted: erasing the financial records scoped to it failed. ' +
+          'Deleting the account now would orphan those records and report a completeness that did ' +
+          'not happen; retry, because the erasure is idempotent. The failure is logged once at the ' +
+          'boundary, against this request',
+      };
+      Object.defineProperty(failure, 'cause', { value: error, enumerable: false, writable: false });
+      return Result.err(failure);
     }
     if (erasure.kind !== 'erased') {
       return Result.err({

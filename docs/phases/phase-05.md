@@ -50,7 +50,11 @@ No change to the protected architecture. The foundation is ordinary Clean Archit
 One cross-module arrangement is worth naming because it is easy to get wrong: `modules/financial-accounts` must not import `modules/transactions`, but it owns two rules that depend on transaction data — an account's currency may not change while records exist, and deleting an account must take its records with it. Accounts therefore *declares* both ports and transactions *implements* them, resolved through the accounts module's `public-api`. The dependency runs one way only.
 ## ADRs added/amended
 
-None. Nothing in this foundation changed a decision that an ADR records.
+**[ADR-0027](../adr/0027-calendar-day-and-instant.md) — calendar days and instants are different types.** ACCEPTED, approved by the Platform Owner. A date on a statement is what an institution wrote on its books, not a moment in time; stored as an instant it shifts across day and month boundaries for readers at different offsets, so a statement for August gains or loses a line depending on where it is read.
+
+The approval admits `CalendarDay` as the **tenth** shared-kernel universal and moves architecture test 20's export cap from nine to ten. It authorises that one semantic distinction and nothing more: an eleventh universal needs its own ADR, architecture justification, architecture-test change and Platform Owner approval. The approval is an engineering decision — no legal, regulatory or compliance position is claimed by it.
+
+Test 20's self-test now proves the cap in **both** directions: a fixture that omits a universal and adds one that does not belong. The missing arm is what catches a rename, since a renamed universal is absent under its old name and extra under its new one — which is also how an aliasing `export { X as Y }` that changes the public surface is caught.
 ## Code and package changes
 
 Two new modules, both inert:

@@ -20,7 +20,7 @@
 | 11 | Deterministic domain | `domain/` reads the system clock or a random source |
 | 17 | Pure packages | `jurisdiction-policy` or `state-machine` gains a framework dependency |
 | 18 | Storage access | A domain touches `ObjectStorage` directly rather than via `documents` |
-| 20 | Kernel surface | `shared-kernel` exports anything beyond the nine universals |
+| 20 | Kernel surface | `shared-kernel` exports anything beyond the ten universals, or is missing one |
 
 ## Correctness
 

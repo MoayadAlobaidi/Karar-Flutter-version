@@ -56,10 +56,23 @@ export interface VersionConflict {
   readonly message: string;
 }
 
-/** The store failed. Never carries store internals outward. */
+/**
+ * The store failed. Never carries store internals outward.
+ *
+ * `operation` is this module's own vocabulary ('read own account'), never the
+ * store's. `cause` holds the original throw for the ONE place allowed to log
+ * it — the boundary that turns this into a response, per the logging rule in
+ * `packages/platform/src/observability/logger.ts` — and is defined
+ * NON-ENUMERABLE so that `JSON.stringify`, object spread, structured logging
+ * and an RFC 7807 body all drop it without anyone remembering to. A field that
+ * must not be serialized is safer as a field that cannot be.
+ */
 export interface StoreFailure {
   readonly kind: 'store_failure';
   readonly message: string;
+  readonly operation: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
 }
 
 /**
@@ -118,6 +131,8 @@ export interface DeletionPartiallyApplied {
 export interface RecordPresenceUnavailable {
   readonly kind: 'record_presence_unavailable';
   readonly message: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
 }
 
 export type ListOwnAccountsError = MissingPrincipalContext | StoreFailure;
@@ -169,12 +184,31 @@ export const ACCOUNT_NOT_FOUND: AccountNotFound = Object.freeze({
     'learns nothing from the difference',
 });
 
-/** Wrap an unexpected store throw without leaking its internals to a client. */
+/**
+ * Wrap an unexpected store throw without leaking its internals to a client.
+ *
+ * The message used to interpolate the caught error, directly under a comment
+ * promising it did not. A driver message is not ours to show: it can carry a
+ * connection string with credentials, the SQL that failed, a table name, a
+ * host and port, or — worst here — a fragment of the row that failed, which in
+ * this module is the financial data the whole encryption story exists to
+ * protect. It is also unstable, so a client that keyed on it would break when
+ * the driver was upgraded.
+ */
 export function storeFailure(operation: string, error: unknown): StoreFailure {
-  return {
-    kind: 'store_failure',
-    message: `${operation} failed: ${error instanceof Error ? error.message : String(error)}`,
+  const failure = {
+    kind: 'store_failure' as const,
+    operation,
+    message:
+      `${operation} could not be completed because the store did not answer. The reason is ` +
+      'deliberately not described here: it comes from the database driver, and driver text can ' +
+      'carry credentials, SQL, or a fragment of the record itself. It is logged once at the ' +
+      'boundary, against this request',
   };
+  // Non-enumerable: invisible to JSON.stringify, spread, and any serializer,
+  // reachable only by code that names it.
+  Object.defineProperty(failure, 'cause', { value: error, enumerable: false, writable: false });
+  return failure as StoreFailure;
 }
 
 /**
@@ -187,14 +221,16 @@ export function recordPresenceUnavailable(
   store: string,
   error: unknown,
 ): RecordPresenceUnavailable {
-  return {
-    kind: 'record_presence_unavailable',
+  const failure = {
+    kind: 'record_presence_unavailable' as const,
     message:
-      `the currency was not changed: whether this account holds ${store} could not be established ` +
-      `(${error instanceof Error ? error.message : String(error)}). The rule fails closed — stored ` +
-      'minor units are scaled by their currency exponent, so re-denominating an account that might ' +
-      'hold records would silently rescale every figure already recorded',
+      `the currency was not changed: whether this account holds ${store} could not be established. ` +
+      'The rule fails closed — stored minor units are scaled by their currency exponent, so ' +
+      're-denominating an account that might hold records would silently rescale every figure ' +
+      'already recorded. Why the question could not be answered is logged once at the boundary',
   };
+  Object.defineProperty(failure, 'cause', { value: error, enumerable: false, writable: false });
+  return failure as RecordPresenceUnavailable;
 }
 
 /**

@@ -112,7 +112,7 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **Port / adapter** — an interface declared in `application/`, implemented in `infrastructure/`. Every external dependency is a port.
 
-**shared-kernel** — exactly nine universals. A type belongs only if a module that has never heard of any other module still needs it.
+**shared-kernel** — exactly ten universals. A type belongs only if a module that has never heard of any other module still needs it.
 
 **Projection / read model** — a non-authoritative, rebuildable view in `readmodel`, built from events. **Never a source of truth.** Always shows an "as of" timestamp.
 

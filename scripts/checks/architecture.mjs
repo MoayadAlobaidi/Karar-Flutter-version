@@ -1895,7 +1895,7 @@ export function checkStorageBoundary(ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 20 — Kernel surface (exactly the nine universals)
+// Test 20 — Kernel surface (exactly the ten universals)
 // ---------------------------------------------------------------------------
 function collectExports(file, resolveReexports) {
   const src = stripComments(readText(file));
@@ -1945,7 +1945,7 @@ export function checkKernelSurface(ctx) {
     if (!expected.has(name)) {
       violations.push({
         file: relPath,
-        detail: `exports '${name}' — the kernel surface is capped at the nine universals (additions require an ADR)`,
+        detail: `exports '${name}' — the kernel surface is capped at the ten universals (additions require an ADR)`,
       });
     }
   }
@@ -1953,7 +1953,7 @@ export function checkKernelSurface(ctx) {
     if (!actual.has(name)) {
       violations.push({
         file: relPath,
-        detail: `universal '${name}' is missing — the kernel surface must be exactly the nine`,
+        detail: `universal '${name}' is missing — the kernel surface must be exactly the ten`,
       });
     }
   }
@@ -2724,10 +2724,17 @@ function buildSelfTestFixture() {
     'packages/shared-kernel/package.json',
     JSON.stringify({ name: '@karar/shared-kernel', dependencies: { lodash: '^4.17.0' } }),
   );
+  // The kernel fixture breaks the cap in BOTH directions at once: it OMITS a
+  // universal and ADDS one that does not belong. A fixture that only added an
+  // export would leave the "missing" arm unproven, and that arm is the one
+  // that catches a rename — a renamed universal is simultaneously missing
+  // under its old name and extra under its new one, which is also how an
+  // `export { X as Y }` alias that changes the public surface is caught.
   write(
     'packages/shared-kernel/src/index.ts',
-    KERNEL_EXPORTS.map((n) => `export type ${n} = unknown;`).join('\n') +
-      `\nexport type ExtraTenthExport = never;\n`,
+    KERNEL_EXPORTS.filter((n) => n !== 'CalendarDay')
+      .map((n) => `export type ${n} = unknown;`)
+      .join('\n') + `\nexport type ExtraTenthExport = never;\n`,
   );
   write(
     'packages/financial-engine/package.json',
@@ -3158,7 +3165,10 @@ const SELF_TEST_CASES = [
   // …and a filesystem import no manifest would ever show.
   { fn: 'checkPurePackages', expect: /capability-registry imports 'node:fs'/ },
   { fn: 'checkStorageBoundary', expect: /client-s3/ },
+  // Test 20 in both directions: an export that does not belong…
   { fn: 'checkKernelSurface', expect: /ExtraTenthExport/ },
+  // …and a universal that is absent.
+  { fn: 'checkKernelSurface', expect: /universal 'CalendarDay' is missing/ },
   // Test 19: a pack clearing a disclosure-bearing capability with no entry…
   { fn: 'checkApprovalPolicy', expect: /fx\/no-entry.*FIXTURE_DISCLOSING/ },
   // …one whose entry is not DECIDED…

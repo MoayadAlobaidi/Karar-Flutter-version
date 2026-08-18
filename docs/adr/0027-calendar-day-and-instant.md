@@ -2,6 +2,8 @@
 
 **Status:** ACCEPTED · **Phase:** 5 · **Irreversible in practice for stored ledger data**
 
+**Approved by the Platform Owner** for one specific semantic distinction: a calendar day is not an instant. The approval admits `CalendarDay` as the tenth shared-kernel universal and moves the export cap of architecture test 20 from nine to ten. It does **not** authorise unrestricted growth of the kernel — an eleventh universal requires its own ADR, explicit architecture justification, an architecture-test change and Platform Owner approval, by the same route this one took. This is an engineering approval and nothing else: no legal, regulatory or compliance decision is claimed or implied by it.
+
 ## Context
 
 A statement line says a payment was booked on 12 August. That is not a moment in time — it is what the institution wrote on its books. The Phase 5 foundation stored it as `timestamptz` anyway, because that is what every other temporal column in the system is and because TypeScript offers `Date` and nothing else.
