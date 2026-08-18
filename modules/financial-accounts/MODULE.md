@@ -12,7 +12,7 @@ Financial accounts and the source-reported balance snapshots attached to them, p
 
 - **Business owner:** _unassigned — solo team, Phase 0_
 - **Technical owner:** _unassigned — solo team, Phase 0_
-- **Status:** PLANNED
+- **Status:** ACTIVE — Phase 5 implemented the account core: `public.financial_accounts` and `public.financial_account_balance_snapshots` (both RLS ENABLEd and FORCEd on tenant and user), the reviewed `public.institutions` catalogue, and manual create, read, update and delete as first-class use cases. **No ingestion endpoint and no transport layer exist yet**, and no account can be created by any provider connection
 - **Phase:** 5
 - **Capability:** TRANSACTIONS — this module is an internal bounded context beneath that product capability, not a capability of its own
 

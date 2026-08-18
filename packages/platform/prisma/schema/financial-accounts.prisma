@@ -1,0 +1,89 @@
+// financial-accounts module mapping (migrations 0087_institutions.sql,
+// 0088_financial_accounts.sql, 0089_financial_account_balance_snapshots.sql).
+// Prisma maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma); `make prisma-drift` is what keeps this file honest.
+//
+// Money: amount_minor_units is BIGINT in PostgreSQL and BigInt here, and it
+// stays BigInt all the way to the domain, where it becomes a shared-kernel
+// Money together with currency_code (ADR-0006). It is never mapped to a
+// JavaScript number: 2^53 is not a safe bound for minor units, and a float
+// cannot represent 0.10 exactly. There is no NUMERIC, DOUBLE PRECISION, or
+// FLOAT anywhere on this module's money path.
+//
+// Deliberately NOT expressed here, enforced by the migrations and their
+// tests instead: every CHECK constraint (the closed currency, account-type,
+// status, and source-kind vocabularies; the mask shape that makes a full
+// account number unrepresentable; the provider-connection biconditional;
+// the one-way-to-name-an-institution rule), the version-increment and
+// immutability triggers, RLS enable/force with the tenant+user principal
+// policies, and the grants. Every repository statement runs inside a
+// principal-context transaction (SET LOCAL app.tenant_id / app.user_id) or
+// the policies return nothing — failing closed.
+//
+// tenant_id and user_id are plain scalars by design (data-model.md §2): no
+// relation crosses a module boundary. institution_ref and the snapshot's
+// account reference are real relations because both targets are owned by
+// this module.
+
+model Institution {
+  id             String   @id @db.Uuid
+  code           String   @unique(map: "institutions_code_key")
+  displayNameEn  String   @map("display_name_en")
+  displayNameAr  String   @map("display_name_ar")
+  status         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @map("updated_at") @db.Timestamptz(6)
+
+  accounts FinancialAccount[]
+
+  @@map("institutions")
+}
+
+model FinancialAccount {
+  id                           String   @id @db.Uuid
+  tenantId                     String   @map("tenant_id") @db.Uuid
+  userId                       String   @map("user_id") @db.Uuid
+  institutionRef               String?  @map("institution_ref") @db.Uuid
+  userSuppliedInstitutionLabel String?  @map("user_supplied_institution_label")
+  accountType                  String   @map("account_type")
+  currencyCode                 String   @map("currency_code")
+  displayName                  String   @map("display_name")
+  mask                         String?
+  status                       String
+  sourceKind                   String   @map("source_kind")
+  providerConnectionRef        String?  @map("provider_connection_ref")
+  version                      Int      @default(1)
+  createdAt                    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                    DateTime @map("updated_at") @db.Timestamptz(6)
+
+  institution Institution?                       @relation(fields: [institutionRef], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "financial_accounts_institution_ref_fkey")
+  snapshots   FinancialAccountBalanceSnapshot[]
+
+  // Sole purpose: the target of the snapshot table's composite foreign key,
+  // which is what makes "an account's currency cannot change once records
+  // exist" a referential fact rather than an application convention.
+  @@unique([id, currencyCode], map: "financial_accounts_id_currency_key")
+  @@index([tenantId, userId, createdAt], map: "financial_accounts_owner_idx")
+  @@index([institutionRef], map: "financial_accounts_institution_idx")
+  @@map("financial_accounts")
+}
+
+model FinancialAccountBalanceSnapshot {
+  id               String   @id @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  accountId        String   @map("account_id") @db.Uuid
+  // BIGINT minor units. BigInt in the client, Money in the domain.
+  amountMinorUnits BigInt   @map("amount_minor_units")
+  currencyCode     String   @map("currency_code")
+  asOf             DateTime @map("as_of") @db.Timestamptz(6)
+  sourceKind       String   @map("source_kind")
+  sourceReference  String   @map("source_reference")
+  capturedAt       DateTime @map("captured_at") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account FinancialAccount @relation(fields: [accountId, currencyCode], references: [id, currencyCode], onDelete: Cascade, onUpdate: NoAction, map: "financial_account_balance_snapshots_account_fkey")
+
+  @@index([tenantId, userId, accountId, asOf], map: "financial_account_balance_snapshots_owner_idx")
+  @@map("financial_account_balance_snapshots")
+}
