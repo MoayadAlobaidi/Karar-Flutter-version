@@ -10,9 +10,16 @@
  * source, read exactly ONE body field, call one use case, map the Result. The
  * declared code is reference DATA the use case validates against the register;
  * nothing here branches on a jurisdiction identifier (architecture test 12).
+ *
+ * FAILURES ARE THROWN, never written to the reply. The HTTP entrypoint's error
+ * boundary is the ONE writer of an RFC 7807 document and the only place its
+ * `application/problem+json` media type is set (apps/api/src/errors/
+ * problem-response.ts); a problem this surface authored travels there as the
+ * body of an HttpException and is forwarded verbatim, code and all. The reply
+ * object below answers successes only.
  */
 
-import { Body, Controller, Get, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, Inject, Post, Req, Res } from '@nestjs/common';
 
 import type { DeclareOwnJurisdiction } from '../../application/use-cases/self-declaration.js';
 import type { ListDeclarableJurisdictions } from '../../application/use-cases/declarable-jurisdictions.js';
@@ -67,16 +74,14 @@ export class JurisdictionController {
     const principal = this.principalSource.fromRequest(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const result = await this.useCases.listDeclarableJurisdictions.execute({
       now: this.clock.now(),
     });
     if (!result.ok) {
       const problem = referencesUnavailableProblem(principal.requestId);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send(toDeclarableReferencesResponse(result.value));
   }
@@ -90,13 +95,11 @@ export class JurisdictionController {
     const principal = this.principalSource.fromRequest(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     if (principal.tenantId === null) {
       const problem = tenantBindingRequiredProblem(principal.requestId);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
 
     // Exactly one body field crosses the boundary — the declared code.
@@ -107,8 +110,7 @@ export class JurisdictionController {
         "'jurisdictionId' is required and must be a jurisdiction reference code",
         principal.requestId,
       );
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
 
     const result = await this.useCases.declareOwnJurisdiction.execute({
@@ -118,8 +120,7 @@ export class JurisdictionController {
     });
     if (!result.ok) {
       const problem = problemForDeclarationError(result.error, principal.requestId);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send(toDeclarationResponse(result.value));
   }

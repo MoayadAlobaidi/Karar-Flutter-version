@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.5.0
-// Digest:     a3e666d2
+// Digest:     82f00bc1
 // Generator:  tool/generate_api_client.dart 1.0.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -19,6 +19,84 @@
 // through an interpolated string.
 
 import 'package:meta/meta.dart';
+
+/// Contract object.
+@immutable
+final class AuthenticatedSessionDto {
+  const AuthenticatedSessionDto({
+    required this.accessToken,
+    required this.accessTokenExpiresAt,
+    required this.refreshToken,
+    required this.refreshTokenExpiresAt,
+    required this.sessionId,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory AuthenticatedSessionDto.fromJson(Map<String, Object?> json) => AuthenticatedSessionDto(
+        accessToken: json['accessToken']! as String,
+        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
+        refreshToken: json['refreshToken']! as String,
+        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
+        sessionId: json['sessionId']! as String,
+        status: AuthenticatedSessionStatusDto.fromWire(json['status']! as String),
+      );
+
+  /// ES256 JWT, 10 minutes. Carries no roles, permissions, or e-mail.
+  final String accessToken;
+
+  final DateTime accessTokenExpiresAt;
+
+  /// The RAW one-time refresh token — returned here and nowhere else; only its SHA-256 digest is stored. Rotated on every use.
+  final String refreshToken;
+
+  final DateTime refreshTokenExpiresAt;
+
+  final String sessionId;
+
+  final AuthenticatedSessionStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accessToken': accessToken,
+        'accessTokenExpiresAt': accessTokenExpiresAt.toUtc().toIso8601String(),
+        'refreshToken': refreshToken,
+        'refreshTokenExpiresAt': refreshTokenExpiresAt.toUtc().toIso8601String(),
+        'sessionId': sessionId,
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'AuthenticatedSessionDto()';
+}
+
+/// Contract enumeration.
+enum AuthenticatedSessionStatusDto {
+  authenticated('authenticated'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const AuthenticatedSessionStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AuthenticatedSessionStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
 
 /// Discriminated union keyed on `kind`.
 @immutable
@@ -725,6 +803,57 @@ enum DeclaredJurisdictionStateDto {
 
 /// Contract object.
 @immutable
+final class EmailVerifiedResultDto {
+  const EmailVerifiedResultDto({
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory EmailVerifiedResultDto.fromJson(Map<String, Object?> json) => EmailVerifiedResultDto(
+        status: EmailVerifiedResultStatusDto.fromWire(json['status']! as String),
+      );
+
+  final EmailVerifiedResultStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'EmailVerifiedResultDto()';
+}
+
+/// Contract enumeration.
+enum EmailVerifiedResultStatusDto {
+  verified('verified'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const EmailVerifiedResultStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static EmailVerifiedResultStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
 final class GetOwnTenantResponseDto {
   const GetOwnTenantResponseDto({
     required this.membership,
@@ -828,6 +957,118 @@ final class IdentityLoginRequestDto {
 
   @override
   String toString() => 'IdentityLoginRequestDto()';
+}
+
+/// Discriminated union keyed on `status`.
+@immutable
+sealed class IdentityLoginResponseDto {
+  const IdentityLoginResponseDto();
+
+  /// Decodes the branch named by `status`.
+  ///
+  /// An unrecognised discriminator throws [FormatException]: a union the
+  /// client cannot classify must not be guessed at, and the transport turns
+  /// the throw into a typed contract-violation failure.
+  factory IdentityLoginResponseDto.fromJson(Map<String, Object?> json) {
+    final discriminator = json['status'];
+    return switch (discriminator) {
+      'authenticated' => IdentityLoginResponseAuthenticatedDto.fromJson(json),
+      'mfa_required' => IdentityLoginResponseMfaRequiredDto.fromJson(json),
+      _ => throw FormatException(
+          'Unknown status for IdentityLoginResponseDto.',
+        ),
+    };
+  }
+
+  /// The raw discriminator value for this branch.
+  String get status;
+
+  /// Encodes this branch, including its discriminator.
+  Map<String, Object?> toJson();
+}
+
+/// The `authenticated` branch of [IdentityLoginResponseDto].
+@immutable
+final class IdentityLoginResponseAuthenticatedDto extends IdentityLoginResponseDto {
+  const IdentityLoginResponseAuthenticatedDto({
+    required this.accessToken,
+    required this.accessTokenExpiresAt,
+    required this.refreshToken,
+    required this.refreshTokenExpiresAt,
+    required this.sessionId,
+  });
+
+  /// Decodes this branch.
+  factory IdentityLoginResponseAuthenticatedDto.fromJson(Map<String, Object?> json) =>
+      IdentityLoginResponseAuthenticatedDto(
+        accessToken: json['accessToken']! as String,
+        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
+        refreshToken: json['refreshToken']! as String,
+        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
+        sessionId: json['sessionId']! as String,
+      );
+
+  /// ES256 JWT, 10 minutes. Carries no roles, permissions, or e-mail.
+  final String accessToken;
+
+  final DateTime accessTokenExpiresAt;
+
+  /// The RAW one-time refresh token — returned here and nowhere else; only its SHA-256 digest is stored. Rotated on every use.
+  final String refreshToken;
+
+  final DateTime refreshTokenExpiresAt;
+
+  final String sessionId;
+
+  @override
+  String get status => 'authenticated';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': 'authenticated',
+        'accessToken': accessToken,
+        'accessTokenExpiresAt': accessTokenExpiresAt.toUtc().toIso8601String(),
+        'refreshToken': refreshToken,
+        'refreshTokenExpiresAt': refreshTokenExpiresAt.toUtc().toIso8601String(),
+        'sessionId': sessionId,
+      };
+
+  @override
+  String toString() => 'IdentityLoginResponseAuthenticatedDto()';
+}
+
+/// The `mfa_required` branch of [IdentityLoginResponseDto].
+@immutable
+final class IdentityLoginResponseMfaRequiredDto extends IdentityLoginResponseDto {
+  const IdentityLoginResponseMfaRequiredDto({
+    required this.challengeExpiresAt,
+    required this.challengeToken,
+  });
+
+  /// Decodes this branch.
+  factory IdentityLoginResponseMfaRequiredDto.fromJson(Map<String, Object?> json) =>
+      IdentityLoginResponseMfaRequiredDto(
+        challengeExpiresAt: DateTime.parse(json['challengeExpiresAt']! as String).toUtc(),
+        challengeToken: json['challengeToken']! as String,
+      );
+
+  final DateTime challengeExpiresAt;
+
+  /// Short-lived (5 minutes) proof that the password step passed. It authenticates /auth/mfa/challenge and /auth/mfa/recovery and nothing else; it is not a session.
+  final String challengeToken;
+
+  @override
+  String get status => 'mfa_required';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': 'mfa_required',
+        'challengeExpiresAt': challengeExpiresAt.toUtc().toIso8601String(),
+        'challengeToken': challengeToken,
+      };
+
+  @override
+  String toString() => 'IdentityLoginResponseMfaRequiredDto()';
 }
 
 /// Contract object.
@@ -1360,6 +1601,57 @@ final class ListTenantMembersResponseDto {
 
 /// Contract object.
 @immutable
+final class LoggedOutResultDto {
+  const LoggedOutResultDto({
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory LoggedOutResultDto.fromJson(Map<String, Object?> json) => LoggedOutResultDto(
+        status: LoggedOutResultStatusDto.fromWire(json['status']! as String),
+      );
+
+  final LoggedOutResultStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'LoggedOutResultDto()';
+}
+
+/// Contract enumeration.
+enum LoggedOutResultStatusDto {
+  loggedOut('logged_out'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const LoggedOutResultStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static LoggedOutResultStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
 final class MembershipDto {
   const MembershipDto({
     required this.effectiveFrom,
@@ -1432,6 +1724,238 @@ enum MembershipStateDto {
 
   /// Parses a wire value, falling back to [unknown].
   static MembershipStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class MfaConfirmedDto {
+  const MfaConfirmedDto({
+    required this.recoveryCodes,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory MfaConfirmedDto.fromJson(Map<String, Object?> json) => MfaConfirmedDto(
+        recoveryCodes: (json['recoveryCodes']! as List<Object?>)
+            .map((Object? element) => element! as String)
+            .toList(growable: false),
+        status: MfaConfirmedStatusDto.fromWire(json['status']! as String),
+      );
+
+  /// Ten single-use recovery codes, delivered exactly once. The platform keeps only their digests; there is no route that re-issues them.
+  final List<String> recoveryCodes;
+
+  final MfaConfirmedStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'recoveryCodes': recoveryCodes
+            .map((String element) => element)
+            .toList(growable: false),
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'MfaConfirmedDto()';
+}
+
+/// Contract enumeration.
+enum MfaConfirmedStatusDto {
+  confirmed('confirmed'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const MfaConfirmedStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static MfaConfirmedStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class MfaDisabledResultDto {
+  const MfaDisabledResultDto({
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory MfaDisabledResultDto.fromJson(Map<String, Object?> json) => MfaDisabledResultDto(
+        status: MfaDisabledResultStatusDto.fromWire(json['status']! as String),
+      );
+
+  final MfaDisabledResultStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'MfaDisabledResultDto()';
+}
+
+/// Contract enumeration.
+enum MfaDisabledResultStatusDto {
+  disabled('disabled'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const MfaDisabledResultStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static MfaDisabledResultStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class MfaEnrolmentStartedDto {
+  const MfaEnrolmentStartedDto({
+    required this.otpauthUrl,
+    required this.secret,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory MfaEnrolmentStartedDto.fromJson(Map<String, Object?> json) => MfaEnrolmentStartedDto(
+        otpauthUrl: json['otpauthUrl']! as String,
+        secret: json['secret']! as String,
+        status: MfaEnrolmentStartedStatusDto.fromWire(json['status']! as String),
+      );
+
+  /// The same secret in otpauth form, for a QR code. It EMBEDS the secret: treat it as the credential it is.
+  final String otpauthUrl;
+
+  /// The base32 TOTP shared secret, delivered exactly once. It rests encrypted under a versioned key and is never readable again — a client that loses it must restart enrolment.
+  final String secret;
+
+  final MfaEnrolmentStartedStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'otpauthUrl': otpauthUrl,
+        'secret': secret,
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'MfaEnrolmentStartedDto()';
+}
+
+/// Contract enumeration.
+enum MfaEnrolmentStartedStatusDto {
+  enrolmentStarted('enrolment_started'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const MfaEnrolmentStartedStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static MfaEnrolmentStartedStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class NeutralReceiptDto {
+  const NeutralReceiptDto({
+    required this.detail,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory NeutralReceiptDto.fromJson(Map<String, Object?> json) => NeutralReceiptDto(
+        detail: json['detail']! as String,
+        status: NeutralReceiptStatusDto.fromWire(json['status']! as String),
+      );
+
+  /// Fixed, conditional prose ("if the address is eligible…"). It states no fact about the address and never varies.
+  final String detail;
+
+  final NeutralReceiptStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'detail': detail,
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'NeutralReceiptDto()';
+}
+
+/// Contract enumeration.
+enum NeutralReceiptStatusDto {
+  accepted('accepted'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const NeutralReceiptStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static NeutralReceiptStatusDto fromWire(String? value) {
     for (final candidate in values) {
       if (candidate.wireValue == value) {
         return candidate;
@@ -1541,6 +2065,164 @@ final class OperatingEntitySummaryDto {
 
   @override
   String toString() => 'OperatingEntitySummaryDto()';
+}
+
+/// Contract object.
+@immutable
+final class OtherSessionsRevokedDto {
+  const OtherSessionsRevokedDto({
+    required this.revokedCount,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory OtherSessionsRevokedDto.fromJson(Map<String, Object?> json) => OtherSessionsRevokedDto(
+        revokedCount: json['revokedCount']! as int,
+        status: OtherSessionsRevokedStatusDto.fromWire(json['status']! as String),
+      );
+
+  final int revokedCount;
+
+  final OtherSessionsRevokedStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'revokedCount': revokedCount,
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'OtherSessionsRevokedDto()';
+}
+
+/// Contract enumeration.
+enum OtherSessionsRevokedStatusDto {
+  revoked('revoked'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const OtherSessionsRevokedStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static OtherSessionsRevokedStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class PasswordChangedResultDto {
+  const PasswordChangedResultDto({
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory PasswordChangedResultDto.fromJson(Map<String, Object?> json) => PasswordChangedResultDto(
+        status: PasswordChangedResultStatusDto.fromWire(json['status']! as String),
+      );
+
+  final PasswordChangedResultStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'PasswordChangedResultDto()';
+}
+
+/// Contract enumeration.
+enum PasswordChangedResultStatusDto {
+  changed('changed'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const PasswordChangedResultStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static PasswordChangedResultStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class PasswordResetResultDto {
+  const PasswordResetResultDto({
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory PasswordResetResultDto.fromJson(Map<String, Object?> json) => PasswordResetResultDto(
+        status: PasswordResetResultStatusDto.fromWire(json['status']! as String),
+      );
+
+  final PasswordResetResultStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'PasswordResetResultDto()';
+}
+
+/// Contract enumeration.
+enum PasswordResetResultStatusDto {
+  reset('reset'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const PasswordResetResultStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static PasswordResetResultStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
 }
 
 /// Contract object.
@@ -1901,6 +2583,78 @@ final class RedeemTenantInvitationResponseDto {
 
 /// Contract object.
 @immutable
+final class RefreshedSessionDto {
+  const RefreshedSessionDto({
+    required this.accessToken,
+    required this.accessTokenExpiresAt,
+    required this.refreshToken,
+    required this.refreshTokenExpiresAt,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory RefreshedSessionDto.fromJson(Map<String, Object?> json) => RefreshedSessionDto(
+        accessToken: json['accessToken']! as String,
+        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
+        refreshToken: json['refreshToken']! as String,
+        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
+        status: RefreshedSessionStatusDto.fromWire(json['status']! as String),
+      );
+
+  final String accessToken;
+
+  final DateTime accessTokenExpiresAt;
+
+  /// The SUCCESSOR token. The presented one is consumed and will not work again.
+  final String refreshToken;
+
+  final DateTime refreshTokenExpiresAt;
+
+  final RefreshedSessionStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accessToken': accessToken,
+        'accessTokenExpiresAt': accessTokenExpiresAt.toUtc().toIso8601String(),
+        'refreshToken': refreshToken,
+        'refreshTokenExpiresAt': refreshTokenExpiresAt.toUtc().toIso8601String(),
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'RefreshedSessionDto()';
+}
+
+/// Contract enumeration.
+enum RefreshedSessionStatusDto {
+  refreshed('refreshed'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const RefreshedSessionStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static RefreshedSessionStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
 final class RequestOwnAccountDisableRequestDto {
   const RequestOwnAccountDisableRequestDto({
     this.reason,
@@ -2005,6 +2759,134 @@ final class RevokeTenantInvitationResponseDto {
 
   @override
   String toString() => 'RevokeTenantInvitationResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class SessionListingDto {
+  const SessionListingDto({
+    required this.sessions,
+  });
+
+  /// Decodes the contract representation.
+  factory SessionListingDto.fromJson(Map<String, Object?> json) => SessionListingDto(
+        sessions: (json['sessions']! as List<Object?>)
+            .map((Object? element) => SessionSummaryDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+      );
+
+  final List<SessionSummaryDto> sessions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'sessions': sessions
+            .map((SessionSummaryDto element) => element.toJson())
+            .toList(growable: false),
+      };
+
+  @override
+  String toString() => 'SessionListingDto()';
+}
+
+/// Contract object.
+@immutable
+final class SessionRevokedResultDto {
+  const SessionRevokedResultDto({
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory SessionRevokedResultDto.fromJson(Map<String, Object?> json) => SessionRevokedResultDto(
+        status: SessionRevokedResultStatusDto.fromWire(json['status']! as String),
+      );
+
+  final SessionRevokedResultStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'SessionRevokedResultDto()';
+}
+
+/// Contract enumeration.
+enum SessionRevokedResultStatusDto {
+  revoked('revoked'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const SessionRevokedResultStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SessionRevokedResultStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class SessionSummaryDto {
+  const SessionSummaryDto({
+    required this.absoluteExpiresAt,
+    required this.createdAt,
+    required this.current,
+    required this.lastSeenAt,
+    required this.sessionId,
+    this.userAgentSummary,
+  });
+
+  /// Decodes the contract representation.
+  factory SessionSummaryDto.fromJson(Map<String, Object?> json) => SessionSummaryDto(
+        absoluteExpiresAt: DateTime.parse(json['absoluteExpiresAt']! as String).toUtc(),
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        current: json['current']! as bool,
+        lastSeenAt: DateTime.parse(json['lastSeenAt']! as String).toUtc(),
+        sessionId: json['sessionId']! as String,
+        userAgentSummary: json['userAgentSummary'] as String?,
+      );
+
+  final DateTime absoluteExpiresAt;
+
+  final DateTime createdAt;
+
+  /// True for the session whose access token made this request.
+  final bool current;
+
+  final DateTime lastSeenAt;
+
+  final String sessionId;
+
+  /// A coarse summary ("Chrome on macOS"), never the raw user-agent string. Null when the client sent none — stated rather than omitted, so a client can tell "unknown" from "the server forgot".
+  final String? userAgentSummary;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'absoluteExpiresAt': absoluteExpiresAt.toUtc().toIso8601String(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'current': current,
+        'lastSeenAt': lastSeenAt.toUtc().toIso8601String(),
+        'sessionId': sessionId,
+        'userAgentSummary': userAgentSummary,
+      };
+
+  @override
+  String toString() => 'SessionSummaryDto()';
 }
 
 /// Contract object.

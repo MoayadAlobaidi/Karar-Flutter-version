@@ -19,6 +19,7 @@
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
+    "@karar/consent-local-fixtures": "workspace:*",
     "@nestjs/testing": "^11.2.0",
     "@types/node": "^25.9.5",
     "@types/pg": "^8.15.0",

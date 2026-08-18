@@ -13,9 +13,16 @@
  * new ids in this phase), and no existing id covers tenant binding;
  * restricting bootstrap would blind clients without restricting any
  * write surface it fronts.
+ *
+ * FAILURES ARE THROWN, never written to the reply. The HTTP entrypoint's error
+ * boundary is the ONE writer of an RFC 7807 document and the only place its
+ * `application/problem+json` media type is set (apps/api/src/errors/
+ * problem-response.ts); a problem this surface authored travels there as the
+ * body of an HttpException and is forwarded verbatim, code and all. The reply
+ * object below answers successes only.
  */
 
-import { Body, Controller, Get, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, Inject, Post, Req, Res } from '@nestjs/common';
 
 import type { GetBootstrap } from '../../application/use-cases/get-bootstrap.js';
 import type { SetTenantBinding } from '../../application/use-cases/set-tenant-binding.js';
@@ -51,8 +58,7 @@ export class BootstrapController {
     const principal = this.principalSource.fromRequest(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const result = await this.useCases.getBootstrap.execute(
       principal,
@@ -60,8 +66,7 @@ export class BootstrapController {
     );
     if (!result.ok) {
       const problem = problemForBootstrapError(result.error, principal.requestId);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send(toBootstrapResponse(result.value));
   }
@@ -75,8 +80,7 @@ export class BootstrapController {
     const principal = this.principalSource.fromRequest(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const raw = (body ?? {}) as Record<string, unknown>;
     const result = await this.useCases.setTenantBinding.execute(
@@ -87,8 +91,7 @@ export class BootstrapController {
     );
     if (!result.ok) {
       const problem = problemForBootstrapError(result.error, principal.requestId);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send(toTenantBindingResponse(result.value));
   }

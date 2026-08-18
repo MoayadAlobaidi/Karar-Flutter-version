@@ -22,9 +22,16 @@
  *
  * Thin by design (architecture test 6): resolve the principal, call one use
  * case, map the Result.
+ *
+ * FAILURES ARE THROWN, never written to the reply. The HTTP entrypoint's error
+ * boundary is the ONE writer of an RFC 7807 document and the only place its
+ * `application/problem+json` media type is set (apps/api/src/errors/
+ * problem-response.ts); a problem this surface authored travels there as the
+ * body of an HttpException and is forwarded verbatim, code and all. The reply
+ * object below answers successes only.
  */
 
-import { Controller, Get, Inject, Req, Res } from '@nestjs/common';
+import { Controller, Get, HttpException, Inject, Req, Res } from '@nestjs/common';
 
 import type { ListOwnMemberships } from '../../application/use-cases/list-own-memberships.js';
 import { authenticationRequiredProblem, problemForTenancyError } from './problems.js';
@@ -58,14 +65,12 @@ export class OwnMembershipsController {
     const principal = this.principalSource.fromRequest(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const result = await this.useCases.listOwnMemberships.execute(principal);
     if (!result.ok) {
       const problem = problemForTenancyError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     // The use case has already dropped everything not ACTIVE at the evaluation
     // instant, so an empty array is a real answer: this caller has no usable

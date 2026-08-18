@@ -20,9 +20,25 @@
  *
  * Thin by design (architecture test 6): resolve the principal, call one use
  * case, map the Result.
+ *
+ * FAILURES ARE THROWN, never written to the reply. The HTTP entrypoint's error
+ * boundary is the ONE writer of an RFC 7807 document and the only place its
+ * `application/problem+json` media type is set (apps/api/src/errors/
+ * problem-response.ts); a problem this surface authored travels there as the
+ * body of an HttpException and is forwarded verbatim, code and all. The reply
+ * object below answers successes only.
  */
 
-import { Controller, Get, Inject, NotFoundException, Param, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpException,
+  Inject,
+  NotFoundException,
+  Param,
+  Req,
+  Res,
+} from '@nestjs/common';
 
 import type {
   GetLegalDocumentContent,
@@ -49,13 +65,23 @@ interface ReplyLike {
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** The RFC 7807 members this surface states; the error boundary writes them. */
+interface ProblemBody {
+  readonly type: 'about:blank';
+  readonly title: string;
+  readonly status: number;
+  readonly code: string;
+  readonly detail?: string;
+  readonly reason?: string;
+}
+
 /**
  * The absence arms answer 409, not 404: the document EXISTS and applies to the
  * caller, the platform simply has no displayable text for it. A 404 would tell
  * the client the document is gone, and a client that believed that would stop
  * asking for consent it still owes.
  */
-function problemFor(error: GetLegalDocumentContentError): { status: number; body: unknown } {
+function problemFor(error: GetLegalDocumentContentError): { status: number; body: ProblemBody } {
   switch (error.kind) {
     case 'NOT_FOUND':
       return {
@@ -144,8 +170,7 @@ export class ConsentDocumentContentController {
     });
     if (!result.ok) {
       const problem = problemFor(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const view = result.value;
     reply.status(200).send({

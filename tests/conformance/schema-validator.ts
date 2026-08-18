@@ -236,6 +236,8 @@ const SUPPORTED_KEYWORDS: ReadonlySet<string> = new Set([
   'additionalProperties',
   'minProperties',
   'items',
+  'minItems',
+  'maxItems',
   'oneOf',
   'pattern',
   'minLength',
@@ -393,6 +395,19 @@ function checkArray(
   resolve: RefResolver,
   out: Violation[],
 ): void {
+  // Cardinality, then shape. The contract uses these where the COUNT is the
+  // promise rather than a limit — the MFA confirmation returns exactly ten
+  // recovery codes, and a response that returned nine would still satisfy
+  // every per-element rule below while breaking the client that stores them.
+  const minItems = node['minItems'];
+  if (typeof minItems === 'number' && value.length < minItems) {
+    out.push({ path, message: `has fewer than the declared minItems ${String(minItems)}` });
+  }
+  const maxItems = node['maxItems'];
+  if (typeof maxItems === 'number' && value.length > maxItems) {
+    out.push({ path, message: `has more than the declared maxItems ${String(maxItems)}` });
+  }
+
   const items = node['items'];
   if (items === undefined) return;
   value.forEach((element, index) => {

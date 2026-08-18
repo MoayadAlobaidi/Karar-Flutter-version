@@ -151,6 +151,29 @@ describe('the validator enforces what it claims to enforce', () => {
     ]);
   });
 
+  it('enforces array cardinality (minItems / maxItems), not only element shape', () => {
+    // The identity fragment declares the recovery-code set as EXACTLY ten.
+    // Every per-element rule holds for a nine-element answer, so without this
+    // the count would be documented and unchecked.
+    const exactlyTen = { type: 'array', minItems: 10, maxItems: 10, items: { type: 'string' } };
+    const ten = Array.from({ length: 10 }, (_, index) => `code-${String(index)}`);
+
+    expect(violations(exactlyTen, ten)).toEqual([]);
+    expect(violations(exactlyTen, ten.slice(1))).toEqual([
+      '<root>: has fewer than the declared minItems 10',
+    ]);
+    expect(violations(exactlyTen, [...ten, 'code-10'])).toEqual([
+      '<root>: has more than the declared maxItems 10',
+    ]);
+    // Cardinality and element shape are reported together, not one instead of
+    // the other: a short array of wrong things is two facts, not one.
+    expect(violations(exactlyTen, [1, 2])).toEqual([
+      '<root>: has fewer than the declared minItems 10',
+      '0: expected type string, received integer',
+      '1: expected type string, received integer',
+    ]);
+  });
+
   it('requires exactly one oneOf branch to match', () => {
     const binding = {
       oneOf: [

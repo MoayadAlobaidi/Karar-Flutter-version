@@ -28,7 +28,7 @@
 
 import 'reflect-metadata';
 
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Socket } from 'node:net';
 
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -46,10 +46,12 @@ import {
 } from '@karar/platform/dist/db/index.js';
 import { createLogger } from '@karar/platform/dist/observability/index.js';
 
-import {
-  LOCAL_SEED_CONTENT,
-  LOCAL_SEED_STORAGE_REF,
-} from '@karar/consent/dist/infrastructure/content/local-seed-content-source.js';
+// The synthetic fixture the LOCAL content source serves, read from the
+// LOCAL/TEST-only package that holds it. It is deliberately NOT in
+// @karar/consent: keeping the bytes out of the module keeps them out of every
+// production build and dependency closure, so this suite reaches for the
+// fixture package directly (a devDependency here, as everywhere).
+import { LOCAL_SEED_CONTENT, LOCAL_SEED_STORAGE_REF } from '@karar/consent-local-fixtures';
 
 import { AppModule } from '@karar/api/dist/app.module.js';
 import { composePhase3Modules } from '@karar/api/dist/composition/phase3-modules.js';
@@ -74,6 +76,26 @@ export interface RequestSpec {
   readonly accessToken?: string;
   readonly payload?: unknown;
   readonly headers?: Headers;
+  /**
+   * The socket peer address this request arrives from. Defaults to
+   * 127.0.0.1, which is what `inject` supplies.
+   *
+   * WHY IT IS SETTABLE. The identity rate limits are keyed on a digest of
+   * the client address as well as on the account, and the limiter is REAL.
+   * Driving every scenario from one address would make the per-IP login
+   * budget (30/15m) a coupling between unrelated tests: exhausting a
+   * per-ACCOUNT budget on purpose in one test would push an unrelated login
+   * elsewhere over the per-IP one, and the failure would name conformance
+   * rather than the arithmetic that caused it. Different scenarios ARE
+   * different clients, so they say so. No limit is relaxed: the addresses
+   * are distinct, and each one's budget is enforced exactly as configured.
+   *
+   * The values used are RFC 5737 TEST-NET documentation addresses, which can
+   * never be a real client. Nothing here is trusted from a header — the
+   * trusted-proxy allow-list is empty, so `x-forwarded-for` still resolves
+   * to nothing and the SOCKET peer is what the digest is taken from.
+   */
+  readonly remoteAddress?: string;
 }
 
 /**
@@ -88,13 +110,14 @@ function environmentFor(database: string): Record<string, string | undefined> {
     KARAR_DB_NAME: database,
     KARAR_TELEMETRY_ENABLED: 'false',
     // A per-run pepper, because the rate limiter is REAL and its store is
-    // shared. Login is capped at 30/15m per IP digest, every fixture sign-in
-    // comes from 127.0.0.1, and the digest is what keys the counter — so
-    // consecutive runs of this suite would exhaust the budget and the second
-    // one would fail on a 429 that says nothing about conformance. Rotating
-    // the pepper gives each run its own key space, which is exactly what the
-    // pepper is for; it is not a relaxation of the limit, and the limiter
-    // still enforces every policy inside the run.
+    // shared. The digests of the addresses and account identifiers this suite
+    // uses are what key the counters, and the suite deliberately exhausts
+    // several budgets to reach the 429s the contract declares — so a second
+    // run would start with them already spent and fail on refusals that say
+    // nothing about conformance. Rotating the pepper gives each run its own
+    // key space, which is exactly what the pepper is for; it is not a
+    // relaxation of any limit, and the limiter still enforces every policy
+    // inside the run.
     KARAR_DIGEST_PEPPER: `conformance-run-${randomUUID()}`,
   };
 }
@@ -168,6 +191,49 @@ export function skipBanner(reason: string): string {
   ].join('\n');
 }
 
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+/** RFC 4648 base32, the encoding an otpauth secret is published in. */
+function decodeBase32(secret: string): Buffer {
+  const normalized = secret.toUpperCase().replace(/=+$/, '').replace(/\s+/g, '');
+  const bytes: number[] = [];
+  let accumulator = 0;
+  let bits = 0;
+  for (const character of normalized) {
+    const value = BASE32_ALPHABET.indexOf(character);
+    if (value < 0) throw new Error('the enrolment secret is not base32');
+    accumulator = (accumulator << 5) | value;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((accumulator >> bits) & 0xff);
+    }
+  }
+  return Buffer.from(bytes);
+}
+
+/**
+ * The code an authenticator app would show for `secret` right now — RFC 6238
+ * with the server's parameters (SHA-1, six digits, thirty-second step; see
+ * modules/identity/infrastructure/crypto/otplib-totp-service.ts).
+ *
+ * WHY IT IS COMPUTED HERE. The MFA responses — the challenge, the recovery
+ * codes, the session an MFA login finally issues — are only reachable through
+ * a code the server will actually accept, and the server accepts exactly what
+ * RFC 6238 says. Twenty lines of the standard is the honest way to hold a
+ * real MFA response to the contract; the alternative was to leave a quarter
+ * of the identity surface unvalidated and call it unreachable.
+ */
+export function totpCode(secret: string, at: Date = new Date()): string {
+  const counter = Math.floor(at.getTime() / 1000 / 30);
+  const message = Buffer.alloc(8);
+  message.writeBigUInt64BE(BigInt(counter));
+  const digest = createHmac('sha1', decodeBase32(secret)).update(message).digest();
+  const offset = (digest[digest.length - 1] as number) & 0x0f;
+  const truncated = digest.readUInt32BE(offset) & 0x7fffffff;
+  return String(truncated % 1_000_000).padStart(6, '0');
+}
+
 /** A registered, logged-in caller. */
 export interface Caller {
   readonly email: string;
@@ -215,6 +281,14 @@ export class ComposedApp {
       LocalPostgresConnectionProfile.fromEnv('app', { env }),
     );
     const composition = composePhase3Modules({ config, env, dbAdapter, logger });
+    // Open the limiter's socket BEFORE anything is served, exactly as main.ts
+    // does. The client is lazyConnect with the offline queue disabled, so the
+    // first command would otherwise lose the race against the handshake and a
+    // fail-closed policy would answer 503 while Redis was running perfectly.
+    // The boolean is deliberately not asserted on: a store that is genuinely
+    // down must not stop the boot — `probeInfrastructure` above is what
+    // decides whether this suite runs at all.
+    await composition.rateLimitStore.connect();
 
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -222,7 +296,7 @@ export class ComposedApp {
           config,
           logger,
           telemetry: { shutdown: () => Promise.resolve() },
-          probes: createDbReadinessProbes(dbAdapter),
+          probes: createDbReadinessProbes(dbAdapter, composition.rateLimitStore),
           modules: composition.modules,
           enrichmentGuard: composition.enrichmentGuard,
           resources: composition.resources,
@@ -239,34 +313,7 @@ export class ComposedApp {
     const superuser = new PostgresPersistenceAdapter(
       LocalPostgresConnectionProfile.fromEnv('superuser', { env, database }),
     );
-    const composed = new ComposedApp(app, superuser, database);
-    await composed.warmRateLimiter();
-    return composed;
-  }
-
-  /**
-   * The rate-limit Redis client is built `lazyConnect` with the offline queue
-   * DISABLED (packages/platform/.../redis-rate-limiter.ts), so the first
-   * command after boot loses the race against the handshake and the route
-   * fails closed with 503. That is the intended behaviour for a store outage;
-   * here it is merely a cold start, and a fixture that inherited it would
-   * report "infrastructure unreachable" while Redis was running perfectly.
-   * One throwaway login drives the connection open before anything depends on
-   * it. Nothing about the responses under test is warmed — only the socket.
-   */
-  private async warmRateLimiter(): Promise<void> {
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-      const probe = await this.request({
-        method: 'POST',
-        url: '/auth/login',
-        payload: { email: `warm-${randomUUID()}@example.invalid`, password: 'not-a-password' },
-      });
-      // 401 means the limiter answered and the credentials were rejected —
-      // the store is live. 503 is the cold-start race; anything else is real.
-      if (probe.statusCode !== 503) return;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw new Error('the rate-limit store never became reachable; refusing to boot the suite');
+    return new ComposedApp(app, superuser, database);
   }
 
   async close(): Promise<void> {
@@ -292,6 +339,7 @@ export class ComposedApp {
         method: spec.method,
         url: spec.url,
         headers,
+        ...(spec.remoteAddress === undefined ? {} : { remoteAddress: spec.remoteAddress }),
         ...(spec.payload === undefined ? {} : { payload: spec.payload as object }),
       });
     const raw = response.body;
@@ -327,13 +375,14 @@ export class ComposedApp {
    * it in. The account is created by the application, not by SQL, so the
    * password hash and the account row are whatever the server actually writes.
    */
-  async registerAndLogin(): Promise<Caller> {
+  async registerAndLogin(from?: string): Promise<Caller> {
     const email = `conformance-${randomUUID()}@example.invalid`;
     const password = `Synthetic-${randomUUID()}`;
     const registered = await this.request({
       method: 'POST',
       url: '/auth/register',
       payload: { email, password },
+      ...(from === undefined ? {} : { remoteAddress: from }),
     });
     if (registered.statusCode !== 202) {
       throw new Error(
@@ -346,21 +395,64 @@ export class ComposedApp {
     );
     const userId = rows[0]?.id;
     if (userId === undefined) throw new Error('fixture registration wrote no account row');
-    return { email, password, userId, accessToken: await this.login(email, password) };
+    return { email, password, userId, accessToken: await this.login(email, password, from) };
   }
 
   /** Signs in an existing account and returns a fresh access token. */
-  async login(email: string, password: string): Promise<string> {
+  async login(email: string, password: string, from?: string): Promise<string> {
     const response = await this.request({
       method: 'POST',
       url: '/auth/login',
       payload: { email, password },
+      ...(from === undefined ? {} : { remoteAddress: from }),
     });
     const body = response.body as { status?: string; accessToken?: string } | null;
     if (response.statusCode !== 200 || body?.accessToken === undefined) {
       throw new Error(`fixture login failed: ${String(response.statusCode)} ${response.raw}`);
     }
     return body.accessToken;
+  }
+
+  /**
+   * Flips an operator kill switch, and reports the state it replaced so the
+   * caller can put it back.
+   *
+   * WHY SQL. There is no runtime route for this in the composed surface —
+   * `operate` is a control-plane operation behind the control-plane gateway,
+   * which is not mounted this phase. The UPDATE is the real one the
+   * application would issue: the 0053 guard trigger still demands the version
+   * increment by exactly one, and the AFTER UPDATE trigger still appends the
+   * history row, so a restriction reached this way is indistinguishable from
+   * an operator's — which is the point. The switch is READ by the composed
+   * app on every guarded request, so this is the honest way to reach the one
+   * 503 an in-process suite can reach without breaking a live dependency for
+   * every other test in the file.
+   */
+  async setKillSwitch(
+    switchId: string,
+    state: 'ACTIVE_RESTRICTION' | 'INACTIVE',
+  ): Promise<'ACTIVE_RESTRICTION' | 'INACTIVE'> {
+    const before = await this.sql<{ state: string }>(
+      `SELECT state FROM public.kill_switches WHERE id = $1`,
+      [switchId],
+    );
+    const previous = before[0]?.state;
+    if (previous === undefined) {
+      throw new Error(`kill switch '${switchId}' is not in the registry table`);
+    }
+    await this.sql(
+      `UPDATE public.kill_switches
+          SET state = $2,
+              reason = 'runtime conformance fixture; restored in the same test',
+              actor = 'operator:conformance-fixture',
+              version = version + 1,
+              effective_from = now(),
+              expires_at = NULL,
+              updated_at = now()
+        WHERE id = $1`,
+      [switchId, state],
+    );
+    return previous === 'ACTIVE_RESTRICTION' ? 'ACTIVE_RESTRICTION' : 'INACTIVE';
   }
 
   /**

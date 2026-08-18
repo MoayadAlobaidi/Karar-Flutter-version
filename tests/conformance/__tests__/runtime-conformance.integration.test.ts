@@ -16,16 +16,26 @@
  * serializer, live PostgreSQL, live Redis. Requests go in as HTTP; what is
  * validated is the status, the Content-Type, and the bytes that came back.
  *
+ * THE 17 /auth OPERATIONS ARE NOW IN. They used to be excluded here because
+ * the identity fragment described every body in prose and attached no schema,
+ * so there was nothing to hold a response to. The fragment has schemas, and
+ * this file drives the real routes for all of them — including the branches
+ * that need a working authenticator (the harness computes RFC 6238 codes), a
+ * genuinely exhausted rate-limit budget, and an operator kill switch.
+ *
  * WHAT IS NOT COVERED, stated plainly rather than implied away:
- *   * the 17 /auth operations — the identity fragment declares response
- *     bodies in prose and attaches no schema, so there is nothing to bind
- *     them to (asserted in contract.test.ts, so the day schemas arrive this
- *     omission is a failing test);
+ *   * `identityVerifyEmail` 200 and `identityResetPassword` 200 — the
+ *     verification code and the reset token are stored as DIGESTS and
+ *     delivered only by e-mail. There is no route, table, or log that returns
+ *     them, which is the design; a test that reached one would have to read
+ *     something only a subject's mailbox holds. The refusals are covered;
+ *   * `identityForgotPassword` 503 — that 503 is a rate-limit STORE outage,
+ *     and the store is the live Redis every other test here depends on.
+ *     Registration's and login's 503s ARE covered, through an operator kill
+ *     switch, which is a real readable state rather than an inflicted outage;
  *   * `recordOwnConsentAcceptance` 201 and `withdrawOwnConsent` 200 — Phase
  *     3.5 refuses acceptance until policy provenance resolves, by design, so
  *     no grant exists to withdraw and neither success body is reachable;
- *   * every 503 — reaching one means breaking a live dependency mid-suite,
- *     which would race every other test in this file;
  *   * `listTenantMembers` 200, `createTenantInvitation` 201,
  *     `revokeTenantInvitation` 200 — these need seeded RBAC grants; the
  *     denial shapes are covered instead;
@@ -50,6 +60,7 @@ import {
   ComposedApp,
   probeInfrastructure,
   skipBanner,
+  totpCode,
   type Caller,
   type WireResponse,
 } from '../app-under-test.js';
@@ -90,62 +101,34 @@ const CONTENT_HASH = 'c'.repeat(64);
 const validated = new Set<string>();
 
 /**
- * KNOWN NON-CONFORMANCE — found by this suite, reported rather than fixed
- * (the handlers are outside this suite's remit).
+ * THE DEFECT THIS LEDGER RECORDED, AND WHY IT IS NOW EMPTY.
  *
- * THE DEFECT. The contract declares every failure body as
- * `application/problem+json` (RFC 7807). Only `GlobalExceptionFilter` sets
- * that header, and it only runs for THROWN failures. Every module that
- * answers through Fastify's reply object directly — tenancy, users,
- * bootstrap, jurisdiction, and the consent CONTENT route — sends its problem
- * body with Fastify's default `application/json`, because no module sets the
- * header (`grep -rn 'problem+json' modules/` finds nothing outside tests).
- * The BODY is a problem document; the media type says it is not one. A
- * generated client that dispatches on Content-Type — the normal way to tell
- * a problem document from a payload — sees a plain JSON body on the failure
- * path and a problem document on the /consent/documents failure path, from
- * the same API. The two error models are visible side by side in one run:
+ * The contract declares every failure body as `application/problem+json`
+ * (RFC 7807). Only `GlobalExceptionFilter` set that header, and it only runs
+ * for THROWN failures — so the five modules that answered through Fastify's
+ * reply object directly (tenancy, users, bootstrap, jurisdiction, and the
+ * consent CONTENT route) sent problem BODIES under Fastify's default
+ * `application/json`. This suite found 25 such (operation, status) pairs and
+ * carried them here. A generated client that dispatches on Content-Type — the
+ * normal way to tell a problem document from a payload — saw two error models
+ * from one API, side by side in a single run:
  *
  *   GET /consent/documents           401 [application/problem+json]
- *     {"type":"urn:karar:error:AUTHENTICATION_REQUIRED", ... ,"instance":"/consent/documents"}
  *   GET /tenancy/tenant              401 [application/json]
- *     {"type":"about:blank","title":"Authentication required","status":401, ...}
  *
- * Each entry below is validated ANYWAY against the declared
- * `application/problem+json` schema, so the body shape is still held to the
- * contract — only the media type is excused. The set is asserted exactly: a
- * fix turns the ledger test red (delete the entry), and a NEW route that
- * starts mislabelling turns it red too.
+ * The fix collapsed them into one. A module that cannot serve a request now
+ * THROWS its RFC 7807 document; the error boundary forwards it verbatim —
+ * code, `reason`, `retryable`, echoed `requestId` and all — through the single
+ * writer in apps/api/src/errors/problem-response.ts, which is the only place
+ * in the service that names the media type. Nothing in a controller decides
+ * it any more.
+ *
+ * The check is KEPT, not deleted, and its expected value is now the empty
+ * set: a handler that goes back to answering a problem through the reply
+ * object turns this red on the next run, naming the operation and status.
  */
-const PROBLEM_MEDIA_TYPE_DEVIATIONS: ReadonlySet<string> = new Set([
-  'createTenantInvitation 403',
-  'declareOwnJurisdiction 400',
-  'declareOwnJurisdiction 401',
-  'declareOwnJurisdiction 409',
-  'getOwnTenant 401',
-  'getOwnUserProfile 401',
-  'getOwnUserProfile 404',
-  'getPlatformBootstrap 401',
-  'listDeclarableJurisdictionReferences 401',
-  'listOwnTenantMemberships 401',
-  'listTenantMembers 401',
-  'listTenantMembers 403',
-  'readConsentDocumentContent 404',
-  'readConsentDocumentContent 409',
-  'redeemTenantInvitation 401',
-  'redeemTenantInvitation 404',
-  'requestOwnAccountDisable 401',
-  'requestOwnAccountDisable 404',
-  'requestOwnAccountDisable 409',
-  'revokeTenantInvitation 403',
-  'setPlatformTenantBinding 400',
-  'setPlatformTenantBinding 401',
-  'setPlatformTenantBinding 403',
-  'updateOwnUserProfile 400',
-  'updateOwnUserProfile 401',
-]);
 
-/** Deviations this run actually observed, compared against the ledger below. */
+/** Problem bodies observed under the wrong media type. Must stay empty. */
 const observedDeviations = new Set<string>();
 
 let app: ComposedApp;
@@ -190,17 +173,13 @@ function expectConforms(operationId: string, response: WireResponse): void {
   const mediaType = mediaTypeOf(response);
   let schema = declared.schemas.get(mediaType);
   if (schema === undefined) {
-    // The one excused mismatch, and only where the ledger already records it:
-    // a problem BODY served as application/json. The body is still validated
-    // against the declared problem schema — the media type is what deviates.
+    // A problem BODY served as application/json. It is RECORDED rather than
+    // thrown on here, and the body is still validated against the declared
+    // problem schema, so one run reports both the media type that regressed
+    // and whether the shape held. The ledger at the end asserts the recorded
+    // set is empty.
     const asProblem = declared.schemas.get('application/problem+json');
     if (mediaType === 'application/json' && asProblem !== undefined) {
-      expect(
-        PROBLEM_MEDIA_TYPE_DEVIATIONS.has(key),
-        `${key} answered Content-Type 'application/json' where the contract declares ` +
-          `application/problem+json, and it is NOT in the known-deviation ledger. ` +
-          `Either the handler regressed or the ledger needs an entry with a reason.`,
-      ).toBe(true);
       observedDeviations.add(key);
       schema = asProblem;
     }
@@ -292,6 +271,743 @@ describe.skipIf(unreachable !== null)(
       await app?.close();
     }, 60_000);
 
+    describe('identity surface', () => {
+      /**
+       * A synthetic address per scenario. The identity limiter is REAL and
+       * keys on the client address as well as on the account, so a test that
+       * deliberately exhausts one budget must not spend another test's.
+       * RFC 5737 TEST-NET-1: these can never be a real client.
+       */
+      const FROM = {
+        sends: '192.0.2.10',
+        login: '192.0.2.11',
+        mfa: '192.0.2.12',
+        mfaBudget: '192.0.2.13',
+        recovery: '192.0.2.14',
+        sessions: '192.0.2.15',
+        password: '192.0.2.16',
+        refresh: '192.0.2.17',
+        unenrolled: '192.0.2.18',
+        killSwitch: '192.0.2.19',
+      } as const;
+
+      /** A fresh address nobody has spent a send budget on. */
+      function freshAddress(): string {
+        return `conformance-${randomUUID()}@example.invalid`;
+      }
+
+      /**
+       * Takes an account all the way to ACTIVE MFA through the real routes,
+       * and returns what those routes handed back exactly once: the shared
+       * secret and the recovery-code set. Both responses are validated on the
+       * way through — this is where identityMfaEnroll 200 and
+       * identityMfaConfirm 200 are covered.
+       */
+      async function enrolMfa(
+        caller: Caller,
+        from: string,
+      ): Promise<{ secret: string; recoveryCodes: string[] }> {
+        const started = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/enroll',
+          accessToken: caller.accessToken,
+          remoteAddress: from,
+        });
+        expect(started.statusCode).toBe(200);
+        expectConforms('identityMfaEnroll', started);
+        const secret = (started.body as { secret: string }).secret;
+
+        const confirmed = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/confirm',
+          accessToken: caller.accessToken,
+          remoteAddress: from,
+          payload: { code: totpCode(secret) },
+        });
+        expect(confirmed.statusCode).toBe(200);
+        expectConforms('identityMfaConfirm', confirmed);
+        const recoveryCodes = (confirmed.body as { recoveryCodes: string[] }).recoveryCodes;
+        // Ten, from the real generator — the contract states the count as
+        // minItems/maxItems, and this is the response it was written from.
+        expect(recoveryCodes).toHaveLength(10);
+        return { secret, recoveryCodes };
+      }
+
+      /** Signs in and returns the whole body, not just the token. */
+      async function loginResponse(caller: Caller, from: string): Promise<WireResponse> {
+        return app.request({
+          method: 'POST',
+          url: '/auth/login',
+          remoteAddress: from,
+          payload: { email: caller.email, password: caller.password },
+        });
+      }
+
+      /**
+       * One account per flow that CONSUMES something — a budget, a session, a
+       * password, an enrolment. Sharing them would make one test's exhausted
+       * budget another test's inexplicable 429.
+       */
+      /** MFA active: the login challenge branch, the challenge completion, the disable. */
+      let mfaSubject: Caller;
+      let mfaSecret: string;
+      /** MFA active, kept aside so the challenge budget can be exhausted. */
+      let mfaBudgetSubject: Caller;
+      /** MFA active, and the holder of the recovery codes below. */
+      let recoverySubject: Caller;
+      let recoveryCodes: string[];
+      /** Never enrolled: the "nothing to confirm" and "not enrolled" arms. */
+      let unenrolled: Caller;
+      let sessionSubject: Caller;
+      let passwordSubject: Caller;
+      let refreshSubject: Caller;
+      let logoutSubject: Caller;
+
+      beforeAll(async () => {
+        unenrolled = await app.registerAndLogin(FROM.unenrolled);
+        sessionSubject = await app.registerAndLogin(FROM.sessions);
+        passwordSubject = await app.registerAndLogin(FROM.password);
+        refreshSubject = await app.registerAndLogin(FROM.refresh);
+        logoutSubject = await app.registerAndLogin(FROM.sessions);
+
+        mfaSubject = await app.registerAndLogin(FROM.mfa);
+        mfaSecret = (await enrolMfa(mfaSubject, FROM.mfa)).secret;
+        mfaBudgetSubject = await app.registerAndLogin(FROM.mfaBudget);
+        await enrolMfa(mfaBudgetSubject, FROM.mfaBudget);
+        recoverySubject = await app.registerAndLogin(FROM.recovery);
+        recoveryCodes = (await enrolMfa(recoverySubject, FROM.recovery)).recoveryCodes;
+      }, 120_000);
+
+      it('POST /auth/register conforms on the neutral receipt, on refusal, and on the send budget', async () => {
+        const email = freshAddress();
+        const accepted = await app.request({
+          method: 'POST',
+          url: '/auth/register',
+          remoteAddress: FROM.sends,
+          payload: { email, password: `Synthetic-${randomUUID()}` },
+        });
+        expect(accepted.statusCode).toBe(202);
+        expectConforms('identityRegister', accepted);
+        expect((accepted.body as { status: string }).status).toBe('accepted');
+
+        const malformed = await app.request({
+          method: 'POST',
+          url: '/auth/register',
+          remoteAddress: FROM.sends,
+          payload: { email: 'not-an-address', password: `Synthetic-${randomUUID()}` },
+        });
+        expect(malformed.statusCode).toBe(400);
+        expectConforms('identityRegister', malformed);
+
+        // The verification-send budget is 3/h per ADDRESS digest, and
+        // registration spends from it. One send is already gone above, so two
+        // more exhaust it and the fourth attempt is refused.
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const repeated = await app.request({
+            method: 'POST',
+            url: '/auth/register',
+            remoteAddress: FROM.sends,
+            payload: { email, password: `Synthetic-${randomUUID()}` },
+          });
+          expect(repeated.statusCode, `registration attempt ${String(attempt + 2)}`).toBe(202);
+        }
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/register',
+          remoteAddress: FROM.sends,
+          payload: { email, password: `Synthetic-${randomUUID()}` },
+        });
+        expect(limited.statusCode).toBe(429);
+        expectConforms('identityRegister', limited);
+        expect((limited.body as { code: string }).code).toBe('RATE_LIMITED');
+        // The wait is part of the answer, not part of the prose.
+        expect(
+          (limited.body as { details?: { retryAfterSeconds?: number } }).details?.retryAfterSeconds,
+        ).toBeGreaterThan(0);
+      });
+
+      it('POST /auth/register and /auth/login conform on an operator kill switch (503)', async () => {
+        // The one 503 an in-process suite can reach honestly: an operator
+        // restriction is a real, readable state, unlike a store outage, which
+        // would have to be inflicted on the live dependency every other test
+        // in this file is using. The switch is restored before the assertions
+        // that follow it, so a failure cannot leave the surface restricted.
+        await app.setKillSwitch('NEW_REGISTRATIONS', 'ACTIVE_RESTRICTION');
+        let restricted: WireResponse;
+        try {
+          restricted = await app.request({
+            method: 'POST',
+            url: '/auth/register',
+            remoteAddress: FROM.killSwitch,
+            payload: { email: freshAddress(), password: `Synthetic-${randomUUID()}` },
+          });
+        } finally {
+          await app.setKillSwitch('NEW_REGISTRATIONS', 'INACTIVE');
+        }
+        expect(restricted.statusCode).toBe(503);
+        expectConforms('identityRegister', restricted);
+        expect((restricted.body as { code: string }).code).toBe('OPERATION_RESTRICTED');
+        expect((restricted.body as { details?: { switchId?: string } }).details?.switchId).toBe(
+          'NEW_REGISTRATIONS',
+        );
+
+        await app.setKillSwitch('PASSWORD_LOGIN', 'ACTIVE_RESTRICTION');
+        let deniedLogin: WireResponse;
+        try {
+          deniedLogin = await app.request({
+            method: 'POST',
+            url: '/auth/login',
+            remoteAddress: FROM.killSwitch,
+            payload: { email: bound.email, password: bound.password },
+          });
+        } finally {
+          await app.setKillSwitch('PASSWORD_LOGIN', 'INACTIVE');
+        }
+        expect(deniedLogin.statusCode).toBe(503);
+        expectConforms('identityLogin', deniedLogin);
+        expect((deniedLogin.body as { code: string }).code).toBe('OPERATION_RESTRICTED');
+
+        // And the restriction really is gone: the same login now succeeds, so
+        // the 503 above was the switch rather than a broken fixture.
+        const restored = await app.request({
+          method: 'POST',
+          url: '/auth/login',
+          remoteAddress: FROM.killSwitch,
+          payload: { email: bound.email, password: bound.password },
+        });
+        expect(restored.statusCode).toBe(200);
+      });
+
+      it('POST /auth/verify-email conforms on the generic refusal', async () => {
+        // The 200 is NOT reachable in-process and is not faked: the code is
+        // minted, stored as a digest, and delivered by e-mail — there is no
+        // route, table, or log that returns it, which is the design. A test
+        // that reached it would have to read something a subject's mailbox is
+        // the only holder of.
+        const refused = await app.request({
+          method: 'POST',
+          url: '/auth/verify-email',
+          remoteAddress: FROM.sends,
+          payload: { email: bound.email, code: 'ZZZZZZZZ' },
+        });
+        expect(refused.statusCode).toBe(401);
+        expectConforms('identityVerifyEmail', refused);
+        expect((refused.body as { code: string }).code).toBe('AUTHENTICATION_REQUIRED');
+      });
+
+      it('POST /auth/resend-verification conforms on the receipt and on the send budget', async () => {
+        const email = freshAddress();
+        const accepted = await app.request({
+          method: 'POST',
+          url: '/auth/resend-verification',
+          remoteAddress: FROM.sends,
+          payload: { email },
+        });
+        expect(accepted.statusCode).toBe(202);
+        expectConforms('identityResendVerification', accepted);
+        // The address was never registered, and the body says nothing about
+        // that — the receipt is the enumeration defence, so it is asserted
+        // to be the SAME object a real send returns.
+        expect(accepted.body).toEqual(
+          (
+            await app.request({
+              method: 'POST',
+              url: '/auth/resend-verification',
+              remoteAddress: FROM.sends,
+              payload: { email },
+            })
+          ).body,
+        );
+
+        const third = await app.request({
+          method: 'POST',
+          url: '/auth/resend-verification',
+          remoteAddress: FROM.sends,
+          payload: { email },
+        });
+        expect(third.statusCode).toBe(202);
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/resend-verification',
+          remoteAddress: FROM.sends,
+          payload: { email },
+        });
+        expect(limited.statusCode).toBe(429);
+        expectConforms('identityResendVerification', limited);
+      });
+
+      it('POST /auth/login conforms on both 200 branches, on the generic 401, and on the budget', async () => {
+        const authenticated = await loginResponse(bound, FROM.login);
+        expect(authenticated.statusCode).toBe(200);
+        expectConforms('identityLogin', authenticated);
+        expect((authenticated.body as { status: string }).status).toBe('authenticated');
+
+        // The OTHER oneOf branch, on a real account with MFA active. A
+        // validator that only ever saw the session branch would prove nothing
+        // about the challenge one — and the two are the whole reason the 200
+        // is a union.
+        const challenged = await loginResponse(mfaSubject, FROM.mfa);
+        expect(challenged.statusCode).toBe(200);
+        expectConforms('identityLogin', challenged);
+        expect((challenged.body as { status: string }).status).toBe('mfa_required');
+        // A challenge is not a session: no token that could reach an
+        // authenticated route may appear in it.
+        expect(challenged.raw).not.toContain('accessToken');
+
+        const wrong = await app.request({
+          method: 'POST',
+          url: '/auth/login',
+          remoteAddress: FROM.login,
+          payload: { email: bound.email, password: 'not-the-password' },
+        });
+        expect(wrong.statusCode).toBe(401);
+        expectConforms('identityLogin', wrong);
+
+        // The per-address budget is 10 per 15 minutes; one failure is already
+        // spent above, and one success before it. The eleventh presentation
+        // of this address is refused whatever the password would have been.
+        const attacked = await app.registerAndLogin(FROM.login);
+        for (let attempt = 0; attempt < 9; attempt += 1) {
+          const rejected = await app.request({
+            method: 'POST',
+            url: '/auth/login',
+            remoteAddress: FROM.login,
+            payload: { email: attacked.email, password: 'not-the-password' },
+          });
+          expect(rejected.statusCode, `login attempt ${String(attempt + 2)}`).toBe(401);
+        }
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/login',
+          remoteAddress: FROM.login,
+          payload: { email: attacked.email, password: attacked.password },
+        });
+        expect(limited.statusCode, 'the correct password must not buy a way past the budget').toBe(
+          429,
+        );
+        expectConforms('identityLogin', limited);
+      });
+
+      it('POST /auth/refresh conforms on rotation, on the generic 401, and on the budget', async () => {
+        const signedIn = await loginResponse(refreshSubject, FROM.refresh);
+        const issued = signedIn.body as { refreshToken: string };
+        const rotated = await app.request({
+          method: 'POST',
+          url: '/auth/refresh',
+          remoteAddress: FROM.refresh,
+          payload: { refreshToken: issued.refreshToken },
+        });
+        expect(rotated.statusCode).toBe(200);
+        expectConforms('identityRefresh', rotated);
+        // A SUCCESSOR, not the same token handed back.
+        expect((rotated.body as { refreshToken: string }).refreshToken).not.toBe(
+          issued.refreshToken,
+        );
+
+        const invalid = await app.request({
+          method: 'POST',
+          url: '/auth/refresh',
+          remoteAddress: FROM.refresh,
+          payload: { refreshToken: 'a'.repeat(43) },
+        });
+        expect(invalid.statusCode).toBe(401);
+        expectConforms('identityRefresh', invalid);
+
+        // 60 presentations per 15 minutes per TOKEN digest — the budget is
+        // spent by presenting the token, valid or not, so one unknown token
+        // reaches it without touching any account. One is spent above.
+        const probe = 'b'.repeat(43);
+        for (let attempt = 0; attempt < 60; attempt += 1) {
+          const rejected = await app.request({
+            method: 'POST',
+            url: '/auth/refresh',
+            remoteAddress: FROM.refresh,
+            payload: { refreshToken: probe },
+          });
+          expect(rejected.statusCode, `refresh attempt ${String(attempt + 1)}`).toBe(401);
+        }
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/refresh',
+          remoteAddress: FROM.refresh,
+          payload: { refreshToken: probe },
+        });
+        expect(limited.statusCode).toBe(429);
+        expectConforms('identityRefresh', limited);
+      });
+
+      it('POST /auth/logout conforms, and the revoked token no longer authenticates', async () => {
+        const token = await app.login(logoutSubject.email, logoutSubject.password, FROM.sessions);
+        const out = await app.request({
+          method: 'POST',
+          url: '/auth/logout',
+          accessToken: token,
+          remoteAddress: FROM.sessions,
+        });
+        expect(out.statusCode).toBe(200);
+        expectConforms('identityLogout', out);
+        expect((out.body as { status: string }).status).toBe('logged_out');
+
+        // The same token again: the session is gone, so this is the 401 —
+        // which also proves the 200 above was a real revocation.
+        const afterwards = await app.request({
+          method: 'POST',
+          url: '/auth/logout',
+          accessToken: token,
+          remoteAddress: FROM.sessions,
+        });
+        expect(afterwards.statusCode).toBe(401);
+        expectConforms('identityLogout', afterwards);
+      });
+
+      it('POST /auth/forgot-password conforms on the receipt and on the send budget', async () => {
+        // The 503 this operation declares is a rate-limit STORE outage, and
+        // it is not reached here: the store is the live Redis every other
+        // test in this file depends on, and taking it down mid-suite would
+        // race all of them. Stated rather than simulated.
+        const email = freshAddress();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const accepted = await app.request({
+            method: 'POST',
+            url: '/auth/forgot-password',
+            remoteAddress: FROM.sends,
+            payload: { email },
+          });
+          expect(accepted.statusCode, `reset request ${String(attempt + 1)}`).toBe(202);
+          expectConforms('identityForgotPassword', accepted);
+        }
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/forgot-password',
+          remoteAddress: FROM.sends,
+          payload: { email },
+        });
+        expect(limited.statusCode).toBe(429);
+        expectConforms('identityForgotPassword', limited);
+      });
+
+      it('POST /auth/reset-password conforms on both refusals', async () => {
+        // The 200 is NOT reachable in-process: the reset token is stored as a
+        // digest and delivered by e-mail only, exactly as the verification
+        // code is. The two refusals ARE reachable, and their ORDER is the
+        // interesting part — the password policy is applied before the token
+        // is looked up, so a bad password never reveals whether the token was
+        // real.
+        const badPassword = await app.request({
+          method: 'POST',
+          url: '/auth/reset-password',
+          remoteAddress: FROM.password,
+          payload: { token: 'c'.repeat(43), newPassword: 'short' },
+        });
+        expect(badPassword.statusCode).toBe(400);
+        expectConforms('identityResetPassword', badPassword);
+
+        const badToken = await app.request({
+          method: 'POST',
+          url: '/auth/reset-password',
+          remoteAddress: FROM.password,
+          payload: { token: 'c'.repeat(43), newPassword: `Synthetic-${randomUUID()}` },
+        });
+        expect(badToken.statusCode).toBe(401);
+        expectConforms('identityResetPassword', badToken);
+      });
+
+      it('POST /auth/change-password conforms on refusal, on policy, and on the change', async () => {
+        const anonymous = await app.request({
+          method: 'POST',
+          url: '/auth/change-password',
+          remoteAddress: FROM.password,
+          payload: { currentPassword: 'x', newPassword: `Synthetic-${randomUUID()}` },
+        });
+        expect(anonymous.statusCode).toBe(401);
+        expectConforms('identityChangePassword', anonymous);
+
+        const tooShort = await app.request({
+          method: 'POST',
+          url: '/auth/change-password',
+          accessToken: passwordSubject.accessToken,
+          remoteAddress: FROM.password,
+          payload: { currentPassword: passwordSubject.password, newPassword: 'short' },
+        });
+        expect(tooShort.statusCode).toBe(400);
+        expectConforms('identityChangePassword', tooShort);
+
+        // Last, because it bumps the token version: everything above needs a
+        // live access token, and this is what makes it stale.
+        const changed = await app.request({
+          method: 'POST',
+          url: '/auth/change-password',
+          accessToken: passwordSubject.accessToken,
+          remoteAddress: FROM.password,
+          payload: {
+            currentPassword: passwordSubject.password,
+            newPassword: `Synthetic-${randomUUID()}`,
+          },
+        });
+        expect(changed.statusCode).toBe(200);
+        expectConforms('identityChangePassword', changed);
+        expect((changed.body as { status: string }).status).toBe('changed');
+      });
+
+      it('the MFA enrolment routes conform on success and on every state refusal', async () => {
+        // mfaSubject is already enrolled and confirmed (the fixture), so a
+        // second enrolment is the conflict.
+        const already = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/enroll',
+          accessToken: mfaSubject.accessToken,
+          remoteAddress: FROM.mfa,
+        });
+        expect(already.statusCode).toBe(409);
+        expectConforms('identityMfaEnroll', already);
+        expect((already.body as { code: string }).code).toBe('CONFLICT');
+
+        expectConforms(
+          'identityMfaEnroll',
+          await app.request({
+            method: 'POST',
+            url: '/auth/mfa/enroll',
+            remoteAddress: FROM.mfa,
+          }),
+        );
+
+        // An account that never started an enrolment has nothing to confirm.
+        const nothingPending = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/confirm',
+          accessToken: unenrolled.accessToken,
+          remoteAddress: FROM.unenrolled,
+          payload: { code: '000000' },
+        });
+        expect(nothingPending.statusCode).toBe(409);
+        expectConforms('identityMfaConfirm', nothingPending);
+
+        // A pending enrolment plus a code that does not verify.
+        const pending = await app.registerAndLogin(FROM.unenrolled);
+        const started = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/enroll',
+          accessToken: pending.accessToken,
+          remoteAddress: FROM.unenrolled,
+        });
+        expect(started.statusCode).toBe(200);
+        const wrongCode = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/confirm',
+          accessToken: pending.accessToken,
+          remoteAddress: FROM.unenrolled,
+          payload: { code: '000000' },
+        });
+        expect(wrongCode.statusCode).toBe(401);
+        expectConforms('identityMfaConfirm', wrongCode);
+      });
+
+      it('POST /auth/mfa/challenge conforms on completion, on refusal, and on the MFA budget', async () => {
+        const challenged = await loginResponse(mfaSubject, FROM.mfa);
+        const challengeToken = (challenged.body as { challengeToken: string }).challengeToken;
+        const completed = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/challenge',
+          remoteAddress: FROM.mfa,
+          payload: { challengeToken, code: totpCode(mfaSecret) },
+        });
+        expect(completed.statusCode).toBe(200);
+        expectConforms('identityMfaChallenge', completed);
+        expect((completed.body as { status: string }).status).toBe('authenticated');
+
+        const unverified = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/challenge',
+          remoteAddress: FROM.mfa,
+          payload: { challengeToken: 'not-a-challenge-token', code: '000000' },
+        });
+        expect(unverified.statusCode).toBe(401);
+        expectConforms('identityMfaChallenge', unverified);
+
+        // 10 verifications per 15 minutes per ACCOUNT — spent by presenting a
+        // valid challenge, whatever the code turns out to be. A separate
+        // account, so exhausting it says nothing about any other test here.
+        const budgetChallenge = await loginResponse(mfaBudgetSubject, FROM.mfaBudget);
+        const budgetToken = (budgetChallenge.body as { challengeToken: string }).challengeToken;
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const rejected = await app.request({
+            method: 'POST',
+            url: '/auth/mfa/challenge',
+            remoteAddress: FROM.mfaBudget,
+            payload: { challengeToken: budgetToken, code: '000000' },
+          });
+          expect(rejected.statusCode, `mfa attempt ${String(attempt + 1)}`).toBe(401);
+        }
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/challenge',
+          remoteAddress: FROM.mfaBudget,
+          payload: { challengeToken: budgetToken, code: '000000' },
+        });
+        expect(limited.statusCode).toBe(429);
+        expectConforms('identityMfaChallenge', limited);
+      });
+
+      it('POST /auth/mfa/recovery conforms on completion, on refusal, and on the MFA budget', async () => {
+        const challenged = await loginResponse(recoverySubject, FROM.recovery);
+        const challengeToken = (challenged.body as { challengeToken: string }).challengeToken;
+        const completed = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/recovery',
+          remoteAddress: FROM.recovery,
+          payload: { challengeToken, recoveryCode: recoveryCodes[0] },
+        });
+        expect(completed.statusCode).toBe(200);
+        expectConforms('identityMfaRecovery', completed);
+        expect((completed.body as { status: string }).status).toBe('authenticated');
+
+        const unverified = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/recovery',
+          remoteAddress: FROM.recovery,
+          payload: { challengeToken: 'not-a-challenge-token', recoveryCode: recoveryCodes[1] },
+        });
+        expect(unverified.statusCode).toBe(401);
+        expectConforms('identityMfaRecovery', unverified);
+
+        // The same 10/15m account budget the challenge path spends; one is
+        // gone on the completion above, so nine more exhaust it.
+        for (let attempt = 0; attempt < 9; attempt += 1) {
+          const rejected = await app.request({
+            method: 'POST',
+            url: '/auth/mfa/recovery',
+            remoteAddress: FROM.recovery,
+            payload: { challengeToken, recoveryCode: 'NOT-A-REAL-RECOVERY-CODE' },
+          });
+          expect(rejected.statusCode, `recovery attempt ${String(attempt + 2)}`).toBe(401);
+        }
+        const limited = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/recovery',
+          remoteAddress: FROM.recovery,
+          payload: { challengeToken, recoveryCode: recoveryCodes[2] },
+        });
+        expect(limited.statusCode).toBe(429);
+        expectConforms('identityMfaRecovery', limited);
+      });
+
+      it('POST /auth/mfa/disable conforms on refusal, on absence, and on the disable', async () => {
+        expectConforms(
+          'identityMfaDisable',
+          await app.request({
+            method: 'POST',
+            url: '/auth/mfa/disable',
+            remoteAddress: FROM.mfa,
+            payload: { code: '000000' },
+          }),
+        );
+
+        const notEnrolled = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/disable',
+          accessToken: unenrolled.accessToken,
+          remoteAddress: FROM.unenrolled,
+          payload: { code: totpCode(mfaSecret) },
+        });
+        expect(notEnrolled.statusCode).toBe(409);
+        expectConforms('identityMfaDisable', notEnrolled);
+
+        const wrongCode = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/disable',
+          accessToken: mfaSubject.accessToken,
+          remoteAddress: FROM.mfa,
+          payload: { code: '000000' },
+        });
+        expect(wrongCode.statusCode).toBe(401);
+        expectConforms('identityMfaDisable', wrongCode);
+
+        // Last on this account: after it, the login above no longer answers
+        // mfa_required, and this test file's MFA fixture is spent.
+        const disabled = await app.request({
+          method: 'POST',
+          url: '/auth/mfa/disable',
+          accessToken: mfaSubject.accessToken,
+          remoteAddress: FROM.mfa,
+          payload: { code: totpCode(mfaSecret) },
+        });
+        expect(disabled.statusCode).toBe(200);
+        expectConforms('identityMfaDisable', disabled);
+        expect((disabled.body as { status: string }).status).toBe('disabled');
+      });
+
+      it('the session routes conform on listing, revoking one, and revoking the rest', async () => {
+        const first = await loginResponse(sessionSubject, FROM.sessions);
+        const firstSessionId = (first.body as { sessionId: string }).sessionId;
+        const second = await loginResponse(sessionSubject, FROM.sessions);
+        const secondToken = (second.body as { accessToken: string }).accessToken;
+
+        const listed = await app.request({
+          method: 'GET',
+          url: '/auth/sessions',
+          accessToken: secondToken,
+          remoteAddress: FROM.sessions,
+        });
+        expect(listed.statusCode).toBe(200);
+        expectConforms('identityListSessions', listed);
+        // NON-EMPTY, and with exactly one session flagged current: an empty
+        // list would satisfy every shape rule while proving nothing about how
+        // a session is serialized.
+        const sessions = (listed.body as { sessions: Array<{ current: boolean }> }).sessions;
+        expect(sessions.length).toBeGreaterThan(1);
+        expect(sessions.filter((session) => session.current)).toHaveLength(1);
+        // Minimized metadata: the address digest the store holds is not in it.
+        expect(listed.raw).not.toContain('ipDigest');
+
+        expectConforms(
+          'identityListSessions',
+          await app.request({ method: 'GET', url: '/auth/sessions' }),
+        );
+
+        const revoked = await app.request({
+          method: 'DELETE',
+          url: `/auth/sessions/${firstSessionId}`,
+          accessToken: secondToken,
+          remoteAddress: FROM.sessions,
+        });
+        expect(revoked.statusCode).toBe(200);
+        expectConforms('identityRevokeSession', revoked);
+
+        // The same id again: nothing live belongs to this account under it.
+        const gone = await app.request({
+          method: 'DELETE',
+          url: `/auth/sessions/${firstSessionId}`,
+          accessToken: secondToken,
+          remoteAddress: FROM.sessions,
+        });
+        expect(gone.statusCode).toBe(404);
+        expectConforms('identityRevokeSession', gone);
+
+        expectConforms(
+          'identityRevokeSession',
+          await app.request({ method: 'DELETE', url: `/auth/sessions/${randomUUID()}` }),
+        );
+
+        // A third session, so the sweep below has something to revoke and
+        // `revokedCount` is a number that had to be computed.
+        await loginResponse(sessionSubject, FROM.sessions);
+        const swept = await app.request({
+          method: 'POST',
+          url: '/auth/sessions/revoke-others',
+          accessToken: secondToken,
+          remoteAddress: FROM.sessions,
+        });
+        expect(swept.statusCode).toBe(200);
+        expectConforms('identityRevokeOtherSessions', swept);
+        expect((swept.body as { revokedCount: number }).revokedCount).toBeGreaterThan(0);
+
+        expectConforms(
+          'identityRevokeOtherSessions',
+          await app.request({ method: 'POST', url: '/auth/sessions/revoke-others' }),
+        );
+      });
+    });
+
     describe('platform bootstrap surface', () => {
       it('GET /platform/bootstrap conforms when bound, unbound, and selection-required', async () => {
         const asBound = await app.request({
@@ -334,10 +1050,10 @@ describe.skipIf(unreachable !== null)(
         const response = await app.request({ method: 'GET', url: '/platform/bootstrap' });
 
         expect(response.statusCode).toBe(401);
-        // The media type is the known deviation recorded above; the body still
-        // has to satisfy the declared Problem schema, and expectConforms holds
-        // it to exactly that.
-        expect(mediaTypeOf(response)).toBe('application/json');
+        // Asserted HERE as well as in the ledger, on the route that used to
+        // show the two error models side by side: a problem body leaves as a
+        // problem document, media type included.
+        expect(mediaTypeOf(response)).toBe('application/problem+json');
         expectConforms('getPlatformBootstrap', response);
         expect((response.body as { code: string }).code).toBe('AUTHENTICATION_REQUIRED');
       });
@@ -923,6 +1639,51 @@ describe.skipIf(unreachable !== null)(
           'getOwnUserProfile 404',
           'getPlatformBootstrap 200',
           'getPlatformBootstrap 401',
+          'identityChangePassword 200',
+          'identityChangePassword 400',
+          'identityChangePassword 401',
+          'identityForgotPassword 202',
+          'identityForgotPassword 429',
+          'identityListSessions 200',
+          'identityListSessions 401',
+          'identityLogin 200',
+          'identityLogin 401',
+          'identityLogin 429',
+          'identityLogin 503',
+          'identityLogout 200',
+          'identityLogout 401',
+          'identityMfaChallenge 200',
+          'identityMfaChallenge 401',
+          'identityMfaChallenge 429',
+          'identityMfaConfirm 200',
+          'identityMfaConfirm 401',
+          'identityMfaConfirm 409',
+          'identityMfaDisable 200',
+          'identityMfaDisable 401',
+          'identityMfaDisable 409',
+          'identityMfaEnroll 200',
+          'identityMfaEnroll 401',
+          'identityMfaEnroll 409',
+          'identityMfaRecovery 200',
+          'identityMfaRecovery 401',
+          'identityMfaRecovery 429',
+          'identityRefresh 200',
+          'identityRefresh 401',
+          'identityRefresh 429',
+          'identityRegister 202',
+          'identityRegister 400',
+          'identityRegister 429',
+          'identityRegister 503',
+          'identityResendVerification 202',
+          'identityResendVerification 429',
+          'identityResetPassword 400',
+          'identityResetPassword 401',
+          'identityRevokeOtherSessions 200',
+          'identityRevokeOtherSessions 401',
+          'identityRevokeSession 200',
+          'identityRevokeSession 401',
+          'identityRevokeSession 404',
+          'identityVerifyEmail 401',
           'listApplicableConsentDocuments 200',
           'listDeclarableJurisdictionReferences 200',
           'listDeclarableJurisdictionReferences 401',
@@ -951,12 +1712,15 @@ describe.skipIf(unreachable !== null)(
         ]);
       });
 
-      it('observed exactly the known media-type deviations — no more, no fewer', () => {
-        // Red when a handler is FIXED (delete the entry) and red when a new one
-        // regresses. Either way somebody reads the reason before the ledger
-        // changes, which is the whole point of writing the defect down instead
-        // of loosening the check.
-        expect([...observedDeviations].sort()).toEqual([...PROBLEM_MEDIA_TYPE_DEVIATIONS].sort());
+      it('served EVERY problem body as application/problem+json — no deviations at all', () => {
+        // Was 25. The expected value is the empty set now, and it stays that
+        // way: a handler that answers a problem through the reply object again
+        // is named here, with its status, on the next run.
+        expect(
+          [...observedDeviations].sort(),
+          'these responses carried an RFC 7807 body under application/json; every problem ' +
+            'document must leave through the writer in apps/api/src/errors/problem-response.ts',
+        ).toEqual([]);
       });
     });
   },

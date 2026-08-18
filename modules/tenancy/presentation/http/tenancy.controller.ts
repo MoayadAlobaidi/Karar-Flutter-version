@@ -7,9 +7,27 @@
  * Query strings, headers, and bodies are never consulted for tenant or user
  * identity — tests assert that a `?tenantId=`, `x-tenant-id` header, and
  * body `tenantId` are all ignored.
+ *
+ * FAILURES ARE THROWN, never written to the reply. The HTTP entrypoint's error
+ * boundary is the ONE writer of an RFC 7807 document and the only place its
+ * `application/problem+json` media type is set (apps/api/src/errors/
+ * problem-response.ts); a problem this surface authored travels there as the
+ * body of an HttpException and is forwarded verbatim, code and all. The reply
+ * object below answers successes only.
  */
 
-import { Body, Controller, Get, Inject, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  Inject,
+  Param,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 
 import type { GetOwnTenant } from '../../application/use-cases/get-own-tenant.js';
 import type { ListMembers } from '../../application/use-cases/list-members.js';
@@ -42,9 +60,9 @@ interface ReplyLike {
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function sendUnauthenticated(reply: ReplyLike): void {
+function unauthenticated(): HttpException {
   const problem = authenticationRequiredProblem();
-  reply.status(problem.status).send(problem.body);
+  return new HttpException(problem.body, problem.status);
 }
 
 @Controller('tenancy')
@@ -57,15 +75,11 @@ export class TenancyController {
   @Get('tenant')
   async getTenant(@Req() request: unknown, @Res() reply: ReplyLike): Promise<void> {
     const principal = this.principalSource.fromRequest(request);
-    if (principal === null) {
-      sendUnauthenticated(reply);
-      return;
-    }
+    if (principal === null) throw unauthenticated();
     const result = await this.useCases.getOwnTenant.execute(principal);
     if (!result.ok) {
       const problem = problemForTenancyError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send({
       tenant: toTenantResponse(result.value.tenant),
@@ -76,15 +90,11 @@ export class TenancyController {
   @Get('members')
   async listMembers(@Req() request: unknown, @Res() reply: ReplyLike): Promise<void> {
     const principal = this.principalSource.fromRequest(request);
-    if (principal === null) {
-      sendUnauthenticated(reply);
-      return;
-    }
+    if (principal === null) throw unauthenticated();
     const result = await this.useCases.listMembers.execute(principal);
     if (!result.ok) {
       const problem = problemForTenancyError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send({ members: result.value.map(toMembershipResponse) });
   }
@@ -97,10 +107,7 @@ export class TenancyController {
     @Res() reply: ReplyLike,
   ): Promise<void> {
     const principal = this.principalSource.fromRequest(request);
-    if (principal === null) {
-      sendUnauthenticated(reply);
-      return;
-    }
+    if (principal === null) throw unauthenticated();
     const raw = (body ?? {}) as Record<string, unknown>;
     const result = await this.useCases.createInvitation.execute(
       {
@@ -112,8 +119,7 @@ export class TenancyController {
     );
     if (!result.ok) {
       const problem = problemForTenancyError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(201).send({
       invitation: toInvitationResponse(result.value.invitation),
@@ -129,23 +135,18 @@ export class TenancyController {
     @Res() reply: ReplyLike,
   ): Promise<void> {
     const principal = this.principalSource.fromRequest(request);
-    if (principal === null) {
-      sendUnauthenticated(reply);
-      return;
-    }
+    if (principal === null) throw unauthenticated();
     if (!UUID_SHAPE.test(invitationId)) {
       const problem = problemForTenancyError({
         kind: 'invitation_not_found',
         message: 'no open invitation with that id exists in the bound tenant',
       });
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const result = await this.useCases.revokeInvitation.execute(invitationId, principal);
     if (!result.ok) {
       const problem = problemForTenancyError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send({ invitation: toInvitationResponse(result.value.invitation) });
   }
@@ -159,10 +160,7 @@ export class TenancyController {
   ): Promise<void> {
     // Redemption requires authentication but NOT an existing tenant binding.
     const redeemer = this.principalSource.redeemerFromRequest(request);
-    if (redeemer === null) {
-      sendUnauthenticated(reply);
-      return;
-    }
+    if (redeemer === null) throw unauthenticated();
     const raw = (body ?? {}) as Record<string, unknown>;
     const result = await this.useCases.redeemInvitation.execute(
       { token: typeof raw.token === 'string' ? raw.token : '' },
@@ -170,8 +168,7 @@ export class TenancyController {
     );
     if (!result.ok) {
       const problem = problemForTenancyError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send({
       tenantId: result.value.tenantId,

@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.5.0
-// Digest:     a3e666d2
+// Digest:     82f00bc1
 // Generator:  tool/generate_api_client.dart 1.0.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -151,7 +151,7 @@ final class KararApiClient {
   /// Revokes every OTHER session and bumps the token version; the calling session's refresh chain stays valid — refresh to obtain a fresh access token.
   ///
   /// `POST /auth/change-password` — requires a session.
-  Future<JsonMap> identityChangePassword({
+  Future<PasswordChangedResultDto> identityChangePassword({
     required IdentityChangePasswordRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -168,7 +168,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityChangePassword');
+    return PasswordChangedResultDto.fromJson(response.requireObject(location: 'identityChangePassword'));
   }
 
   /// Request a password-reset token
@@ -176,7 +176,7 @@ final class KararApiClient {
   /// Always 202 — existing, unknown, disabled, and cooling-down (60s per account) addresses are indistinguishable. The token travels only in the e-mail.
   ///
   /// `POST /auth/forgot-password` — unauthenticated.
-  Future<JsonMap> identityForgotPassword({
+  Future<NeutralReceiptDto> identityForgotPassword({
     required IdentityForgotPasswordRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -193,7 +193,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityForgotPassword');
+    return NeutralReceiptDto.fromJson(response.requireObject(location: 'identityForgotPassword'));
   }
 
   /// List the caller's live sessions
@@ -201,7 +201,7 @@ final class KararApiClient {
   /// Owner-scoped by FORCEd row-level security. Metadata is minimized at the edge: a coarse user-agent summary; no raw addresses or user agents.
   ///
   /// `GET /auth/sessions` — requires a session.
-  Future<JsonMap> identityListSessions({
+  Future<SessionListingDto> identityListSessions({
     CancellationToken? cancellation,
     TimeoutProfile timeouts = TimeoutProfile.standard,
   }) async {
@@ -214,7 +214,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityListSessions');
+    return SessionListingDto.fromJson(response.requireObject(location: 'identityListSessions'));
   }
 
   /// Password login
@@ -222,7 +222,7 @@ final class KararApiClient {
   /// One generic 401 covers unknown address, wrong password, disabled account, and an engaged lockout. Accounts with confirmed MFA receive a 5-minute challenge token instead of a session.
   ///
   /// `POST /auth/login` — unauthenticated.
-  Future<JsonMap> identityLogin({
+  Future<IdentityLoginResponseDto> identityLogin({
     required IdentityLoginRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -239,13 +239,13 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityLogin');
+    return IdentityLoginResponseDto.fromJson(response.requireObject(location: 'identityLogin'));
   }
 
   /// Revoke the current session
   ///
   /// `POST /auth/logout` — requires a session.
-  Future<JsonMap> identityLogout({
+  Future<LoggedOutResultDto> identityLogout({
     String? idempotencyKey,
     CancellationToken? cancellation,
     TimeoutProfile timeouts = TimeoutProfile.standard,
@@ -260,7 +260,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityLogout');
+    return LoggedOutResultDto.fromJson(response.requireObject(location: 'identityLogout'));
   }
 
   /// Complete an MFA login with a TOTP code
@@ -268,7 +268,7 @@ final class KararApiClient {
   /// Exchanges the login-issued challenge token plus a current TOTP code (±30s window) for a session. Budget 10/15m per account, fail closed.
   ///
   /// `POST /auth/mfa/challenge` — unauthenticated.
-  Future<JsonMap> identityMfaChallenge({
+  Future<AuthenticatedSessionDto> identityMfaChallenge({
     required IdentityMfaChallengeRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -285,7 +285,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityMfaChallenge');
+    return AuthenticatedSessionDto.fromJson(response.requireObject(location: 'identityMfaChallenge'));
   }
 
   /// Prove possession and activate MFA
@@ -293,7 +293,7 @@ final class KararApiClient {
   /// Returns the ten one-time recovery codes EXACTLY ONCE.
   ///
   /// `POST /auth/mfa/confirm` — requires a session.
-  Future<JsonMap> identityMfaConfirm({
+  Future<MfaConfirmedDto> identityMfaConfirm({
     required IdentityMfaConfirmRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -310,7 +310,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityMfaConfirm');
+    return MfaConfirmedDto.fromJson(response.requireObject(location: 'identityMfaConfirm'));
   }
 
   /// Disable MFA (requires a current TOTP or recovery code)
@@ -318,7 +318,7 @@ final class KararApiClient {
   /// Destroys the recovery-code set; audited and notified.
   ///
   /// `POST /auth/mfa/disable` — requires a session.
-  Future<JsonMap> identityMfaDisable({
+  Future<MfaDisabledResultDto> identityMfaDisable({
     required IdentityMfaDisableRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -335,7 +335,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityMfaDisable');
+    return MfaDisabledResultDto.fromJson(response.requireObject(location: 'identityMfaDisable'));
   }
 
   /// Start TOTP enrolment
@@ -343,7 +343,7 @@ final class KararApiClient {
   /// Returns the shared secret and otpauth URL EXACTLY ONCE; the secret is stored encrypted (key-version provenance) and never retrievable again.
   ///
   /// `POST /auth/mfa/enroll` — requires a session.
-  Future<JsonMap> identityMfaEnroll({
+  Future<MfaEnrolmentStartedDto> identityMfaEnroll({
     String? idempotencyKey,
     CancellationToken? cancellation,
     TimeoutProfile timeouts = TimeoutProfile.standard,
@@ -358,7 +358,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityMfaEnroll');
+    return MfaEnrolmentStartedDto.fromJson(response.requireObject(location: 'identityMfaEnroll'));
   }
 
   /// Complete an MFA login with a one-time recovery code
@@ -366,7 +366,7 @@ final class KararApiClient {
   /// Each code works once. Five failed recovery attempts per account in 15 minutes lock recovery for the remainder of the window (the counter never resets on lock).
   ///
   /// `POST /auth/mfa/recovery` — unauthenticated.
-  Future<JsonMap> identityMfaRecovery({
+  Future<AuthenticatedSessionDto> identityMfaRecovery({
     required IdentityMfaRecoveryRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -383,7 +383,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityMfaRecovery');
+    return AuthenticatedSessionDto.fromJson(response.requireObject(location: 'identityMfaRecovery'));
   }
 
   /// Rotate a refresh token
@@ -391,7 +391,7 @@ final class KararApiClient {
   /// One-time: the presented token is consumed and a successor returned. Presenting a used or superseded token is treated as theft — the family and its session are revoked, the event recorded, the account notified — and still answers the same generic 401.
   ///
   /// `POST /auth/refresh` — unauthenticated.
-  Future<JsonMap> identityRefresh({
+  Future<RefreshedSessionDto> identityRefresh({
     required IdentityRefreshRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -408,7 +408,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityRefresh');
+    return RefreshedSessionDto.fromJson(response.requireObject(location: 'identityRefresh'));
   }
 
   /// Register an account and send a verification code
@@ -416,7 +416,7 @@ final class KararApiClient {
   /// Enumeration-resistant: an already-registered address returns the SAME 202 body as a fresh registration. The verification code travels only in the e-mail; it is never in a response.
   ///
   /// `POST /auth/register` — unauthenticated.
-  Future<JsonMap> identityRegister({
+  Future<NeutralReceiptDto> identityRegister({
     required IdentityRegisterRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -433,7 +433,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityRegister');
+    return NeutralReceiptDto.fromJson(response.requireObject(location: 'identityRegister'));
   }
 
   /// Re-send the verification code
@@ -441,7 +441,7 @@ final class KararApiClient {
   /// Always 202 — unknown, already-verified, disabled, and cooling-down (60s per account) cases are indistinguishable from a successful send.
   ///
   /// `POST /auth/resend-verification` — unauthenticated.
-  Future<JsonMap> identityResendVerification({
+  Future<NeutralReceiptDto> identityResendVerification({
     required IdentityResendVerificationRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -458,7 +458,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityResendVerification');
+    return NeutralReceiptDto.fromJson(response.requireObject(location: 'identityResendVerification'));
   }
 
   /// Consume a reset token and set a new password
@@ -466,7 +466,7 @@ final class KararApiClient {
   /// One-time, 30-minute token. Completing a reset revokes EVERY session and refresh-token family and bumps the token version.
   ///
   /// `POST /auth/reset-password` — unauthenticated.
-  Future<JsonMap> identityResetPassword({
+  Future<PasswordResetResultDto> identityResetPassword({
     required IdentityResetPasswordRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -483,13 +483,13 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityResetPassword');
+    return PasswordResetResultDto.fromJson(response.requireObject(location: 'identityResetPassword'));
   }
 
   /// Revoke every session except the current one
   ///
   /// `POST /auth/sessions/revoke-others` — requires a session.
-  Future<JsonMap> identityRevokeOtherSessions({
+  Future<OtherSessionsRevokedDto> identityRevokeOtherSessions({
     String? idempotencyKey,
     CancellationToken? cancellation,
     TimeoutProfile timeouts = TimeoutProfile.standard,
@@ -504,13 +504,13 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityRevokeOtherSessions');
+    return OtherSessionsRevokedDto.fromJson(response.requireObject(location: 'identityRevokeOtherSessions'));
   }
 
   /// Revoke one of the caller's sessions
   ///
   /// `DELETE /auth/sessions/{sessionId}` — requires a session.
-  Future<JsonMap> identityRevokeSession({
+  Future<SessionRevokedResultDto> identityRevokeSession({
     required String sessionId,
     CancellationToken? cancellation,
     TimeoutProfile timeouts = TimeoutProfile.standard,
@@ -524,7 +524,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityRevokeSession');
+    return SessionRevokedResultDto.fromJson(response.requireObject(location: 'identityRevokeSession'));
   }
 
   /// Consume a one-time e-mail verification code
@@ -532,7 +532,7 @@ final class KararApiClient {
   /// One generic failure for wrong, expired, capped, or unknown codes. Verifying an already-verified account is an idempotent success.
   ///
   /// `POST /auth/verify-email` — unauthenticated.
-  Future<JsonMap> identityVerifyEmail({
+  Future<EmailVerifiedResultDto> identityVerifyEmail({
     required IdentityVerifyEmailRequestDto body,
     String? idempotencyKey,
     CancellationToken? cancellation,
@@ -549,7 +549,7 @@ final class KararApiClient {
         timeouts: timeouts,
       ),
     );
-    return response.requireObject(location: 'identityVerifyEmail');
+    return EmailVerifiedResultDto.fromJson(response.requireObject(location: 'identityVerifyEmail'));
   }
 
   /// List the legal documents applicable to the caller, with their effective versions

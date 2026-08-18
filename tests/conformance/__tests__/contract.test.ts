@@ -170,8 +170,10 @@ describe('the OpenAPI document loads and resolves', () => {
   it('binds a schema to EVERY schema-bearing response the document declares', () => {
     const ledger = contract.schemaBearingResponses();
     // A number, not merely "> 0": a loader that stopped resolving half the
-    // fragments would still be non-empty, and would still look fine.
-    expect(ledger.length).toBe(66);
+    // fragments would still be non-empty, and would still look fine. It was
+    // 66 before the identity fragment gained schemas; those 17 operations
+    // contribute the 48 rows that make it 114.
+    expect(ledger.length).toBe(114);
     for (const row of ledger) {
       expect(
         contract.responseSchema(row.operationId, row.status, row.mediaType),
@@ -180,14 +182,16 @@ describe('the OpenAPI document loads and resolves', () => {
     }
   });
 
-  it('states plainly which operations this suite CANNOT bind — the identity surface', () => {
-    // The 17 /auth operations describe their bodies in prose ("{status:
-    // verified}") and declare no schema. That is a contract gap, and naming it
-    // is the honest alternative to a coverage figure that quietly excludes it:
-    // no runtime check of an /auth response is possible until the fragment
-    // gains schemas, and this assertion turns the day it does into a
-    // deliberate decision rather than an unnoticed one.
-    const unbindable = contract
+  it('leaves NO operation the client is generated from describing itself in prose alone', () => {
+    // This assertion used to name the 17 /auth operations as unbindable: the
+    // identity fragment described every body in prose ("{status: verified}")
+    // and attached no schema, so the generated Dart client decoded them as
+    // untyped JSON and the runtime suite had nothing to hold the server to.
+    // Both ends read THIS document, so an operation with no schema anywhere
+    // is an operation nobody can check — the expected value is the empty list
+    // now, and a new prose-only operation is a failing test rather than a
+    // silent hole.
+    const proseOnly = contract
       .operations()
       .filter((operation) =>
         [...operation.responses.values()].every((response) => response.schemas.size === 0),
@@ -195,25 +199,11 @@ describe('the OpenAPI document loads and resolves', () => {
       .map((operation) => operation.operationId)
       .sort();
 
-    expect(unbindable).toEqual([
-      'identityChangePassword',
-      'identityForgotPassword',
-      'identityListSessions',
-      'identityLogin',
-      'identityLogout',
-      'identityMfaChallenge',
-      'identityMfaConfirm',
-      'identityMfaDisable',
-      'identityMfaEnroll',
-      'identityMfaRecovery',
-      'identityRefresh',
-      'identityRegister',
-      'identityResendVerification',
-      'identityResetPassword',
-      'identityRevokeOtherSessions',
-      'identityRevokeSession',
-      'identityVerifyEmail',
-    ]);
+    expect(
+      proseOnly,
+      'these operations declare no response schema at all; the generated client cannot type ' +
+        'them and the runtime conformance suite cannot validate them',
+    ).toEqual([]);
   });
 });
 

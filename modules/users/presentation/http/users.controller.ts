@@ -9,9 +9,16 @@
  * body `tenantId` are ignored by construction, and tests assert exactly that.
  * The PATCH body is reduced to the two approved fields before the use case
  * ever sees it; everything else in the body does not exist to this surface.
+ *
+ * FAILURES ARE THROWN, never written to the reply. The HTTP entrypoint's error
+ * boundary is the ONE writer of an RFC 7807 document and the only place its
+ * `application/problem+json` media type is set (apps/api/src/errors/
+ * problem-response.ts); a problem this surface authored travels there as the
+ * body of an HttpException and is forwarded verbatim, code and all. The reply
+ * object below answers successes only.
  */
 
-import { Body, Controller, Get, Inject, Patch, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, Inject, Patch, Post, Req, Res } from '@nestjs/common';
 
 import type { GetOwnProfile } from '../../application/use-cases/get-own-profile.js';
 import type {
@@ -53,14 +60,12 @@ export class UsersController {
     const principal = this.principal(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const result = await this.useCases.getOwnProfile.execute(principal);
     if (!result.ok) {
       const problem = problemForUsersError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send(toUserProfileResponse(result.value));
   }
@@ -74,8 +79,7 @@ export class UsersController {
     const principal = this.principal(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     // Approved fields only: everything else in the body is dropped here.
     const raw = (body ?? {}) as Record<string, unknown>;
@@ -86,8 +90,7 @@ export class UsersController {
     const result = await this.useCases.updateOwnProfile.execute(input, principal);
     if (!result.ok) {
       const problem = problemForUsersError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply.status(200).send(toUserProfileResponse(result.value));
   }
@@ -101,8 +104,7 @@ export class UsersController {
     const principal = this.principal(request);
     if (principal === null) {
       const problem = authenticationRequiredProblem();
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     const raw = (body ?? {}) as Record<string, unknown>;
     const result = await this.useCases.requestAccountDisable.execute(
@@ -111,8 +113,7 @@ export class UsersController {
     );
     if (!result.ok) {
       const problem = problemForUsersError(result.error);
-      reply.status(problem.status).send(problem.body);
-      return;
+      throw new HttpException(problem.body, problem.status);
     }
     reply
       .status(202)
