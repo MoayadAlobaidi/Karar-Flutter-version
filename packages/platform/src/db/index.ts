@@ -13,6 +13,13 @@ export {
   type SslConfig,
 } from './connection-profile.js';
 export { PgError, mapPgError, type PgErrorCode } from './errors.js';
+export {
+  REQUIRED_SESSION_TIME_ZONE,
+  SESSION_STARTUP_OPTIONS,
+  SessionTimeZoneError,
+  assertSessionTimeZoneIsUtc,
+  poolConfigFor,
+} from './session-config.js';
 export { PostgresPersistenceAdapter, type TransactionClient } from './adapter.js';
 export {
   BootstrapError,
