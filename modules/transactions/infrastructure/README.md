@@ -10,4 +10,8 @@ May import this module's `application/` ports and `domain/`, plus frameworks. **
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 5: implemented. Prisma repositories for the transaction aggregate and
+the categorisation chain, a UUID v7 id source, and two LOCAL/TEST provider
+adapters that say what they are — both hold key material in process memory,
+which production must not do; production binds the same ports to adapters over
+the platform's key-management provider (ADR-0017)._

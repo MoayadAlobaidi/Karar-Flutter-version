@@ -10,4 +10,9 @@ May import this module's `domain/`, its own ports, and `shared-kernel`. **Never 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 5: implemented. Six use cases (list, create, read, update, delete,
+assign category), none of whose inputs carry a `userId` or a `tenantId` — the
+principal arrives through `PrincipalContextPort`. Two of the ports here exist
+for the statement-ingestion workstream to bind: `DedupFingerprintPort` (keyed
+per subject and versioned, never a plain hash of predictable fields) and
+`HsfFieldEncryptionPort`._

@@ -8,7 +8,7 @@ Transactions, statement import, normalisation, deduplication, provenance, and ca
 
 - **Business owner:** _unassigned — solo team, Phase 0_
 - **Technical owner:** _unassigned — solo team, Phase 0_
-- **Status:** PLANNED
+- **Status:** ACTIVE — Phase 5 implemented the transaction core: `public.transactions` with exact signed BIGINT minor units and per-field encrypted HSF columns, append-only revisions and provenance, category assignments with a single ACTIVE row, and the global category and merchant-rule catalogues. **The CSV ingestion pipeline is not built yet**; the dedup-fingerprint and HSF field-encryption ports it will use are declared here with LOCAL/TEST adapters only
 - **Phase:** 5
 - **Capability:** TRANSACTIONS
 - **Highest classification:** HIGHLY_SENSITIVE_FINANCIAL
