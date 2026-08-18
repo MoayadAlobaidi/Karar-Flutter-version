@@ -14,6 +14,15 @@ export {
 } from './connection-profile.js';
 export { PgError, mapPgError, type PgErrorCode } from './errors.js';
 export {
+  CONNECTIONS_PER_WORKER,
+  CONNECTION_HEADROOM,
+  DatabaseUnavailableError,
+  connectionBudget,
+  databaseIsRequired,
+  skipUnlessDatabaseRequired,
+  type ConnectionBudget,
+} from './connection-budget.js';
+export {
   REQUIRED_SESSION_TIME_ZONE,
   SESSION_STARTUP_OPTIONS,
   SessionTimeZoneError,

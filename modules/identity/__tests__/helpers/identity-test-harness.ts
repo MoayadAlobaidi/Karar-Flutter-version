@@ -25,6 +25,7 @@ import {
   maintenanceDatabase,
   migrateToLatest,
   PostgresPersistenceAdapter,
+  skipUnlessDatabaseRequired,
 } from '@karar/platform/dist/db/index.js';
 import { createPrismaClient, type PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 import { InMemoryTestEncryptionProvider } from '@karar/platform/dist/keys/index.js';
@@ -60,7 +61,13 @@ export async function probePostgres(): Promise<string | null> {
     return null;
   } catch (error) {
     await client.end().catch(() => {});
-    return error instanceof Error ? error.message : String(error);
+    const reason = error instanceof Error ? error.message : String(error);
+    // KARAR_INTEGRATION=1 declares that this run MUST exercise the database.
+    // Under it an unreachable server throws instead of producing a skip,
+    // because a skipped integration suite lands in the same green summary as a
+    // passing one and proves nothing.
+    skipUnlessDatabaseRequired('identity integration suite', reason);
+    return reason;
   }
 }
 
