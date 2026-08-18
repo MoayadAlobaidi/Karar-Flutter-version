@@ -16,12 +16,13 @@
 // exercising any single response.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..');
+// __dirname: this package compiles to CommonJS (vitest provides it in-runner),
+// which is why this does not use import.meta.url as the workspace's ESM suites
+// do. The same convention is in main-boot.test.ts and readiness.integration.test.ts.
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 
 /** The single file permitted to name the media type. */
 const WRITER = path.join('apps', 'api', 'src', 'errors', 'problem-response.ts');
