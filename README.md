@@ -17,8 +17,8 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **4 — COMPLETE** — merged to `main` ([phase report](docs/phases/phase-04.md), [PR #7](https://github.com/MoayadAlobaidi/Karar-Flutter-version/pull/7), merge commit [`457bd4e`](https://github.com/MoayadAlobaidi/Karar-Flutter-version/commit/457bd4e71b9920d348289204cf6e3b34146d2abd)); Phase 5 **NOT STARTED**. COMPLETE and merged mean the implementation, its internal gates and its merge are done — **not** deployed, signed, certified, app-store ready, production ready, or reviewed by counsel or a regulator |
-| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — its PR is open and unmerged |
+| Current phase | **4 — COMPLETE** — merged to `main` ([phase report](docs/phases/phase-04.md), merge commit [`457bd4e`](https://github.com/MoayadAlobaidi/Karar-Flutter-version/commit/457bd4e71b9920d348289204cf6e3b34146d2abd)). **Phase 5 is opened** on `claude/karar-v2-phase-5-financial-foundation` with its [report](docs/phases/phase-05.md) written and **nothing built**; the canonical phase marker advances with Phase 5's first implementation, for the reason recorded in that report |
+| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — merged 18 August 2026 |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, and a Flutter client covering account, identity and platform state — **no consumer product capability is implemented or reachable** |
 | Mobile | Builds and tests for Android and iOS, with per-environment application identifiers verified out of real packaged artifacts. **No signed build, no signing material, no store submission, no deployed endpoint** — a build for any environment other than `LOCAL` is refused because no endpoint exists, and the biometric prompt has never been exercised on a device |
