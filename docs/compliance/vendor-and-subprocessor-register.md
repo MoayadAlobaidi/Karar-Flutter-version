@@ -6,7 +6,7 @@
 
 **What was NOT added, because it does not exist.** Phase 4 built a mobile client and created no cloud account, no hosting, no DNS record, no email or push provider, no crash-reporting or analytics vendor, no advertising identifier, no app-store or developer-programme account, and no Apple Team ID. The client ships no third-party SDK that transmits anything anywhere. A register of a client application usually grows a telemetry vendor at this point; this one did not, and that absence is the entry.
 
-**CI-005 is still open and is now falling due.** Its due date is the Phase 4 gate, which has not been held. No vendor security review has been performed in this phase, the Phase 1 baseline still stands for GitHub, npm, pub.dev, Docker Hub, and the base-image publishers, and KAR-CTL-047 stays DESIGNED. Adding seven suppliers on top of an unreviewed set widens the nonconformity rather than leaving it where it was.
+**CI-005 is still open and is now falling due.** Its due date is the Phase 4 gate, which has now been held; the nonconformity was carried forward rather than closed, because no vendor security review was performed. No vendor security review has been performed in this phase, the Phase 1 baseline still stands for GitHub, npm, pub.dev, Docker Hub, and the base-image publishers, and KAR-CTL-047 stays DESIGNED. Adding seven suppliers on top of an unreviewed set widens the nonconformity rather than leaving it where it was.
 
 **v0.2 (2026-08-16, Phase 3.5):** Cloudflare added as a current vendor — **domain registrar and authoritative DNS provider only**, explicitly **not** a financial-data processor or subprocessor, with the conditions that would change that classification stated in its row and in rule 6.
 
