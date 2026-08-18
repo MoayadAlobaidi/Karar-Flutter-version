@@ -607,11 +607,22 @@ jobs:
       # manifest is the cheap half of the fix: it carries the Android package
       # name, which is the only thing the iOS lane needs from this one.
       # Building an APK on the macOS runner would also work and costs far more.
-      - name: Publish the merged manifest for the iOS lane
+      - name: Publish the Android build outputs the iOS lane asserts against
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: android-merged-manifest
-          path: apps/mobile/build/app/intermediates/merged_manifest/**/AndroidManifest.xml
+          name: android-build-outputs
+          # BOTH paths, because the suite reads both and the gate variable
+          # turns a missing one into a failure rather than a skip. The merged
+          # manifest carries the packaged application id, which is the half the
+          # cross-platform identity comparison needs. The generated
+          # data-extraction rules are a separate Gradle output under
+          # build/app/generated, and every assertion about exclusion domains,
+          # the platform attribute and the test-only identity reads those.
+          # Publishing only the manifest made the iOS lane fail its own
+          # verification step the first time it ran.
+          path: |
+            apps/mobile/build/app/intermediates/merged_manifest/**/AndroidManifest.xml
+            apps/mobile/build/app/generated/res/**/data_extraction_rules.xml
           if-no-files-found: error
           retention-days: 1
 
@@ -658,11 +669,14 @@ jobs:
       # Restored to the exact path the suite reads, so the comparison runs
       # against the manifest the Android lane actually produced rather than a
       # value re-derived on this runner.
-      - name: Fetch the merged manifest from the Android lane
+      - name: Fetch the Android build outputs from the Android lane
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
-          name: android-merged-manifest
-          path: apps/mobile/build/app/intermediates/merged_manifest
+          name: android-build-outputs
+          # Restored at the common ancestor of the two published paths, so the
+          # tree the suite reads is the one Gradle produced:
+          # app/intermediates/merged_manifest/... and app/generated/res/...
+          path: apps/mobile/build/app
 
       - name: Build for the simulator (no code signing)
         run: |

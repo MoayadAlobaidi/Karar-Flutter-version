@@ -226,5 +226,15 @@ describe.skipIf(unreachable !== null)('login and lockout (live PostgreSQL)', () 
     } finally {
       await limited.end();
     }
-  });
+    // BUDGET, NOT TOLERANCE. This test spends eleven login executions, and a
+    // login execution is deliberately expensive: the password hash is argon2,
+    // tuned so that guessing costs an attacker real time. Eleven of them plus
+    // a harness build sit close enough to vitest's 5000ms default that the
+    // suite failed once at 5005ms under parallel load and passed on the next
+    // run -- observed, not hypothesised. Raising the budget for this one test
+    // changes nothing it asserts: the eleventh attempt must still be refused
+    // with RATE_LIMITED, and a genuine hang still fails here. The alternative,
+    // a flaky test on a merge-blocking check, teaches everyone to re-run CI
+    // until it is green, which is how a real failure gets waved through.
+  }, 30_000);
 });
