@@ -10,7 +10,9 @@ Accounts and balances. Accounts are created from statement import; there is no b
 - **Technical owner:** _unassigned — solo team, Phase 0_
 - **Status:** PLANNED
 - **Phase:** 5
-- **Capability:** FINANCIAL_ACCOUNTS
+- **Capability:** TRANSACTIONS — this module is an internal bounded context beneath that product capability, not a capability of its own
+
+**Why not `FINANCIAL_ACCOUNTS`.** This file previously named a capability that does not exist. The closed production registry declares `TRANSACTIONS` and has no `FINANCIAL_ACCOUNTS` id, so the name here resolved to nothing and any reader checking it against the registry would have found a hole. Accounts are not independently purchasable, entitleable or deployable — a user who has accounts but not transactions has nothing, and the reverse is incoherent — so a second capability id would add a dimension the product does not have while widening the surface that availability, entitlement and PolicyPack clearing all have to reason about. Adding one would need an ADR, a capability-map change, a registry change, and an analysis of its bootstrap and client exposure; none of that is warranted to describe a bounded context. Module boundaries and capability ids are deliberately different things here.
 - **Highest classification:** HIGHLY_SENSITIVE_FINANCIAL
 
 ## Data owned
