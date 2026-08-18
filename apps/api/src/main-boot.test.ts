@@ -1,8 +1,10 @@
 /**
  * Boot lifecycle tests against the BUILT entrypoint (dist/main.js): config
- * fail-fast and SIGTERM graceful shutdown. They spawn real processes and need
- * `pnpm build` to have run first — they skip (loudly) when dist is missing.
- * No database is required: the probe pool connects lazily.
+ * fail-fast, startup with an unreachable rate-limit store, and SIGTERM
+ * graceful shutdown. They spawn real processes and need `pnpm build` to have
+ * run first — they skip (loudly) when dist is missing. No infrastructure is
+ * required: the probe pool connects lazily and the store tests point at a
+ * port nothing listens on.
  */
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -77,6 +79,52 @@ describe.skipIf(!distBuilt)('boot fail-fast (spawned dist/main.js)', () => {
     }
     expect(result.stderr).not.toContain('should-never-print');
   });
+});
+
+/** GET /readyz on a spawned server, as the bytes an orchestrator would see. */
+async function fetchReadyz(port: number): Promise<{ status: number; raw: string }> {
+  const response = await fetch(`http://127.0.0.1:${port}/readyz`);
+  return { status: response.status, raw: await response.text() };
+}
+
+describe.skipIf(!distBuilt)('startup without the rate-limit store (spawned dist/main.js)', () => {
+  it('still boots and listens, and reports readiness not-ready with redis down', async () => {
+    const port = 3700 + (process.pid % 500);
+    // Nothing listens here: the store is unreachable for the whole run.
+    const storePort = 6499;
+    let probe: Promise<{ status: number; raw: string }> | undefined;
+    const result = await bootProcess(
+      {
+        KARAR_ENV: 'local',
+        PORT: String(port),
+        REDIS_PORT: String(storePort),
+        KARAR_TELEMETRY_ENABLED: 'false',
+        KARAR_LOG_LEVEL: 'info',
+      },
+      (child, stdoutSoFar) => {
+        if (probe === undefined && stdoutSoFar().includes('api listening')) {
+          probe = fetchReadyz(port).finally(() => child.kill('SIGTERM'));
+        }
+      },
+    );
+    // Booting without a dependency is deliberate: the process listens, and
+    // the startup connect reports the outcome instead of being fatal.
+    expect(result.stdout).toContain('api listening');
+    expect(result.stdout).toContain('rate-limit store did not answer at startup');
+    if (probe === undefined) throw new Error(`the server never listened\n${result.stdout}`);
+    const readiness = await probe;
+    // ...and readiness says so, so nothing is routed here in the meantime.
+    expect(readiness.status).toBe(503);
+    const body = JSON.parse(readiness.raw) as { status: string; checks: { redis: string } };
+    expect(body.status).toBe('unavailable');
+    expect(body.checks.redis).toBe('down');
+    // States only: the endpoint, the driver text and the retry chatter stay
+    // server-side — including ioredis's own unhandled-error console writes.
+    for (const leaked of [String(storePort), '127.0.0.1', 'ECONNREFUSED', 'ioredis', 'Stream']) {
+      expect(readiness.raw).not.toContain(leaked);
+    }
+    expect(result.stderr).toBe('');
+  }, 30_000);
 });
 
 describe.skipIf(!distBuilt)('graceful shutdown (spawned dist/main.js)', () => {

@@ -8,6 +8,7 @@ export interface ReadinessReport {
   readonly checks: {
     readonly postgres: 'up' | 'down';
     readonly migrations: MigrationsStatus;
+    readonly redis: 'up' | 'down';
   };
 }
 
@@ -27,25 +28,31 @@ const dbUp = makeGauge(METRIC_NAMES.dbUp, {
  *
  *   postgres    `SELECT 1` on the application role   → 'up' | 'down'
  *   migrations  schema verify (applied == latest)    → 'ok' | 'behind' | 'unknown'
+ *   redis       round trip to the rate-limit store   → 'up' | 'down'
  *
- * Ready (HTTP 200) ONLY when postgres is up AND migrations are 'ok'; anything
- * else — including 'unknown' — reports 503 with per-check states. The report
- * carries STATES ONLY: never hosts, ports, roles, connection strings or
- * driver error text.
+ * Ready (HTTP 200) ONLY when postgres is up, migrations are 'ok' AND the
+ * rate-limit store answers; anything else — including 'unknown' — reports 503
+ * with per-check states. The store counts because the identity policies that
+ * bound credential guessing fail CLOSED without it (platform ratelimit
+ * policy.ts): an instance that cannot rate-limit refuses login, verification,
+ * reset, MFA and invitation, and calling that ready would route real traffic
+ * into guaranteed 503s. The report carries STATES ONLY: never hosts, ports,
+ * roles, connection strings or driver error text.
  */
 @Injectable()
 export class ReadinessService {
   constructor(@Inject(READINESS_PROBES) private readonly probes: ReadinessProbes) {}
 
   async check(): Promise<ReadinessReport> {
-    const [postgres, migrations] = await Promise.all([
+    const [postgres, migrations, redis] = await Promise.all([
       this.probePostgres(),
       this.probeMigrations(),
+      this.probeRedis(),
     ]);
-    const ready = postgres === 'up' && migrations === 'ok';
+    const ready = postgres === 'up' && migrations === 'ok' && redis === 'up';
     readinessState.record(ready ? 1 : 0);
     dbUp.record(postgres === 'up' ? 1 : 0);
-    return { ready, checks: { postgres, migrations } };
+    return { ready, checks: { postgres, migrations, redis } };
   }
 
   private async probePostgres(): Promise<'up' | 'down'> {
@@ -64,6 +71,17 @@ export class ReadinessService {
       return await this.probes.migrationsStatus(CHECK_BUDGET_MS);
     } catch {
       return 'unknown';
+    }
+  }
+
+  private async probeRedis(): Promise<'up' | 'down'> {
+    try {
+      await this.probes.pingRedis(CHECK_BUDGET_MS);
+      return 'up';
+    } catch {
+      // Same stance as the database: the driver's reason (refused/timeout/
+      // "stream isn't writeable") is server-side detail, never a response.
+      return 'down';
     }
   }
 }

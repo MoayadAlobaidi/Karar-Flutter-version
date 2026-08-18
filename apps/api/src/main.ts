@@ -55,12 +55,23 @@ async function bootstrap(): Promise<void> {
   // control-plane — composed once, outside Nest (composition/phase3-modules.ts).
   const composition = composePhase3Modules({ config, env: process.env, dbAdapter, logger });
 
+  // Rate limiting is a STARTUP dependency, not a lazy one. The limiter client
+  // has no offline queue, so a connection that is merely scheduled when the
+  // first login arrives rejects that command — and every credential-guessing
+  // policy fails closed, turning a healthy store into a 503. Establish it
+  // here, before anything can be routed to this process. A store that is
+  // genuinely down does not stop the boot: it stays out of /readyz's green
+  // path (redis: 'down') and reconnects underneath.
+  if (!(await composition.rateLimitStore.connect())) {
+    logger.warn('rate-limit store did not answer at startup; readiness stays not-ready');
+  }
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.forRoot({
       config,
       logger,
       telemetry,
-      probes: createDbReadinessProbes(dbAdapter),
+      probes: createDbReadinessProbes(dbAdapter, composition.rateLimitStore),
       modules: composition.modules,
       enrichmentGuard: composition.enrichmentGuard,
       resources: composition.resources,
