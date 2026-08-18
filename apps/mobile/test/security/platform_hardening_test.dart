@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/bundle_identity.dart';
 import 'support/source_tree.dart';
 
 const String _androidManifest = 'android/app/src/main/AndroidManifest.xml';
@@ -892,6 +893,17 @@ void main() {
       // unquoted `$(...)` makes the whole project file unparseable to Xcode.
       // That failure mode is silent in this repository — nothing but an actual
       // iOS build catches it — so the quoting is asserted, not assumed.
+      //
+      // THIS TEST IS NOT ABOUT THE ARTIFACT AND CANNOT BE.
+      //
+      // It passed unchanged through the whole period in which LOCAL, DEV,
+      // STAGING and PRODUCTION all produced `com.kararfinance.app`, because a
+      // prefix check on a build setting says nothing about what any build was
+      // called. What the artifact is called is asserted in
+      // ios_packaged_bundle_test.dart against the packaged plist, and the
+      // cross-platform group below asserts the two platforms agree. This stays
+      // for the one thing it does establish: the project file names the owned
+      // identifier and nothing else.
       final identifiers = RegExp(r'PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);')
           .allMatches(project)
           .map((RegExpMatch match) => match.group(1)!.trim())
@@ -901,7 +913,7 @@ void main() {
       for (final identifier in identifiers) {
         expect(
           identifier,
-          startsWith('"com.kararfinance.app'),
+          startsWith('"${baseApplicationId()}'),
           reason: '$identifier must be the owned identifier, and must be quoted '
               'because it interpolates a build setting',
         );
@@ -928,6 +940,235 @@ void main() {
         reason: 'release signing material is supplied externally at release time',
       );
       expect(project, isNot(contains('PROVISIONING_PROFILE_SPECIFIER = "')));
+    });
+  });
+
+  // ONE RULE, TWO PLATFORMS, AND THE ARTIFACTS THEY ACTUALLY PRODUCED.
+  //
+  // The Android data-extraction rules NAME the iOS counterpart by bundle
+  // identifier. For as long as the iOS xcconfigs left KARAR_BUNDLE_ID_SUFFIX
+  // empty, that element was a claim about an identifier no iOS build produced:
+  // a DEV artifact named `com.kararfinance.app.dev` while every iOS build,
+  // whatever it was compiled for, was `com.kararfinance.app`. The generator
+  // recorded the gap in a comment. A comment is not a control.
+  //
+  // Closing it needs three things, and all three are here:
+  //
+  //   1. ONE RULE. `applicationId` and `environmentSuffixes` in
+  //      app/build.gradle.kts are the authority. ios/Scripts/bundle_identity.sh
+  //      is a second ENCODING of it — a shell file, because the iOS build phase
+  //      is a shell script — and it is asserted equal rather than trusted.
+  //
+  //   2. THE BUILT ARTIFACTS, not the sources. The merged manifest's package
+  //      attribute is the applicationId a build actually produced; the packaged
+  //      plist's CFBundleIdentifier is what the iOS artifact actually calls
+  //      itself. Both are read here.
+  //
+  //   3. NO APPLE TEAM ID ANYWHERE. Agreeing about the identifier is not the
+  //      same as being able to configure the cross-platform transfer, which
+  //      needs an identity this project does not have. That refusal is asserted
+  //      in the data-extraction group above and is untouched by any of this.
+  group('cross-platform application identity', () {
+    test('both platforms encode the same environment-to-identifier rule', () {
+      // Character-for-character, not "both contain .dev somewhere". The two
+      // encodings exist because the two build systems cannot read each other's;
+      // that is a reason for two files, not for two rules.
+      expect(
+        iosBaseBundleIdentifier(),
+        baseApplicationId(),
+        reason: 'the iOS build phase derives from a different base identifier '
+            'than the Android build packages. One of the two is naming an '
+            'application this project does not own.',
+      );
+      expect(
+        iosEnvironmentSuffixRule(),
+        environmentSuffixRule(),
+        reason: 'the suffix table in $iosBundleIdentityRules and the one in '
+            '$_appGradle are not the same rule. They must be, because the '
+            "Android artifact's data-extraction rules name the iOS artifact by "
+            'the identifier this table produces.',
+      );
+      expect(
+        iosDeclaredEnvironments().toSet(),
+        declaredEnvironments().toSet(),
+        reason: 'the environment list the iOS build phase validates against is '
+            'not the set of environments the product has',
+      );
+    });
+
+    test('only production is unsuffixed, on both platforms', () {
+      // Restating the Android-only assertion above in the form that matters
+      // across platforms: the empty suffix is production's, and it is the only
+      // empty one. An artifact with no suffix is a production artifact whatever
+      // built it.
+      final Map<String, String> rule = environmentSuffixRule();
+      expect(
+        rule['PRODUCTION'],
+        isEmpty,
+        reason: 'production must be the unsuffixed identity, or nothing is',
+      );
+      for (final MapEntry<String, String> entry in rule.entries) {
+        if (entry.key == 'PRODUCTION') continue;
+        expect(
+          entry.value,
+          isNotEmpty,
+          reason: '${entry.key} maps to an empty suffix, so a ${entry.key} '
+              'artifact carries the production identifier on both platforms. It '
+              'would install over production, and an App Store record for that '
+              'identifier would accept it.',
+        );
+      }
+      // Distinct, not merely non-empty: two environments sharing a suffix is
+      // the same collision with more steps.
+      expect(
+        rule.values.toSet().length,
+        rule.length,
+        reason: 'two environments map to the same identifier in $rule',
+      );
+    });
+
+    test('the applicationId a build produced is the rule\'s value for the '
+        'environment that assembly recorded', () {
+      // The MERGED manifest, because `applicationIdSuffix` is applied by the
+      // build: the Gradle source states an intention and the merged manifest
+      // states the result. Pairing it with the environment recorded in the
+      // generated rules resource is what makes this non-vacuous — it asserts
+      // that `-Pkarar.env` and `applicationIdSuffix` produced the same answer
+      // in one assembly, rather than inverting the identifier and comparing it
+      // with itself.
+      final Map<String, String> observed = builtAndroidApplicationIds();
+      if (observed.isEmpty) {
+        _requireBuildIfExpected();
+        markTestSkipped(
+          'no merged manifest present — run `flutter build apk --debug '
+          '-Pkarar.env=LOCAL --dart-define=KARAR_ENV=LOCAL` first',
+        );
+        return;
+      }
+
+      final Set<String> assembled = _generatedRules()
+          .map((_GeneratedRules resource) => resource.environment)
+          .whereType<String>()
+          .toSet();
+      expect(
+        assembled,
+        isNotEmpty,
+        reason: 'a build produced a merged manifest but no generated '
+            'data-extraction rules, so there is nothing that says which '
+            'environment it was assembled for',
+      );
+
+      final Set<String> expectedIdentifiers = assembled
+          .map(counterpartBundleIdentifier)
+          .toSet();
+      for (final MapEntry<String, String> entry in observed.entries) {
+        expect(
+          expectedIdentifiers,
+          contains(entry.value),
+          reason: '${entry.key} declares package="${entry.value}", which is not '
+              'what the rule produces for any environment this tree was '
+              'assembled for ($assembled). The packaged identity and the '
+              'requested environment have come apart.',
+        );
+      }
+    });
+
+    test('the iOS artifact is named what the Android build names its '
+        'counterpart', () {
+      // THE ASSERTION THE OLD COMMENT SAID COULD NOT BE MADE.
+      //
+      // `counterpartBundleId.set(variant.applicationId)` asserts the iOS
+      // counterpart of a DEV Android artifact is `com.kararfinance.app.dev`.
+      // The generator's own doc comment recorded that this was NOT CLAIMED to
+      // be true, because no iOS build produced that identifier. This reads the
+      // built iOS bundles and claims it.
+      final List<PackagedIosBundle> bundles = packagedIosBundles();
+      if (bundles.isEmpty) {
+        if (!Platform.isMacOS) {
+          markTestSkipped(
+            'no iOS artifact can be read without plutil; the Android gate does '
+            'not promise one',
+          );
+          return;
+        }
+        markTestSkipped(
+          'no built iOS bundle under build/ios. Run `flutter build ios '
+          '--simulator --debug --dart-define=KARAR_ENV=LOCAL`; '
+          'KARAR_VERIFY_IOS_ARTIFACT makes its absence a failure in '
+          'ios_packaged_bundle_test.dart.',
+        );
+        return;
+      }
+
+      for (final PackagedIosBundle bundle in bundles) {
+        expect(
+          declaredEnvironments(),
+          contains(bundle.environment),
+          reason: '${bundle.label} records no usable environment '
+              "('${bundle.environment}'), so what it should be called cannot be "
+              'derived. The packaging phase refuses to produce such an artifact.',
+        );
+        expect(
+          bundle.bundleIdentifier,
+          counterpartBundleIdentifier(bundle.environment),
+          reason: '${bundle.label} was compiled for ${bundle.environment} and '
+              "calls itself '${bundle.bundleIdentifier}', but the Android build "
+              'names '
+              "'${counterpartBundleIdentifier(bundle.environment)}' as the iOS "
+              'counterpart for that environment',
+        );
+      }
+
+      // And directly, artifact to artifact, wherever both were built.
+      final Map<String, String> android = builtAndroidApplicationIds();
+      final Map<String, String> environments = environmentByBundleIdentifier();
+      for (final PackagedIosBundle bundle in bundles) {
+        for (final MapEntry<String, String> entry in android.entries) {
+          if (environments[entry.value] != bundle.environment) continue;
+          expect(
+            bundle.bundleIdentifier,
+            entry.value,
+            reason: 'the ${bundle.environment} iOS artifact (${bundle.label}) '
+                "is '${bundle.bundleIdentifier}' and the ${bundle.environment} "
+                "Android artifact (${entry.key}) is '${entry.value}'",
+          );
+        }
+      }
+    });
+
+    test('a deployed artifact names its counterpart by the same rule', () {
+      // The bundleId attribute in the generated resource, checked against the
+      // rule rather than against a literal. LOCAL is excluded because it
+      // deliberately declares the test-only identity instead — the counterpart
+      // it would otherwise name is one no App Store record exists for, and the
+      // test-only value is what keeps an invented identity out of a LOCAL
+      // artifact. That branch is asserted in the data-extraction group above
+      // and is not weakened here.
+      final rules = _generatedRules()
+          .where((_GeneratedRules resource) => resource.isDeployed)
+          .toList();
+      if (rules.isEmpty) {
+        markTestSkipped(
+          'no deployed data-extraction rules were generated; a deployed '
+          'assembly also requires an Apple Team ID, which this repository does '
+          'not hold',
+        );
+        return;
+      }
+
+      for (final resource in rules) {
+        final String? declared =
+            RegExp(r'<platform-specific-params[^>]*bundleId="([^"]*)"')
+                .firstMatch(resource.declarations)
+                ?.group(1);
+        expect(
+          declared,
+          counterpartBundleIdentifier(resource.environment!),
+          reason: '${resource.path} was generated for ${resource.environment} '
+              "and names '$declared' as the iOS counterpart, which is not the "
+              'identifier an iOS build of that environment produces',
+        );
+      }
     });
   });
 

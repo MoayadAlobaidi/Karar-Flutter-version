@@ -324,18 +324,41 @@ abstract class GenerateDataExtractionRules : DefaultTask() {
     ///
     /// Wired to the variant's own applicationId, which already carries the
     /// environment suffix. The iOS project declares the same identifier and the
-    /// same suffix scheme (`com.kararfinance.app$(KARAR_BUNDLE_ID_SUFFIX)`), so
-    /// this is the project's own owned identifier rather than a new invention.
-    /// It is not used for LOCAL, which declares the test-only value instead.
+    /// same suffix scheme, so this is the project's own owned identifier rather
+    /// than a new invention. It is not used for LOCAL, which declares the
+    /// test-only value instead.
     ///
-    /// NOT CLAIMED: that the two agree today. The iOS xcconfigs currently leave
+    /// THE TWO NOW AGREE, AND THAT IS ASSERTED RATHER THAN ASSUMED.
+    ///
+    /// This comment used to record the opposite. The iOS xcconfigs left
     /// KARAR_BUNDLE_ID_SUFFIX empty for every configuration, so an iOS build
-    /// produces `com.kararfinance.app` whatever it is built for, while a DEV
-    /// artifact names `com.kararfinance.app.dev`. Hardcoding the unsuffixed
-    /// identifier here would be worse, not better: a DEV artifact would then
-    /// name the PRODUCTION counterpart. Naming a counterpart that does not exist
-    /// yet is the smaller error, and the section excludes every domain either
-    /// way. The iOS suffix is a separate packaging gap, recorded as such.
+    /// produced `com.kararfinance.app` whatever it was compiled for, while a DEV
+    /// artifact named `com.kararfinance.app.dev` — a counterpart no build
+    /// produced. Hardcoding the unsuffixed identifier here would have been
+    /// worse, not better: a DEV artifact would then have named the PRODUCTION
+    /// counterpart.
+    ///
+    /// iOS now derives its identifier from the compiled `--dart-define=
+    /// KARAR_ENV` in the `Verify Packaged Bundle` build phase, against the same
+    /// suffix table this file declares — ios/Scripts/bundle_identity.sh, which
+    /// the mobile security suite asserts is character-for-character
+    /// `environmentSuffixes` below. Xcode resolves PRODUCT_BUNDLE_IDENTIFIER
+    /// before any script runs and an xcconfig cannot decode the dart-defines,
+    /// so the phase is where the derivation has to happen; a build whose
+    /// compiled environment and packaged identifier disagree fails there, and a
+    /// build that was told no environment at all is refused outright.
+    ///
+    /// What is asserted, on the ARTIFACTS rather than on either source: the
+    /// CFBundleIdentifier inside the built `.app` equals the value below for the
+    /// same environment. See the cross-platform identity group in
+    /// test/security/platform_hardening_test.dart and the identifier assertions
+    /// in test/security/ios_packaged_bundle_test.dart.
+    ///
+    /// STILL NOT CLAIMED: that a cross-platform transfer can be CONFIGURED. That
+    /// needs an Apple Team ID, which is an identity this project does not hold
+    /// and does not invent — see the refusal in `platformSpecificParams` below.
+    /// Agreeing about the identifier and being able to name the owner of it are
+    /// different things, and only the first of them is done.
     @get:Input
     abstract val counterpartBundleId: Property<String>
 

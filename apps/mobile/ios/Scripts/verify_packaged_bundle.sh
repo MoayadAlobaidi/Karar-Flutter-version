@@ -28,6 +28,21 @@
 # configuration loader has no default for KARAR_ENV either, so such a build
 # reaches CONFIG_INVALID at startup and never issues a request.
 #
+# IT ALSO SETTLES THE BUNDLE IDENTIFIER, FOR THE SAME REASON.
+#
+# `PRODUCT_BUNDLE_IDENTIFIER` is resolved by Xcode from build settings, and an
+# xcconfig cannot decode DART_DEFINES, so the xcconfig can only ever state a
+# DEFAULT per configuration — Debug means LOCAL, Release means PRODUCTION —
+# which is right for the ordinary case and wrong for every build that crosses
+# the two axes. This phase knows the compiled environment, so it is the only
+# place the identifier can be settled against it. It derives the expected
+# identifier from the shared rule in Scripts/bundle_identity.sh, narrows the
+# packaged plist to it, re-reads to confirm, and fails the build on a missing
+# environment, an unknown environment, a seed that is not one of the four
+# identifiers, or a final value that is not what the environment says it must
+# be. There is no path through this section that leaves a DEV, STAGING or LOCAL
+# artifact carrying `com.kararfinance.app`.
+#
 # It also asserts that the privacy disclosures are really in the bundle. An
 # empty Face ID purpose string, or an Arabic localization that silently failed
 # to copy, both look like working builds and are noticed only by the user being
@@ -80,6 +95,111 @@ fi
 plutil -replace KararBuildEnvironment -string \
     "${compiled_environment:-UNSET}" "$plist" \
     || fail "could not record the build environment in the packaged plist"
+
+# ---------------------------------------------------------------------------
+# Bundle identity
+# ---------------------------------------------------------------------------
+#
+# The rule is not written here. It is sourced, and the file it comes from is
+# asserted equal to the Android suffix table by the security suite, so the two
+# platforms cannot come to disagree about what a DEV artifact is called.
+identity_rules="${SRCROOT:-}/Scripts/bundle_identity.sh"
+[ -f "$identity_rules" ] || fail "$identity_rules is missing. It carries the \
+environment-to-bundle-identifier rule, and without it this phase cannot say \
+what the artifact should be called."
+. "$identity_rules"
+
+# ABSENCE IS NOT PRODUCTION, AND IT IS NOT LOCAL EITHER.
+#
+# The ATS section below can afford to treat an undetermined environment as
+# "grant nothing", because the artifact starts without the exception and the
+# safe answer is to leave it that way. An identifier has no such safe answer:
+# the artifact starts WITH one, whatever the xcconfig seeded, and every possible
+# value names some real environment. So the build stops.
+[ -n "$compiled_environment" ] || fail "Missing environment: this build passed \
+no --dart-define=KARAR_ENV, so nothing says which environment the artifact is \
+for and its bundle identifier cannot be derived. An artifact that does not know \
+what it is must not be produced: pass --dart-define=KARAR_ENV=LOCAL (or DEV, \
+STAGING, PRODUCTION). The Dart configuration loader has no default for it \
+either, so such a build would reach CONFIG_INVALID at startup."
+
+expected_identifier="$(karar_bundle_identifier "$compiled_environment")" \
+    || fail "Unknown environment: this build was compiled for \
+'$compiled_environment', which is not one of $KARAR_ENVIRONMENTS. An \
+unrecognised environment is refused rather than given the unsuffixed \
+identifier, which is production's."
+
+# WHAT THE BUILD SETTINGS ASKED FOR, BEFORE THIS PHASE TOUCHES ANYTHING.
+#
+# Checked against the rule rather than merely read, because a typo in an
+# xcconfig — `.stagng`, or a suffix left on a Release configuration — produces
+# an identifier that still starts with the owned prefix and would otherwise be
+# silently overwritten here and never noticed. The seed must be one of the four
+# real identifiers; which one it is, is the configuration's default and is
+# allowed to differ from the compiled environment.
+seed_identifier="${PRODUCT_BUNDLE_IDENTIFIER:-}"
+seed_is_an_identity=0
+for candidate_environment in $KARAR_ENVIRONMENTS; do
+    if [ "$seed_identifier" = "$(karar_bundle_identifier "$candidate_environment")" ]; then
+        seed_is_an_identity=1
+    fi
+done
+[ "$seed_is_an_identity" -eq 1 ] || fail "PRODUCT_BUNDLE_IDENTIFIER is \
+'$seed_identifier', which is not an identifier this project issues. The \
+xcconfig seed must be one of the identifiers $KARAR_ENVIRONMENTS map to under \
+Scripts/bundle_identity.sh; anything else is a typo that would be overwritten \
+here and never seen."
+
+packaged_identifier="$(plutil -extract CFBundleIdentifier raw -o - "$plist" \
+    2>/dev/null || true)"
+[ "$packaged_identifier" = "$seed_identifier" ] || fail "the packaged plist \
+declares CFBundleIdentifier '$packaged_identifier' but the build settings \
+resolved PRODUCT_BUNDLE_IDENTIFIER to '$seed_identifier'. Something between \
+Xcode writing the plist and this phase reading it rewrote the identity, and \
+this phase must not narrow a value whose provenance it cannot account for."
+
+if [ "$packaged_identifier" != "$expected_identifier" ]; then
+    # THE ONE THING THAT MAKES THIS UNSOUND IS A PROVISIONING PROFILE.
+    #
+    # Xcode selects the profile from PRODUCT_BUNDLE_IDENTIFIER, at build
+    # settings time, before this phase exists. Narrowing the packaged
+    # identifier afterwards would leave the artifact claiming an identity its
+    # own profile does not cover, which installs nowhere and is discovered on a
+    # device rather than here. Every artifact this repository produces today is
+    # unsigned or ad-hoc signed and has neither a team nor a profile, so this
+    # never fires — but the day a real Apple Team ID exists, this phase stops
+    # being the right mechanism and the refusal says so instead of shipping a
+    # broken artifact.
+    if [ -n "${DEVELOPMENT_TEAM:-}" ] || [ -n "${PROVISIONING_PROFILE_SPECIFIER:-}" ]; then
+        fail "Cross-platform identity is not configured for signed builds: this \
+$compiled_environment build must carry '$expected_identifier' but its build \
+settings resolved '$seed_identifier', and it is signed against team \
+'${DEVELOPMENT_TEAM:-}' / profile '${PROVISIONING_PROFILE_SPECIFIER:-}'. \
+Correcting the identifier here would desynchronise the artifact from the \
+profile that was chosen for it. A signed build needs per-environment Xcode \
+configurations and per-environment App Store records, and both need a real \
+Apple Team ID — which this repository does not hold and must not invent. Build \
+unsigned, or supply the Team ID out of band and do that work."
+    fi
+
+    plutil -replace CFBundleIdentifier -string "$expected_identifier" "$plist" \
+        || fail "could not set CFBundleIdentifier to '$expected_identifier' in \
+the packaged plist"
+    echo "note: narrowed the packaged bundle identifier from \
+'$packaged_identifier' to '$expected_identifier' for a $compiled_environment \
+build in the ${CONFIGURATION:-unknown} configuration"
+fi
+
+# Re-read rather than trust the write, on the same rule as the ATS removal
+# below: a rewrite that reported success and did not take would otherwise ship
+# the wrong identity. This also covers the branch that did NOT rewrite, so the
+# final value is asserted on every path rather than only on the corrected one.
+final_identifier="$(plutil -extract CFBundleIdentifier raw -o - "$plist" \
+    2>/dev/null || true)"
+[ "$final_identifier" = "$expected_identifier" ] || fail "the packaged plist \
+declares CFBundleIdentifier '$final_identifier' for a $compiled_environment \
+build, which must be '$expected_identifier'. The compiled environment and the \
+packaged identity have to be the same statement."
 
 # ---------------------------------------------------------------------------
 # The endpoint a deployed build was compiled with
@@ -253,4 +373,4 @@ reading that language."
 done
 
 echo "note: packaged bundle verified for ${CONFIGURATION:-unknown} / \
-${compiled_environment:-UNSET}"
+${compiled_environment:-UNSET} as '$final_identifier'"

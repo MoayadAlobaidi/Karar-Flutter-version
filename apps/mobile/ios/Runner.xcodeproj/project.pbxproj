@@ -286,6 +286,7 @@
 			inputPaths = (
 				"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}",
 				"$(SRCROOT)/Scripts/verify_packaged_bundle.sh",
+				"$(SRCROOT)/Scripts/bundle_identity.sh",
 				"$(SRCROOT)/Runner/ATSLocalDevelopment.plist",
 			);
 			name = "Verify Packaged Bundle";
