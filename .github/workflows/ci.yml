@@ -659,7 +659,7 @@ jobs:
       # against the manifest the Android lane actually produced rather than a
       # value re-derived on this runner.
       - name: Fetch the merged manifest from the Android lane
-        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b # v6.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: android-merged-manifest
           path: apps/mobile/build/app/intermediates/merged_manifest
