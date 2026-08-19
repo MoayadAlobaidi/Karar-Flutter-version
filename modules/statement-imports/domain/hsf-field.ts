@@ -48,6 +48,28 @@ export const HSF_REDACTION = '[HIGHLY_SENSITIVE_FINANCIAL redacted]';
  */
 export const HSF_FIELD_MAX_LENGTH = 512;
 
+/**
+ * Upper bound on an instrument mask, in UTF-8 BYTES.
+ *
+ * `statement_import_rows.instrument_mask_ciphertext` carries this same bound
+ * in SQL, for a reason the column comment states plainly: so the column
+ * cannot quietly become storage for a full card number. AES-256-GCM
+ * preserves length, so a byte bound on the ciphertext is a byte bound on the
+ * plaintext, and the two numbers must stay equal.
+ *
+ * It is repeated here rather than left to PostgreSQL alone because a bound
+ * enforced only at INSERT arrives as an untyped store failure that ends the
+ * whole import, when what actually happened is that ONE cell in ONE row was
+ * too long. Refusing it in the domain turns that into an ordinary row error
+ * — `(row, INSTRUMENT_MASK, FIELD_TOO_LARGE)` — and the other rows import.
+ *
+ * Bytes, not characters: {@link HSF_FIELD_MAX_LENGTH} counts UTF-16 code
+ * units, but the column counts bytes, so a short string of multi-byte
+ * characters can satisfy the character bound and still break the byte one.
+ * `statement-row-mask-bound.test.ts` holds this equal to the migration.
+ */
+export const INSTRUMENT_MASK_MAX_BYTES = 32;
+
 export class HsfField {
   readonly #value: string;
 

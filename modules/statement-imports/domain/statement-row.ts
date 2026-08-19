@@ -30,7 +30,7 @@
 import { CalendarDay } from '@karar/shared-kernel';
 import type { Currency } from '@karar/shared-kernel';
 
-import { HsfField } from './hsf-field.js';
+import { HsfField, INSTRUMENT_MASK_MAX_BYTES } from './hsf-field.js';
 import {
   normalizeAmount,
   normalizeDay,
@@ -209,6 +209,7 @@ export function mapStatementRow(input: {
     normalizeText(at(mapping.instrumentMaskColumn)),
     'INSTRUMENT_MASK',
     errors,
+    INSTRUMENT_MASK_MAX_BYTES,
   );
   const descriptionField = boundedHsf(rowNumber, narrative, 'DESCRIPTION', errors);
   const merchantField = boundedHsf(rowNumber, merchantText, 'MERCHANT', errors);
@@ -365,14 +366,29 @@ function boundedHsf(
   value: string | null,
   field: SafeField,
   errors: RowError[],
+  maxBytes?: number,
 ): HsfField | null {
   if (value === null) return null;
+  if (maxBytes !== undefined && utf8ByteLength(value) > maxBytes) {
+    errors.push(rowError(rowNumber, field, 'FIELD_TOO_LARGE'));
+    return null;
+  }
   try {
     return HsfField.of(value);
   } catch {
     errors.push(rowError(rowNumber, field, 'FIELD_TOO_LARGE'));
     return null;
   }
+}
+
+/**
+ * The length PostgreSQL will measure, not the length JavaScript reports.
+ *
+ * `'\u062d1234'.length` is 5 but its UTF-8 encoding is 6 bytes, and it is the
+ * encoding that meets the column's `octet_length` check.
+ */
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
 }
 
 /**

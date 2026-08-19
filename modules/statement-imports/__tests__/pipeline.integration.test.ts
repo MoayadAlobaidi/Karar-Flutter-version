@@ -443,6 +443,67 @@ describe.skipIf(unreachable !== null)('statement-imports pipeline', () => {
     });
   });
 
+  describe('a field the database bounds more tightly than the domain once did', () => {
+    it('refuses the row and parses the rest, instead of failing the whole import', async () => {
+      // The instrument mask column is bounded at 32 bytes in SQL so it cannot
+      // become storage for a full card number. Parsing WRITES the rows it
+      // read, so before the domain enforced that bound too, one over-long
+      // cell reached PostgreSQL and ended the entire parse as an untyped
+      // store failure — the other rows, which were fine, were lost with it.
+      const pipeline = wire(handle, clock);
+
+      const started = await pipeline.start.execute({ accountId }, ACTOR_A1);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+      const importId = started.value.id;
+
+      const csv = [
+        'Booking Date,Description,Amount,Card',
+        // Values no other test in this file commits, so the good row counts
+        // as valid rather than as a duplicate of an earlier import.
+        '2026-09-03,SYNTHETIC MERCHANT FOUR,-77.25,****4321',
+        `2026-09-04,SYNTHETIC MERCHANT FIVE,31.75,${'9'.repeat(33)}`,
+        '',
+      ].join('\n');
+
+      const stored = await pipeline.store.execute(
+        {
+          importId,
+          content: streamOf(bytesOf(csv)),
+          mediaType: 'text/csv',
+          maxBytes: LIMITS.maxBytes,
+        },
+        ACTOR_A1,
+      );
+      expect(stored.ok).toBe(true);
+      if (!stored.ok) return;
+
+      const parsed = await pipeline.parse.execute(
+        { importId, mapping: { ...MAPPING, instrumentMaskColumn: 3 }, limits: LIMITS },
+        ACTOR_A1,
+      );
+
+      // The import is alive and awaiting a decision — not a store failure.
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      expect(parsed.value.state).toBe('REVIEW_REQUIRED');
+      expect(parsed.value.counts.rowCount).toBe(2);
+      expect(parsed.value.counts.validRowCount).toBe(1);
+      expect(parsed.value.counts.invalidRowCount).toBe(1);
+      expect(parsed.value.counts.exactDuplicateCount).toBe(0);
+
+      const preview = await pipeline.preview.execute({ importId, limits: LIMITS }, ACTOR_A1);
+      expect(preview.ok).toBe(true);
+      if (!preview.ok) return;
+      expect(preview.value.rowErrors).toEqual([
+        { rowNumber: 2, safeField: 'INSTRUMENT_MASK', reasonCode: 'FIELD_TOO_LARGE' },
+      ]);
+
+      // And the refusal names the field without quoting what was in it.
+      expect(JSON.stringify(preview.value)).not.toContain('9999');
+    });
+  });
+
   describe('the commit is idempotent', () => {
     it('answers a retry with the same result and writes nothing a second time', async () => {
       const pipeline = wire(handle, clock);
