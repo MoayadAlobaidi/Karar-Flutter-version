@@ -444,4 +444,25 @@ void main() {
       expect(request.query['limit'], 25);
     });
   });
+
+  group('accessibility', () {
+    // Four of the seven financial features asserted these; three did not, and
+    // this is one of the three. A control a screen reader cannot name is
+    // unusable to somebody who cannot see it, and one below the platform
+    // minimum is unusable to somebody whose hands shake.
+    testWidgets('every interactive control is named and big enough', (WidgetTester tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+
+      await pumpWallet(tester);
+
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      // Measured from the render tree: the guideline above does not see this
+      // product's own pressable, so it alone would pass at any size.
+      expectEveryTapTargetLargeEnough(tester, expectAtLeast: 1);
+      handle.dispose();
+    });
+  });
+
 }
