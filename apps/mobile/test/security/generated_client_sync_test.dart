@@ -134,20 +134,29 @@ void main() {
       // literal would mean either a hand edit or a contract carrying material
       // it should not.
       //
-      // SCREAMING_SNAKE_CASE is excluded because that is what an enum wire
-      // value looks like and what a credential never does. Length alone flagged
-      // EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW — forty-five characters
-      // of ordinary declared vocabulary — the moment the generator began
-      // emitting enum members at all. A base64, hex or token literal has mixed
-      // case or padding and is still caught, which is the property this test is
-      // for. This suite deliberately does not read the contract (see the header),
-      // so the shape of the literal is what it judges.
-      final wireValueShape = RegExp(r'^[A-Z][A-Z0-9_]*$');
+      // The exemption is the set of wire values the generated enums THEMSELVES
+      // declare, read out of the same files being scanned. Not "anything in
+      // SCREAMING_SNAKE_CASE": a secret can be uppercase with separators, and a
+      // shape-based exemption would wave it through. Deriving the set from the
+      // declarations means a token nobody declared is still caught however it
+      // is cased, while EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW — 45
+      // characters of ordinary declared vocabulary — is not a finding.
+      //
+      // This suite deliberately does not read the contract (see the header).
+      // It does not need to: a generated enum member IS the contract's wire
+      // value, and a hand edit that invented one would have to invent the
+      // enum around it, which the drift check catches separately.
+      final declaredWireValues = <String>{
+        for (final entry in generated.entries)
+          ...RegExp(r"^\s+[a-zA-Z_$][\w$]*\('([^']*)'\),?\s*$", multiLine: true)
+              .allMatches(stripCodeComments(entry.value))
+              .map((RegExpMatch match) => match.group(1)!),
+      };
       for (final entry in generated.entries) {
         final literals = RegExp(r"'([A-Za-z0-9+/_-]{40,}={0,2})'")
             .allMatches(stripCodeComments(entry.value))
             .map((RegExpMatch match) => match.group(1)!)
-            .where((String literal) => !wireValueShape.hasMatch(literal))
+            .where((String literal) => !declaredWireValues.contains(literal))
             .toList(growable: false);
         expect(
           literals,
