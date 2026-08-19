@@ -29,23 +29,28 @@ const int maximumRevealedDigits = 4;
 /// A masked tail that is safe to put on a screen.
 @immutable
 final class SafeMask {
-  const SafeMask._(this.value);
+  const SafeMask._(this.value, {required this.isWithheld});
 
   /// Nothing was reported. Distinct from withheld: the platform sent no mask.
-  static const SafeMask absent = SafeMask._(null);
+  ///
+  /// The two states carry the same null value, so they are told apart by a
+  /// flag rather than by identity — two `const` instances with identical
+  /// fields are the SAME object in Dart, and an identity check between them
+  /// would answer "withheld" for an absent mask.
+  static const SafeMask absent = SafeMask._(null, isWithheld: false);
 
   /// A value arrived and this client refuses to render it.
-  static const SafeMask withheld = SafeMask._(null);
+  static const SafeMask withheld = SafeMask._(null, isWithheld: true);
 
   /// The characters to render, or null when there are none to render.
   final String? value;
 
-  bool get isPresent => value != null;
-
   /// Whether a value arrived and was refused. Rendered as an explicit
   /// "withheld" state so a refusal is visible rather than mistaken for
   /// absence.
-  bool get isWithheld => identical(this, withheld);
+  final bool isWithheld;
+
+  bool get isPresent => value != null;
 
   /// Accepts [reported] only if it cannot be a full identifier.
   static SafeMask from(String? reported) {
@@ -85,7 +90,7 @@ final class SafeMask {
     if (letters >= 2 && digits >= 2 && _opensWithLetterPair(trimmed)) {
       return withheld;
     }
-    return SafeMask._(trimmed);
+    return SafeMask._(trimmed, isWithheld: false);
   }
 
   static bool _opensWithLetterPair(String value) {

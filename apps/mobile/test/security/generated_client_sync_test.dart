@@ -129,13 +129,25 @@ void main() {
     });
 
     test('generated code is never hand-edited into carrying a credential', () {
-      // The generator emits no literals other than paths and field names. A
-      // long opaque literal here would mean either a hand edit or a contract
-      // carrying material it should not.
+      // The generator emits no literals other than paths, field names and the
+      // wire values of vocabularies the contract declares. A long OPAQUE
+      // literal would mean either a hand edit or a contract carrying material
+      // it should not.
+      //
+      // SCREAMING_SNAKE_CASE is excluded because that is what an enum wire
+      // value looks like and what a credential never does. Length alone flagged
+      // EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW — forty-five characters
+      // of ordinary declared vocabulary — the moment the generator began
+      // emitting enum members at all. A base64, hex or token literal has mixed
+      // case or padding and is still caught, which is the property this test is
+      // for. This suite deliberately does not read the contract (see the header),
+      // so the shape of the literal is what it judges.
+      final wireValueShape = RegExp(r'^[A-Z][A-Z0-9_]*$');
       for (final entry in generated.entries) {
         final literals = RegExp(r"'([A-Za-z0-9+/_-]{40,}={0,2})'")
             .allMatches(stripCodeComments(entry.value))
             .map((RegExpMatch match) => match.group(1)!)
+            .where((String literal) => !wireValueShape.hasMatch(literal))
             .toList(growable: false);
         expect(
           literals,

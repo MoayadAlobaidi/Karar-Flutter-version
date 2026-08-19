@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../l10n/karar_localization.dart';
 import '../../../shared/shared.dart';
+import '../../financial_accounts/domain/financial_account.dart';
 import '../../financial_accounts/domain/money.dart';
 import '../../financial_accounts/domain/source_rail.dart';
 import '../../financial_accounts/presentation/accounts_providers.dart';
@@ -175,7 +176,7 @@ final class _Filters extends ConsumerWidget {
     final accountsView = ref.watch(ownAccountsProvider).value;
     final accounts = accountsView is AccountsLoaded
         ? accountsView.accounts
-        : const <FinancialAccountOption>[];
+        : const <FinancialAccount>[];
 
     return FinancialSection(
       heading: l10n.transactionFiltersTitle,

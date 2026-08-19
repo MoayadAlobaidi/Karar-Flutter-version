@@ -51,7 +51,7 @@ enum SourceLinkStatus {
 }
 
 /// What was OBSERVED, not what is supported.
-enum SourceCapabilityObservation {
+enum SourceDataObservationState {
   observed,
 
   /// This platform has not seen it.
@@ -89,8 +89,8 @@ final class SourceObservation {
 final class SourceCapabilities {
   const SourceCapabilities({required this.balance, required this.pendingTransactions});
 
-  final SourceCapabilityObservation balance;
-  final SourceCapabilityObservation pendingTransactions;
+  final SourceDataObservationState balance;
+  final SourceDataObservationState pendingTransactions;
 
   @override
   String toString() => 'SourceCapabilities()';

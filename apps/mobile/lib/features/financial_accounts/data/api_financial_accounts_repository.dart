@@ -331,11 +331,11 @@ const Map<String, SourceLinkStatus> sourceLinkStatusByWire = <String, SourceLink
   'DORMANT': SourceLinkStatus.dormant,
 };
 
-const Map<String, SourceCapabilityObservation> sourceCapabilityByWire =
-    <String, SourceCapabilityObservation>{
-  'OBSERVED': SourceCapabilityObservation.observed,
-  'NOT_OBSERVED': SourceCapabilityObservation.notObserved,
-  'NOT_PROVIDED': SourceCapabilityObservation.notProvided,
+const Map<String, SourceDataObservationState> sourceCapabilityByWire =
+    <String, SourceDataObservationState>{
+  'OBSERVED': SourceDataObservationState.observed,
+  'NOT_OBSERVED': SourceDataObservationState.notObserved,
+  'NOT_PROVIDED': SourceDataObservationState.notProvided,
 };
 
 // ---------------------------------------------------------------------------
@@ -518,15 +518,15 @@ AccountSourceLink decodeSourceLink(JsonMap json) {
             end: coverage.calendarDay('end', '$at.historyCoverage'),
           ),
     capabilities: SourceCapabilities(
-      balance: decodeEnum<SourceCapabilityObservation>(
+      balance: decodeEnum<SourceDataObservationState>(
         capabilities.stringOrNull('balance', '$at.capabilities'),
         sourceCapabilityByWire,
-        SourceCapabilityObservation.unrecognised,
+        SourceDataObservationState.unrecognised,
       ),
-      pendingTransactions: decodeEnum<SourceCapabilityObservation>(
+      pendingTransactions: decodeEnum<SourceDataObservationState>(
         capabilities.stringOrNull('pendingTransactions', '$at.capabilities'),
         sourceCapabilityByWire,
-        SourceCapabilityObservation.unrecognised,
+        SourceDataObservationState.unrecognised,
       ),
     ),
     version: json.integer('version', at),

@@ -255,10 +255,17 @@ final class UnionVariant {
 
 /// A string enum.
 final class EnumSchema extends SchemaDefinition {
-  EnumSchema(super.name, super.documentation, this.values);
+  EnumSchema(super.name, super.documentation, this.values, {this.unknownWireValue = ''});
 
   /// Wire value to Dart member name, sorted by wire value.
   final Map<String, String> values;
+
+  /// The wire value the fallback member carries.
+  ///
+  /// Empty when the member is purely the client's fallback for a value it has
+  /// never heard of. When the CONTRACT declares its own `UNKNOWN`, that string
+  /// goes here, so the member round-trips instead of serialising as absent.
+  final String unknownWireValue;
 }
 
 /// One field of an object.
@@ -674,6 +681,7 @@ final class ContractReader {
       // terminates.
       _schemas[className] = ObjectSchema(className, '', const <PropertyDefinition>[]);
       final oneOf = resolved['oneOf'];
+      final componentEnum = resolved['enum'];
       if (oneOf is YamlList) {
         _schemas[className] = _buildUnion(
           className,
@@ -681,6 +689,18 @@ final class ContractReader {
           resolved,
           fragmentKey: fragmentPath,
         );
+      } else if (componentEnum is YamlList && resolved['type'] == 'string') {
+        // A NAMED string enum is an enum, exactly as an inline one is.
+        //
+        // This branch was missing, and the consequence was not a compile error
+        // but a runtime one: every `type: string, enum:` component became a
+        // field-less DTO whose `fromJson` cast the wire's string to a Map. A
+        // well-formed response threw, and had the cast somehow succeeded the
+        // value would have been discarded — the class had nowhere to put it.
+        // Twenty vocabularies on the financial surface are declared that way,
+        // so the generated client could not decode its own contract.
+        _schemas.remove(className);
+        _registerEnum(className, componentEnum, resolved['description']?.toString() ?? '');
       } else {
         _registerObject(className, resolved, fragmentKey: fragmentPath, force: true);
       }
@@ -865,6 +885,9 @@ final class ContractReader {
       return;
     }
     final members = <String, String>{};
+    // Set when the contract declares its own `UNKNOWN`; the generated fallback
+    // member then carries that wire value instead of being synthetic.
+    var declaresUnknown = false;
     for (final raw in values) {
       if (raw == null) {
         continue;
@@ -872,8 +895,15 @@ final class ContractReader {
       final wire = raw.toString();
       final member = _camel(wire.toLowerCase());
       if (member == 'unknown') {
-        throw ContractError('Enum $className declares a value that collides with '
-            'the generated "unknown" member.');
+        // A contract that DECLARES `UNKNOWN` means it: the value is a real
+        // answer the server sends, not the client's fallback for a value it
+        // has never heard of. Both map to the same Dart member, and that is
+        // correct — `AccountNature.UNKNOWN` and "a nature this client does not
+        // recognise" are the same thing to a caller, which is exactly why the
+        // contract spells it out. Refusing here would have forced the contract
+        // to rename a value it is right to have.
+        declaresUnknown = true;
+        continue;
       }
       // A wire value made only of separators, or one starting with a digit,
       // cannot become a Dart identifier. Fail here with the offending value
@@ -903,7 +933,7 @@ final class ContractReader {
     final sorted = <String, String>{
       for (final key in members.keys.toList()..sort()) key: members[key]!,
     };
-    _schemas[className] = EnumSchema(className, documentation, sorted);
+    _schemas[className] = EnumSchema(className, documentation, sorted, unknownWireValue: declaresUnknown ? 'UNKNOWN' : '');
   }
 
   List<String> _typeNames(Object? declared) {
@@ -996,7 +1026,7 @@ final class DartEmitter {
       ..writeln('  ///')
       ..writeln('  /// The server may add enumeration values at any time; a client that')
       ..writeln('  /// threw on one would break on a deployment it did not ship with.')
-      ..writeln("  unknown('');")
+      ..writeln("  unknown('${schema.unknownWireValue}');")
       ..writeln()
       ..writeln('  const ${schema.name}(this.wireValue);')
       ..writeln()
@@ -1012,8 +1042,9 @@ final class DartEmitter {
       ..writeln('    return unknown;')
       ..writeln('  }')
       ..writeln()
-      ..writeln('  /// The wire value, or null for [unknown].')
-      ..writeln('  String? toWire() => this == unknown ? null : wireValue;')
+      ..writeln('  /// The wire value, or null when [unknown] carries none.')
+      ..writeln('  String? toWire() =>')
+      ..writeln('      this == unknown && wireValue.isEmpty ? null : wireValue;')
       ..writeln('}');
   }
 

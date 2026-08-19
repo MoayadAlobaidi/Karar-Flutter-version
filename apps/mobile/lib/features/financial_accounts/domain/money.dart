@@ -99,6 +99,87 @@ enum MoneyDirection {
   unrecognised,
 }
 
+/// Turns what a person typed into an exact minor-unit string.
+///
+/// It is a STRING-to-STRING transformation and touches no numeric type at all:
+/// the digits a person typed become the digits the ledger stores, with the
+/// decimal point removed and the fraction padded to the currency's exponent.
+/// Parsing to a `double` and multiplying by a power of ten is the classic way
+/// to turn 8.10 into 809 minor units, and there is no arithmetic here that
+/// could.
+///
+/// Returns null when the input is not a non-negative amount this currency can
+/// hold — including when it carries MORE fractional digits than the exponent
+/// allows, because silently dropping one is silently changing the amount.
+///
+/// Grouping separators are removed and both the ASCII and the Arabic decimal
+/// separators are accepted, so a person typing on an Arabic keyboard is not
+/// refused for using their own punctuation.
+String? minorUnitsFromTypedAmount(String typed, int exponent) {
+  final buffer = StringBuffer();
+  var separatorSeen = false;
+  var fractionDigits = 0;
+  for (final unit in typed.trim().codeUnits) {
+    if (unit == 0x2C || unit == 0x066C || unit == 0x20 || unit == 0x2019) {
+      // Grouping separator: comma, Arabic thousands separator, space, or the
+      // typographic apostrophe some locales group with.
+      continue;
+    }
+    if (unit == 0x2E || unit == 0x066B) {
+      if (separatorSeen) {
+        return null;
+      }
+      separatorSeen = true;
+      continue;
+    }
+    final digit = _asciiDigitOf(unit);
+    if (digit == null) {
+      return null;
+    }
+    buffer.writeCharCode(digit);
+    if (separatorSeen) {
+      fractionDigits++;
+    }
+  }
+
+  final digits = buffer.toString();
+  if (digits.isEmpty || fractionDigits > exponent) {
+    return null;
+  }
+
+  final padded = StringBuffer(digits);
+  for (var index = fractionDigits; index < exponent; index++) {
+    padded.write('0');
+  }
+  final minorUnits = padded.toString();
+
+  var firstSignificant = 0;
+  while (firstSignificant < minorUnits.length - 1 &&
+      minorUnits.codeUnitAt(firstSignificant) == 0x30) {
+    firstSignificant++;
+  }
+  return minorUnits.substring(firstSignificant);
+}
+
+/// The ASCII code unit for [unit] when it is a digit in any of the scripts the
+/// product renders, or null.
+///
+/// Arabic-Indic and Extended Arabic-Indic digits are accepted because a person
+/// reading the interface in Arabic may well type them, and refusing their own
+/// numerals would be refusing their own language.
+int? _asciiDigitOf(int unit) {
+  if (unit >= 0x30 && unit <= 0x39) {
+    return unit;
+  }
+  if (unit >= 0x0660 && unit <= 0x0669) {
+    return 0x30 + (unit - 0x0660);
+  }
+  if (unit >= 0x06F0 && unit <= 0x06F9) {
+    return 0x30 + (unit - 0x06F0);
+  }
+  return null;
+}
+
 /// A magnitude and a direction, which is how a person enters an amount.
 ///
 /// The platform accepts exactly this shape for a manual entry and refuses a

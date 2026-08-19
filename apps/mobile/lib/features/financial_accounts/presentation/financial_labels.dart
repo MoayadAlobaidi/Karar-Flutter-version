@@ -138,14 +138,14 @@ String sourceAuthorityLabel(SourceAuthority authority, AppLocalizations l10n) =>
     };
 
 String sourceObservationLabel(
-  SourceCapabilityObservation observation,
+  SourceDataObservationState observation,
   AppLocalizations l10n,
 ) =>
     switch (observation) {
-      SourceCapabilityObservation.observed => l10n.sourceObservationObserved,
-      SourceCapabilityObservation.notObserved => l10n.sourceObservationNotObserved,
-      SourceCapabilityObservation.notProvided => l10n.sourceObservationNotProvided,
-      SourceCapabilityObservation.unrecognised => l10n.sourceObservationUnrecognised,
+      SourceDataObservationState.observed => l10n.sourceObservationObserved,
+      SourceDataObservationState.notObserved => l10n.sourceObservationNotObserved,
+      SourceDataObservationState.notProvided => l10n.sourceObservationNotProvided,
+      SourceDataObservationState.unrecognised => l10n.sourceObservationUnrecognised,
     };
 
 String portfolioGroupingLabel(PortfolioGrouping grouping, AppLocalizations l10n) =>
