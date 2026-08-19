@@ -24,6 +24,12 @@
  * - `TransferMatchEraserPort` — declared here and satisfied by
  *   `modules/transfer-matching`, which depends on this module and is not
  *   depended on by it. Both of this module's deletion paths call it.
+ * - `ImportedRecordCommitPort` and `PrismaStatementCommitWriter` — the
+ *   contract and the implementation for the records a reviewed statement
+ *   import produces, written on a transaction `modules/statement-imports`
+ *   opens. Declared and implemented here because the four tables are this
+ *   module's; the transaction is a parameter because the import's state moves
+ *   and its row links have to land with the records or not at all.
  *
  * Deliberately absent:
  *
@@ -206,6 +212,18 @@ export type {
   TransferMatchEraserPort,
   TransferMatchErasureOutcome,
 } from './application/ports/transfer-match-eraser.js';
+// The port this module declares for `modules/statement-imports`, and the
+// writer that fills it. Both live here because the four tables a statement
+// commit writes are this module's; the port takes the caller's OPEN
+// transaction, which is what lets one import commit be one unit of work
+// without either module writing the other's rows.
+export type {
+  ImportedNarrativeColumns,
+  ImportedRecordBatch,
+  ImportedRecordCommit,
+  ImportedRecordCommitPort,
+  RecordWriteUnit,
+} from './application/ports/imported-record-commit.js';
 export {
   DuplicateTransactionError,
   OccurrenceOrdinalNotNextError,
@@ -281,6 +299,7 @@ export {
 
 // infrastructure — implementations for the composition root
 export { PrismaTransactionRepository } from './infrastructure/persistence/prisma-transaction-repository.js';
+export { PrismaStatementCommitWriter } from './infrastructure/persistence/prisma-statement-commit-writer.js';
 export {
   PrismaCategoryAssignmentRepository,
   PrismaFinancialCategoryCatalogue,

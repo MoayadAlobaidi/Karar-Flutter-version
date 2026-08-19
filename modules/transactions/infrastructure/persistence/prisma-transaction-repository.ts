@@ -93,7 +93,7 @@ function sqlStateOf(error: unknown): string | null {
   return typeof code === 'string' ? code : null;
 }
 
-function isUniqueViolation(error: unknown): boolean {
+export function isUniqueViolation(error: unknown): boolean {
   return (
     (typeof error === 'object' &&
       error !== null &&
@@ -108,7 +108,7 @@ function isUniqueViolation(error: unknown): boolean {
  * the pre-check catches it, so a caller sees one contract whether it lost a
  * race or broke the rule outright.
  */
-function rethrowTriggerRefusal(
+export function rethrowTriggerRefusal(
   error: unknown,
   context: { readonly attemptedOrdinal: number; readonly fingerprintVersion: string },
 ): never {

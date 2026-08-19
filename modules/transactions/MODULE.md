@@ -85,6 +85,47 @@ cycle wearing a hat) or the platform (which owns no domain vocabulary). Drift
 surfaces as a compile error at the composition root — the one place that
 legitimately knows about both.
 
+### The port this module declares, fills, and hands to `modules/statement-imports`
+
+A reviewed CSV statement becomes financial records: rows in `public.transactions`,
+`public.transaction_revisions`, `public.transaction_provenance` and
+`public.transaction_category_assignments`. All four are this module's. They were
+briefly written from the ingestion module — recorded there as boundary debt
+rather than left to be discovered — because a statement commit must be ONE unit
+of work with the import's own state moves and its row links, and
+`TransactionRepository.commit` opens its own transaction per record.
+
+| Port | Implementation | Contract |
+|---|---|---|
+| `ImportedRecordCommitPort` | `PrismaStatementCommitWriter` | `writeImportedRecords` — for every reviewed line: the transaction, its revision 1 attributed to `SOURCE_IMPORT`, its provenance naming the import and the exact row, and the category assignment where an exact reviewed rule applied. **On a transaction the CALLER opened**, opening none of its own and committing nothing |
+
+**The transaction is a parameter, and that is what closed the debt.** The
+ingestion module opens one unit of work, binds its principal into it, moves its
+import state, and hands the open handle here through an opaque wrapper — the
+same discipline the transactional outbox uses (ADR-0012), and the reason the
+port can name a transaction without naming an ORM. A throw here aborts that
+unit, so "everything, or nothing" holds across two modules with neither writing
+the other's rows.
+
+**This port is declared HERE, unlike the two above.** The eraser and presence
+ports alias `modules/financial-accounts`' own declarations, because that module
+does not depend on this one. `modules/statement-imports` does, so an import of
+its declaration would be a dependency cycle wearing a hat. The contract is
+therefore stated in this module's vocabulary — its branded references, its
+`ProcessingVersions`, its sign convention — which is the right vocabulary for
+rows this module owns, and the ingestion module maps into it before its
+transaction opens.
+
+Narrative arrives already ciphertext, encrypted through this module's own
+`HsfFieldEncryptionPort` under this module's key and domain-separation label.
+Encrypting inside the port would mean calling a key provider while holding
+somebody else's transaction open, which is how a connection pool starves under
+load. The two rules the database enforces on these rows —
+`transactions_dedup_key` and `transactions_occurrence_guard` — come back as
+`DuplicateTransactionError` and `OccurrenceOrdinalNotNextError`, the same typed
+refusals the single-record path raises, so no SQLSTATE and no driver text
+crosses the boundary.
+
 ### Retention is enforced, not merely declared
 
 `CreateManualTransaction` asks `TransactionRetentionDecisionPort` **first**, before
@@ -105,7 +146,7 @@ reference, and it is not a proposal for a period.
 
 ## Notes and known limitations
 
-**Manual entry and CSV import are intended to be first-class rather than stopgaps** (challenge C9) — and today **neither is a running path.** `CreateManualTransaction` exists as a use case with its gates and its tests; nothing calls it, because no controller, route or composition root does. The CSV pipeline does not exist at all: no parser, no staging tables, no import state machine. The normalisation rules below are therefore a specification with test cases behind it, not a description of something a person can currently use.
+**Manual entry and CSV import are intended to be first-class rather than stopgaps** (challenge C9) — and today **neither is a running path.** `CreateManualTransaction` exists as a use case with its gates and its tests; nothing calls it, because no controller, route or composition root does. The CSV pipeline now exists, in `modules/statement-imports` — parser, staging tables, import state machine and a reviewed commit that writes through `ImportedRecordCommitPort` above — and it has no HTTP surface either, so it is not a path a person can reach yet. The normalisation rules below are therefore still a specification with test cases behind it.
 
 Rules ported from the legacy as *rules plus test cases*, not code: Arabic-Indic digit and U+066B/U+066C separator normalisation; accounting negatives and trailing minus; **unreadable rows return null, never a substituted zero**; ambiguous dates flagged rather than assumed; exact reconciliation with **no tolerance**; duplicate rejection by content hash; review before commit.
 

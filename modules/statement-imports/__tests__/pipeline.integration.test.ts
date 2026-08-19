@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Clock } from '@karar/shared-kernel';
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
-import { PrismaMerchantRuleDirectory } from '@karar/transactions';
+import { PrismaMerchantRuleDirectory, PrismaStatementCommitWriter } from '@karar/transactions';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
 import { CommitStatementImport } from '../application/use-cases/commit-statement-import.js';
@@ -43,7 +43,7 @@ import { TransactionsDeterministicCategoryAdapter } from '../infrastructure/adap
 import { StreamingCsvParser } from '../infrastructure/parsing/streaming-csv-parser.js';
 import { PlatformOutboxStatementImportRecorder } from '../infrastructure/persistence/platform-outbox-recorder.js';
 import { PrismaCanonicalDedupLookupReader } from '../infrastructure/persistence/prisma-canonical-dedup-lookup.js';
-import { PrismaStatementCommitWriter } from '../infrastructure/persistence/prisma-statement-commit-writer.js';
+import { PrismaStatementCommitUnitOfWork } from '../infrastructure/persistence/prisma-statement-commit-unit-of-work.js';
 import { PrismaStatementImportRepository } from '../infrastructure/persistence/prisma-statement-import-repository.js';
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import {
@@ -220,10 +220,13 @@ function wire(
     reject: new RejectStatementImport(repository, clock),
     commit: new CommitStatementImport(
       repository,
-      new PrismaStatementCommitWriter(
+      new PrismaStatementCommitUnitOfWork(
         handle,
-        encryption,
         new TransactionsCanonicalNarrativeAdapter(testTransactionsEncryption()),
+        // The canonical rows are written by the module that owns them, on the
+        // transaction this unit of work opens. Wired here exactly as a
+        // composition root would wire it.
+        new PrismaStatementCommitWriter(),
         outbox,
       ),
       accounts,

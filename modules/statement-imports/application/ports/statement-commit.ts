@@ -44,16 +44,27 @@
  * plaintext beyond the narrative that is about to become a transaction's own
  * description. The outbox notice carries identifiers only.
  *
- * ## Where the implementation belongs, and where it is
+ * ## Where the implementation is, and where the rows are written
  *
- * The rows this writes into `public.transactions` belong to
- * `modules/transactions`, so the natural home for the implementation is
- * there — exactly as `PrismaFinancialRecordEraser` lives in that module and
- * satisfies a port `modules/financial-accounts` declares. It is not there
- * yet; this module ships the only implementation for now, and MODULE.md
- * records the move as work the lead owns. The PORT is declared here either
- * way, because the module that owns the atomicity requirement is the module
- * that declares the contract.
+ * The rows a commit writes into `public.transactions`,
+ * `public.transaction_revisions`, `public.transaction_provenance` and
+ * `public.transaction_category_assignments` belong to `modules/transactions`,
+ * and that is where the code that writes them lives —
+ * `PrismaStatementCommitWriter`, satisfying `ImportedRecordCommitPort` that
+ * module declares, on the same principle as `PrismaFinancialRecordEraser`
+ * living there and satisfying a need `modules/financial-accounts` has.
+ *
+ * This port's own implementation, `PrismaStatementCommitUnitOfWork`, opens the
+ * ONE transaction, writes this module's own rows in it, and hands the open
+ * handle over for the canonical records. That handle is what made the split
+ * possible without giving up atomicity: a repository that opens its own
+ * transaction per record could never be part of somebody else's unit of work.
+ *
+ * The PORT stays declared here, because the module that owns the atomicity
+ * requirement is the module that declares the contract — and because
+ * `modules/transactions` cannot import this module without making a cycle,
+ * which is why the contract it fills is declared on ITS side rather than
+ * aliased from this one the way the eraser is.
  */
 
 import type { CalendarDay } from '@karar/shared-kernel';

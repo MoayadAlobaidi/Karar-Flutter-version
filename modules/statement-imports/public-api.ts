@@ -344,7 +344,7 @@ export {
   sqlStateOf,
 } from './infrastructure/persistence/prisma-statement-import-repository.js';
 export { PrismaCanonicalDedupLookupReader } from './infrastructure/persistence/prisma-canonical-dedup-lookup.js';
-export { PrismaStatementCommitWriter } from './infrastructure/persistence/prisma-statement-commit-writer.js';
+export { PrismaStatementCommitUnitOfWork } from './infrastructure/persistence/prisma-statement-commit-unit-of-work.js';
 export {
   STATEMENT_IMPORT_COMMITTED_EVENT,
   PlatformOutboxStatementImportRecorder,

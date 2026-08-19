@@ -263,9 +263,12 @@ export interface AssignmentRow {
  */
 type DbBytes = Uint8Array<ArrayBuffer>;
 
-function ownedBytes(value: Uint8Array): DbBytes;
-function ownedBytes(value: Uint8Array | null): DbBytes | null;
-function ownedBytes(value: Uint8Array | null): DbBytes | null {
+// Exported because the batch writer builds the same columns for an imported
+// statement line, and one copy of "own the bytes before handing them over" is
+// the only way that rule cannot be half-applied.
+export function ownedBytes(value: Uint8Array): DbBytes;
+export function ownedBytes(value: Uint8Array | null): DbBytes | null;
+export function ownedBytes(value: Uint8Array | null): DbBytes | null {
   return value === null ? null : new Uint8Array(value);
 }
 
