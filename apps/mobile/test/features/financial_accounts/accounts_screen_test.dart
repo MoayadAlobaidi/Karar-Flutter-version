@@ -431,6 +431,28 @@ void main() {
       textScales: featureTextScales,
     );
   });
+
+  group('accessibility', () {
+    // The identity surfaces have asserted these guidelines since Phase 4; the
+    // financial surfaces — the larger and newer half of the app — asserted
+    // neither. A control a screen reader cannot name is unusable to somebody
+    // who cannot see it, and a tap target below the platform minimum is
+    // unusable to somebody whose hands shake.
+    testWidgets('every interactive control is named and big enough', (WidgetTester tester) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+
+      await pumpPortfolio(tester);
+
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
+      // Measured from the render tree, because the guideline above does not
+      // see this product's own pressable.
+      expectEveryTapTargetLargeEnough(tester);
+      handle.dispose();
+    });
+  });
+
 }
 
 /// Re-exported so the test reads the same label function the screen does.

@@ -233,3 +233,34 @@ SessionTokens liveTokens({String sessionId = 'session-1'}) => SessionTokens(
 
 /// Yields to the event loop so scheduled futures complete.
 Future<void> settleMicrotasks() => Future<void>.delayed(Duration.zero);
+
+/// Asserts every pressable control on screen is big enough to hit.
+///
+/// `androidTapTargetGuideline` is asserted alongside this, but it does NOT
+/// substitute for it: a `KararPressable` rendered at 20x20 passes the
+/// guideline while a plain `ElevatedButton` at the same size fails it, so the
+/// guideline alone would report a surface as accessible whose every control
+/// is this product's own button. Measured here from the render tree instead,
+/// which cannot be fooled by how a semantics node is composed.
+///
+/// The minimum is the larger of the two platform figures — Android asks for
+/// 48dp, iOS for 44pt — because one build serves both.
+void expectEveryTapTargetLargeEnough(WidgetTester tester, {double minimum = 48.0}) {
+  final Finder pressables = find.byType(KararPressable);
+  final int count = pressables.evaluate().length;
+  final List<String> tooSmall = <String>[];
+
+  for (int index = 0; index < count; index += 1) {
+    final Size size = tester.getSize(pressables.at(index));
+    if (size.width + 0.01 < minimum || size.height + 0.01 < minimum) {
+      tooSmall.add('#$index $size');
+    }
+  }
+
+  expect(
+    tooSmall,
+    isEmpty,
+    reason: 'every control a person taps must be at least '
+        '${minimum}x$minimum; these are not: $tooSmall',
+  );
+}
