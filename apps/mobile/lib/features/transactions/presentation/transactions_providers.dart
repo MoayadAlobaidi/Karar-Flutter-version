@@ -9,10 +9,10 @@
 // time.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/dependency_injection/providers.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../../financial_accounts/domain/page.dart';
-import '../../financial_accounts/presentation/accounts_providers.dart';
 import '../data/api_transactions_repository.dart';
 import '../domain/transaction.dart';
 import '../domain/transaction_detail.dart';
@@ -20,7 +20,7 @@ import '../domain/transactions_repository.dart';
 
 final Provider<TransactionsRepository> transactionsRepositoryProvider =
     Provider<TransactionsRepository>(
-  (Ref ref) => ApiTransactionsRepository(ref.watch(financialGatewayProvider)),
+  (Ref ref) => ApiTransactionsRepository(ref.watch(apiClientProvider)),
 );
 
 final Provider<LoadTransactionPage> loadTransactionPageProvider =

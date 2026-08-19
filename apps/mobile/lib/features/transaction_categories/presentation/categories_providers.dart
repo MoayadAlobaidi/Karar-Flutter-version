@@ -5,16 +5,16 @@
 // keystroke.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/dependency_injection/providers.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
-import '../../financial_accounts/presentation/accounts_providers.dart';
 import '../data/api_transaction_categories_repository.dart';
 import '../domain/transaction_categories_repository.dart';
 import '../domain/transaction_category.dart';
 
 final Provider<TransactionCategoriesRepository> transactionCategoriesRepositoryProvider =
     Provider<TransactionCategoriesRepository>(
-  (Ref ref) => ApiTransactionCategoriesRepository(ref.watch(financialGatewayProvider)),
+  (Ref ref) => ApiTransactionCategoriesRepository(ref.watch(apiClientProvider)),
 );
 
 final Provider<LoadCategoryCatalogue> loadCategoryCatalogueProvider =

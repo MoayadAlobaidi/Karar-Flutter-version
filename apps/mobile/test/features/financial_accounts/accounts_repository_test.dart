@@ -1,21 +1,25 @@
-// THE WIRE, DECODED.
+// THE CONTRACT, READ ONCE.
 //
-// The financial repositories decode the contract themselves rather than
-// through the generated DTOs. The first group here is the EVIDENCE for that
-// decision: the generated financial DTOs cannot decode a well-formed response
-// at all, because the generator emits a field-less class for every named
-// string enumeration and then casts the wire's string to a Map.
+// Every request below is issued by the GENERATED client and every response is
+// decoded by the GENERATED DTOs. The repository's own job is the mapping from
+// those DTOs to the domain, and that is what most of this file exercises:
+// every vocabulary, in both directions, plus the shapes that must fail loudly
+// rather than render as an empty row.
 //
-// The rest of the file is the mapping itself: every vocabulary, in both
-// directions, plus the shapes that must fail loudly rather than render as an
-// empty row.
+// The first group is the foundation the rest stands on — that the generated
+// DTOs decode a well-formed financial response, carry their enumeration
+// values, and fall back rather than throwing on a value the server added.
+// It used to assert the opposite, because the generator emitted a field-less
+// class for every named string component and then cast the wire's string to a
+// Map. Both defects are fixed in the generator; these assert the behaviour
+// that replaced them.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/networking/api_transport.dart';
+import 'package:karar_mobile/core/networking/generated/karar_api_client.dart';
 import 'package:karar_mobile/core/networking/generated/models.dart';
 import 'package:karar_mobile/features/financial_accounts/data/api_financial_accounts_repository.dart';
-import 'package:karar_mobile/features/financial_accounts/data/financial_gateway.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/account_source_link.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/balance_snapshot.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/financial_account.dart';
@@ -85,7 +89,7 @@ Map<String, Object?> pageBody(List<Object?> items) => <String, Object?>{
     (ApiRequest request) async => ApiResponse(statusCode: statusCode, body: body),
   );
   return (
-    repository: ApiFinancialAccountsRepository(FinancialGateway(transport)),
+    repository: ApiFinancialAccountsRepository(KararApiClient(transport)),
     transport: transport,
   );
 }
@@ -119,17 +123,24 @@ void main() {
       expect(AccountTypeDto.unknown.toWire(), isNull);
     });
 
-    test('a declared UNKNOWN round-trips instead of serialising as absent', () {
-      // AccountNature declares UNKNOWN itself, so the contract's value and the
-      // client's fallback are the same member — which is correct, because to a
-      // caller they mean the same thing.
+    test('a declared UNKNOWN is its own member, not the fallback', () {
+      // AccountNature DECLARES UNKNOWN, so "the platform said nobody stated a
+      // nature" and "this build cannot read the nature the platform sent" are
+      // two different answers and must stay two members. Collapsing them would
+      // let a nature added tomorrow render as one the platform stated.
       expect(AccountNatureDto.fromWire('UNKNOWN'), AccountNatureDto.unknown);
       expect(AccountNatureDto.unknown.toWire(), 'UNKNOWN');
       expect(AccountNatureDto.fromWire('ASSET'), AccountNatureDto.asset);
+      expect(
+        AccountNatureDto.fromWire('A_NATURE_THIS_BUILD_HAS_NEVER_SEEN'),
+        AccountNatureDto.unrecognised,
+      );
+      expect(AccountNatureDto.unrecognised.toWire(), isNull);
+      expect(AccountNatureDto.unrecognised, isNot(AccountNatureDto.unknown));
     });
   });
 
-  group('the hand-written decoder reads the contract', () {
+  group('the DTO-to-domain mapping reads the contract', () {
     test('every account type maps, and an unknown one is unrecognised', () async {
       Future<AccountType> typeFor(String wire) async =>
           (await accountFrom(accountBody(accountType: wire))).accountType;
@@ -402,12 +413,57 @@ void main() {
 
       final body = held.transport.requests.single.body! as Map<String, Object?>;
       expect(body['expectedVersion'], 3);
+      // CLEARED: present, carrying null.
       expect(body.containsKey('mask'), isTrue);
       expect(body['mask'], isNull);
-      // Untouched fields are ABSENT rather than null: the two are different
-      // requests and the platform does not conflate them.
+      // CHANGED: present, carrying a value.
+      expect(body['displayName'], 'Renamed');
+      // LEFT ALONE: absent. Absent and null are different requests and the
+      // platform does not conflate them, so neither does the encoder.
       expect(body.containsKey('nature'), isFalse);
       expect(body.containsKey('status'), isFalse);
+      expect(body.containsKey('walletKind'), isFalse);
+      expect(body.containsKey('institutionId'), isFalse);
+      expect(body.containsKey('userSuppliedInstitutionLabel'), isFalse);
+    });
+
+    test('clearing the issuer clears both of the fields that name one', () async {
+      // An issuer is named EITHER by catalogue reference OR by the subject's
+      // own label. Clearing one without the other would leave the account
+      // still naming an issuer through the half nobody cleared.
+      final held = repositoryFor(accountBody());
+      await held.repository.updateAccount(
+        'account-0001',
+        const AccountEdit(expectedVersion: 2, clearIssuer: true),
+      );
+
+      final body = held.transport.requests.single.body! as Map<String, Object?>;
+      expect(body.containsKey('institutionId'), isTrue);
+      expect(body['institutionId'], isNull);
+      expect(body.containsKey('userSuppliedInstitutionLabel'), isTrue);
+      expect(body['userSuppliedInstitutionLabel'], isNull);
+    });
+
+    test('clearing a wallet kind is not the same as never naming one', () async {
+      final cleared = repositoryFor(accountBody());
+      await cleared.repository.updateAccount(
+        'account-0001',
+        const AccountEdit(expectedVersion: 1, clearWalletKind: true),
+      );
+      final clearedBody =
+          cleared.transport.requests.single.body! as Map<String, Object?>;
+      expect(clearedBody.containsKey('walletKind'), isTrue);
+      expect(clearedBody['walletKind'], isNull);
+
+      final named = repositoryFor(accountBody());
+      await named.repository.updateAccount(
+        'account-0001',
+        const AccountEdit(expectedVersion: 1, walletKind: WalletKind.prepaid),
+      );
+      expect(
+        (named.transport.requests.single.body! as Map<String, Object?>)['walletKind'],
+        'PREPAID',
+      );
     });
 
     test('the currency is never sent on an update', () async {
@@ -515,7 +571,7 @@ void main() {
       });
 
       final result = await LoadOwnAccounts(
-        ApiFinancialAccountsRepository(FinancialGateway(transport)),
+        ApiFinancialAccountsRepository(KararApiClient(transport)),
       )();
 
       expect((result as Success<List<FinancialAccount>>).value, hasLength(3));
@@ -541,7 +597,7 @@ void main() {
       );
 
       await LoadOwnAccounts(
-        ApiFinancialAccountsRepository(FinancialGateway(transport)),
+        ApiFinancialAccountsRepository(KararApiClient(transport)),
         maximumPages: 4,
       )();
 

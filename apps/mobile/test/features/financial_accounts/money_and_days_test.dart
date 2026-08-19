@@ -62,38 +62,234 @@ void main() {
     });
   });
 
-  group('typed amounts become minor units by string transformation', () {
-    test('a whole amount is padded to the exponent', () {
-      expect(minorUnitsFromTypedAmount('12', 2), '1200');
-      expect(minorUnitsFromTypedAmount('12', 3), '12000');
-      expect(minorUnitsFromTypedAmount('12', 0), '12');
+  group('the typed-amount grammar', () {
+    // THE GRAMMAR, RESTATED AS A TABLE.
+    //
+    //     amount    ::= digits [ separator digits ]
+    //     digits    ::= digit+                       (ASCII, Arabic-Indic,
+    //                                                 Extended Arabic-Indic)
+    //     separator ::= U+002E FULL STOP | U+066B ARABIC DECIMAL SEPARATOR
+    //
+    // No sign, no grouping, no interior whitespace, at most one separator with
+    // digits on both sides, no more fractional digits than the exponent, and a
+    // result within the contract's thirty characters.
+    //
+    // The rejection list is the important half. Every entry in it used to be
+    // ACCEPTED and silently turned into a different amount.
+
+    group('accepts, with exactly these minor units', () {
+      test('a whole amount is padded to the exponent', () {
+        expect(minorUnitsFromTypedAmount('0', 2), '0');
+        expect(minorUnitsFromTypedAmount('8', 2), '800');
+        expect(minorUnitsFromTypedAmount('12', 2), '1200');
+        expect(minorUnitsFromTypedAmount('12', 3), '12000');
+        expect(minorUnitsFromTypedAmount('12', 0), '12');
+      });
+
+      test('a fractional amount keeps every digit exactly', () {
+        // The classic float defect: 8.10 * 100 is 809.9999... in binary.
+        expect(minorUnitsFromTypedAmount('8.1', 2), '810');
+        expect(minorUnitsFromTypedAmount('8.10', 2), '810');
+        expect(minorUnitsFromTypedAmount('0.07', 2), '7');
+        expect(minorUnitsFromTypedAmount('0.00', 2), '0');
+      });
+
+      test('a zero-decimal currency takes no fraction and needs none', () {
+        expect(minorUnitsFromTypedAmount('0', 0), '0');
+        expect(minorUnitsFromTypedAmount('8', 0), '8');
+        expect(minorUnitsFromTypedAmount('1250', 0), '1250');
+      });
+
+      test('a two-decimal currency', () {
+        expect(minorUnitsFromTypedAmount('1250.75', 2), '125075');
+      });
+
+      test('a three-decimal currency keeps the third digit', () {
+        expect(minorUnitsFromTypedAmount('1.005', 3), '1005');
+        expect(minorUnitsFromTypedAmount('8.1', 3), '8100');
+        expect(minorUnitsFromTypedAmount('0.001', 3), '1');
+      });
+
+      test('Arabic-Indic digits', () {
+        expect(minorUnitsFromTypedAmount('١٢', 2), '1200');
+        expect(
+          minorUnitsFromTypedAmount('١٢.٥٠', 2),
+          '1250',
+        );
+      });
+
+      test('Persian, that is Extended Arabic-Indic, digits', () {
+        expect(minorUnitsFromTypedAmount('۱۲', 2), '1200');
+        expect(
+          minorUnitsFromTypedAmount('۱۲.۵۰', 2),
+          '1250',
+        );
+      });
+
+      test('U+066B, the Arabic decimal separator', () {
+        expect(
+          minorUnitsFromTypedAmount('١٢٫٥٠', 2),
+          '1250',
+        );
+        expect(
+          minorUnitsFromTypedAmount('۱۲٫۵۰', 2),
+          '1250',
+        );
+        // With ASCII digits too: the separator is a punctuation choice, not a
+        // numeral-system one, and a person may mix them.
+        expect(minorUnitsFromTypedAmount('12٫50', 2), '1250');
+      });
+
+      test('surrounding whitespace is trimmed, because a keyboard adds it', () {
+        expect(minorUnitsFromTypedAmount('  8.10  ', 2), '810');
+      });
+
+      test('leading zeros are not part of the value', () {
+        expect(minorUnitsFromTypedAmount('008.10', 2), '810');
+        expect(minorUnitsFromTypedAmount('000', 2), '0');
+      });
+
+      test('the largest amount the contract can hold', () {
+        // Thirty minor-unit characters exactly: 28 integer digits and 2
+        // fractional ones for a two-decimal currency.
+        const typed = '1234567890123456789012345678.99';
+        const expected = '123456789012345678901234567899';
+        expect(expected.length, maximumMinorUnitDigits);
+        expect(minorUnitsFromTypedAmount(typed, 2), expected);
+
+        // And the same bound for a zero-decimal currency.
+        const thirtyDigits = '999999999999999999999999999999';
+        expect(thirtyDigits.length, maximumMinorUnitDigits);
+        expect(minorUnitsFromTypedAmount(thirtyDigits, 0), thirtyDigits);
+      });
     });
 
-    test('a fractional amount keeps every digit exactly', () {
-      // The classic float defect: 8.10 * 100 is 809.9999... in binary.
-      expect(minorUnitsFromTypedAmount('8.10', 2), '810');
-      expect(minorUnitsFromTypedAmount('0.07', 2), '7');
-      expect(minorUnitsFromTypedAmount('1.005', 3), '1005');
+    group('refuses, rather than reinterpreting', () {
+      test('nothing at all', () {
+        expect(minorUnitsFromTypedAmount('', 2), isNull);
+        expect(minorUnitsFromTypedAmount('   ', 2), isNull);
+      });
+
+      test('a sign, because entry is magnitude plus direction', () {
+        expect(minorUnitsFromTypedAmount('-1.00', 2), isNull);
+        expect(minorUnitsFromTypedAmount('+1.00', 2), isNull);
+        expect(minorUnitsFromTypedAmount('-0', 2), isNull);
+      });
+
+      test('two decimal separators', () {
+        expect(minorUnitsFromTypedAmount('1.2.3', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1.20.30', 2), isNull);
+        // One of each is still two.
+        expect(minorUnitsFromTypedAmount('1.2٫3', 2), isNull);
+      });
+
+      test('a separator with nothing on one side of it', () {
+        expect(minorUnitsFromTypedAmount('.5', 2), isNull);
+        expect(minorUnitsFromTypedAmount('5.', 2), isNull);
+        expect(minorUnitsFromTypedAmount('.', 2), isNull);
+        expect(minorUnitsFromTypedAmount('٫5', 2), isNull);
+      });
+
+      test('more fractional digits than the currency allows', () {
+        expect(minorUnitsFromTypedAmount('1.005', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1.5', 0), isNull);
+        expect(minorUnitsFromTypedAmount('1.0', 0), isNull);
+        expect(minorUnitsFromTypedAmount('1.0005', 3), isNull);
+      });
+
+      test('grouping, which is what a silent deletion used to change', () {
+        // Each of these used to be accepted, with the separator deleted, and
+        // became the amount in the comment.
+        expect(minorUnitsFromTypedAmount('1,2', 2), isNull); // was 12
+        expect(minorUnitsFromTypedAmount('12,34', 2), isNull); // was 1234
+        expect(minorUnitsFromTypedAmount('8,10', 2), isNull); // was 810
+        expect(minorUnitsFromTypedAmount('1,234.50', 2), isNull); // was 123450
+        expect(minorUnitsFromTypedAmount('1 2', 2), isNull); // was 12
+        expect(minorUnitsFromTypedAmount("1'2", 2), isNull); // was 12
+        expect(
+          minorUnitsFromTypedAmount('1٬234.50', 2),
+          isNull,
+        ); // was 123450, via the Arabic thousands separator
+      });
+
+      test('malformed grouping, whatever convention it is read under', () {
+        expect(minorUnitsFromTypedAmount('1,2,3', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1,23,456', 2), isNull);
+        expect(minorUnitsFromTypedAmount(',123', 2), isNull);
+        expect(minorUnitsFromTypedAmount('123,', 2), isNull);
+      });
+
+      test('mixed grouping conventions', () {
+        // A comma group and a full-stop group in one figure. There is no
+        // convention in which both are grouping, and reading one of them as a
+        // decimal separator would be picking a locale the person never chose.
+        expect(minorUnitsFromTypedAmount('1.234,56', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1,234.567,8', 3), isNull);
+        expect(minorUnitsFromTypedAmount('1٬234.56', 2), isNull);
+      });
+
+      test('grouping inside the fraction', () {
+        expect(minorUnitsFromTypedAmount('1.23,4', 3), isNull);
+        expect(minorUnitsFromTypedAmount('1.2 3', 3), isNull);
+        expect(minorUnitsFromTypedAmount("1.2'3", 3), isNull);
+      });
+
+      test('alphabetic characters', () {
+        expect(minorUnitsFromTypedAmount('abc', 2), isNull);
+        expect(minorUnitsFromTypedAmount('12a', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1e3', 2), isNull);
+        expect(minorUnitsFromTypedAmount('12 QAR', 2), isNull);
+        expect(minorUnitsFromTypedAmount('١٢ ر.ق', 2), isNull);
+      });
+
+      test('unexpected punctuation', () {
+        expect(minorUnitsFromTypedAmount('1/2', 2), isNull);
+        expect(minorUnitsFromTypedAmount('(1.00)', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1_000', 2), isNull);
+        expect(minorUnitsFromTypedAmount('1 000', 2), isNull);
+        expect(minorUnitsFromTypedAmount('٠1٪', 2), isNull);
+      });
+
+      test('a value longer than the contract allows', () {
+        // Thirty-one minor-unit characters, one past the contract's bound.
+        expect(
+          minorUnitsFromTypedAmount('12345678901234567890123456789.99', 2),
+          isNull,
+        );
+        expect(
+          minorUnitsFromTypedAmount('9999999999999999999999999999999', 0),
+          isNull,
+        );
+        // The bound is on the value, so the same digits within it are fine.
+        expect(
+          minorUnitsFromTypedAmount('999999999999999999999999999999', 0),
+          '999999999999999999999999999999',
+        );
+      });
+
+      test('an exponent the contract cannot state', () {
+        expect(minorUnitsFromTypedAmount('1', -1), isNull);
+      });
     });
 
-    test('more fractional digits than the currency allows is refused', () {
-      expect(minorUnitsFromTypedAmount('1.005', 2), isNull);
-    });
-
-    test('a signed amount is refused, because entry is magnitude plus direction', () {
-      expect(minorUnitsFromTypedAmount('-1.00', 2), isNull);
-    });
-
-    test('grouping separators are ignored and Arabic numerals are accepted', () {
-      expect(minorUnitsFromTypedAmount('1,234.50', 2), '123450');
-      expect(minorUnitsFromTypedAmount('١٢٫٥٠', 2), '1250');
-      expect(minorUnitsFromTypedAmount('۱۲٫۵۰', 2), '1250');
-    });
-
-    test('anything that is not an amount is refused rather than coerced', () {
-      expect(minorUnitsFromTypedAmount('', 2), isNull);
-      expect(minorUnitsFromTypedAmount('abc', 2), isNull);
-      expect(minorUnitsFromTypedAmount('1.2.3', 2), isNull);
+    test('what a person retypes is what the ledger holds', () {
+      // The correction screen renders stored minor units back into the field.
+      // That rendering must round-trip through this grammar, or a person could
+      // open a correction and be told the amount already there is invalid.
+      for (final probe in <(String, int)>[
+        ('0', 0),
+        ('8', 0),
+        ('8.10', 2),
+        ('0.07', 2),
+        ('1.005', 3),
+        ('1234567890123456789012345678.99', 2),
+      ]) {
+        expect(
+          minorUnitsFromTypedAmount(probe.$1, probe.$2),
+          isNotNull,
+          reason: '"${probe.$1}" at exponent ${probe.$2} must round-trip',
+        );
+      }
     });
   });
 

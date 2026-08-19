@@ -14,26 +14,26 @@ import '../../../app/dependency_injection/providers.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_financial_accounts_repository.dart';
-import '../data/financial_gateway.dart';
 import '../domain/account_portfolio.dart';
 import '../domain/account_source_link.dart';
 import '../domain/balance_snapshot.dart';
 import '../domain/financial_account.dart';
 import '../domain/financial_accounts_repository.dart';
 
-/// The one gateway every financial repository issues requests through.
-final Provider<FinancialGateway> financialGatewayProvider = Provider<FinancialGateway>(
-  (Ref ref) => FinancialGateway(ref.watch(apiTransportProvider)),
-);
+// The financial repositories issue their requests through `apiClientProvider`,
+// the composition root's generated client. There is no financial client of its
+// own: a second one would be a second place for a timeout, an interceptor or a
+// credential to be configured differently, and the financial surface is the
+// last one where two answers would be acceptable.
 
 final Provider<FinancialAccountsRepository> financialAccountsRepositoryProvider =
     Provider<FinancialAccountsRepository>(
-  (Ref ref) => ApiFinancialAccountsRepository(ref.watch(financialGatewayProvider)),
+  (Ref ref) => ApiFinancialAccountsRepository(ref.watch(apiClientProvider)),
 );
 
 final Provider<IssuerCatalogueRepository> issuerCatalogueRepositoryProvider =
     Provider<IssuerCatalogueRepository>(
-  (Ref ref) => ApiFinancialAccountsRepository(ref.watch(financialGatewayProvider)),
+  (Ref ref) => ApiFinancialAccountsRepository(ref.watch(apiClientProvider)),
 );
 
 final Provider<LoadOwnAccounts> loadOwnAccountsProvider = Provider<LoadOwnAccounts>(

@@ -5,15 +5,15 @@
 // under the account it spends from.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/dependency_injection/providers.dart';
 import '../../../core/errors/result.dart';
-import '../../financial_accounts/presentation/accounts_providers.dart';
 import '../data/api_payment_instruments_repository.dart';
 import '../domain/payment_instrument.dart';
 import '../domain/payment_instruments_repository.dart';
 
 final Provider<PaymentInstrumentsRepository> paymentInstrumentsRepositoryProvider =
     Provider<PaymentInstrumentsRepository>(
-  (Ref ref) => ApiPaymentInstrumentsRepository(ref.watch(financialGatewayProvider)),
+  (Ref ref) => ApiPaymentInstrumentsRepository(ref.watch(apiClientProvider)),
 );
 
 final Provider<LoadAccountInstruments> loadAccountInstrumentsProvider =

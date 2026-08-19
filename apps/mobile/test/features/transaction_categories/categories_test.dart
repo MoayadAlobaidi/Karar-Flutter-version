@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/networking/api_transport.dart';
-import 'package:karar_mobile/features/financial_accounts/data/financial_gateway.dart';
+import 'package:karar_mobile/core/networking/generated/karar_api_client.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/page.dart' as financial;
 import 'package:karar_mobile/features/transaction_categories/data/api_transaction_categories_repository.dart';
 import 'package:karar_mobile/features/transaction_categories/domain/transaction_categories_repository.dart';
@@ -128,7 +128,7 @@ void main() {
       );
 
       final result = await ApiTransactionCategoriesRepository(
-        FinancialGateway(transport),
+        KararApiClient(transport),
       ).listCategories();
 
       final items = (result as Success<financial.Page<TransactionCategory>>).value.items;
@@ -167,7 +167,7 @@ void main() {
       });
 
       final result = await LoadCategoryCatalogue(
-        ApiTransactionCategoriesRepository(FinancialGateway(transport)),
+        ApiTransactionCategoriesRepository(KararApiClient(transport)),
       )();
 
       expect((result as Success<CategoryCatalogue>).value.entries, hasLength(2));

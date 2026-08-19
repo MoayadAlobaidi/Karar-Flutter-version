@@ -109,27 +109,24 @@ void main() {
     });
 
     test('no widget performs HTTP', () {
+      // There is no exception any more. The feature used to declare a gateway
+      // of its own in `accounts_providers.dart`, which had to be waved through
+      // here; the repositories now take the composition root's generated
+      // client, so no presentation file names a request-issuing type at all.
       final offenders = <String>[];
       for (final source in _sources(layer: 'presentation')) {
         for (final needle in <String>[
           'ApiRequest(',
           'ApiTransport',
           'HttpMethod.',
-          'FinancialGateway(',
+          'KararApiClient(',
         ]) {
           if (source.body.contains(needle)) {
             offenders.add('${source.path} uses $needle');
           }
         }
       }
-      // `financialGatewayProvider` is the one exception and is a provider
-      // declaration rather than a request: it appears in accounts_providers,
-      // which is the composition seam for this feature.
-      expect(
-        offenders.where((String hit) => !hit.contains('accounts_providers.dart')),
-        isEmpty,
-        reason: offenders.join('\n'),
-      );
+      expect(offenders, isEmpty, reason: offenders.join('\n'));
     });
 
     test('only the data layer reaches the transport', () {

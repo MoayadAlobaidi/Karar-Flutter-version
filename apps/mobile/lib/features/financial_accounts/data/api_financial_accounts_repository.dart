@@ -1,16 +1,29 @@
-// The accounts-and-wallets repository.
+// The accounts-and-wallets repository, over the GENERATED client.
 //
-// DTO → domain mapping lives here and nowhere else. Above this file the client
-// deals only in the domain types, so a contract change is absorbed in one
-// place — and the vocabularies below are the client's single reading of the
-// contract's enumerations.
+// Requests are issued by `KararApiClient`, which is generated from the
+// contract. No path, no query-parameter name, no body field name and no
+// enumeration wire value is written by hand anywhere in this file: each of
+// those would be a second reading of a contract that already has one, and a
+// second reading is a place for the two to drift apart without anything
+// failing.
 //
-// Nothing is defaulted. Every unknown wire value maps to its vocabulary's
-// `unrecognised` member so that a value this build has not shipped for renders
+// What IS written by hand is the mapping from the generated DTOs to the domain
+// types, and it lives here and nowhere else. Above this file the client deals
+// only in the domain, so a contract change is absorbed in one place.
+//
+// EVERY vocabulary mapping below is an EXHAUSTIVE switch over the generated
+// enumeration with no default arm. That is deliberate and it is the regression
+// guard: the day the contract gains a member, regeneration adds it to the
+// generated enum and this file stops compiling until somebody decides what it
+// means. A `Map` lookup with a fallback — which is what this replaced — would
+// have compiled happily and quietly answered "unrecognised" forever.
+//
+// The generated `unknown` member always maps to the domain's `unrecognised`
+// and never to a real member: a value this build has not shipped for renders
 // as unrecognised rather than as whichever member happened to be first.
 import '../../../core/errors/result.dart';
-import '../../../core/networking/api_transport.dart';
-import '../../../core/networking/http_method.dart';
+import '../../../core/networking/generated/karar_api_client.dart';
+import '../../../core/networking/generated/models.dart';
 import '../domain/account_source_link.dart';
 import '../domain/balance_snapshot.dart';
 import '../domain/calendar_day.dart';
@@ -18,43 +31,38 @@ import '../domain/financial_account.dart';
 import '../domain/financial_accounts_repository.dart';
 import '../domain/page.dart';
 import '../domain/safe_mask.dart';
-import 'financial_gateway.dart';
-import 'financial_wire.dart';
+import 'contract_mapping.dart';
 
-/// [FinancialAccountsRepository] over the shared transport.
+/// [FinancialAccountsRepository] over the generated client.
 final class ApiFinancialAccountsRepository
     implements FinancialAccountsRepository, IssuerCatalogueRepository {
-  const ApiFinancialAccountsRepository(this._gateway);
+  const ApiFinancialAccountsRepository(this._client);
 
-  final FinancialGateway _gateway;
+  final KararApiClient _client;
 
   @override
   Future<Result<Page<FinancialAccount>>> listOwnAccounts({
     int? limit,
     String? cursor,
   }) =>
-      guarded<Page<FinancialAccount>>(
-        'financial.accounts',
-        () async => decodePage<FinancialAccount>(
-          await _gateway.get(
-            FinancialPaths.accounts,
-            query: <String, Object?>{'limit': limit, 'cursor': cursor},
-            location: 'financial.accounts',
-          ),
-          'financial.accounts',
-          decodeAccount,
-        ),
-      );
+      guarded<Page<FinancialAccount>>('financial.accounts', () async {
+        final response = await _client.listOwnFinancialAccounts(
+          limit: limit,
+          cursor: cursor,
+        );
+        return pageFrom<FinancialAccount, FinancialAccountViewDto>(
+          response.items,
+          response.page,
+          accountFromDto,
+        );
+      });
 
   @override
   Future<Result<FinancialAccount>> readOwnAccount(String accountId) =>
       guarded<FinancialAccount>(
         'financial.accounts.read',
-        () async => decodeAccount(
-          await _gateway.get(
-            FinancialPaths.account(accountId),
-            location: 'financial.accounts.read',
-          ),
+        () async => accountFromDto(
+          await _client.readOwnFinancialAccount(accountId: accountId),
         ),
       );
 
@@ -62,13 +70,8 @@ final class ApiFinancialAccountsRepository
   Future<Result<FinancialAccount>> createManualAccount(ManualAccountDraft draft) =>
       guarded<FinancialAccount>(
         'financial.accounts.create',
-        () async => decodeAccount(
-          await _gateway.send(
-            HttpMethod.post,
-            FinancialPaths.accounts,
-            body: _createBody(draft),
-            location: 'financial.accounts.create',
-          ),
+        () async => accountFromDto(
+          await _client.createOwnManualFinancialAccount(body: createBodyFor(draft)),
         ),
       );
 
@@ -76,12 +79,10 @@ final class ApiFinancialAccountsRepository
   Future<Result<FinancialAccount>> updateAccount(String accountId, AccountEdit edit) =>
       guarded<FinancialAccount>(
         'financial.accounts.update',
-        () async => decodeAccount(
-          await _gateway.send(
-            HttpMethod.patch,
-            FinancialPaths.account(accountId),
-            body: _updateBody(edit),
-            location: 'financial.accounts.update',
+        () async => accountFromDto(
+          await _client.updateOwnFinancialAccount(
+            accountId: accountId,
+            body: updateBodyFor(edit),
           ),
         ),
       );
@@ -92,18 +93,18 @@ final class ApiFinancialAccountsRepository
     int? limit,
     String? cursor,
   }) =>
-      guarded<Page<BalanceSnapshot>>(
-        'financial.accounts.balances',
-        () async => decodePage<BalanceSnapshot>(
-          await _gateway.get(
-            FinancialPaths.accountBalances(accountId),
-            query: <String, Object?>{'limit': limit, 'cursor': cursor},
-            location: 'financial.accounts.balances',
-          ),
-          'financial.accounts.balances',
-          decodeBalanceSnapshot,
-        ),
-      );
+      guarded<Page<BalanceSnapshot>>('financial.accounts.balances', () async {
+        final response = await _client.listOwnAccountBalanceSnapshots(
+          accountId: accountId,
+          limit: limit,
+          cursor: cursor,
+        );
+        return pageFrom<BalanceSnapshot, BalanceSnapshotViewDto>(
+          response.items,
+          response.page,
+          balanceSnapshotFromDto,
+        );
+      });
 
   @override
   Future<Result<Page<AccountSourceLink>>> listSourceLinks(
@@ -111,424 +112,415 @@ final class ApiFinancialAccountsRepository
     int? limit,
     String? cursor,
   }) =>
-      guarded<Page<AccountSourceLink>>(
-        'financial.accounts.sourceLinks',
-        () async => decodePage<AccountSourceLink>(
-          await _gateway.get(
-            FinancialPaths.accountSourceLinks(accountId),
-            query: <String, Object?>{'limit': limit, 'cursor': cursor},
-            location: 'financial.accounts.sourceLinks',
-          ),
-          'financial.accounts.sourceLinks',
-          decodeSourceLink,
-        ),
-      );
+      guarded<Page<AccountSourceLink>>('financial.accounts.sourceLinks', () async {
+        final response = await _client.listOwnAccountSourceLinks(
+          accountId: accountId,
+          limit: limit,
+          cursor: cursor,
+        );
+        return pageFrom<AccountSourceLink, AccountSourceLinkViewDto>(
+          response.items,
+          response.page,
+          sourceLinkFromDto,
+        );
+      });
 
   @override
   Future<Result<Page<Issuer>>> listSelectableIssuers({int? limit, String? cursor}) =>
-      guarded<Page<Issuer>>(
-        'financial.institutions',
-        () async => decodePage<Issuer>(
-          await _gateway.get(
-            FinancialPaths.institutions,
-            query: <String, Object?>{'limit': limit, 'cursor': cursor},
-            location: 'financial.institutions',
-          ),
-          'financial.institutions',
-          decodeIssuer,
-        ),
-      );
-
-  /// The create body.
-  ///
-  /// `origin` and `status` are absent because the contract accepts neither:
-  /// origin is fixed to MANUAL by the use case and status starts ACTIVE. There
-  /// is therefore no field here through which an EXTERNAL_PROVIDER account
-  /// could be requested, which is what makes "Connected" unreachable at the
-  /// point where a record is created rather than only at the point where one
-  /// is rendered.
-  static JsonMap _createBody(ManualAccountDraft draft) {
-    final label = draft.unlistedIssuerLabel?.trim();
-    return <String, Object?>{
-      'accountType': accountTypeWire[draft.accountType],
-      'currency': draft.currencyCode.trim().toUpperCase(),
-      'displayName': draft.displayName.trim(),
-      if (draft.walletKind != null) 'walletKind': walletKindWire[draft.walletKind],
-      if (draft.nature != null) 'nature': accountNatureWire[draft.nature],
-      if (draft.issuerId != null) 'institutionId': draft.issuerId,
-      if (label != null && label.isNotEmpty) 'userSuppliedInstitutionLabel': label,
-      if (draft.mask != null && draft.mask!.trim().isNotEmpty)
-        'mask': draft.mask!.trim(),
-    };
-  }
-
-  /// The update body.
-  ///
-  /// A field ABSENT is left alone; a field present as `null` is CLEARED. The
-  /// two are different requests and the platform does not conflate them, so
-  /// neither does this: the explicit `clear*` flags are the only way a null
-  /// reaches the wire.
-  static JsonMap _updateBody(AccountEdit edit) => <String, Object?>{
-        'expectedVersion': edit.expectedVersion,
-        if (edit.displayName != null) 'displayName': edit.displayName!.trim(),
-        if (edit.accountType != null) 'accountType': accountTypeWire[edit.accountType],
-        if (edit.clearWalletKind)
-          'walletKind': null
-        else if (edit.walletKind != null)
-          'walletKind': walletKindWire[edit.walletKind],
-        if (edit.nature != null) 'nature': accountNatureWire[edit.nature],
-        if (edit.lifecycle != null) 'status': accountLifecycleWire[edit.lifecycle],
-        if (edit.clearMask) 'mask': null else if (edit.mask != null) 'mask': edit.mask,
-        if (edit.clearIssuer) ...<String, Object?>{
-          'institutionId': null,
-          'userSuppliedInstitutionLabel': null,
-        } else ...<String, Object?>{
-          if (edit.issuerId != null) 'institutionId': edit.issuerId,
-          if (edit.unlistedIssuerLabel != null)
-            'userSuppliedInstitutionLabel': edit.unlistedIssuerLabel!.trim(),
-        },
-      };
+      guarded<Page<Issuer>>('financial.institutions', () async {
+        final response = await _client.listFinancialInstitutions(
+          limit: limit,
+          cursor: cursor,
+        );
+        return pageFrom<Issuer, InstitutionViewDto>(
+          response.items,
+          response.page,
+          issuerFromDto,
+        );
+      });
 }
 
 // ---------------------------------------------------------------------------
-// Vocabularies. One reading of the contract's enumerations, in both directions.
+// Requests
 // ---------------------------------------------------------------------------
 
-const Map<String, AccountType> accountTypeByWire = <String, AccountType>{
-  'CURRENT': AccountType.current,
-  'SAVINGS': AccountType.savings,
-  'CREDIT_CARD': AccountType.creditCard,
-  'CASH': AccountType.cash,
-  'WALLET': AccountType.wallet,
-  'OTHER': AccountType.other,
-};
+/// The create body.
+///
+/// `origin` and `status` are absent because the contract accepts neither:
+/// origin is fixed to MANUAL by the use case and status starts ACTIVE. There
+/// is therefore no field here through which an EXTERNAL_PROVIDER account could
+/// be requested, which is what makes "Connected" unreachable at the point
+/// where a record is created rather than only at the point where one is
+/// rendered.
+///
+/// Every optional field is [Omittable]: a field the draft does not name is
+/// OMITTED rather than sent as null, because the two are different requests.
+CreateOwnManualFinancialAccountRequestDto createBodyFor(ManualAccountDraft draft) {
+  final label = draft.unlistedIssuerLabel?.trim();
+  final mask = draft.mask?.trim();
+  return CreateOwnManualFinancialAccountRequestDto(
+    accountType: accountTypeToDto(draft.accountType),
+    currency: draft.currencyCode.trim().toUpperCase(),
+    displayName: draft.displayName.trim(),
+    walletKind: draft.walletKind == null
+        ? const Omittable<WalletKindDto>.omitted()
+        : Omittable<WalletKindDto>.sent(walletKindToDto(draft.walletKind!)),
+    nature: draft.nature == null ? null : accountNatureToDto(draft.nature!),
+    institutionId: draft.issuerId == null
+        ? const Omittable<String>.omitted()
+        : Omittable<String>.sent(draft.issuerId),
+    userSuppliedInstitutionLabel: label == null || label.isEmpty
+        ? const Omittable<String>.omitted()
+        : Omittable<String>.sent(label),
+    mask: mask == null || mask.isEmpty
+        ? const Omittable<String>.omitted()
+        : Omittable<String>.sent(mask),
+  );
+}
 
-const Map<AccountType, String> accountTypeWire = <AccountType, String>{
-  AccountType.current: 'CURRENT',
-  AccountType.savings: 'SAVINGS',
-  AccountType.creditCard: 'CREDIT_CARD',
-  AccountType.cash: 'CASH',
-  AccountType.wallet: 'WALLET',
-  AccountType.other: 'OTHER',
-};
+/// The update body.
+///
+/// A field ABSENT is left alone; a field present as `null` is CLEARED. The two
+/// are different requests and the platform does not conflate them, so neither
+/// does this: the explicit `clear*` flags are the only way a null reaches the
+/// wire, and they reach it as [Omittable.sent] with a null value.
+UpdateOwnFinancialAccountRequestDto updateBodyFor(AccountEdit edit) =>
+    UpdateOwnFinancialAccountRequestDto(
+      expectedVersion: edit.expectedVersion,
+      displayName: edit.displayName?.trim(),
+      accountType:
+          edit.accountType == null ? null : accountTypeToDto(edit.accountType!),
+      walletKind: edit.clearWalletKind
+          ? const Omittable<WalletKindDto>.sent(null)
+          : (edit.walletKind == null
+              ? const Omittable<WalletKindDto>.omitted()
+              : Omittable<WalletKindDto>.sent(walletKindToDto(edit.walletKind!))),
+      nature: edit.nature == null ? null : accountNatureToDto(edit.nature!),
+      status: edit.lifecycle == null ? null : accountStatusToDto(edit.lifecycle!),
+      mask: edit.clearMask
+          ? const Omittable<String>.sent(null)
+          : (edit.mask == null
+              ? const Omittable<String>.omitted()
+              : Omittable<String>.sent(edit.mask)),
+      institutionId: edit.clearIssuer
+          ? const Omittable<String>.sent(null)
+          : (edit.issuerId == null
+              ? const Omittable<String>.omitted()
+              : Omittable<String>.sent(edit.issuerId)),
+      userSuppliedInstitutionLabel: edit.clearIssuer
+          ? const Omittable<String>.sent(null)
+          : (edit.unlistedIssuerLabel == null
+              ? const Omittable<String>.omitted()
+              : Omittable<String>.sent(edit.unlistedIssuerLabel!.trim())),
+    );
 
-const Map<String, WalletKind> walletKindByWire = <String, WalletKind>{
-  'MOBILE_MONEY': WalletKind.mobileMoney,
-  'E_MONEY': WalletKind.eMoney,
-  'PREPAID': WalletKind.prepaid,
-  'PAYROLL': WalletKind.payroll,
-  'SUPER_APP': WalletKind.superApp,
-  'OTHER': WalletKind.other,
-};
+// ---------------------------------------------------------------------------
+// Vocabularies, domain → contract
+//
+// Each switch is exhaustive over the DOMAIN enumeration. `unrecognised` has no
+// wire form by construction — it exists only to name a value the platform sent
+// that this build does not know — so asking to WRITE one is a client defect
+// and is refused before a request leaves, rather than being sent as some
+// nearby member.
+// ---------------------------------------------------------------------------
 
-const Map<WalletKind, String> walletKindWire = <WalletKind, String>{
-  WalletKind.mobileMoney: 'MOBILE_MONEY',
-  WalletKind.eMoney: 'E_MONEY',
-  WalletKind.prepaid: 'PREPAID',
-  WalletKind.payroll: 'PAYROLL',
-  WalletKind.superApp: 'SUPER_APP',
-  WalletKind.other: 'OTHER',
-};
+AccountTypeDto accountTypeToDto(AccountType type) => switch (type) {
+      AccountType.current => AccountTypeDto.current,
+      AccountType.savings => AccountTypeDto.savings,
+      AccountType.creditCard => AccountTypeDto.creditCard,
+      AccountType.cash => AccountTypeDto.cash,
+      AccountType.wallet => AccountTypeDto.wallet,
+      AccountType.other => AccountTypeDto.other,
+      AccountType.unrecognised => throw unwritableVocabularyMember('accountType'),
+    };
 
-const Map<String, AccountNature> accountNatureByWire = <String, AccountNature>{
-  'ASSET': AccountNature.asset,
-  'LIABILITY': AccountNature.liability,
-  'UNKNOWN': AccountNature.notStated,
-};
+WalletKindDto walletKindToDto(WalletKind kind) => switch (kind) {
+      WalletKind.mobileMoney => WalletKindDto.mobileMoney,
+      WalletKind.eMoney => WalletKindDto.eMoney,
+      WalletKind.prepaid => WalletKindDto.prepaid,
+      WalletKind.payroll => WalletKindDto.payroll,
+      WalletKind.superApp => WalletKindDto.superApp,
+      WalletKind.other => WalletKindDto.other,
+      WalletKind.unrecognised => throw unwritableVocabularyMember('walletKind'),
+    };
 
-const Map<AccountNature, String> accountNatureWire = <AccountNature, String>{
-  AccountNature.asset: 'ASSET',
-  AccountNature.liability: 'LIABILITY',
-  AccountNature.notStated: 'UNKNOWN',
-};
+AccountNatureDto accountNatureToDto(AccountNature nature) => switch (nature) {
+      AccountNature.asset => AccountNatureDto.asset,
+      AccountNature.liability => AccountNatureDto.liability,
+      // The contract DECLARES `UNKNOWN`, so "the subject did not state one" has
+      // a wire form and is writable. It is a different member from the
+      // generated fallback, which carries no wire value at all.
+      AccountNature.notStated => AccountNatureDto.unknown,
+      AccountNature.unrecognised => throw unwritableVocabularyMember('nature'),
+    };
 
-const Map<String, AccountOrigin> accountOriginByWire = <String, AccountOrigin>{
-  'MANUAL': AccountOrigin.manual,
-  'CSV': AccountOrigin.csv,
-  'EXTERNAL_PROVIDER': AccountOrigin.externalProvider,
-};
+AccountStatusDto accountStatusToDto(AccountLifecycle lifecycle) =>
+    switch (lifecycle) {
+      AccountLifecycle.active => AccountStatusDto.active,
+      AccountLifecycle.archived => AccountStatusDto.archived,
+      AccountLifecycle.closed => AccountStatusDto.closed,
+      AccountLifecycle.unrecognised => throw unwritableVocabularyMember('status'),
+    };
 
-const Map<String, AccountLifecycle> accountLifecycleByWire = <String, AccountLifecycle>{
-  'ACTIVE': AccountLifecycle.active,
-  'ARCHIVED': AccountLifecycle.archived,
-  'CLOSED': AccountLifecycle.closed,
-};
+// ---------------------------------------------------------------------------
+// Vocabularies, contract → domain
+// ---------------------------------------------------------------------------
 
-const Map<AccountLifecycle, String> accountLifecycleWire = <AccountLifecycle, String>{
-  AccountLifecycle.active: 'ACTIVE',
-  AccountLifecycle.archived: 'ARCHIVED',
-  AccountLifecycle.closed: 'CLOSED',
-};
+AccountType accountTypeFromDto(AccountTypeDto dto) => switch (dto) {
+      AccountTypeDto.current => AccountType.current,
+      AccountTypeDto.savings => AccountType.savings,
+      AccountTypeDto.creditCard => AccountType.creditCard,
+      AccountTypeDto.cash => AccountType.cash,
+      AccountTypeDto.wallet => AccountType.wallet,
+      AccountTypeDto.other => AccountType.other,
+      AccountTypeDto.unknown => AccountType.unrecognised,
+    };
 
-const Map<String, IssuerKind> issuerKindByWire = <String, IssuerKind>{
-  'BANK': IssuerKind.bank,
-  'E_MONEY_ISSUER': IssuerKind.eMoneyIssuer,
-  'MOBILE_MONEY_OPERATOR': IssuerKind.mobileMoneyOperator,
-  'TELCO_FINANCIAL_SERVICES': IssuerKind.telcoFinancialServices,
-  'PAYMENT_INSTITUTION': IssuerKind.paymentInstitution,
-  'FINTECH_WALLET': IssuerKind.fintechWallet,
-  'CARD_ISSUER': IssuerKind.cardIssuer,
-  'EXCHANGE_HOUSE': IssuerKind.exchangeHouse,
-  'OTHER': IssuerKind.other,
-};
+WalletKind walletKindFromDto(WalletKindDto dto) => switch (dto) {
+      WalletKindDto.mobileMoney => WalletKind.mobileMoney,
+      WalletKindDto.eMoney => WalletKind.eMoney,
+      WalletKindDto.prepaid => WalletKind.prepaid,
+      WalletKindDto.payroll => WalletKind.payroll,
+      WalletKindDto.superApp => WalletKind.superApp,
+      WalletKindDto.other => WalletKind.other,
+      WalletKindDto.unknown => WalletKind.unrecognised,
+    };
 
-const Map<String, IssuerStatus> issuerStatusByWire = <String, IssuerStatus>{
-  'ACTIVE': IssuerStatus.active,
-  'RETIRED': IssuerStatus.retired,
-};
+AccountNature accountNatureFromDto(AccountNatureDto dto) => switch (dto) {
+      AccountNatureDto.asset => AccountNature.asset,
+      AccountNatureDto.liability => AccountNature.liability,
+      // The platform's OWN `UNKNOWN`: it answered, and the answer is that
+      // nobody stated a nature. That is not the same as a nature this build
+      // cannot read, and the two must not collapse — reporting "not stated"
+      // for a value the contract added later would present a guess as a fact.
+      AccountNatureDto.unknown => AccountNature.notStated,
+      AccountNatureDto.unrecognised => AccountNature.unrecognised,
+    };
 
-const Map<String, BalanceKind> balanceKindByWire = <String, BalanceKind>{
-  'BOOKED': BalanceKind.booked,
-  'AVAILABLE': BalanceKind.available,
-  'CURRENT': BalanceKind.current,
-  'OUTSTANDING': BalanceKind.outstanding,
-  'CREDIT_LIMIT': BalanceKind.creditLimit,
-  'OTHER_SOURCE_REPORTED': BalanceKind.otherSourceReported,
-};
+AccountLifecycle accountLifecycleFromDto(AccountStatusDto dto) => switch (dto) {
+      AccountStatusDto.active => AccountLifecycle.active,
+      AccountStatusDto.archived => AccountLifecycle.archived,
+      AccountStatusDto.closed => AccountLifecycle.closed,
+      AccountStatusDto.unknown => AccountLifecycle.unrecognised,
+    };
 
-const Map<String, SourceKind> sourceKindByWire = <String, SourceKind>{
-  'MANUAL': SourceKind.manual,
-  'CSV': SourceKind.csv,
-  'EXTERNAL_PROVIDER': SourceKind.externalProvider,
-};
+AccountOrigin accountOriginFromDto(AccountOriginDto dto) => switch (dto) {
+      AccountOriginDto.manual => AccountOrigin.manual,
+      AccountOriginDto.csv => AccountOrigin.csv,
+      AccountOriginDto.externalProvider => AccountOrigin.externalProvider,
+      AccountOriginDto.unknown => AccountOrigin.unrecognised,
+    };
 
-const Map<String, RailAvailability> railAvailabilityByWire = <String, RailAvailability>{
-  'EXECUTABLE': RailAvailability.executable,
-  'NOT_IMPLEMENTED': RailAvailability.notImplemented,
-};
+IssuerKind issuerKindFromDto(InstitutionKindDto dto) => switch (dto) {
+      InstitutionKindDto.bank => IssuerKind.bank,
+      InstitutionKindDto.eMoneyIssuer => IssuerKind.eMoneyIssuer,
+      InstitutionKindDto.mobileMoneyOperator => IssuerKind.mobileMoneyOperator,
+      InstitutionKindDto.telcoFinancialServices => IssuerKind.telcoFinancialServices,
+      InstitutionKindDto.paymentInstitution => IssuerKind.paymentInstitution,
+      InstitutionKindDto.fintechWallet => IssuerKind.fintechWallet,
+      InstitutionKindDto.cardIssuer => IssuerKind.cardIssuer,
+      InstitutionKindDto.exchangeHouse => IssuerKind.exchangeHouse,
+      InstitutionKindDto.other => IssuerKind.other,
+      InstitutionKindDto.unknown => IssuerKind.unrecognised,
+    };
 
-const Map<String, ConnectionRail> connectionRailByWire = <String, ConnectionRail>{
-  'MANUAL': ConnectionRail.manual,
-  'USER_FILE_UPLOAD': ConnectionRail.userFileUpload,
-  'OPEN_FINANCE_API': ConnectionRail.openFinanceApi,
-  'DIRECT_BANK_OR_WALLET_API': ConnectionRail.directBankOrWalletApi,
-  'LICENSED_AGGREGATOR_API': ConnectionRail.licensedAggregatorApi,
-  'HOST_TO_HOST_SFTP': ConnectionRail.hostToHostSftp,
-  'ISO_20022_FILE': ConnectionRail.iso20022File,
-  'SWIFT_MT_FILE': ConnectionRail.swiftMtFile,
-  'OFX_QFX_FILE': ConnectionRail.ofxQfxFile,
-  'QIF_FILE': ConnectionRail.qifFile,
-  'PDF_STATEMENT': ConnectionRail.pdfStatement,
-  'SECURE_EMAIL_STATEMENT': ConnectionRail.secureEmailStatement,
-  'DEVICE_SIGNAL': ConnectionRail.deviceSignal,
-};
+IssuerStatus issuerStatusFromDto(InstitutionViewStatusDto dto) => switch (dto) {
+      InstitutionViewStatusDto.active => IssuerStatus.active,
+      InstitutionViewStatusDto.retired => IssuerStatus.retired,
+      InstitutionViewStatusDto.unknown => IssuerStatus.unrecognised,
+    };
 
-const Map<String, SourceAuthority> sourceAuthorityByWire = <String, SourceAuthority>{
-  'AUTHORITATIVE': SourceAuthority.authoritative,
-  'SUPPLEMENTAL': SourceAuthority.supplemental,
-  'UNVERIFIED': SourceAuthority.unverified,
-};
+BalanceKind balanceKindFromDto(BalanceKindDto dto) => switch (dto) {
+      BalanceKindDto.booked => BalanceKind.booked,
+      BalanceKindDto.available => BalanceKind.available,
+      BalanceKindDto.current => BalanceKind.current,
+      BalanceKindDto.outstanding => BalanceKind.outstanding,
+      BalanceKindDto.creditLimit => BalanceKind.creditLimit,
+      BalanceKindDto.otherSourceReported => BalanceKind.otherSourceReported,
+      BalanceKindDto.unknown => BalanceKind.unrecognised,
+    };
 
-const Map<String, MatchBasis> matchBasisByWire = <String, MatchBasis>{
-  'EXACT_EXTERNAL_REFERENCE': MatchBasis.exactExternalReference,
-  'PROBABLE': MatchBasis.probable,
-};
+SourceKind sourceKindFromDto(SourceKindDto dto) => switch (dto) {
+      SourceKindDto.manual => SourceKind.manual,
+      SourceKindDto.csv => SourceKind.csv,
+      SourceKindDto.externalProvider => SourceKind.externalProvider,
+      SourceKindDto.unknown => SourceKind.unrecognised,
+    };
 
-const Map<String, SourceLinkStatus> sourceLinkStatusByWire = <String, SourceLinkStatus>{
-  'PENDING_CONFIRMATION': SourceLinkStatus.pendingConfirmation,
-  'LINKED': SourceLinkStatus.linked,
-  'DECLINED': SourceLinkStatus.declined,
-  'DORMANT': SourceLinkStatus.dormant,
-};
+SourceKindDto sourceKindToDto(SourceKind kind) => switch (kind) {
+      SourceKind.manual => SourceKindDto.manual,
+      SourceKind.csv => SourceKindDto.csv,
+      // Present so the mapping is total over the vocabulary. No path in this
+      // platform produces a record with this rail, so a filter for it returns
+      // nothing — which is the honest answer rather than an error.
+      SourceKind.externalProvider => SourceKindDto.externalProvider,
+      SourceKind.unrecognised => throw unwritableVocabularyMember('sourceKind'),
+    };
 
-const Map<String, SourceDataObservationState> sourceCapabilityByWire =
-    <String, SourceDataObservationState>{
-  'OBSERVED': SourceDataObservationState.observed,
-  'NOT_OBSERVED': SourceDataObservationState.notObserved,
-  'NOT_PROVIDED': SourceDataObservationState.notProvided,
-};
+RailAvailability railAvailabilityFromDto(RailAvailabilityDto dto) => switch (dto) {
+      RailAvailabilityDto.executable => RailAvailability.executable,
+      RailAvailabilityDto.notImplemented => RailAvailability.notImplemented,
+      RailAvailabilityDto.unknown => RailAvailability.unrecognised,
+    };
+
+ConnectionRail connectionRailFromDto(ConnectionRailDto dto) => switch (dto) {
+      ConnectionRailDto.manual => ConnectionRail.manual,
+      ConnectionRailDto.userFileUpload => ConnectionRail.userFileUpload,
+      ConnectionRailDto.openFinanceApi => ConnectionRail.openFinanceApi,
+      ConnectionRailDto.directBankOrWalletApi => ConnectionRail.directBankOrWalletApi,
+      ConnectionRailDto.licensedAggregatorApi => ConnectionRail.licensedAggregatorApi,
+      ConnectionRailDto.hostToHostSftp => ConnectionRail.hostToHostSftp,
+      ConnectionRailDto.iso20022File => ConnectionRail.iso20022File,
+      ConnectionRailDto.swiftMtFile => ConnectionRail.swiftMtFile,
+      ConnectionRailDto.ofxQfxFile => ConnectionRail.ofxQfxFile,
+      ConnectionRailDto.qifFile => ConnectionRail.qifFile,
+      ConnectionRailDto.pdfStatement => ConnectionRail.pdfStatement,
+      ConnectionRailDto.secureEmailStatement => ConnectionRail.secureEmailStatement,
+      ConnectionRailDto.deviceSignal => ConnectionRail.deviceSignal,
+      ConnectionRailDto.unknown => ConnectionRail.unrecognised,
+    };
+
+SourceAuthority sourceAuthorityFromDto(SourceAuthorityDto dto) => switch (dto) {
+      SourceAuthorityDto.authoritative => SourceAuthority.authoritative,
+      SourceAuthorityDto.supplemental => SourceAuthority.supplemental,
+      SourceAuthorityDto.unverified => SourceAuthority.unverified,
+      SourceAuthorityDto.unknown => SourceAuthority.unrecognised,
+    };
+
+MatchBasis matchBasisFromDto(MatchBasisDto dto) => switch (dto) {
+      MatchBasisDto.exactExternalReference => MatchBasis.exactExternalReference,
+      MatchBasisDto.probable => MatchBasis.probable,
+      MatchBasisDto.unknown => MatchBasis.unrecognised,
+    };
+
+SourceLinkStatus sourceLinkStatusFromDto(SourceLinkStatusDto dto) => switch (dto) {
+      SourceLinkStatusDto.pendingConfirmation => SourceLinkStatus.pendingConfirmation,
+      SourceLinkStatusDto.linked => SourceLinkStatus.linked,
+      SourceLinkStatusDto.declined => SourceLinkStatus.declined,
+      SourceLinkStatusDto.dormant => SourceLinkStatus.dormant,
+      SourceLinkStatusDto.unknown => SourceLinkStatus.unrecognised,
+    };
+
+SourceDataObservationState sourceObservationFromDto(
+  SourceCapabilityObservationDto dto,
+) =>
+    switch (dto) {
+      SourceCapabilityObservationDto.observed => SourceDataObservationState.observed,
+      SourceCapabilityObservationDto.notObserved =>
+        SourceDataObservationState.notObserved,
+      SourceCapabilityObservationDto.notProvided =>
+        SourceDataObservationState.notProvided,
+      SourceCapabilityObservationDto.unknown =>
+        SourceDataObservationState.unrecognised,
+    };
 
 // ---------------------------------------------------------------------------
 // Decoders
 // ---------------------------------------------------------------------------
 
-/// Whether a `providerAccessStatus` token means this platform can reach an
-/// issuer. It is `false` for every input, including one this build has never
-/// seen, and it is a named function so a test can say so over any string.
+/// Whether a reported provider-access token means this platform can reach an
+/// issuer. It is `false` for EVERY input, including one this build has never
+/// seen, and it is a named function so a test can say so over any value.
 ///
-/// A `switch` that mapped NOT_IMPLEMENTED to false and defaulted the rest to
-/// true is the shape this replaces: a server that ever added a token would
-/// have turned the whole surface into a connection claim.
-bool providerAccessIsNeverImplemented(String reportedStatus) => false;
+/// The parameter is deliberately untyped: the contract states the vocabulary
+/// three times, once per view, and the answer does not depend on which one
+/// arrived or on whether the token is even a member. A `switch` that mapped
+/// NOT_IMPLEMENTED to false and defaulted the rest to true is the shape this
+/// replaces — a server that ever added a token would have turned the whole
+/// surface into a connection claim.
+bool providerAccessIsNeverImplemented(Object? reportedStatus) => false;
 
 /// One account or wallet.
-FinancialAccount decodeAccount(JsonMap json) {
-  const at = 'FinancialAccountView';
-  final currency = json.object('currency', at);
-  final institution = json.objectOrNull('institution', at);
-  final unlistedLabel = json.stringOrNull('userSuppliedInstitutionLabel', at);
-  final link = json.object('link', at);
-
+FinancialAccount accountFromDto(FinancialAccountViewDto dto) {
+  final unlistedLabel = dto.userSuppliedInstitutionLabel;
   return FinancialAccount(
-    accountId: json.string('accountId', at),
-    displayName: json.string('displayName', at),
-    accountType: decodeEnum<AccountType>(
-      json.stringOrNull('accountType', at),
-      accountTypeByWire,
-      AccountType.unrecognised,
-    ),
-    walletKind: json['walletKind'] == null
-        ? null
-        : decodeEnum<WalletKind>(
-            json.stringOrNull('walletKind', at),
-            walletKindByWire,
-            WalletKind.unrecognised,
-          ),
-    nature: decodeEnum<AccountNature>(
-      json.stringOrNull('nature', at),
-      accountNatureByWire,
-      AccountNature.unrecognised,
-    ),
-    currency: CurrencyRef(
-      code: currency.string('code', '$at.currency'),
-      exponent: currency.integer('exponent', '$at.currency'),
-    ),
-    mask: SafeMask.from(json.stringOrNull('mask', at)),
-    issuer: institution != null
-        ? IssuerFromCatalogue(decodeIssuer(institution))
+    accountId: dto.accountId,
+    displayName: dto.displayName,
+    accountType: accountTypeFromDto(dto.accountType),
+    walletKind: dto.walletKind == null ? null : walletKindFromDto(dto.walletKind!),
+    nature: accountNatureFromDto(dto.nature),
+    currency: CurrencyRef(code: dto.currency.code, exponent: dto.currency.exponent),
+    mask: SafeMask.from(dto.mask),
+    issuer: dto.institution != null
+        ? IssuerFromCatalogue(issuerFromDto(dto.institution!))
         : (unlistedLabel != null && unlistedLabel.trim().isNotEmpty
             ? IssuerUnlisted(unlistedLabel)
             : const IssuerNotStated()),
-    lifecycle: decodeEnum<AccountLifecycle>(
-      json.stringOrNull('status', at),
-      accountLifecycleByWire,
-      AccountLifecycle.unrecognised,
-    ),
-    origin: decodeEnum<AccountOrigin>(
-      json.stringOrNull('origin', at),
-      accountOriginByWire,
-      AccountOrigin.unrecognised,
-    ),
+    lifecycle: accountLifecycleFromDto(dto.status),
+    origin: accountOriginFromDto(dto.origin),
     link: InstitutionLinkClaim(
-      impliesLiveInstitutionLink: link.boolean('impliesLiveInstitutionLink', '$at.link'),
+      impliesLiveInstitutionLink: dto.link.impliesLiveInstitutionLink,
       // Read so a response omitting it is a contract violation rather than a
-      // silent absence, and then discarded: NOT_IMPLEMENTED is the vocabulary's
-      // only member, so there is no token this client would read as
-      // "implemented". Provider access is false here for every input.
-      providerAccessImplemented: providerAccessIsNeverImplemented(
-        link.string('providerAccessStatus', '$at.link'),
-      ),
+      // silent absence, and then discarded: NOT_IMPLEMENTED is the
+      // vocabulary's only member, so there is no token this client would read
+      // as "implemented". Provider access is false here for every input.
+      providerAccessImplemented:
+          providerAccessIsNeverImplemented(dto.link.providerAccessStatus),
     ),
-    createdAt: json.instant('createdAt', at),
-    updatedAt: json.instant('updatedAt', at),
-    version: json.integer('version', at),
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    version: dto.version,
   );
 }
 
 /// One reviewed catalogue issuer.
-Issuer decodeIssuer(JsonMap json) {
-  const at = 'InstitutionView';
-  return Issuer(
-    issuerId: json.string('institutionId', at),
-    code: json.string('code', at),
-    kind: decodeEnum<IssuerKind>(
-      json.stringOrNull('kind', at),
-      issuerKindByWire,
-      IssuerKind.unrecognised,
-    ),
-    displayNameEn: json.string('displayNameEn', at),
-    displayNameAr: json.string('displayNameAr', at),
-    status: decodeEnum<IssuerStatus>(
-      json.stringOrNull('status', at),
-      issuerStatusByWire,
-      IssuerStatus.unrecognised,
-    ),
-  );
-}
+Issuer issuerFromDto(InstitutionViewDto dto) => Issuer(
+      issuerId: dto.institutionId,
+      code: dto.code,
+      kind: issuerKindFromDto(dto.kind),
+      displayNameEn: dto.displayNameEn,
+      displayNameAr: dto.displayNameAr,
+      status: issuerStatusFromDto(dto.status),
+    );
 
 /// One figure a source reported.
-BalanceSnapshot decodeBalanceSnapshot(JsonMap json) {
-  const at = 'BalanceSnapshotView';
-  return BalanceSnapshot(
-    snapshotId: json.string('snapshotId', at),
-    accountId: json.string('accountId', at),
-    amount: json.money('amount', at),
-    balanceKind: decodeEnum<BalanceKind>(
-      json.stringOrNull('balanceKind', at),
-      balanceKindByWire,
-      BalanceKind.unrecognised,
-    ),
-    sourceKind: decodeEnum<SourceKind>(
-      json.stringOrNull('sourceKind', at),
-      sourceKindByWire,
-      SourceKind.unrecognised,
-    ),
-    availability: decodeEnum<RailAvailability>(
-      json.stringOrNull('availability', at),
-      railAvailabilityByWire,
-      RailAvailability.unrecognised,
-    ),
-    asOf: json.instant('asOf', at),
-    capturedAt: json.instant('capturedAt', at),
-  );
-}
+BalanceSnapshot balanceSnapshotFromDto(BalanceSnapshotViewDto dto) => BalanceSnapshot(
+      snapshotId: dto.snapshotId,
+      accountId: dto.accountId,
+      amount: moneyFrom(dto.amount, 'BalanceSnapshotView.amount'),
+      balanceKind: balanceKindFromDto(dto.balanceKind),
+      sourceKind: sourceKindFromDto(dto.sourceKind),
+      availability: railAvailabilityFromDto(dto.availability),
+      asOf: dto.asOf,
+      capturedAt: dto.capturedAt,
+    );
 
 /// One source feeding one account.
-AccountSourceLink decodeSourceLink(JsonMap json) {
-  const at = 'AccountSourceLinkView';
-  final link = json.object('link', at);
-  final observation = json.object('observation', at);
-  final capabilities = json.object('capabilities', at);
-  final coverage = json.objectOrNull('historyCoverage', at);
-
-  return AccountSourceLink(
-    sourceLinkId: json.string('sourceLinkId', at),
-    accountId: json.string('accountId', at),
-    connectionId: json.string('connectionId', at),
-    rail: decodeEnum<ConnectionRail>(
-      json.stringOrNull('rail', at),
-      connectionRailByWire,
-      ConnectionRail.unrecognised,
-    ),
-    availability: decodeEnum<RailAvailability>(
-      json.stringOrNull('availability', at),
-      railAvailabilityByWire,
-      RailAvailability.unrecognised,
-    ),
-    sourceAuthority: decodeEnum<SourceAuthority>(
-      json.stringOrNull('sourceAuthority', at),
-      sourceAuthorityByWire,
-      SourceAuthority.unrecognised,
-    ),
-    matchBasis: decodeEnum<MatchBasis>(
-      json.stringOrNull('matchBasis', at),
-      matchBasisByWire,
-      MatchBasis.unrecognised,
-    ),
-    status: decodeEnum<SourceLinkStatus>(
-      json.stringOrNull('status', at),
-      sourceLinkStatusByWire,
-      SourceLinkStatus.unrecognised,
-    ),
-    impliesLiveInstitutionLink:
-        link.boolean('impliesLiveInstitutionLink', '$at.link'),
-    providerAccessImplemented: false,
-    subjectConfirmedAt: json.instantOrNull('subjectConfirmedAt', at),
-    sourcePriority: json.integer('sourcePriority', at),
-    observation: SourceObservation(
-      firstObservedAt: observation.instant('firstObservedAt', '$at.observation'),
-      lastObservedAt: observation.instant('lastObservedAt', '$at.observation'),
-      lastSuccessfulImportAt:
-          observation.instantOrNull('lastSuccessfulImportAt', '$at.observation'),
-    ),
-    historyCoverage: coverage == null
-        ? null
-        : CalendarDayRange(
-            start: coverage.calendarDay('start', '$at.historyCoverage'),
-            end: coverage.calendarDay('end', '$at.historyCoverage'),
-          ),
-    capabilities: SourceCapabilities(
-      balance: decodeEnum<SourceDataObservationState>(
-        capabilities.stringOrNull('balance', '$at.capabilities'),
-        sourceCapabilityByWire,
-        SourceDataObservationState.unrecognised,
+AccountSourceLink sourceLinkFromDto(AccountSourceLinkViewDto dto) => AccountSourceLink(
+      sourceLinkId: dto.sourceLinkId,
+      accountId: dto.accountId,
+      connectionId: dto.connectionId,
+      rail: connectionRailFromDto(dto.rail),
+      availability: railAvailabilityFromDto(dto.availability),
+      sourceAuthority: sourceAuthorityFromDto(dto.sourceAuthority),
+      matchBasis: matchBasisFromDto(dto.matchBasis),
+      status: sourceLinkStatusFromDto(dto.status),
+      impliesLiveInstitutionLink: dto.link.impliesLiveInstitutionLink,
+      providerAccessImplemented:
+          providerAccessIsNeverImplemented(dto.link.providerAccessStatus),
+      subjectConfirmedAt: dto.subjectConfirmedAt,
+      sourcePriority: dto.sourcePriority,
+      observation: SourceObservation(
+        firstObservedAt: dto.observation.firstObservedAt,
+        lastObservedAt: dto.observation.lastObservedAt,
+        lastSuccessfulImportAt: dto.observation.lastSuccessfulImportAt,
       ),
-      pendingTransactions: decodeEnum<SourceDataObservationState>(
-        capabilities.stringOrNull('pendingTransactions', '$at.capabilities'),
-        sourceCapabilityByWire,
-        SourceDataObservationState.unrecognised,
+      historyCoverage: dto.historyCoverage == null
+          ? null
+          : CalendarDayRange(
+              start: calendarDayFrom(
+                dto.historyCoverage!.start,
+                'AccountSourceLinkView.historyCoverage.start',
+              ),
+              end: calendarDayFrom(
+                dto.historyCoverage!.end,
+                'AccountSourceLinkView.historyCoverage.end',
+              ),
+            ),
+      capabilities: SourceCapabilities(
+        balance: sourceObservationFromDto(dto.capabilities.balance),
+        pendingTransactions:
+            sourceObservationFromDto(dto.capabilities.pendingTransactions),
       ),
-    ),
-    version: json.integer('version', at),
-  );
-}
+      version: dto.version,
+    );

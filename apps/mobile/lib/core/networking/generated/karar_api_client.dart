@@ -5,7 +5,7 @@
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.6.0
 // Digest:     18e39b12
-// Generator:  tool/generate_api_client.dart 1.0.0
+// Generator:  tool/generate_api_client.dart 1.1.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
 // Drift check: dart run tool/generate_api_client.dart --check
@@ -887,7 +887,7 @@ final class KararApiClient {
         query: <String, Object?>{
           'limit': limit,
           'cursor': cursor,
-          'kind': kind,
+          'kind': kind?.toWire(),
         },
         requiresAuthentication: true,
         cancellation: cancellation,
@@ -919,8 +919,8 @@ final class KararApiClient {
         query: <String, Object?>{
           'limit': limit,
           'cursor': cursor,
-          'balanceKind': balanceKind,
-          'sourceKind': sourceKind,
+          'balanceKind': balanceKind?.toWire(),
+          'sourceKind': sourceKind?.toWire(),
         },
         requiresAuthentication: true,
         cancellation: cancellation,
@@ -953,8 +953,8 @@ final class KararApiClient {
         query: <String, Object?>{
           'limit': limit,
           'cursor': cursor,
-          'instrumentType': instrumentType,
-          'status': status,
+          'instrumentType': instrumentType?.toWire(),
+          'status': status?.toWire(),
           'spendable': spendable,
         },
         requiresAuthentication: true,
@@ -989,8 +989,8 @@ final class KararApiClient {
         query: <String, Object?>{
           'limit': limit,
           'cursor': cursor,
-          'rail': rail,
-          'status': status,
+          'rail': rail?.toWire(),
+          'status': status?.toWire(),
         },
         requiresAuthentication: true,
         cancellation: cancellation,
@@ -1028,13 +1028,13 @@ final class KararApiClient {
           'limit': limit,
           'cursor': cursor,
           'institutionId': institutionId,
-          'institutionKind': institutionKind,
-          'accountType': accountType,
-          'walletKind': walletKind,
-          'nature': nature,
+          'institutionKind': institutionKind?.toWire(),
+          'accountType': accountType?.toWire(),
+          'walletKind': walletKind?.toWire(),
+          'nature': nature?.toWire(),
           'currency': currency,
-          'status': status,
-          'origin': origin,
+          'status': status?.toWire(),
+          'origin': origin?.toWire(),
         },
         requiresAuthentication: true,
         cancellation: cancellation,
@@ -1065,8 +1065,8 @@ final class KararApiClient {
         query: <String, Object?>{
           'limit': limit,
           'cursor': cursor,
-          'rail': rail,
-          'status': status,
+          'rail': rail?.toWire(),
+          'status': status?.toWire(),
           'institutionId': institutionId,
         },
         requiresAuthentication: true,
@@ -1187,9 +1187,9 @@ final class KararApiClient {
           'cursor': cursor,
           'accountId': accountId,
           'currency': currency,
-          'direction': direction,
-          'status': status,
-          'sourceKind': sourceKind,
+          'direction': direction?.toWire(),
+          'status': status?.toWire(),
+          'sourceKind': sourceKind?.toWire(),
           'bookedFrom': bookedFrom,
           'bookedTo': bookedTo,
         },
@@ -1220,7 +1220,7 @@ final class KararApiClient {
         query: <String, Object?>{
           'limit': limit,
           'cursor': cursor,
-          'state': state,
+          'state': state?.toWire(),
         },
         requiresAuthentication: true,
         cancellation: cancellation,
@@ -1607,6 +1607,8 @@ final class KararApiClient {
   /// The request body is the file itself, as `text/csv`. It is read as a STREAM and never buffered whole before its size is known: the declared `Content-Length` is checked against the central byte bound before a byte is read, and the accumulated length is checked again on every chunk. The request is refused the moment either crosses the bound (code SOURCE_TOO_LARGE), and nothing is truncated to fit.
   /// The bytes are stored only as authenticated ciphertext, outside PostgreSQL. Nothing about that storage — its locator, its algorithm, its key version, its nonce, its auth tag, its checksum — appears in any response.
   /// Re-uploading a file this subject has already committed answers 200 with the import in state DUPLICATE and refusal code SOURCE_ALREADY_IMPORTED, rather than silently importing the same statement twice.
+  ///
+  /// NOT MODELLED: the contract declares this request body as `text/csv`, which is not JSON. This method sends NO BODY. Sending one needs a transport that carries raw bytes; until there is one, this operation cannot be called for its intended effect.
   ///
   /// `POST /financial/statement-imports/{importId}/source` — requires a session.
   Future<StatementImportViewDto> uploadOwnStatementImportSource({

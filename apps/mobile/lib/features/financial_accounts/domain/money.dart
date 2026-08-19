@@ -99,33 +99,90 @@ enum MoneyDirection {
   unrecognised,
 }
 
-/// Turns what a person typed into an exact minor-unit string.
+/// The most characters the contract admits in a `minorUnits` value.
 ///
-/// It is a STRING-to-STRING transformation and touches no numeric type at all:
+/// The contract's pattern is `^-?[0-9]{1,30}$`. A figure that does not fit is
+/// not an amount this platform can hold, and the client refuses it here rather
+/// than sending something the platform will reject or, worse, truncate.
+const int maximumMinorUnitDigits = 30;
+
+/// THE GRAMMAR AN AMOUNT MAY BE TYPED IN.
+///
+/// A financial client must never turn malformed punctuation into a different
+/// valid amount. This one accepts exactly:
+///
+///     amount    ::= digits [ separator digits ]
+///     digits    ::= digit+
+///     digit     ::= U+0030..U+0039   (ASCII)
+///                 | U+0660..U+0669   (Arabic-Indic)
+///                 | U+06F0..U+06F9   (Extended Arabic-Indic)
+///     separator ::= U+002E FULL STOP | U+066B ARABIC DECIMAL SEPARATOR
+///
+/// Surrounding whitespace is trimmed. Everything else is refused: a sign, a
+/// second separator, a separator with no digits on one side, more fractional
+/// digits than the currency's exponent allows, a letter, any punctuation, and
+/// a value whose minor units would not fit the contract's thirty characters.
+///
+/// NO GROUPING SEPARATOR IS ACCEPTED, and that is the whole point.
+/// ------------------------------------------------------------------
+/// This function used to delete commas, the Arabic thousands separator,
+/// spaces and typographic apostrophes wherever they appeared. Deleting a
+/// separator is not a lenient reading of a well-formed amount; it is a
+/// REINTERPRETATION of a malformed one, and each of these silently became a
+/// different figure:
+///
+///     '1,2'    → 12       (someone typing a comma decimal meant 1.2)
+///     '12,34'  → 1234     (they meant 12.34)
+///     '8,10'   → 810      (they meant 8.10)
+///     '1,2,3'  → 123      (no convention produces this)
+///     '1 2'    → 12       (two numbers, or a typo)
+///     "1'2"    → 12       (a stray keystroke)
+///
+/// Every one of those was accepted and turned into an amount the person did
+/// not type. Grouping cannot be validated away either: `1,234` is a thousand
+/// under one convention and one point two three four under another, and the
+/// client does not know which the person meant. The amount field is a numeric
+/// keypad, which produces no grouping separator at all, so refusing them costs
+/// nothing and removes the entire class of silent reinterpretation.
+///
+/// A refusal is visible: the form reports the amount as invalid and the person
+/// retypes it. A silent reinterpretation is not, and it writes a wrong record
+/// that looks exactly like a right one.
+///
+/// Both decimal separators are accepted because a person reading the interface
+/// in Arabic may type U+066B, and refusing their own punctuation would be
+/// refusing their own language. A plain COMMA is never read as a decimal
+/// separator: no surface in this product selects a convention in which it is.
+///
+/// The transformation is STRING to STRING and touches no numeric type at all:
 /// the digits a person typed become the digits the ledger stores, with the
-/// decimal point removed and the fraction padded to the currency's exponent.
+/// separator removed and the fraction padded to the currency's exponent.
 /// Parsing to a `double` and multiplying by a power of ten is the classic way
 /// to turn 8.10 into 809 minor units, and there is no arithmetic here that
 /// could.
 ///
-/// Returns null when the input is not a non-negative amount this currency can
-/// hold — including when it carries MORE fractional digits than the exponent
-/// allows, because silently dropping one is silently changing the amount.
-///
-/// Grouping separators are removed and both the ASCII and the Arabic decimal
-/// separators are accepted, so a person typing on an Arabic keyboard is not
-/// refused for using their own punctuation.
+/// Returns null for anything the grammar does not accept.
 String? minorUnitsFromTypedAmount(String typed, int exponent) {
-  final buffer = StringBuffer();
+  // The contract declares `exponent: { type: integer, minimum: 0 }`. A
+  // negative one is not a currency this platform describes, and padding by a
+  // negative amount would silently drop digits.
+  if (exponent < 0) {
+    return null;
+  }
+
+  final input = typed.trim();
+  if (input.isEmpty) {
+    return null;
+  }
+
+  final integerPart = StringBuffer();
+  final fractionPart = StringBuffer();
   var separatorSeen = false;
-  var fractionDigits = 0;
-  for (final unit in typed.trim().codeUnits) {
-    if (unit == 0x2C || unit == 0x066C || unit == 0x20 || unit == 0x2019) {
-      // Grouping separator: comma, Arabic thousands separator, space, or the
-      // typographic apostrophe some locales group with.
-      continue;
-    }
-    if (unit == 0x2E || unit == 0x066B) {
+
+  for (final unit in input.codeUnits) {
+    if (unit == _fullStop || unit == _arabicDecimalSeparator) {
+      // A second separator means the input is not one amount. It is refused
+      // rather than resolved: neither reading is more likely to be right.
       if (separatorSeen) {
         return null;
       }
@@ -134,31 +191,51 @@ String? minorUnitsFromTypedAmount(String typed, int exponent) {
     }
     final digit = _asciiDigitOf(unit);
     if (digit == null) {
+      // A grouping separator, a sign, a letter, a space, an apostrophe: all
+      // arrive here, and all are refused. Nothing is skipped.
       return null;
     }
-    buffer.writeCharCode(digit);
-    if (separatorSeen) {
-      fractionDigits++;
-    }
+    (separatorSeen ? fractionPart : integerPart).writeCharCode(digit);
   }
 
-  final digits = buffer.toString();
-  if (digits.isEmpty || fractionDigits > exponent) {
+  // `.5` and `5.` are both incomplete. Reading either as a whole amount would
+  // be inventing the missing side.
+  if (integerPart.isEmpty || (separatorSeen && fractionPart.isEmpty)) {
+    return null;
+  }
+  // MORE fractional digits than the currency holds is refused rather than
+  // rounded: dropping one is changing the amount.
+  if (fractionPart.length > exponent) {
     return null;
   }
 
-  final padded = StringBuffer(digits);
-  for (var index = fractionDigits; index < exponent; index++) {
-    padded.write('0');
+  final assembled = StringBuffer()
+    ..write(integerPart)
+    ..write(fractionPart);
+  for (var index = fractionPart.length; index < exponent; index++) {
+    assembled.write('0');
   }
-  final minorUnits = padded.toString();
 
-  var firstSignificant = 0;
-  while (firstSignificant < minorUnits.length - 1 &&
-      minorUnits.codeUnitAt(firstSignificant) == 0x30) {
-    firstSignificant++;
+  final minorUnits = _withoutLeadingZeros(assembled.toString());
+  // The bound is on the VALUE that goes on the wire. Leading zeros are not
+  // part of it, so `0008.10` is the same two-digit-currency amount as `8.10`.
+  return minorUnits.length > maximumMinorUnitDigits ? null : minorUnits;
+}
+
+/// U+002E FULL STOP.
+const int _fullStop = 0x2E;
+
+/// U+066B ARABIC DECIMAL SEPARATOR.
+const int _arabicDecimalSeparator = 0x066B;
+
+/// [digits] without its leading zeros, keeping at least one character so zero
+/// stays `0` rather than becoming the empty string.
+String _withoutLeadingZeros(String digits) {
+  var first = 0;
+  while (first < digits.length - 1 && digits.codeUnitAt(first) == 0x30) {
+    first++;
   }
-  return minorUnits.substring(firstSignificant);
+  return digits.substring(first);
 }
 
 /// The ASCII code unit for [unit] when it is a digit in any of the scripts the
@@ -166,7 +243,9 @@ String? minorUnitsFromTypedAmount(String typed, int exponent) {
 ///
 /// Arabic-Indic and Extended Arabic-Indic digits are accepted because a person
 /// reading the interface in Arabic may well type them, and refusing their own
-/// numerals would be refusing their own language.
+/// numerals would be refusing their own language. Mixing scripts within one
+/// amount is accepted too: each code point has exactly one numeric value, so
+/// there is no ambiguity to resolve and nothing is being guessed at.
 int? _asciiDigitOf(int unit) {
   if (unit >= 0x30 && unit <= 0x39) {
     return unit;

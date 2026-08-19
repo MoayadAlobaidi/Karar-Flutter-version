@@ -10,14 +10,22 @@
 //   * NO figure inside either instrument row.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karar_mobile/core/errors/failure.dart';
+import 'package:karar_mobile/core/errors/result.dart';
+import 'package:karar_mobile/core/networking/api_transport.dart';
+import 'package:karar_mobile/core/networking/generated/karar_api_client.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/account_source_link.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/balance_snapshot.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/financial_account.dart';
+import 'package:karar_mobile/features/financial_accounts/domain/page.dart'
+    as paging;
 import 'package:karar_mobile/features/financial_accounts/presentation/account_detail_screen.dart';
+import 'package:karar_mobile/features/payment_instruments/data/api_payment_instruments_repository.dart';
 import 'package:karar_mobile/features/payment_instruments/domain/payment_instrument.dart';
 import 'package:karar_mobile/features/payment_instruments/presentation/account_instruments_section.dart';
 import 'package:karar_mobile/l10n/karar_localization.dart';
 
+import '../../core/support/fakes.dart';
 import '../financial_accounts/support/financial_fixtures.dart';
 import '../financial_accounts/support/financial_harness.dart';
 import '../platform_bootstrap/support/feature_harness.dart';
@@ -295,5 +303,145 @@ void main() {
       },
       textScales: featureTextScales,
     );
+  });
+
+  group('the instrument contract, decoded', () {
+    // The screens above use a scripted repository, so this is the only place
+    // that drives a real contract body through the generated DTO and into the
+    // domain. What it proves beyond the vocabularies: the projection carries
+    // NO figure, and the mapper does not invent one.
+    Map<String, Object?> instrumentBody({
+      String instrumentType = 'VIRTUAL_CARD',
+      String status = 'ACTIVE',
+      bool spendable = true,
+      String mask = '**4321',
+    }) =>
+        <String, Object?>{
+          'instrumentId': 'instrument-0001',
+          'accountId': walletId,
+          'instrumentType': instrumentType,
+          'status': status,
+          'spendable': spendable,
+          'mask': mask,
+          'displayLabel': 'A synthetic card',
+          'issuerLink': <String, Object?>{
+            'impliesLiveIssuerLink': false,
+            'providerAccessStatus': 'NOT_IMPLEMENTED',
+          },
+          'createdAt': '2026-01-01T00:00:00.000Z',
+          'updatedAt': '2026-02-01T00:00:00.000Z',
+          'version': 1,
+        };
+
+    ({ApiPaymentInstrumentsRepository repository, FakeApiTransport transport})
+        repositoryFor(Object? body) {
+      final transport = FakeApiTransport(
+        (ApiRequest request) async => ApiResponse(statusCode: 200, body: body),
+      );
+      return (
+        repository: ApiPaymentInstrumentsRepository(KararApiClient(transport)),
+        transport: transport,
+      );
+    }
+
+    Future<PaymentInstrument> instrumentFrom(Map<String, Object?> body) async {
+      final result = await repositoryFor(<String, Object?>{
+        'items': <Object?>[body],
+        'page': <String, Object?>{
+          'limit': 50,
+          'returned': 1,
+          'hasMore': false,
+          'nextCursor': null,
+        },
+      }).repository.listForAccount(walletId);
+      return (result as Success<paging.Page<PaymentInstrument>>).value.items.single;
+    }
+
+    test('every instrument type maps, and an unknown one is unrecognised',
+        () async {
+      Future<InstrumentType> typeFor(String wire) async =>
+          (await instrumentFrom(instrumentBody(instrumentType: wire)))
+              .instrumentType;
+
+      expect(await typeFor('PHYSICAL_CARD'), InstrumentType.physicalCard);
+      expect(await typeFor('VIRTUAL_CARD'), InstrumentType.virtualCard);
+      expect(await typeFor('PREPAID_CARD'), InstrumentType.prepaidCard);
+      expect(await typeFor('TOKENIZED_CARD'), InstrumentType.tokenizedCard);
+      expect(await typeFor('QR_PAYMENT_IDENTITY'), InstrumentType.qrPaymentIdentity);
+      expect(await typeFor('OTHER'), InstrumentType.other);
+      expect(await typeFor('SOMETHING_NEWER'), InstrumentType.unrecognised);
+    });
+
+    test('every status maps, and spendable is stated rather than derived',
+        () async {
+      Future<InstrumentStatus> statusFor(String wire) async =>
+          (await instrumentFrom(instrumentBody(status: wire))).status;
+
+      expect(await statusFor('ACTIVE'), InstrumentStatus.active);
+      expect(await statusFor('SUSPENDED'), InstrumentStatus.suspended);
+      expect(await statusFor('EXPIRED'), InstrumentStatus.expired);
+      expect(await statusFor('CANCELLED'), InstrumentStatus.cancelled);
+      expect(await statusFor('SOMETHING_NEWER'), InstrumentStatus.unrecognised);
+
+      // ACTIVE and spendable are different questions and the contract answers
+      // both; the mapper reads the answer rather than inferring one.
+      final held = await instrumentFrom(
+        instrumentBody(status: 'ACTIVE', spendable: false),
+      );
+      expect(held.status, InstrumentStatus.active);
+      expect(held.spendable, isFalse);
+    });
+
+    test('a mask that could be a full number is withheld at the boundary',
+        () async {
+      final held = await instrumentFrom(instrumentBody(mask: '4111111111111111'));
+      expect(held.mask.isWithheld, isTrue);
+      expect(held.mask.value, isNull);
+    });
+
+    test('the issuer link claim is read from the wire and never inferred',
+        () async {
+      expect(
+        (await instrumentFrom(instrumentBody())).impliesLiveIssuerLink,
+        isFalse,
+      );
+    });
+
+    test('a malformed shape is a stated failure naming the field', () async {
+      final missing = Map<String, Object?>.of(instrumentBody())..remove('mask');
+      final result = await repositoryFor(<String, Object?>{
+        'items': <Object?>[missing],
+        'page': <String, Object?>{
+          'limit': 50,
+          'returned': 1,
+          'hasMore': false,
+          'nextCursor': null,
+        },
+      }).repository.listForAccount(walletId);
+
+      expect(result.failureOrNull, isA<ContractViolationFailure>());
+      expect(
+        (result.failureOrNull! as ContractViolationFailure).location,
+        'PaymentInstrumentView.mask',
+      );
+    });
+
+    test('the request goes to the account it is nested under', () async {
+      final held = repositoryFor(<String, Object?>{
+        'items': <Object?>[],
+        'page': <String, Object?>{
+          'limit': 50,
+          'returned': 0,
+          'hasMore': false,
+          'nextCursor': null,
+        },
+      });
+      await held.repository.listForAccount(walletId, limit: 25);
+
+      final request = held.transport.requests.single;
+      expect(request.path, '/financial/accounts/$walletId/payment-instruments');
+      expect(request.method.wireName, 'GET');
+      expect(request.query['limit'], 25);
+    });
   });
 }

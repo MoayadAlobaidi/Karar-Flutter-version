@@ -1,18 +1,23 @@
-// The category-catalogue repository.
+// The category-catalogue repository, over the GENERATED client.
+//
+// A catalogue code is a value, not a vocabulary: the contract declares it as a
+// string with a pattern, so a code this build has never seen is still a code
+// and is carried through untouched. Nothing here maps it onto a closed set,
+// because there is no closed set to map it onto.
 import '../../../core/errors/result.dart';
-import '../../../core/networking/api_transport.dart';
-import '../../financial_accounts/data/financial_gateway.dart';
-import '../../financial_accounts/data/financial_wire.dart';
+import '../../../core/networking/generated/karar_api_client.dart';
+import '../../../core/networking/generated/models.dart';
+import '../../financial_accounts/data/contract_mapping.dart';
 import '../../financial_accounts/domain/page.dart';
 import '../domain/transaction_categories_repository.dart';
 import '../domain/transaction_category.dart';
 
-/// [TransactionCategoriesRepository] over the shared transport.
+/// [TransactionCategoriesRepository] over the generated client.
 final class ApiTransactionCategoriesRepository
     implements TransactionCategoriesRepository {
-  const ApiTransactionCategoriesRepository(this._gateway);
+  const ApiTransactionCategoriesRepository(this._client);
 
-  final FinancialGateway _gateway;
+  final KararApiClient _client;
 
   @override
   Future<Result<Page<TransactionCategory>>> listCategories({
@@ -20,35 +25,27 @@ final class ApiTransactionCategoriesRepository
     String? cursor,
     bool? assignableOnly,
   }) =>
-      guarded<Page<TransactionCategory>>(
-        'financial.categories',
-        () async => decodePage<TransactionCategory>(
-          await _gateway.get(
-            FinancialPaths.categories,
-            query: <String, Object?>{
-              'limit': limit,
-              'cursor': cursor,
-              'assignable': assignableOnly,
-            },
-            location: 'financial.categories',
-          ),
-          'financial.categories',
-          decodeCategory,
-        ),
-      );
+      guarded<Page<TransactionCategory>>('financial.categories', () async {
+        final response = await _client.listFinancialCategories(
+          limit: limit,
+          cursor: cursor,
+          assignable: assignableOnly,
+        );
+        return pageFrom<TransactionCategory, CategoryViewDto>(
+          response.items,
+          response.page,
+          categoryFromDto,
+        );
+      });
 }
 
 /// One catalogue entry.
-TransactionCategory decodeCategory(JsonMap json) {
-  const at = 'CategoryView';
-  final labels = json.object('labels', at);
-  return TransactionCategory(
-    code: json.string('code', at),
-    parentCode: json.stringOrNull('parentCode', at),
-    labelEn: labels.string('en', '$at.labels'),
-    labelAr: labels.string('ar', '$at.labels'),
-    catalogueVersion: json.string('catalogueVersion', at),
-    assignable: json.boolean('assignable', at),
-    retiredAt: json.instantOrNull('retiredAt', at),
-  );
-}
+TransactionCategory categoryFromDto(CategoryViewDto dto) => TransactionCategory(
+      code: dto.code,
+      parentCode: dto.parentCode,
+      labelEn: dto.labels.en,
+      labelAr: dto.labels.ar,
+      catalogueVersion: dto.catalogueVersion,
+      assignable: dto.assignable,
+      retiredAt: dto.retiredAt,
+    );
