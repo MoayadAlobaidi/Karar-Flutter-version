@@ -143,7 +143,7 @@ Every subject-owned table carries RLS `ENABLE` + `FORCE` with principal GUCs; th
 **Migrations `0088`, `0089` and `0090` were edited in place after being pushed at `f0b8412`.** They are unmerged and deployed nowhere, and the alternative — a corrective migration — would have preserved plaintext holder-sensitive columns that were never meant to exist. The consequence is stated rather than discovered: **any database provisioned at `f0b8412` fails checksum verification and must be recreated.**
 ## API changes
 
-**Twenty-seven operations over twenty-one paths, all under `/financial/*`.** The merged contract moves from 35 operations across 34 paths at the Phase 4 close to **62 operations across 55 paths**, and from 128 declared operation/status pairs to **273**. The fragments are authored by hand under ADR-0009 and merged into `openapi.yaml` by `$ref` per path:
+**Twenty-seven operations over twenty-one paths, all under `/financial/*`.** The merged contract moves from 35 operations across 34 paths at the Phase 4 close to **62 operations across 55 paths**, and from 128 declared operation/status pairs to **300**. The fragments are authored by hand under ADR-0009 and merged into `openapi.yaml` by `$ref` per path:
 
 | Fragment | Paths | Operations |
 |---|---|---|
@@ -235,7 +235,7 @@ The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, wh
 - **Account deletion is not exposed over HTTP**, and this is the one omission most likely to be read as an oversight. The cross-module cascade is **not atomic** — four module transactions, nothing spanning them — so a partial outcome is a real answer and the contract for reporting one has not been chosen. The use case exists, is tested, and is deliberately absent from the bundle the controllers can call.
 - **Categorization is assignment, not a pipeline.** A subject can set a transaction's category over HTTP; nothing applies merchant rules automatically, and no use case reads them.
 
-**Carried forward from Phase 4, unfixed by this work:** no build has run on a device, so the biometric prompt has never been shown to appear; no build is signed and no signing material exists; no Apple Team ID exists; the compound credential-abandonment guarantee is local-only; golden baselines are not CI-enforced; **EV-427 is `PENDING` and overdue**, with no DNS record and all seven registrar hardening rows still `TO_VERIFY`; and one maintainer holds every role. Runtime conformance still covers 82 of the 128 non-financial declared pairs — the Phase 5 surface brought its own suite covering 66 of its 145, so the merged contract's 273 pairs are 148 covered and 125 not.
+**Carried forward from Phase 4, unfixed by this work:** no build has run on a device, so the biometric prompt has never been shown to appear; no build is signed and no signing material exists; no Apple Team ID exists; the compound credential-abandonment guarantee is local-only; golden baselines are not CI-enforced; **EV-427 is `PENDING` and overdue**, with no DNS record and all seven registrar hardening rows still `TO_VERIFY`; and one maintainer holds every role. Runtime conformance still covers 82 of the 128 non-financial declared pairs — the Phase 5 surface brought its own suite covering 139 of its 172, so the merged contract's 300 pairs are 221 covered and 79 not.
 ## Review findings and their disposition
 
 An independent review pass was run over the remediated foundation. It implemented nothing; every fix below was made afterwards and re-verified.
