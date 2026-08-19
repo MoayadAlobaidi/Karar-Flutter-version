@@ -4,20 +4,25 @@
 
 **Gates block the merge, not merely the workflow run.** The legacy's gates *"block a workflow run, not a merge or a deploy; no enforcement path exists in the repository"* (INFRA-07).
 
-## Current status, and why four tests are asleep
+## Current status, and why three tests are asleep
 
-`pnpm arch:test` over the tree at `66ad086`: **24 passed, 0 failed, 4 deferred by activation phase**, registry errors 0, self-test ok, plus two supplementary checks (`admin-no-db-driver`, `phase5-ingestion-not-mounted-early`).
+`pnpm arch:test` over the tree at `ef1d155`: of the **27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred by activation phase**; registry errors 0; the self-test passes over 65 cases; and both supplementary checks (`admin-no-db-driver`, `phase5-ingestion-not-mounted-early`) pass. The registry's `currentPhase` is **5**.
 
-Each test carries an **activation phase** in [`architecture-test-registry.json`](architecture-test-registry.json), and the runner enforces the gate in both directions: a test whose activation phase has been reached with no implementation is a **registry error**, not a silent skip. The registry's `currentPhase` is **4**.
+**The runner's own summary line prints `25 passed`, and the discrepancy is arithmetic rather than substance.** It adds `admin-no-db-driver` to the pass count and does not add `phase5-ingestion-not-mounted-early`, which increments the failure count on a violation and increments nothing on a pass. The registry-derived figure above is the one to quote; the asymmetry is recorded here rather than resolved by choosing whichever number reads better.
+
+Each test carries an **activation phase** in [`architecture-test-registry.json`](architecture-test-registry.json), and the runner enforces the gate in both directions: a test whose activation phase has been reached with no implementation is a **registry error**, not a silent skip.
 
 | Deferred | Activation | Waiting on |
 |---|---|---|
 | 13 Sealed containment | 13 | No code carries `SEALED`-marked content to scan (Documents + Sealed Vault phase) |
 | 14 Grant required | 13 | Vault transaction isolation becomes implementable and checkable with the same phase |
-| 24 Resource limits declared | 5 | **A first ingestion path — manual or CSV — that is actually mounted.** None exists |
 | canary-purity | 13 | The sealed-integrity canary is designed and implemented (key-custody phase) |
 
-**Test 24 is the one worth explaining, because it looks like an omission and is not.** Its activation phase is 5 and Phase 5 is in progress, but the registry's `currentPhase` deliberately stays at **4**. Setting it to 5 would make test 24 a live obligation while no ingestion path exists for it to scan — so it would scan nothing and pass, which is the failure mode this repository has already been bitten by three times. The lock runs both ways: test 24 will refuse a phase-5 tree whose ingestion paths declare no limits, and the supplementary `phase5-ingestion-not-mounted-early` check refuses a pre-phase-5 tree that mounts an ingestion path at all. **Neither the marker nor the path can move without the other**, and `currentPhase` advances to 5 in the same change that lands the first mounted ingestion path.
+**Test 24 is the one worth explaining, because the lock it sits inside is the only one in this repository that runs in both directions.** Its activation phase is 5, and for most of Phase 5 the registry deliberately stayed at `currentPhase` 4: setting it to 5 while no ingestion path existed would have made the test scan nothing and pass, which is the failure mode this repository has already been bitten by three times. The other half of the lock, the supplementary `phase5-ingestion-not-mounted-early` check, refused a pre-phase-5 tree that mounted an ingestion path at all. **Neither the marker nor the path could move without the other** — and they moved together, in one commit that mounted the CSV upload and parse routes, implemented `checkResourceLimits`, flipped test 24 to `ACTIVE` with its `implementedIn`, advanced `currentPhase` 4 → 5, and updated the README status row.
+
+**What test 24 now enforces, and how its pass was shown to be non-vacuous.** It discovers real ingestion paths from the tree rather than from a maintained list — using the same definition the pre-activation guard used, so the two controls cannot disagree about what counts — and fails in both directions: a mounted path declaring no central policy, and a central policy naming a path that no longer exists. It also fails when the tree contains no real path at all. Two mutations of the live tree prove the pass is real rather than asserted: hardcoding a byte or row bound in a helper fails, naming `apps/api/src/financial/csv-body.ts`; removing the `INGESTION_LIMIT_POLICIES` reference from a mounted controller fails, naming `statement-import-source.controller.ts`. The first mutation is why the check scans the whole ingestion surface rather than only the files that mount a route: a controller can reference the central policy faithfully and then call a helper that hardcodes the number, and the helper is where the bound actually bites. That hole was found by mutating the real tree, not by the seeded self-tests — which is the argument for doing both.
+
+The supplementary `phase5-ingestion-not-mounted-early` check now scans zero files and passes trivially, because the marker has moved past it. It is kept rather than deleted: it is the guard that would fire again if the marker were ever rolled back with the routes left in place.
 
 The **self-test runs on every invocation**, not as a separate job: it seeds a violation per checker in a temporary tree and asserts each one fails and names the seeded file, then asserts that a set of legitimate shapes stays unflagged. A suite whose passes have not been shown to be non-vacuous on the same run is a suite that reports its own configuration.
 

@@ -61,7 +61,7 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
 | `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
 
-**As implemented in Phases 2–5** — **62 tables** across `platform`, `audit`, and `public`, created by **51 migrations** numbered `0001` through `0099` (number ranges owned per workstream, with deliberate gaps that stay gaps): 48 through Phase 3.5, and **fourteen** added by the Phase 5 financial data foundation. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md), whose row count is the cross-check on the table count above and currently agrees with it. Of the 62, **57 are mapped in Prisma** and verified against the live database by `scripts/db/prisma-mapping-check.mjs`; the five that are not are the platform and audit infrastructure tables no module owns. `readmodel` and `sealed` arrive with their phases.
+**As implemented in Phases 2–5** — **66 tables** across `platform`, `audit`, and `public`, created by **53 migrations** numbered `0001` through `0101` (number ranges owned per workstream, with deliberate gaps that stay gaps): 48 through Phase 3.5, and **eighteen** added by the Phase 5 financial data platform. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) — that register holds 62 rows, and the four it does not hold are the statement-import tables, declared in `modules/statement-imports/MODULE.md` because that module owns both the tables and the decision. Architecture test 25 reads both, so the split is checked rather than trusted. Of the 66, **61 are mapped in Prisma** and verified against the live database by `scripts/db/prisma-mapping-check.mjs`; the five that are not are the platform and audit infrastructure tables no module owns. `readmodel` and `sealed` arrive with their phases.
 
 | Table | Purpose | Classification |
 |---|---|---|
@@ -91,7 +91,7 @@ The Phase 3.5 domain tables, same convention:
 | [`capability`](../../modules/capability/MODULE.md) | `capability_availability`, `capability_availability_history`, `tenant_capability_entitlements`, `tenant_capability_entitlement_history` (`0076`–`0077`) |
 | [`subject-policy`](../../modules/subject-policy/MODULE.md) | `subject_policy_selections` (`0083`) |
 
-The Phase 5 financial tables, same convention. **They are reachable by nothing** — no route, no use-case wiring, no client method, nothing deployed — and are listed here because they exist in the schema, not because they are in use:
+The Phase 5 financial tables, same convention. They are reached by **27 operations over 21 `/financial/*` paths**, and `modules/provider-capabilities` is listed with them precisely because it owns **no table at all**:
 
 | Module | Tables |
 |---|---|
@@ -100,6 +100,8 @@ The Phase 5 financial tables, same convention. **They are reachable by nothing**
 | [`financial-connections`](../../modules/financial-connections/MODULE.md) | `financial_connections`, `account_source_links` (`0096`–`0097`) |
 | [`payment-instruments`](../../modules/payment-instruments/MODULE.md) | `payment_instruments` (`0098`) |
 | [`transfer-matching`](../../modules/transfer-matching/MODULE.md) | `transfer_matches` (`0099`) |
+| [`statement-imports`](../../modules/statement-imports/MODULE.md) | `statement_imports`, `statement_import_sources`, `statement_import_rows`, `statement_import_row_errors` (`0100`–`0101`) |
+| [`provider-capabilities`](../../modules/provider-capabilities/MODULE.md) | **none** — the module is typed profiles describing what a rail could do, and a profile that owned a row would look like a fact about a provider |
 
 ```mermaid
 graph TD
@@ -113,14 +115,15 @@ graph TD
   A --> T[Transaction]
   T --> P[TransactionProvenance]
   T --> TM[TransferMatch<br/>no amount]
-  ING[Ingestion: manual · CSV<br/>NOT BUILT] -.writes.-> T
-  API[HTTP route · client method<br/>NOT BUILT] -.reads.-> A
+  SI[StatementImport<br/>staged rows, reviewed] --commit--> T
+  ING[Manual entry · CSV upload<br/>BUILT] --writes--> SI
+  API[HTTP route<br/>27 operations] --reads--> A
+  CLI[Client method · screen<br/>NOT BUILT] -.would call.-> API
 
-  style ING stroke-dasharray: 5 5
-  style API stroke-dasharray: 5 5
+  style CLI stroke-dasharray: 5 5
 ```
 
-**Dashed boxes are not built.** Every solid box is a table that exists and code that has been tested against live PostgreSQL, and none of it is reachable.
+**The dashed box is the one that is not built.** Every solid box is a table that exists, code tested against live PostgreSQL, and — where it is a route — an operation the runtime-conformance suite drives for real. **Staged import rows are not financial records**: they live in their own tables, they are inert, and only a reviewed commit turns them into transactions.
 
 Seven concepts the Phase 5 model keeps apart, following [ADR-0028](../adr/0028-multi-rail-financial-sources.md), because collapsing any pair produces a specific untruth:
 
@@ -310,7 +313,7 @@ Architecture test 22 detects all three failure shapes the legacy exhibits:
 | Enabled but no policy | The only shape the legacy's own guard tested for |
 | **FORCEd but not enabled** | The admin audit log itself (RLS-02) |
 
-**Active since Phase 3** (CODE). Current coverage, as architecture test 22 reports it over the tree at `66ad086`: **62 tables scanned across 51 migrations — 32 RLS-enabled and FORCEd, 37 allow-listed** in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, **7 deliberately both** (identity's bootstrap-armed tables). The Phase 5 additions split the same way as everything before them: every subject-owned financial table is ENABLE + FORCE with principal GUCs, and the three catalogue tables that sit outside the tenant boundary (`institutions`, `financial_categories`, `merchant_rules`) are allow-listed rather than given a no-op policy, so a reviewer reads them in the register instead of inferring them from an absent one. Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
+**Active since Phase 3** (CODE). Current coverage, as architecture test 22 reports it over the tree at `ef1d155`: **66 tables scanned across 53 migrations — 36 RLS-enabled and FORCEd, 37 allow-listed** in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, **7 deliberately both** (identity's bootstrap-armed tables). The Phase 5 additions split the same way as everything before them: every subject-owned financial table is ENABLE + FORCE with principal GUCs, the four statement-import tables included, and the three catalogue tables that sit outside the tenant boundary (`institutions`, `financial_categories`, `merchant_rules`) are allow-listed rather than given a no-op policy, so a reviewer reads them in the register instead of inferring them from an absent one. Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
 
 The six new allow-list entries are all Phase 3.5 reference or deployment-wide configuration with no tenant or subject column to scope on: the country and jurisdiction registers, jurisdiction settings, the pack-activation ledger, and capability availability with its history. The five new ENABLE+FORCE tables are the ones that do have a subject or tenant: both jurisdiction-assignment tables, subject policy selections, and the tenant entitlement table with its history. Each carries its own compensating grants — `karar_app` holds `SELECT` only on the reference and configuration tables, and `SELECT`+`INSERT` only on the ledgers. A tenant predicate on capability availability would fabricate a relationship that does not exist and break resolution for every tenant at once, which is the reason recorded in the entry.
 

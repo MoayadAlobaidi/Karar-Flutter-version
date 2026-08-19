@@ -76,8 +76,8 @@ export class LocalKeyedFileFingerprintProvider implements SourceFileFingerprintP
 
   readonly #rootKey: Buffer;
 
-  constructor(options: { readonly rootKey?: Uint8Array } = {}) {
-    const rootKey = options.rootKey ?? randomBytes(ROOT_KEY_BYTES);
+  constructor(options: { readonly rootKey: Uint8Array }) {
+    const rootKey = options.rootKey;
     if (rootKey.length !== ROOT_KEY_BYTES) {
       throw new Error(
         `the source-file fingerprint root key must be ${ROOT_KEY_BYTES} bytes, got ${rootKey.length}`,
@@ -137,4 +137,48 @@ export function fileFingerprintsEqual(
   const a = Buffer.from(left.value, 'utf8');
   const b = Buffer.from(right.value, 'utf8');
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The one environment token a local-only key holder may be reached in. */
+const LOCAL_ENVIRONMENT = 'local';
+
+export class SourceFileFingerprintKeyUnavailableError extends Error {
+  override readonly name = 'SourceFileFingerprintKeyUnavailableError';
+  readonly env: string;
+
+  constructor(env: string) {
+    super(
+      `no approved source-file fingerprint provider is wired for KARAR_ENV='${env}', and there is ` +
+        'no fallback. The fingerprint is how a re-uploaded statement is recognised as the one ' +
+        'already committed, so a root key minted here would make every digest already stored ' +
+        'incomparable — duplicate detection would report success while detecting nothing',
+    );
+    this.env = env;
+  }
+}
+
+/**
+ * The single seam a composition root uses to obtain the port.
+ *
+ * The provider used to mint its own root key when none was supplied, which is
+ * the failure this resolver exists to prevent: a generated key nobody can
+ * reproduce silently turns every stored digest into a value nothing will ever
+ * match again. `rootKey` is now required, so the class cannot produce one by
+ * omission, and the environment decides whether a local key holder may exist
+ * at all — never the order in which a composition root happens to construct
+ * things.
+ */
+export function resolveSourceFileFingerprintPort(options: {
+  readonly env: string;
+  readonly approvedProvider?: SourceFileFingerprintPort | null;
+  readonly localRootKey?: Uint8Array;
+}): SourceFileFingerprintPort {
+  const approved = options.approvedProvider ?? null;
+  if (approved !== null) return approved;
+  if (options.env !== LOCAL_ENVIRONMENT) {
+    throw new SourceFileFingerprintKeyUnavailableError(options.env);
+  }
+  return new LocalKeyedFileFingerprintProvider({
+    rootKey: options.localRootKey ?? randomBytes(ROOT_KEY_BYTES),
+  });
 }

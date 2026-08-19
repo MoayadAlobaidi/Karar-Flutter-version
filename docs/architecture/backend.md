@@ -39,7 +39,8 @@ karar/
 │   │                         errors, observability, events/outbox/jobs (Phase 2);
 │   │                         Prisma runtime, principal context, rate limiting,
 │   │                         trusted-proxy http, notifications port (Phase 3);
-│   │                         ingestion limit policies (Phase 5, unenforced)
+│   │                         ingestion limit policies (Phase 5, enforced on the
+│   │                         mounted CSV upload and held by architecture test 24)
 │   ├── consent-local-fixtures/            — devDependency only. Never installed
 │   └── financial-retention-local-fixtures/  in a deployed build
 ├── modules/                — bounded contexts
@@ -78,7 +79,7 @@ Wiring is **ordinary NestJS module imports**. The capability registry governs av
 
 ### Modules with code
 
-Seventeen of the twenty-seven module directories have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. Twelve are listed below with the HTTP surface and mechanics they landed; the five Phase 5 financial contexts follow in their own table, kept separate because **none of them is reachable by anything.** One phrase each:
+Nineteen of the twenty-nine module directories have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. Twelve are listed below with the HTTP surface and mechanics they landed; the seven Phase 5 contexts follow in their own table, kept separate because their surface arrived in one piece and is read as one. One phrase each:
 
 | Module | Landed mechanics (Phase) |
 |---|---|
@@ -95,7 +96,7 @@ Seventeen of the twenty-seven module directories have implementations; each `MOD
 | `subject-policy` | Immutable, version-pinned records of a subject's pack-permitted elections; option content stays capability-owned; no events, no HTTP surface (3.5) |
 | `bootstrap` | `GET /platform/bootstrap` and `POST /platform/tenant-binding`; composes client-safe views and owns no data (3.5). Since Phase 4 every enrichment port returns a **tagged outcome**, so a store fault and a legitimately empty answer are different values rather than the same one (4) |
 
-The five Phase 5 financial contexts, listed apart because **not one of them has a controller, a route, a composition-root binding, a client method or a screen.** They are schema, domain, ports, repositories and tests, and a request has never traversed any of them:
+The seven Phase 5 contexts. Six of them are reached by **27 operations over 21 `/financial/*` paths**, composed in `apps/api/src/composition/phase5-modules.ts` and served by eight controllers; the seventh owns no table and serves nothing. The generated Dart client carries the matching 27 methods because it is generated from the whole contract — **and nothing in `apps/mobile/lib/` calls one**, so there is still no financial surface on the client:
 
 | Module | Landed mechanics (Phase) |
 |---|---|
@@ -103,9 +104,11 @@ The five Phase 5 financial contexts, listed apart because **not one of them has 
 | `transactions` | Signed `BIGINT` minor units, booked dates as `CalendarDay` rather than instants (ADR-0027), append-only revisions and provenance, keyed versioned dedup fingerprints with an occurrence rule enforced by trigger and by repository, category assignments with one `ACTIVE` row (5) |
 | `financial-connections` | Thirteen named acquisition rails with only `MANUAL` and `USER_FILE_UPLOAD` writable — refused otherwise by database CHECK; account source links as a many-to-many; a keyed, per-subject, versioned source-account fingerprint; **no credential column anywhere**, proved against `information_schema` (5) |
 | `payment-instruments` | What spends from an account, with **no balance column** and six independent mechanisms holding that absence; the account an instrument spends from frozen by trigger (5) |
-| `transfer-matching` | Two of a person's transactions recorded as one movement of their own money, carrying **no amount**; erased before the transactions it names, through a port `transactions` declares (5) |
+| `transfer-matching` | Two of a person's transactions recorded as one movement of their own money, carrying **no amount**; erased before the transactions it names, through a port `transactions` declares; the cross-side race closed with ordered advisory locks (5) |
+| `statement-imports` | A CSV statement staged behind review: draft, upload, parse, preview, commit or erase, with the arrows enforced by a trigger (SQLSTATE `KAR51`) rather than by a use case. **Parsing writes no financial record**; only a reviewed commit does, atomically and idempotently. The uploaded bytes are encrypted and their locator never leaves the server (5) |
+| `provider-capabilities` | Typed profiles of what a rail *could* do. **No table, and it executes nothing** — a described rail is not an executable one, an app is not an API, and `VERIFIED` requires named evidence. No real provider appears anywhere in it (5) |
 
-A sixth directory, `modules/statement-imports`, is **under construction** as this is written. It has no `MODULE.md`, no committed migration, and **no mounted route** — nothing in `apps/api` composes it. It is named here so a reader who finds the directory knows it is in progress rather than undocumented, and nothing about statement import may be read as implemented until its own report says so. **CSV ingestion is not implemented.**
+**The permissions these seven declare are a special case worth naming.** Six of them declare twelve permissions between them, every one held by `USER` and by nothing else — and **none is seeded by a migration and none is consulted by a route.** The mounted financial surface authorises by the session's server-side tenant binding, the application-layer access ports, and RLS. That is a narrower enforcement story than the documented rule, and the exact shape of the gap is in [`../security/access-control.md`](../security/access-control.md): the Phase 3 and 3.5 modules enforce their permissions inside their use cases through each module's `PolicyService` port, while the financial surface has no policy call at all. `provider-capabilities` declares no permission, because it exposes nothing.
 
 Phase 4 added four client-facing operations and no table. `GET /tenancy/memberships` lists the caller's own active memberships and is deliberately **tenantless** — mounted through its own module with a principal source that drops the tenant id, so it cannot receive the tenant-bound principal and onboarding can call it before a binding exists. `GET /jurisdiction/declarable-references` and `POST /jurisdiction/self-declaration` let a subject declare a jurisdiction as `USER_DECLARED` / `UNVERIFIED`, which exists because both operator write paths are gated on a deliberately unseeded permission and bootstrap otherwise reported no jurisdiction forever; the offered set and the accepted set share **one predicate**, so they cannot drift apart. `GET /consent/documents/{documentId}/content` serves a legal document's text, hash-verified against the version that published it — and answers an unknown document and another entity's document **byte-identically**, so the catalogue is not an oracle.
 
@@ -236,7 +239,7 @@ Use cases return `Result<T, DomainError>`. Exceptions are for genuinely exceptio
 
 Separately, all seventeen `/auth` operations described their response bodies in **prose** and attached no schema, which meant the generated Dart client decoded them as untyped JSON and no runtime check could hold the server to anything. They now carry full schemas built from shared components, including the login 200 as a `oneOf` over the authenticated and MFA-required branches. That ledger asserts empty too.
 
-Both are held by the runtime conformance suite, which validates real serialized responses from the composed application against the OpenAPI document across 82 of the 128 declared operation/status pairs ([`flutter.md` §8](flutter.md)).
+Both are held by the runtime conformance suite, which validates real serialized responses from the composed application against the OpenAPI document across 82 of the 128 non-financial declared operation/status pairs ([`flutter.md` §8](flutter.md)). The Phase 5 financial surface brought its own file rather than joining that one, because the Phase 3 suite drives a single long ordered scenario and adding twenty-seven operations to it would let one failure hide the rest. It carries its own ledger, asserted the same way, over **66 of the 145 pairs the financial fragments declare** — so the merged contract's 273 pairs are 148 covered and 125 not.
 
 **What reaches a client is a narrower set, decided in one place.** Since Phase 3.5 only actionable reasons cross the edge — `CONSENT_REQUIRED`, `RECONSENT_REQUIRED`, `ENTITLEMENT_MISSING`, `ENTITLEMENT_EXPIRED`, and `PENDING_PROVIDER` where the descriptor opts in. Legal, jurisdictional, and not-yet-built reasons are not rendered as an unavailable capability; the capability is **omitted entirely**, because naming the reason would advertise that it exists ([`capability-registry.md` §5](capability-registry.md)).
 
@@ -283,7 +286,7 @@ Production log level must retain the forensic timeline the incident plan depends
 | `application/` | Use case tests with in-memory port fakes |
 | `infrastructure/` | Integration against a real PostgreSQL in Docker |
 | Tenant isolation | **Adversarial** cross-tenant tests asserting on **non-empty expected data** |
-| Architecture | 26 tests plus a canary-purity check, CI-blocking; the current run is 24 passed, 0 failed, 4 deferred by activation phase |
+| Architecture | 26 tests plus a canary-purity check, CI-blocking; of the 27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred to phase 13 |
 | Database sessions | Pinned to UTC at connection startup, and verified against **PostgreSQL 17.10 with the server default left at `Asia/Qatar`** — CI's `postgres:17-alpine` runs UTC and would agree with the code's assumption rather than test it |
 
 The non-empty assertion is not pedantry. The legacy's tenant roster returns empty for everyone because a policy is missing, and *an empty result is indistinguishable from correct isolation* — so the isolation claim on that endpoint has never actually been tested.

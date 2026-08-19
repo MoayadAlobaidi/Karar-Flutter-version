@@ -311,20 +311,41 @@ export {
 } from './infrastructure/persistence/prisma-financial-record-lifecycle.js';
 export { TransactionStoreError } from './infrastructure/persistence/row-mappers.js';
 export { Uuidv7IdSource } from './infrastructure/persistence/uuidv7-id-source.js';
+// The one environment token the three local-only adapters below accept.
+export { LOCAL_ENVIRONMENT } from './infrastructure/providers/local-environment.js';
 // LOCAL/TEST ONLY — both hold key material in process memory. Production
 // binds these ports to adapters over the platform's key-management provider
 // (ADR-0017), with custody, rotation, and the sealed-integrity canary.
-export { LocalAesGcmFieldEncryptionProvider } from './infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
+//
+// **A composition root binds the RESOLVERS, never the classes.** Each resolver
+// returns the approved provider when one is wired, gives `local` the adapter
+// below, and throws for every other environment — with no fallback to a
+// generated key, which would leave stored ciphertext unreadable and stored
+// dedup digests incomparable. The classes themselves no longer mint key
+// material at all: both take it as a required argument, so no reordering,
+// helper extraction or lazy construction in a composition root can produce a
+// working local provider by accident. That ordering hazard is what these
+// resolvers exist to remove.
+export {
+  LOCAL_HSF_KEY_VERSION,
+  LocalAesGcmFieldEncryptionProvider,
+  resolveHsfFieldEncryptionPort,
+} from './infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 export {
   DEDUP_FINGERPRINT_VERSION,
+  DedupFingerprintKeyUnavailableError,
   LocalKeyedDedupFingerprintProvider,
   fingerprintsEqual,
+  resolveDedupFingerprintPort,
 } from './infrastructure/providers/local-keyed-dedup-fingerprint-provider.js';
 // LOCAL ONLY — and it enforces that itself: constructing it outside a local
 // environment throws, because a decision with no legal effect must not be
 // able to govern real data. A deployed environment binds the retention port
 // to the PolicyPack slot, which today answers PENDING_LEGAL_REVIEW.
 export {
+  FIXTURE_ENVIRONMENT,
   LocalRetentionFixtureMissingError,
   LocalSyntheticRetentionDecisionProvider,
+  LocalTransactionRetentionFixtureEnvironmentError,
+  resolveTransactionRetentionDecisionPort,
 } from './infrastructure/providers/local-synthetic-retention-decision-provider.js';

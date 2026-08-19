@@ -371,6 +371,8 @@ export {
 export {
   SOURCE_FILE_FINGERPRINT_VERSION,
   LocalKeyedFileFingerprintProvider,
+  SourceFileFingerprintKeyUnavailableError,
+  resolveSourceFileFingerprintPort,
   fileFingerprintsEqual,
 } from './infrastructure/providers/local-keyed-file-fingerprint-provider.js';
 // LOCAL ONLY — and it enforces that itself: constructing it outside a local

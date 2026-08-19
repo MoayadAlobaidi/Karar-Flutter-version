@@ -28,7 +28,7 @@
 
 ### The Phase 5 financial permissions, and the staff permissions that do not exist
 
-Five bounded contexts declare ten permissions between them, every one held by `USER` and by nothing else. **None of them is seeded, mounted or reachable** — no controller, route or guard consults any of them, because no endpoint exists.
+Six bounded contexts declare twelve permissions between them, every one held by `USER` and by nothing else.
 
 | Module | Permissions |
 |---|---|
@@ -37,8 +37,13 @@ Five bounded contexts declare ten permissions between them, every one held by `U
 | `payment-instruments` | `accounts.instrument.read` · `accounts.instrument.write` |
 | `transactions` | `transactions.transaction.read` · `transactions.transaction.write` |
 | `transfer-matching` | `accounts.transfer.read` · `accounts.transfer.write` |
+| `statement-imports` | `transactions.import.read` · `transactions.import.write` |
 
-**What is absent is the design.** There is no staff permission returning one customer's accounts, connections, source links, instruments, transactions or transfer matches, and none may be added — each of those sets is a different disclosure about the same person. A source link says which institutions someone deals with and, through its fingerprint, which of their accounts are the same account; an instrument list says which products they hold and which accounts they spend from; a transfer-match set says which of their accounts feed which, and how often. And no `?userId=` parameter is accepted anywhere.
+**None of the twelve is seeded by a migration, and no route consults one.** That was uncontroversial while no endpoint existed; it is a real statement now that 27 operations over 21 `/financial/*` paths are mounted. **Authorisation on the financial surface is three other things**, and they are what actually deny: the principal comes exclusively from the session's server-side tenant binding, resolved in one file, so a request with no principal answers 401 and one with no tenant binding answers 403 — different remedies, deliberately distinguished; every write resolves its target account through an application-layer access port before being accepted; and every repository binds the RLS principal context per transaction. A foreign account id answers **404**, identically to an unknown one, so the surface is not an existence oracle.
+
+**That is a narrower enforcement story than the documented rule**, which is `requirePermission(...)` on the route *and* `authorize()` inside the use case, and it is recorded here as a difference rather than presented as equivalent. Two facts about that gap need stating exactly, because a reader could otherwise infer the wrong one. First, the Phase 3 and 3.5 modules enforce their permissions **inside their use cases**, through each module's own `PolicyService` port — `tenancy`, `authorization`, `operating-entity`, `consent`, `jurisdiction`, `capability` and `control-plane` all call `authorize(...)` before acting. Second, the `requirePermission(...)` guard factory in `modules/authorization/presentation/http/` is **declared and has no production call site anywhere in the repository**; the only code that mints one is the authorization module's own guard test. So the financial surface is not an outlier in skipping the route-level half — nothing mounts that half — but it is an outlier in having no use-case half either: its twelve permissions are declared and consulted by nothing. Closing that gap, by seeding the twelve and calling through a policy port, is work this phase has not done.
+
+**What is absent is the design.** There is no staff permission returning one customer's accounts, connections, source links, instruments, transactions, statement imports or transfer matches, and none may be added — each of those sets is a different disclosure about the same person. A source link says which institutions someone deals with and, through its fingerprint, which of their accounts are the same account; an instrument list says which products they hold and which accounts they spend from; a transfer-match set says which of their accounts feed which, and how often; a statement import is the raw file a bank sent them. And **no `?userId=` or `?tenantId=` parameter is accepted anywhere on the mounted surface** — not in a path, a query, a header or a body. That is proved three ways rather than asserted: a mutation-checked source scan, a contract check that no operation declares such a parameter, and a runtime request carrying `?userId=`, `?tenantId=` and `x-tenant-id` that returns byte-for-byte what the same request returns without them.
 
 ## 3. Roles
 

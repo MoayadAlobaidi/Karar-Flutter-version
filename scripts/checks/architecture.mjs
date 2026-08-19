@@ -3673,7 +3673,12 @@ function main() {
 
   const preActivation = checkIngestionNotMountedBeforePhase5({ root: REPO_ROOT });
   const preActivationStatus = preActivation.violations.length === 0 ? 'PASS' : 'FAIL';
-  if (preActivation.violations.length > 0) failCount += 1;
+  // Counted on BOTH arms, like the check above it. Incrementing only on failure
+  // made the summary undercount by one whenever this passed, so the printed
+  // total disagreed with the rows above it — and a summary that does not match
+  // its own detail is the first thing a reader stops trusting.
+  if (preActivationStatus === 'FAIL') failCount += 1;
+  else passCount += 1;
   console.log(
     `${preActivationStatus.padEnd(7)} supplementary     phase5-ingestion-not-mounted-early (files scanned: ${preActivation.scanned})`,
   );

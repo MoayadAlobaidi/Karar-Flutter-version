@@ -54,9 +54,13 @@ import type {
   TransactionRetentionDecision,
   TransactionRetentionDecisionPort,
 } from '../../application/ports/transaction-retention-decision.js';
+import { LOCAL_ENVIRONMENT } from './local-environment.js';
 
-/** The only environment this fixture may exist in. */
-export const FIXTURE_ENVIRONMENT = 'local';
+/**
+ * The only environment this fixture may exist in — the module-wide token, not
+ * a second opinion about what "local" means.
+ */
+export const FIXTURE_ENVIRONMENT = LOCAL_ENVIRONMENT;
 
 /**
  * The fixture's self-description. It names itself a fixture in the basis
@@ -125,16 +129,31 @@ function loadRetentionFixture(): RetentionFixtureModule {
   return loaded;
 }
 
+/**
+ * The typed refusal both the constructor and the resolver raise. It was a bare
+ * `Error`, which meant the only way to identify it was to match its message —
+ * and a message is prose that gets reworded. The wording below is unchanged so
+ * that existing assertions on it still hold; the name is what callers should
+ * match on from here.
+ */
+export class LocalTransactionRetentionFixtureEnvironmentError extends Error {
+  override readonly name = 'LocalTransactionRetentionFixtureEnvironmentError';
+
+  constructor(readonly env: string) {
+    super(
+      `the synthetic transaction-retention fixture may only be constructed in the '${FIXTURE_ENVIRONMENT}' ` +
+        `environment, not '${env}'. It carries no legal effect, and a deployed ` +
+        'environment must resolve retention from a PolicyPack decision or refuse to write — ' +
+        'substituting a duration is the fabricated legal answer this refusal exists to prevent ' +
+        '(modules/transactions/MODULE.md)',
+    );
+  }
+}
+
 export class LocalSyntheticRetentionDecisionProvider implements TransactionRetentionDecisionPort {
   constructor(options: { readonly environment: string }) {
     if (options.environment !== FIXTURE_ENVIRONMENT) {
-      throw new Error(
-        `the synthetic transaction-retention fixture may only be constructed in the '${FIXTURE_ENVIRONMENT}' ` +
-          `environment, not '${String(options.environment)}'. It carries no legal effect, and a deployed ` +
-          'environment must resolve retention from a PolicyPack decision or refuse to write — ' +
-          'substituting a duration is the fabricated legal answer this refusal exists to prevent ' +
-          '(modules/transactions/MODULE.md)',
-      );
+      throw new LocalTransactionRetentionFixtureEnvironmentError(String(options.environment));
     }
   }
 
@@ -152,4 +171,33 @@ export class LocalSyntheticRetentionDecisionProvider implements TransactionReten
       effect: 'SYNTHETIC_NO_LEGAL_EFFECT',
     });
   }
+}
+
+/**
+ * The single seam a composition root uses to obtain the port.
+ *
+ * `local` gets the labelled fixture. Every other environment must supply a
+ * provider that reads a reviewed decision, and gets a throw when it does not.
+ * There is deliberately no third branch: no default period, no "permissive
+ * until launch" flag, and no reuse of the fixture.
+ *
+ * The fixture's constructor already refuses outside `local`, so this resolver
+ * is not what makes the module safe. It exists so that the composition root
+ * names a PORT rather than a class — every Phase 5 port arrives through a
+ * resolver of this shape, and a reader checking that a surface fails closed
+ * does not have to know which of the constructions happen to guard themselves.
+ * `modules/financial-accounts`' `resolveRetentionDecisionPort` is the same
+ * seam for the same reason.
+ */
+export function resolveTransactionRetentionDecisionPort(options: {
+  readonly env: string;
+  /** The deployment's PolicyPack-backed provider, when one is wired. */
+  readonly approvedProvider?: TransactionRetentionDecisionPort | null;
+}): TransactionRetentionDecisionPort {
+  const approved = options.approvedProvider ?? null;
+  if (approved !== null) return approved;
+  if (options.env !== FIXTURE_ENVIRONMENT) {
+    throw new LocalTransactionRetentionFixtureEnvironmentError(options.env);
+  }
+  return new LocalSyntheticRetentionDecisionProvider({ environment: options.env });
 }

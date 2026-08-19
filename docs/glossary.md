@@ -232,7 +232,7 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **Per-environment application identifier** — the rule that each of the four environments ships under its own Android `applicationId` and iOS `CFBundleIdentifier`. Its practical consequence is that **`KARAR_ENV` has no default**: a build told nothing about its environment is refused rather than becoming a production-identified artifact, which is why `flutter run` and Xcode-IDE builds require the dart-define.
 
-**Runtime conformance** — validating real serialized responses from the *composed* application against the OpenAPI document that describes them, as opposed to the drift check, which binds the contract to the generated client. Covers 82 of 128 declared operation/status pairs. Distinct from a contract test in that nothing is mocked: real composition root, real guards, real serializer, live PostgreSQL and Redis.
+**Runtime conformance** — validating real serialized responses from the *composed* application against the OpenAPI document that describes them, as opposed to the drift check, which binds the contract to the generated client. Two suites, one per surface: 82 of the 128 non-financial declared operation/status pairs, and 66 of the 145 the `/financial/*` fragments declare — 148 of the merged contract's 273. Distinct from a contract test in that nothing is mocked: real composition root, real guards, real serializer, live PostgreSQL and Redis.
 
 **Deviation ledger** — a test whose expected value is the **empty** set, replacing a list of known-and-tolerated exceptions. Phase 4 emptied two: problem documents served under the wrong media type, and operations describing their responses in prose with no schema. The point is that a new instance becomes a failing test rather than a silent addition to a list nobody re-reads.
 
@@ -252,9 +252,9 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 ---
 
-## Financial data foundation (Phase 5)
+## Financial data platform (Phase 5)
 
-Added while Phase 5 was in progress. **Every term below names schema and backend code that no route, client method or screen reaches**, under [ADR-0027](adr/0027-calendar-day-and-instant.md) and [ADR-0028](adr/0028-multi-rail-financial-sources.md).
+Added while Phase 5 was in progress, under [ADR-0027](adr/0027-calendar-day-and-instant.md) and [ADR-0028](adr/0028-multi-rail-financial-sources.md). **Every term below names schema and backend code that 27 mounted `/financial/*` operations now reach — and that no screen renders, no deployment runs, and no available capability exposes.**
 
 **Issuer** — who offers a financial product: a bank, e-money issuer, mobile-money operator, telco financial service, payment institution, fintech wallet, card issuer, exchange house, or other. **One row per issuer globally**, in a reviewed catalogue. Its code carries no country prefix, because a code beginning `QA_` reads as a fact about where the issuer belongs and invites a duplicate the moment a second market appears.
 
@@ -289,6 +289,14 @@ Added while Phase 5 was in progress. **Every term below names schema and backend
 **CalendarDay** — the **tenth** shared-kernel universal ([ADR-0027](adr/0027-calendar-day-and-instant.md), ACCEPTED). A date on a statement is what an institution wrote on its books: no time, therefore no timezone, therefore nothing to shift by. Stored as an instant it moves across day and month boundaries for readers at different offsets, and a statement for August gains or loses a line depending on where it is read.
 
 **HSF field encryption** — per-field AES-256-GCM for `HIGHLY_SENSITIVE_FINANCIAL` values, stored as a ciphertext / nonce / auth-tag triple with algorithm and key version per row and **no plaintext column**. The AAD binds tenant, user, table, row and field, so a ciphertext moved elsewhere fails to open rather than decoding as another subject's data.
+
+**Statement import** — one CSV statement as a state machine: `DRAFT` → `SOURCE_STORED` → `PARSING` → `REVIEW_REQUIRED` → `COMMITTING` → `COMMITTED`, with `REJECTED`, `FAILED`, `DUPLICATE` and `ERASED` as the exits. The arrows are enforced by a database trigger rather than by a use case, because the invariant that matters — **no canonical transaction is written before the subject has reviewed** — is a claim about ordering, and an ordering claim living only in a use case is a claim about the code path somebody happened to take.
+
+**Staged row** — a parsed statement line, normalised, fingerprinted and **inert**. It is not a financial record and it lives in its own table with deliberately different column names (`staged_row_fingerprint`, never `dedup_fingerprint`), so nothing reading the catalogue can mistake one for the other. Only a reviewed commit turns staged rows into transactions.
+
+**Column mapping** — which CSV column means what, supplied as an **argument to the parse** rather than stored as a draft. There is therefore no operation that updates a mapping: correcting one means parsing again from the stored source, and an endpoint that appeared to save a mapping and changed nothing would be worse than its absence.
+
+**Provider capability profile** — a typed description of what a rail *could* do for a given provider. It owns **no table and executes nothing**: a described rail is not an executable one, an app is not an API, and a `VERIFIED` capability state is unconstructible without an evidence reference a human recorded. **No real provider appears in any profile**, no capability is `VERIFIED`, and `provider_access_status` is `NOT_IMPLEMENTED` on every institution market — `AVAILABLE` is refused by database CHECK unless regulatory evidence is named.
 
 ---
 

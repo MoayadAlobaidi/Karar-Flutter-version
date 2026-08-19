@@ -31,9 +31,9 @@ Two entries that a reader may expect here and will not find in the registry:
 | `FINANCIAL_ACCOUNTS`, `FINANCIAL_CONNECTIONS`, `PAYMENT_INSTRUMENTS`, `TRANSFER_MATCHING` | **Bounded contexts, not registry capability ids.** The closed union has seven members and none of these is one of them |
 | `FUNDRAISING` | **Deliberately absent from the runtime registry.** Documentation-only future concept: no id, no descriptor, nothing in the platform can reference it |
 
-**Module boundaries and capability ids are deliberately different things.** The `TRANSACTIONS` capability sits above five Phase 5 bounded contexts — `financial-accounts`, `transactions`, `financial-connections`, `payment-instruments`, `transfer-matching` — and none of them earns its own id. A user who has accounts but no transactions has nothing, and the reverse is incoherent, so a second id would add a dimension the product does not have while widening the surface that availability, entitlement and PolicyPack clearing all have to reason about. Adding one would need an ADR, a change here, a registry change, and an analysis of its bootstrap and client exposure.
+**Module boundaries and capability ids are deliberately different things.** The `TRANSACTIONS` capability sits above seven Phase 5 bounded contexts — `financial-accounts`, `transactions`, `financial-connections`, `payment-instruments`, `transfer-matching`, `statement-imports`, `provider-capabilities` — and none of them earns its own id. A user who has accounts but no transactions has nothing, and the reverse is incoherent, so a second id would add a dimension the product does not have while widening the surface that availability, entitlement and PolicyPack clearing all have to reason about. Adding one would need an ADR, a change here, a registry change, and an analysis of its bootstrap and client exposure.
 
-**All five contexts are `NOT_IMPLEMENTED` at the registry and that is accurate**, not a lag. Schema and domain code exist; no controller, route, composition-root binding, client method or screen does. `IMPLEMENTED` in this registry means the capability's code exists as something a deployment could expose, and nothing here can be exposed.
+**`TRANSACTIONS` is `NOT_IMPLEMENTED` at the registry even though 27 operations now answer, and that is the row working rather than lagging.** `IMPLEMENTED` here means the capability's code exists as something a deployment *could* expose — and a deployment could not: no environment is provisioned, no PolicyPack clears the capability, `qa/v1` clears nothing, `declaredJurisdictions` is empty, and no client calls a single one of the generated methods. A mounted route in a local process is evidence about a code path, not about availability. The row moves when the capability is exposable, and even then `IMPLEMENTED` gates nothing on its own.
 
 ## 2. Platform capabilities
 
@@ -82,11 +82,13 @@ graph TB
         AZ[authorization] --- TN
         OE[operating-entity] --- CO[consent]
     end
-    subgraph "Financial Data — built, reachable by nothing"
+    subgraph "Financial Data — built and served over HTTP, deployed nowhere"
         TX[transactions] --> FA[financial-accounts]
         FC[financial-connections] --> FA
         PI[payment-instruments] --> FA
         TM[transfer-matching] --> TX
+        SI[statement-imports] --> TX
+        PC[provider-capabilities<br/>no table, executes nothing]
     end
     subgraph "Financial Intelligence"
         BU[budgets] --- GO[goals] --- IN[insights] --- ZK[zakat]

@@ -1,5 +1,6 @@
 /**
- * LOCAL AND TEST keyed dedup fingerprint.
+ * LOCAL AND TEST keyed dedup fingerprint, and the fail-closed seam every
+ * environment passes through to reach it.
  *
  * **This is the LOCAL/TEST adapter.** It holds a root key in process memory;
  * production binds `DedupFingerprintPort` to an adapter that resolves the
@@ -7,6 +8,35 @@
  * the same custody and rotation story as any other key. Everything else here
  * — the derivation, the canonical encoding, the version handling — IS the
  * production design, because those are what the unique constraint depends on.
+ *
+ * ## Why the environment guard is in THIS file
+ *
+ * It used to be nowhere. This adapter constructed anywhere, minting a random
+ * root key for itself when the caller supplied none, and the only thing
+ * keeping it out of a deployed process was that the composition root happened
+ * to build guarded providers on earlier lines. Reordering those lines,
+ * extracting a helper, constructing lazily, or composing this module from a
+ * second entry point would have enabled in-process key material in a deployed
+ * environment with nothing failing.
+ *
+ * Two changes remove that ordering dependency, and neither can be undone by
+ * moving a line:
+ *
+ * 1. **This adapter no longer mints key material.** `rootKey` is a required
+ *    argument with no default, so `new LocalKeyedDedupFingerprintProvider()`
+ *    — the exact expression the composition root used to contain — no longer
+ *    compiles.
+ * 2. **`resolveDedupFingerprintPort` below is the only path that mints one**,
+ *    and it throws outside `KARAR_ENV=local` unless a deployment has wired an
+ *    approved provider. The refusal belongs to the call, not to its position.
+ *
+ * A random root key is never a fallback for a missing approved provider. The
+ * digest is the whole content identity of a transaction: derive it under a
+ * key nobody can reproduce and every previously stored digest becomes
+ * incomparable, so duplicate detection silently stops detecting anything and
+ * the unique constraint in migration 0090 starts guarding a namespace that no
+ * longer exists. A deployment that cannot resolve the real root key must
+ * refuse to start, not invent one.
  *
  * ## The construction
  *
@@ -78,6 +108,7 @@ import type {
   FingerprintInput,
 } from '../../application/ports/dedup-fingerprint.js';
 import type { TransactionsPrincipal } from '../../application/ports/principal-context.js';
+import { LOCAL_ENVIRONMENT } from './local-environment.js';
 
 /**
  * The version this adapter mints, and the complete definition it names:
@@ -151,8 +182,16 @@ export class LocalKeyedDedupFingerprintProvider implements DedupFingerprintPort 
 
   readonly #rootKey: Buffer;
 
-  constructor(options?: { readonly rootKey?: Uint8Array }) {
-    const key = options?.rootKey ?? randomBytes(ROOT_KEY_BYTES);
+  /**
+   * `rootKey` is REQUIRED and has no default. An adapter that generates its
+   * own root key when handed none is an adapter that works everywhere,
+   * including the places it must not exist — and every digest it produces is
+   * incomparable with the ones already in the table. The caller either owns
+   * root-key material it can reproduce, or it goes through
+   * `resolveDedupFingerprintPort`, which mints one only for `local`.
+   */
+  constructor(options: { readonly rootKey: Uint8Array }) {
+    const key = options.rootKey;
     if (key.length < ROOT_KEY_BYTES) {
       throw new Error(
         `the dedup root key must be at least ${ROOT_KEY_BYTES} bytes; a short MAC key weakens every fingerprint derived from it`,
@@ -186,4 +225,61 @@ export function fingerprintsEqual(left: DedupFingerprint, right: DedupFingerprin
   const a = Buffer.from(left.value, 'utf8');
   const b = Buffer.from(right.value, 'utf8');
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * The typed refusal a non-local environment gets when no approved
+ * dedup-fingerprint provider is wired.
+ *
+ * It is its own class rather than a bare `Error` so a boot log, a readiness
+ * probe or a test can name what refused without matching on message text.
+ * `DedupFingerprintPort` declares no failure type of its own — fingerprinting
+ * either happens or the process has no business running — so the refusal
+ * lives here, beside the resolver that raises it.
+ */
+export class DedupFingerprintKeyUnavailableError extends Error {
+  override readonly name = 'DedupFingerprintKeyUnavailableError';
+
+  constructor(readonly env: string) {
+    super(
+      `no approved dedup-fingerprint provider is wired for KARAR_ENV='${env}', and there is no ` +
+        `fallback. The fingerprint is a transaction's content identity and participates in the ` +
+        `unique constraint: a root key minted here to keep the boot going would make every digest ` +
+        `already in the table incomparable, so duplicate detection would report success while ` +
+        `detecting nothing. Wire the environment's key-management-backed adapter (ADR-0017)`,
+    );
+  }
+}
+
+/**
+ * The single seam a composition root uses to obtain the port.
+ *
+ * `local` gets the in-process adapter above, with a root key minted here and
+ * nowhere else. **Every other environment must supply an approved provider,
+ * and gets a throw when it does not.**
+ *
+ * The guard is HERE rather than at the call site on purpose. A composition
+ * root that reorders its lines, extracts a helper, defers a construction, or
+ * grows a second entry point cannot move this refusal, because the refusal
+ * belongs to the resolver rather than to the position it is called from.
+ *
+ * `localRootKey` exists for a local run that wants its digests to stay
+ * comparable across restarts. Omitted, the root key is random per process:
+ * acceptable only because a local database is disposable, and stated rather
+ * than discovered.
+ */
+export function resolveDedupFingerprintPort(options: {
+  readonly env: string;
+  /** The deployment's key-management-backed adapter, when one is wired. */
+  readonly approvedProvider?: DedupFingerprintPort | null;
+  readonly localRootKey?: Uint8Array;
+}): DedupFingerprintPort {
+  const approved = options.approvedProvider ?? null;
+  if (approved !== null) return approved;
+  if (options.env !== LOCAL_ENVIRONMENT) {
+    throw new DedupFingerprintKeyUnavailableError(options.env);
+  }
+  return new LocalKeyedDedupFingerprintProvider({
+    rootKey: options.localRootKey ?? randomBytes(ROOT_KEY_BYTES),
+  });
 }

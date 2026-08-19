@@ -5,25 +5,37 @@
  * WHAT THIS FILE IS RESPONSIBLE FOR, and what it must never do:
  *
  * EVERY PORT IS BOUND TO A REAL IMPLEMENTATION OR THE BOOT FAILS. Nothing is
- * stubbed to succeed. Five modules resolve their encryption, retention and
- * source-store ports through their OWN fail-closed resolvers, and every one
- * of those resolvers THROWS outside `KARAR_ENV=local` unless a deployment has
- * wired an approved provider. That is the whole point: a deployed environment
- * with no key-management adapter and no approved retention decision must
- * refuse to compose this surface at boot, rather than discover it at the
- * first write. A synthetic retention period carries no legal effect, and a
- * process that substituted one would be fabricating the answer to a question
- * only counsel may answer.
+ * stubbed to succeed. Every encryption, retention, dedup and source-store port
+ * on this surface is obtained through its OWN module's fail-closed resolver,
+ * and every one of those resolvers THROWS outside `KARAR_ENV=local` unless a
+ * deployment has wired an approved provider. That is the whole point: a
+ * deployed environment with no key-management adapter and no approved
+ * retention decision must refuse to compose this surface at boot, rather than
+ * discover it at the first write. A synthetic retention period carries no
+ * legal effect, and a process that substituted one would be fabricating the
+ * answer to a question only counsel may answer.
  *
- * TWO OF THE TRANSACTIONS MODULE'S LOCAL PROVIDERS CARRY NO ENVIRONMENT GUARD
- * OF THEIR OWN — its AES field-encryption provider and its keyed dedup
- * fingerprint provider both construct anywhere. They are therefore built
- * BELOW the guarded constructions, and only after them: the accounts,
- * connections, instruments and statement-import resolvers, and the
- * transactions retention fixture, all refuse outside `local`, so control
- * never reaches those two lines in any other environment. The ordering is
- * load-bearing and is stated here so a future edit does not quietly reorder
- * it into a hole.
+ * NO REFUSAL HERE DEPENDS ON LINE ORDER, and that is a deliberate repair. Two
+ * of the transactions module's local providers — its AES field-encryption
+ * adapter and its keyed dedup-fingerprint adapter — used to carry no guard of
+ * their own and minted their own key material, so they were safe only because
+ * OTHER constructors above them threw first. That is security by line
+ * ordering: reordering this file, extracting a helper, deferring a
+ * construction, or composing these modules from a second entry point would
+ * have enabled in-process key material in a deployed environment with nothing
+ * failing. Both now refuse in their own resolver, and neither class will
+ * construct without key material handed to it, so the guarantee survives any
+ * rearrangement of the lines below. The resolvers are still grouped first for
+ * readability — but only for readability.
+ *
+ * EVERY LOCAL-ONLY PROVIDER ON THIS SURFACE IS NOW GUARDED BY ITS OWN
+ * MODULE. Each is obtained through a resolver that takes the environment and
+ * refuses outside local, so no reordering, extracted helper or lazy
+ * construction here can produce a working local key holder by accident. The
+ * source-file fingerprint port was the last one wired through a stopgap in
+ * this file; it now resolves through `@karar/statement-imports` like the
+ * rest, and its root key is a required argument rather than something the
+ * adapter mints for itself when nobody supplies one.
  *
  * THE INGESTION BOUNDS COME FROM THE CENTRAL REGISTRY. The CSV path is handed
  * `INGESTION_LIMIT_POLICIES.csvStatementImport` and the manual paths
@@ -87,9 +99,6 @@ import {
   CreateManualTransaction,
   DeleteOwnTransaction,
   ListOwnTransactions,
-  LocalAesGcmFieldEncryptionProvider as TransactionsEncryptionProvider,
-  LocalKeyedDedupFingerprintProvider,
-  LocalSyntheticRetentionDecisionProvider as TransactionsRetentionFixture,
   PrismaCategoryAssignmentRepository,
   PrismaFinancialCategoryCatalogue,
   PrismaFinancialRecordPresenceReader,
@@ -99,6 +108,9 @@ import {
   ReadOwnTransaction,
   UpdateOwnTransaction,
   Uuidv7IdSource as TransactionsIdSource,
+  resolveDedupFingerprintPort,
+  resolveHsfFieldEncryptionPort as resolveTransactionsEncryption,
+  resolveTransactionRetentionDecisionPort as resolveTransactionsRetention,
 } from '@karar/transactions';
 import {
   ConfirmTransferMatch,
@@ -112,7 +124,7 @@ import {
   CommitStatementImport,
   EraseStatementImport,
   FinancialAccountsCanonicalAccountAdapter,
-  LocalKeyedFileFingerprintProvider,
+  resolveSourceFileFingerprintPort,
   ParseStatementSource,
   PlatformOutboxStatementImportRecorder,
   PreviewStatementImport,
@@ -149,11 +161,11 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   // A malformed bound stops the process here rather than at the first upload.
   assertIngestionLimitPoliciesValid();
 
-  // --- fail-closed ports, FIRST -------------------------------------------
-  // Each of these throws outside `local` unless an approved provider is
-  // wired. Nothing below them can be reached in a deployed environment
-  // without one, which is what makes the two unguarded transactions
-  // providers further down safe to construct.
+  // --- fail-closed ports ---------------------------------------------------
+  // Each of these throws outside `local` unless an approved provider is wired,
+  // and each throws from inside its own module's resolver. Grouping them here
+  // is for a reader's benefit only: moving any one of these lines anywhere
+  // else in this function changes nothing about what it refuses.
   const accountsEncryption = resolveAccountsEncryption({ env: environment });
   const accountsRetention = resolveAccountsRetention({ env: environment });
   const connectionsEncryption = resolveConnectionsEncryption({ env: environment });
@@ -161,15 +173,9 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   const importsEncryption = resolveImportsEncryption({ env: environment });
   const importsRetention = resolveImportsRetention({ env: environment });
   const importsSourceStore = resolveEncryptedSourceStorePort({ env: environment });
-  // The transactions module declares no resolver; its fixture refuses outside
-  // `local` on its own, and it is constructed BEFORE the two unguarded
-  // providers below so the refusal precedes them.
-  const transactionsRetention = new TransactionsRetentionFixture({ environment });
-
-  // Unguarded by construction — see the file header. Reached only after every
-  // refusal above has passed.
-  const transactionsEncryption = new TransactionsEncryptionProvider();
-  const dedupFingerprints = new LocalKeyedDedupFingerprintProvider();
+  const transactionsRetention = resolveTransactionsRetention({ env: environment });
+  const transactionsEncryption = resolveTransactionsEncryption({ env: environment });
+  const dedupFingerprints = resolveDedupFingerprintPort({ env: environment });
 
   // --- accounts ------------------------------------------------------------
   const accounts = new PrismaFinancialAccountRepository(prisma, accountsEncryption);
@@ -305,7 +311,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
         storeImportSource: new StoreImportSource(
           imports,
           importsSourceStore,
-          new LocalKeyedFileFingerprintProvider(),
+          resolveSourceFileFingerprintPort({ env: environment }),
           importsRetention,
           importIds,
           clock,

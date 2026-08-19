@@ -62,7 +62,7 @@
  * any machine.
  */
 
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import type {
   SourceAccountFingerprintInput,
@@ -114,8 +114,8 @@ export class LocalKeyedSourceAccountFingerprintProvider
 
   readonly #rootKey: Buffer;
 
-  constructor(options?: { readonly rootKey?: Uint8Array }) {
-    const key = options?.rootKey ?? randomBytes(ROOT_KEY_BYTES);
+  constructor(options: { readonly rootKey: Uint8Array }) {
+    const key = options.rootKey;
     if (key.length < ROOT_KEY_BYTES) {
       throw new Error(
         `the source-account fingerprint root key must be at least ${ROOT_KEY_BYTES} bytes; a ` +
