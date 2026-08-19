@@ -131,6 +131,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   post:
@@ -215,6 +217,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such account for this principal (code ACCOUNT_NOT_FOUND).
         content:
@@ -278,6 +282,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
@@ -347,6 +353,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
         content:
@@ -394,6 +402,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
@@ -449,6 +459,8 @@
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: >-
@@ -514,6 +526,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
         content:
@@ -565,6 +579,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'

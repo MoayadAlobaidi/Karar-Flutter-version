@@ -57,6 +57,29 @@ export function tenantBindingRequiredProblem(): ProblemResponse {
 }
 
 /**
+ * The capability behind this surface is not available for this principal.
+ *
+ * ONE DOCUMENT FOR EVERY REASON, BYTE FOR BYTE. Unbuilt code, a capability
+ * deployed nowhere, a jurisdiction that no policy pack clears, a pack still
+ * with legal review, a missing or expired entitlement, consent that was never
+ * given or has been withdrawn, an unconfigured provider, and a store that
+ * could not be read all produce exactly this. There is no `reason`, no
+ * `retryable` and no detail that varies: a caller able to tell two refusals
+ * apart could enumerate the platform's legal and commercial posture one
+ * request at a time, which is the same reason another subject's account id
+ * answers 404 identically to an id that never existed.
+ *
+ * `retryable` is absent rather than false. Present, it would have to be true
+ * for the store-failure case and false for the others, and that single
+ * boolean would be the leak this document exists to prevent.
+ */
+export function capabilityUnavailableProblem(): ProblemResponse {
+  return problem(403, 'Capability unavailable', 'CAPABILITY_UNAVAILABLE', {
+    detail: 'this capability is not available for this principal',
+  });
+}
+
+/**
  * A malformed request. `field` names WHICH input was wrong; the value itself
  * is never echoed, because a rejected body may hold an account number the
  * caller mistyped into the wrong field.

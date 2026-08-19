@@ -23,12 +23,24 @@
  * the two transactions it names — and the serializer has no field for one.
  */
 
-import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 import { MATCH_STATES } from '@karar/transfer-matching';
 import type { MatchState } from '@karar/transfer-matching';
 
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { transferMatchWire } from './dto/matches.js';
 import { pageOf, readPageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
@@ -51,6 +63,7 @@ interface ReplyLike {
  */
 const LIMITS = INGESTION_LIMIT_POLICIES.manualTransaction;
 
+@UseGuards(FinancialCapabilityGuard)
 @Controller('financial/transfer-matches')
 export class TransferMatchesController {
   constructor(

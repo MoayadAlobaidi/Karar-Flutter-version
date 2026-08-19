@@ -283,6 +283,28 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
     new Set([AuthController, PasswordController, MfaController, SessionsController]),
   );
 
+  // Phase 3.5 is composed before the list below rather than inline in it,
+  // because Phase 5 consumes something it builds: the capability resolver the
+  // bootstrap document is projected from. Sharing the instance is the point —
+  // a financial route must refuse from the same facts the client was told,
+  // not from a second availability lookup that could drift from them.
+  const phase35 = composePhase35Modules({
+    environment: config.env,
+    prisma,
+    recordAudit,
+    clock,
+    logger,
+    resolveTenantContext,
+    switchTenant,
+    bindSession: identityRuntime.useCases.bindSessionTenant,
+    revokeSession: identityRuntime.useCases.revokeSession,
+    consentStatus: consentUseCases.getOwnConsentStatus,
+    resolveEntity,
+    entities: new PrismaOperatingEntityRepository(prisma.client),
+    licences: new PrismaEntityLicenceRepository(prisma.client),
+    edgeContext: new IdentityEdgeContext(trustedProxies, identityRuntime.deps.digester),
+  });
+
   const modules: DynamicModule[] = [
     IdentityApiModule.forRoot({ runtime: identityRuntime, trustedProxies, killSwitches }),
     UsersApiModule.register({
@@ -303,32 +325,22 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       principalSource: { fromRequest: policyActorFrom },
     }),
     ControlPlaneModule.register({ killSwitchPort: killSwitches }),
-    ...composePhase35Modules({
-      environment: config.env,
-      prisma,
-      recordAudit,
-      clock,
-      logger,
-      resolveTenantContext,
-      switchTenant,
-      bindSession: identityRuntime.useCases.bindSessionTenant,
-      revokeSession: identityRuntime.useCases.revokeSession,
-      consentStatus: consentUseCases.getOwnConsentStatus,
-      resolveEntity,
-      entities: new PrismaOperatingEntityRepository(prisma.client),
-      licences: new PrismaEntityLicenceRepository(prisma.client),
-      edgeContext: new IdentityEdgeContext(trustedProxies, identityRuntime.deps.digester),
-    }),
+    ...phase35.modules,
     // Phase 5: the financial surface. Its composition resolves every
     // encryption, retention and source-store port through the modules' OWN
     // fail-closed resolvers, so a deployed environment with no approved
     // provider refuses to boot here rather than discovering it at the first
     // write (phase5-modules.ts states the ordering that makes that hold).
+    // It also takes the SHARED capability resolver: no financial route
+    // executes for a principal the resolver does not report the capability as
+    // available for, and that decision is the bootstrap document's, not a
+    // second one.
     ...composePhase5Modules({
       environment: config.env,
       prisma,
       clock,
       producer: config.service.name,
+      capabilityResolution: phase35.capabilityResolution,
     }),
   ];
 

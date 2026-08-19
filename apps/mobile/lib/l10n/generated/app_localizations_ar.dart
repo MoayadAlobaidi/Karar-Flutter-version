@@ -1465,4 +1465,979 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get tenantInvitationFailedDescription =>
       'لم يُقبل الرمز. ربما استُخدم من قبل، أو سُحب، أو صدر لحساب آخر.';
+
+  @override
+  String get financialHomeTabHome => 'الرئيسية';
+
+  @override
+  String get financialHomeTabAccounts => 'الحسابات';
+
+  @override
+  String get financialUnavailableTitle => 'غير متاح';
+
+  @override
+  String get financialUnavailableDescription =>
+      'هذا الجزء من كرار غير متاح لحسابك.';
+
+  @override
+  String get financialUnavailableAction => 'العودة';
+
+  @override
+  String get accountsScreenTitle => 'الحسابات والمحافظ';
+
+  @override
+  String get accountsEmptyTitle => 'لا توجد حسابات بعد';
+
+  @override
+  String get accountsEmptyDescription => 'أضف حسابًا يدويًا لتبدأ في متابعته.';
+
+  @override
+  String get accountsFilteredEmptyTitle => 'لا يوجد ما يطابق عوامل التصفية هذه';
+
+  @override
+  String get accountsFilteredEmptyDescription =>
+      'أزل عوامل التصفية لعرض كل ما لديك.';
+
+  @override
+  String get accountsUnavailableTitle => 'تعذّر تحميل الحسابات';
+
+  @override
+  String get accountsUnavailableDescription =>
+      'تعذّر على كرار قراءة حساباتك في الوقت الحالي.';
+
+  @override
+  String get accountsGroupByLabel => 'التجميع حسب';
+
+  @override
+  String get accountsFiltersLabel => 'عوامل التصفية';
+
+  @override
+  String get accountsFiltersClear => 'مسح عوامل التصفية';
+
+  @override
+  String financialFiltersActiveCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عامل تصفية',
+      many: '$count عامل تصفية',
+      few: '$count عوامل تصفية',
+      two: 'عاملا تصفية',
+      one: 'عامل تصفية واحد',
+      zero: 'لا توجد عوامل تصفية',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get accountsAddManualAction => 'إضافة حساب يدويًا';
+
+  @override
+  String get accountsPerCurrencyNoticeTitle => 'معروضة لكل عملة على حدة';
+
+  @override
+  String get accountsPerCurrencyNoticeDescription =>
+      'يفصل كرار بين كل عملة وأخرى. فهو لا يحوّل بين العملات ولا يجمعها معًا.';
+
+  @override
+  String get accountsFilterAllOption => 'الكل';
+
+  @override
+  String get groupByIssuer => 'الجهة المُصدِرة';
+
+  @override
+  String get groupByIssuerKind => 'نوع الجهة المُصدِرة';
+
+  @override
+  String get groupByAccountType => 'نوع الحساب';
+
+  @override
+  String get groupByWalletKind => 'نوع المحفظة';
+
+  @override
+  String get groupByNature => 'الطبيعة';
+
+  @override
+  String get groupByCurrency => 'العملة';
+
+  @override
+  String get groupByLifecycle => 'الحالة';
+
+  @override
+  String get groupByOrigin => 'المصدر';
+
+  @override
+  String get accountTypeCurrent => 'حساب جارٍ';
+
+  @override
+  String get accountTypeSavings => 'حساب توفير';
+
+  @override
+  String get accountTypeCreditCard => 'حساب بطاقة ائتمان';
+
+  @override
+  String get accountTypeCash => 'نقد';
+
+  @override
+  String get accountTypeWallet => 'محفظة';
+
+  @override
+  String get accountTypeOther => 'أخرى';
+
+  @override
+  String get accountTypeUnrecognised => 'نوع غير معروف';
+
+  @override
+  String get walletKindMobileMoney => 'أموال عبر الهاتف';
+
+  @override
+  String get walletKindEMoney => 'نقود إلكترونية';
+
+  @override
+  String get walletKindPrepaid => 'مدفوعة مسبقًا';
+
+  @override
+  String get walletKindPayroll => 'رواتب';
+
+  @override
+  String get walletKindSuperApp => 'تطبيق شامل';
+
+  @override
+  String get walletKindOther => 'محفظة أخرى';
+
+  @override
+  String get walletKindUnrecognised => 'نوع محفظة غير معروف';
+
+  @override
+  String get walletKindNone => 'ليست محفظة';
+
+  @override
+  String get accountNatureAsset => 'أصل';
+
+  @override
+  String get accountNatureLiability => 'التزام';
+
+  @override
+  String get accountNatureNotStated => 'غير محدَّدة';
+
+  @override
+  String get accountNatureUnrecognised => 'طبيعة غير معروفة';
+
+  @override
+  String get accountLifecycleActive => 'نشط';
+
+  @override
+  String get accountLifecycleArchived => 'مؤرشف';
+
+  @override
+  String get accountLifecycleClosed => 'مغلق';
+
+  @override
+  String get accountLifecycleUnrecognised => 'حالة غير معروفة';
+
+  @override
+  String get issuerKindBank => 'بنك';
+
+  @override
+  String get issuerKindEMoneyIssuer => 'مُصدِر نقود إلكترونية';
+
+  @override
+  String get issuerKindMobileMoneyOperator => 'مشغّل أموال عبر الهاتف';
+
+  @override
+  String get issuerKindTelcoFinancialServices => 'خدمات مالية من مشغّل اتصالات';
+
+  @override
+  String get issuerKindPaymentInstitution => 'مؤسسة دفع';
+
+  @override
+  String get issuerKindFintechWallet => 'محفظة تقنية مالية';
+
+  @override
+  String get issuerKindCardIssuer => 'مُصدِر بطاقات';
+
+  @override
+  String get issuerKindExchangeHouse => 'شركة صرافة';
+
+  @override
+  String get issuerKindOther => 'مؤسسة أخرى';
+
+  @override
+  String get issuerKindUnrecognised => 'نوع جهة غير معروف';
+
+  @override
+  String get issuerKindNone => 'لم تُذكر جهة مُصدِرة';
+
+  @override
+  String get issuerNotStated => 'لم تُذكر جهة مُصدِرة';
+
+  @override
+  String get issuerUnlistedHint => 'أدخلتها بنفسك';
+
+  @override
+  String get issuerRetiredHint => 'لم تعد متاحة للاختيار';
+
+  @override
+  String get accountMaskLabel => 'الرقم المرجعي';
+
+  @override
+  String get accountMaskAbsent => 'غير متوفر';
+
+  @override
+  String get accountMaskWithheld => 'محجوب';
+
+  @override
+  String get accountMaskNeverFullNumber =>
+      'لا يعرض كرار أبدًا رقم حساب أو بطاقة أو آيبان كاملًا.';
+
+  @override
+  String get balancesSectionTitle => 'الأرصدة كما أبلغت بها المصادر';
+
+  @override
+  String get balancesEmptyTitle => 'لم يُبلَّغ عن أي رصيد';
+
+  @override
+  String get balancesEmptyDescription =>
+      'لم يُبلغ أي مصدر عن رقم لهذا الحساب حتى الآن.';
+
+  @override
+  String get balancesNoTotalNotice =>
+      'كل رقم هو ما أبلغ به مصدر واحد، للنوع الذي أبلغ عنه. ولا يجمع كرار هذه الأرقام معًا.';
+
+  @override
+  String get balanceKindBooked => 'المُقيَّد';
+
+  @override
+  String get balanceKindAvailable => 'المتاح';
+
+  @override
+  String get balanceKindCurrent => 'الحالي';
+
+  @override
+  String get balanceKindOutstanding => 'المستحق';
+
+  @override
+  String get balanceKindCreditLimit => 'حد الائتمان';
+
+  @override
+  String get balanceKindOtherSourceReported => 'نوع آخر أبلغ عنه المصدر';
+
+  @override
+  String get balanceKindUnrecognised => 'نوع غير معروف';
+
+  @override
+  String balanceAsOfLabel(String when) {
+    return 'صحيح حتى $when';
+  }
+
+  @override
+  String balanceCapturedLabel(String when) {
+    return 'سجّله كرار في $when';
+  }
+
+  @override
+  String get balanceOlderReportsLabel => 'بلاغات أقدم';
+
+  @override
+  String get dataOriginManuallyAdded => 'أُضيف يدويًا';
+
+  @override
+  String get dataOriginImportedFromStatement => 'مستورَد من كشف حساب';
+
+  @override
+  String get dataOriginFileImportOnly => 'استيراد ملفات فقط';
+
+  @override
+  String get dataOriginNotStated => 'المصدر غير محدَّد';
+
+  @override
+  String get sourceSectionTitle => 'من أين تأتي هذه البيانات';
+
+  @override
+  String get sourceLastSynchronisedLabel => 'آخر مزامنة';
+
+  @override
+  String get sourceNeverImportedTitle => 'لم يكتمل أي استيراد بعد';
+
+  @override
+  String get sourceNoneObservedTitle => 'لا يوجد مصدر يغذّي هذا الحساب';
+
+  @override
+  String get sourceNoLiveLinkNotice =>
+      'لا يملك كرار أي ارتباط مباشر بأي بنك أو محفظة أو مُصدِر بطاقات. ولا تصل البيانات إلا عندما تُدخلها بنفسك أو تستورد ملفًا.';
+
+  @override
+  String get sourceStatusPendingConfirmation => 'بانتظار تأكيدك';
+
+  @override
+  String get sourceStatusAttached => 'مرتبط بهذا الحساب';
+
+  @override
+  String get sourceStatusDeclined => 'مرفوض';
+
+  @override
+  String get sourceStatusDormant => 'خامل';
+
+  @override
+  String get sourceStatusUnrecognised => 'حالة غير معروفة';
+
+  @override
+  String get sourceAuthorityAuthoritative => 'مرجعي';
+
+  @override
+  String get sourceAuthoritySupplemental => 'مكمّل';
+
+  @override
+  String get sourceAuthorityUnverified => 'غير متحقَّق منه';
+
+  @override
+  String get sourceAuthorityUnrecognised => 'الأهمية غير معروفة';
+
+  @override
+  String get sourceCoverageLabel => 'الأيام المشمولة';
+
+  @override
+  String sourceCoverageRange(String end, String start) {
+    return 'من $start إلى $end';
+  }
+
+  @override
+  String get sourceCoverageNone => 'لم يُقدَّم شيء بعد';
+
+  @override
+  String get sourceBalanceObservationLabel => 'الأرصدة المرصودة';
+
+  @override
+  String get sourcePendingObservationLabel => 'المعاملات المعلّقة المرصودة';
+
+  @override
+  String get sourceObservationObserved => 'مرصود';
+
+  @override
+  String get sourceObservationNotObserved => 'غير مرصود';
+
+  @override
+  String get sourceObservationNotProvided => 'لم يُقدَّم إطلاقًا';
+
+  @override
+  String get sourceObservationUnrecognised => 'غير معروف';
+
+  @override
+  String get instrumentsSectionTitle => 'ما الذي ينفق من هذا الحساب';
+
+  @override
+  String get instrumentsEmptyTitle => 'لا توجد بطاقات أو هويات دفع';
+
+  @override
+  String get instrumentsNoBalanceNotice =>
+      'لا تحمل البطاقة رصيدًا خاصًا بها. الرصيد يخص الحساب أعلاه.';
+
+  @override
+  String instrumentsCountLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count أداة',
+      many: '$count أداة',
+      few: '$count أدوات',
+      two: 'أداتان',
+      one: 'أداة واحدة',
+      zero: 'لا توجد أدوات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get instrumentTypePhysicalCard => 'بطاقة فعلية';
+
+  @override
+  String get instrumentTypeVirtualCard => 'بطاقة افتراضية';
+
+  @override
+  String get instrumentTypePrepaidCard => 'بطاقة مدفوعة مسبقًا';
+
+  @override
+  String get instrumentTypeTokenizedCard => 'بطاقة مرمَّزة';
+
+  @override
+  String get instrumentTypeQrPaymentIdentity => 'هوية دفع بالرمز';
+
+  @override
+  String get instrumentTypeOther => 'أداة أخرى';
+
+  @override
+  String get instrumentTypeUnrecognised => 'نوع غير معروف';
+
+  @override
+  String get instrumentStatusActive => 'نشطة';
+
+  @override
+  String get instrumentStatusSuspended => 'موقوفة';
+
+  @override
+  String get instrumentStatusExpired => 'منتهية';
+
+  @override
+  String get instrumentStatusCancelled => 'ملغاة';
+
+  @override
+  String get instrumentStatusUnrecognised => 'حالة غير معروفة';
+
+  @override
+  String get instrumentSpendable => 'يمكن استخدامها للإنفاق';
+
+  @override
+  String get instrumentNotSpendable => 'لا يمكن استخدامها للإنفاق';
+
+  @override
+  String get accountDetailTitle => 'الحساب';
+
+  @override
+  String get accountDetailIdentitySection => 'التفاصيل';
+
+  @override
+  String get accountDetailEditAction => 'تعديل الحساب';
+
+  @override
+  String get accountDetailRecentTransactions => 'أحدث المعاملات';
+
+  @override
+  String get accountDetailSeeAllTransactions => 'عرض كل المعاملات';
+
+  @override
+  String get accountDetailUnavailableTitle => 'تعذّر تحميل الحساب';
+
+  @override
+  String get accountDetailUnavailableDescription =>
+      'تعذّر على كرار قراءة هذا الحساب في الوقت الحالي.';
+
+  @override
+  String get accountCurrencyLabel => 'العملة';
+
+  @override
+  String get accountTypeFieldLabel => 'النوع';
+
+  @override
+  String get accountWalletKindFieldLabel => 'نوع المحفظة';
+
+  @override
+  String get accountNatureFieldLabel => 'الطبيعة';
+
+  @override
+  String get accountLifecycleFieldLabel => 'الحالة';
+
+  @override
+  String get accountIssuerFieldLabel => 'الجهة المُصدِرة';
+
+  @override
+  String get accountSourceFieldLabel => 'المصدر';
+
+  @override
+  String get accountCreatedLabel => 'أُضيف';
+
+  @override
+  String get accountUpdatedLabel => 'آخر تعديل';
+
+  @override
+  String get accountFormCreateTitle => 'إضافة حساب';
+
+  @override
+  String get accountFormEditTitle => 'تعديل الحساب';
+
+  @override
+  String get accountFormDisplayNameLabel => 'الاسم';
+
+  @override
+  String get accountFormDisplayNameHelper => 'أنت وحدك من يرى هذا الاسم.';
+
+  @override
+  String get accountFormTypeLabel => 'النوع';
+
+  @override
+  String get accountFormWalletKindLabel => 'نوع المحفظة';
+
+  @override
+  String get accountFormWalletKindHelper => 'المحفظة وحدها لها نوع محفظة.';
+
+  @override
+  String get accountFormNatureLabel => 'الطبيعة';
+
+  @override
+  String get accountFormCurrencyLabel => 'العملة';
+
+  @override
+  String get accountFormCurrencyHelper => 'رمز من ثلاثة أحرف، مثل QAR.';
+
+  @override
+  String get accountFormMaskLabel => 'الرقم المرجعي';
+
+  @override
+  String get accountFormMaskHelper =>
+      'نهاية قصيرة مقنّعة فقط. ولا تُدخل أبدًا رقم حساب أو بطاقة أو آيبان كاملًا.';
+
+  @override
+  String get accountFormIssuerLabel => 'الجهة المُصدِرة';
+
+  @override
+  String get accountFormIssuerCatalogueOption => 'اختيار جهة مُراجَعة';
+
+  @override
+  String get accountFormIssuerUnlistedOption => 'إدخال جهة بنفسك';
+
+  @override
+  String get accountFormIssuerNoneOption => 'بدون جهة مُصدِرة';
+
+  @override
+  String get accountFormIssuerUnlistedLabel => 'اسم الجهة المُصدِرة';
+
+  @override
+  String get accountFormIssuersUnavailable =>
+      'تعذّر تحميل قائمة الجهات المُراجَعة. ما زال بإمكانك إدخال جهة بنفسك.';
+
+  @override
+  String get accountFormValidationSummaryTitle => 'راجع هذه الحقول';
+
+  @override
+  String get accountFormErrorDisplayName => 'أدخل اسمًا لهذا الحساب.';
+
+  @override
+  String get accountFormErrorCurrency => 'أدخل رمز عملة من ثلاثة أحرف.';
+
+  @override
+  String get accountFormErrorWalletKindRequired => 'اختر نوع المحفظة.';
+
+  @override
+  String get accountFormErrorWalletKindNotAllowed =>
+      'المحفظة وحدها لها نوع محفظة.';
+
+  @override
+  String get accountFormErrorIssuerNamedTwice =>
+      'اختر جهة مُراجَعة أو أدخل واحدة، وليس الاثنين معًا.';
+
+  @override
+  String get accountFormSaved => 'تم الحفظ.';
+
+  @override
+  String get accountFormVersionConflict =>
+      'تغيّر هذا الحساب أثناء تعديلك له. أعد تحميله ثم حاول مجددًا.';
+
+  @override
+  String get accountFormNoChange => 'لم يتغيّر شيء بعد.';
+
+  @override
+  String get accountFormRejected => 'تعذّر على كرار حفظ هذا الحساب.';
+
+  @override
+  String get accountFormCurrencyImmutable =>
+      'لا يمكن تغيير العملة بعد أن يحتوي الحساب على سجلات.';
+
+  @override
+  String get transactionsScreenTitle => 'المعاملات';
+
+  @override
+  String get transactionsEmptyTitle => 'لا توجد معاملات بعد';
+
+  @override
+  String get transactionsEmptyDescription => 'سجّل معاملة لتبدأ في المتابعة.';
+
+  @override
+  String get transactionsFilteredEmptyTitle =>
+      'لا يوجد ما يطابق عوامل التصفية هذه';
+
+  @override
+  String get transactionsFilteredEmptyDescription =>
+      'أزل عوامل التصفية لعرض كل ما هو مسجَّل.';
+
+  @override
+  String get transactionsUnavailableTitle => 'تعذّر تحميل المعاملات';
+
+  @override
+  String get transactionsUnavailableDescription =>
+      'تعذّر على كرار قراءة معاملاتك في الوقت الحالي.';
+
+  @override
+  String get transactionsLoadMoreAction => 'تحميل المزيد';
+
+  @override
+  String get transactionsAddManualAction => 'تسجيل معاملة';
+
+  @override
+  String get transactionDetailTitle => 'المعاملة';
+
+  @override
+  String get transactionDetailUnavailableTitle => 'تعذّر تحميل المعاملة';
+
+  @override
+  String get transactionDetailUnavailableDescription =>
+      'تعذّر على كرار قراءة هذه المعاملة في الوقت الحالي.';
+
+  @override
+  String get transactionAmountLabel => 'المبلغ';
+
+  @override
+  String get transactionOriginalAmountLabel => 'كما ذكره المصدر';
+
+  @override
+  String get transactionOriginalAmountNotice =>
+      'استخدم المصدر عملة مختلفة. يعرض كرار كليهما ولا يحوّل أيًّا منهما.';
+
+  @override
+  String get transactionBookedOnLabel => 'قُيِّدت في';
+
+  @override
+  String get transactionValueDateLabel => 'تاريخ القيمة';
+
+  @override
+  String get transactionEventOccurredLabel => 'الطابع الزمني للمصدر';
+
+  @override
+  String get transactionSourceTimezoneLabel => 'المنطقة الزمنية للمصدر';
+
+  @override
+  String get transactionDescriptionLabel => 'الوصف';
+
+  @override
+  String get transactionMerchantLabel => 'التاجر';
+
+  @override
+  String get transactionNoteLabel => 'ملاحظة';
+
+  @override
+  String get transactionAccountLabel => 'الحساب';
+
+  @override
+  String get transactionStatusPosted => 'مُرحَّلة';
+
+  @override
+  String get transactionStatusVoided => 'ملغاة';
+
+  @override
+  String get transactionStatusUnrecognised => 'حالة غير معروفة';
+
+  @override
+  String get directionMoneyIn => 'مبلغ وارد';
+
+  @override
+  String get directionMoneyOut => 'مبلغ صادر';
+
+  @override
+  String get directionUnrecognised => 'اتجاه غير معروف';
+
+  @override
+  String get transactionCategoryLabel => 'الفئة';
+
+  @override
+  String get transactionCategoryNone => 'بدون فئة';
+
+  @override
+  String get transactionCategoryChangeAction => 'اختيار فئة';
+
+  @override
+  String get transactionCategoryByUser => 'اخترتها بنفسك';
+
+  @override
+  String get transactionCategoryByRule => 'حدّدتها قاعدة';
+
+  @override
+  String get transactionCategoryBySourceUnrecognised => 'مصدر غير معروف';
+
+  @override
+  String get transactionCategoryRuleVersionLabel => 'إصدار القاعدة';
+
+  @override
+  String get transactionRevisionsTitle => 'السجل';
+
+  @override
+  String transactionRevisionNumber(int number) {
+    return 'المراجعة $number';
+  }
+
+  @override
+  String get transactionRevisionSourceImport => 'من كشف حساب مستورَد';
+
+  @override
+  String get transactionRevisionManualEntry => 'أُدخلت يدويًا';
+
+  @override
+  String get transactionRevisionUserInput => 'صحّحتها بنفسك';
+
+  @override
+  String get transactionRevisionUnrecognised => 'أصل غير معروف';
+
+  @override
+  String transactionRevisionChangedFields(String fields) {
+    return 'المتغيّر: $fields';
+  }
+
+  @override
+  String get transactionRevisionNoChangedFields => 'كما سُجِّلت في الأصل';
+
+  @override
+  String get transactionDivergesFromSource =>
+      'لقد صحّحت قيمة قدّمها المصدر. وتبقى قيم المصدر نفسها محفوظة في السجل.';
+
+  @override
+  String get revisableFieldAmount => 'المبلغ';
+
+  @override
+  String get revisableFieldBookingDate => 'تاريخ القيد';
+
+  @override
+  String get revisableFieldValueDate => 'تاريخ القيمة';
+
+  @override
+  String get revisableFieldMerchant => 'التاجر';
+
+  @override
+  String get revisableFieldDescription => 'الوصف';
+
+  @override
+  String get revisableFieldNote => 'الملاحظة';
+
+  @override
+  String get revisableFieldStatus => 'الحالة';
+
+  @override
+  String get revisableFieldUnrecognised => 'حقل غير معروف';
+
+  @override
+  String get transactionProvenanceTitle => 'مصدر البيانات';
+
+  @override
+  String get transactionProvenanceUnavailable => 'تعذّر تحميل مصدر البيانات';
+
+  @override
+  String get provenanceImportedFromStatement => 'جاءت من ملف كشف حساب';
+
+  @override
+  String get provenanceNotImportedFromStatement => 'لم تأتِ من ملف كشف حساب';
+
+  @override
+  String get provenanceSourceDirectionLabel => 'الاتجاه كما ذكره المصدر';
+
+  @override
+  String get sourceDirectionDebit => 'مدين';
+
+  @override
+  String get sourceDirectionCredit => 'دائن';
+
+  @override
+  String get sourceDirectionNotStated => 'غير مذكور';
+
+  @override
+  String get sourceDirectionUnrecognised => 'غير معروف';
+
+  @override
+  String get provenanceDirectionMappingLabel => 'كيف تحدّد الاتجاه';
+
+  @override
+  String get directionMappingManualEntry => 'أُدخل يدويًا';
+
+  @override
+  String get directionMappingSourceDirectionWord => 'من صياغة المصدر نفسه';
+
+  @override
+  String get directionMappingSourceSignedAmount => 'من إشارة المصدر';
+
+  @override
+  String get directionMappingSourceSignedAmountInverted =>
+      'من إشارة المصدر بعد عكسها';
+
+  @override
+  String get directionMappingUnrecognised => 'غير معروف';
+
+  @override
+  String get provenanceVersionsLabel => 'إصدارات المعالجة';
+
+  @override
+  String get provenanceParserVersionLabel => 'المحلّل';
+
+  @override
+  String get provenanceMappingVersionLabel => 'التعيين';
+
+  @override
+  String get provenanceNormalizationVersionLabel => 'التوحيد';
+
+  @override
+  String get provenanceFingerprintVersionLabel => 'فحص التكرار';
+
+  @override
+  String get transactionCorrectAction => 'تصحيح هذه المعاملة';
+
+  @override
+  String get transactionCorrectTitle => 'تصحيح المعاملة';
+
+  @override
+  String get transactionCorrectNotice =>
+      'يُضاف التصحيح إلى السجل. ولا يُستبدل أي شيء.';
+
+  @override
+  String get transactionCorrectionSaved => 'تم تسجيل التصحيح.';
+
+  @override
+  String get transactionVersionConflict =>
+      'تغيّرت هذه المعاملة أثناء تعديلك لها. أعد تحميلها ثم حاول مجددًا.';
+
+  @override
+  String get transactionNoChange => 'لم يتغيّر شيء بعد.';
+
+  @override
+  String get transactionRejected => 'تعذّر على كرار حفظ هذه المعاملة.';
+
+  @override
+  String get transactionDeleteAction => 'حذف المعاملة';
+
+  @override
+  String get transactionDeleteConfirmTitle => 'حذف هذه المعاملة؟';
+
+  @override
+  String get transactionDeleteConfirmMessage =>
+      'ستُحذف المعاملة وأي مطابقات تحويل تشير إليها.';
+
+  @override
+  String get transactionDeleted => 'تم الحذف.';
+
+  @override
+  String get transactionDeletePartial =>
+      'اكتمل جزء فقط من هذا الحذف. وقد تبقى بعض السجلات المرتبطة.';
+
+  @override
+  String get transactionFormCreateTitle => 'تسجيل معاملة';
+
+  @override
+  String get transactionFormAccountLabel => 'الحساب';
+
+  @override
+  String get transactionFormMagnitudeLabel => 'المبلغ';
+
+  @override
+  String get transactionFormMagnitudeHelper =>
+      'مبلغ موجب بعملة الحساب. واختر أدناه إن كان واردًا أم صادرًا.';
+
+  @override
+  String get transactionFormDirectionLabel => 'الاتجاه';
+
+  @override
+  String get transactionFormBookingDateLabel => 'تاريخ القيد';
+
+  @override
+  String get transactionFormValueDateLabel => 'تاريخ القيمة';
+
+  @override
+  String get transactionFormDayHelper => 'يوم تقويمي بالصيغة YYYY-MM-DD.';
+
+  @override
+  String get transactionFormDescriptionLabel => 'الوصف';
+
+  @override
+  String get transactionFormMerchantLabel => 'التاجر';
+
+  @override
+  String get transactionFormNoteLabel => 'ملاحظة';
+
+  @override
+  String get transactionFormOptionalHelper => 'اختياري.';
+
+  @override
+  String get transactionFormValidationSummaryTitle => 'راجع هذه الحقول';
+
+  @override
+  String get transactionFormErrorAccount => 'اختر حسابًا.';
+
+  @override
+  String get transactionFormErrorDescription => 'أدخل وصفًا.';
+
+  @override
+  String get transactionFormErrorDirection =>
+      'اختر إن كان المبلغ واردًا أم صادرًا.';
+
+  @override
+  String get transactionFormErrorMagnitude => 'أدخل مبلغًا موجبًا.';
+
+  @override
+  String get transactionFormErrorBookingDate =>
+      'أدخل يوم القيد بالصيغة YYYY-MM-DD.';
+
+  @override
+  String get transactionFormErrorValueDate =>
+      'أدخل تاريخ القيمة بالصيغة YYYY-MM-DD أو اتركه فارغًا.';
+
+  @override
+  String get transactionFormSaved => 'تم التسجيل.';
+
+  @override
+  String get transactionFormNoAccounts => 'أضف حسابًا قبل تسجيل معاملة.';
+
+  @override
+  String get transactionFiltersTitle => 'عوامل التصفية';
+
+  @override
+  String get transactionFilterDirectionLabel => 'الاتجاه';
+
+  @override
+  String get transactionFilterStatusLabel => 'الحالة';
+
+  @override
+  String get transactionFilterCurrencyLabel => 'العملة';
+
+  @override
+  String get transactionFilterSourceLabel => 'المصدر';
+
+  @override
+  String get transactionFilterAccountLabel => 'الحساب';
+
+  @override
+  String get categoryPickerTitle => 'اختيار فئة';
+
+  @override
+  String get categorySearchLabel => 'البحث في الفئات';
+
+  @override
+  String get categoriesEmptyTitle => 'لا توجد فئات متاحة';
+
+  @override
+  String get categoriesEmptyDescription =>
+      'لا يوفّر الفهرس المُراجَع أي خيار في الوقت الحالي.';
+
+  @override
+  String get categoriesUnavailableTitle => 'تعذّر تحميل الفئات';
+
+  @override
+  String get categoriesUnavailableDescription =>
+      'تعذّر على كرار قراءة فهرس الفئات في الوقت الحالي.';
+
+  @override
+  String get categoryRetiredHint => 'لم تعد متاحة';
+
+  @override
+  String get categoryAssigned => 'تم حفظ الفئة.';
+
+  @override
+  String get categoryAssignmentWins => 'اختيارك الخاص قائم بالفعل.';
+
+  @override
+  String get categoryUnknown => 'هذه الفئة غير متاحة.';
+
+  @override
+  String get categoryCatalogueVersionLabel => 'إصدار الفهرس';
+
+  @override
+  String a11yFinancialAmount(String amount, String direction) {
+    return '$amount، $direction';
+  }
+
+  @override
+  String a11yAccountSummary(String currency, String name, String type) {
+    return '$name، $type، $currency';
+  }
+
+  @override
+  String a11yBalanceSummary(String amount, String asOf, String kind) {
+    return '$kind، $amount، $asOf';
+  }
+
+  @override
+  String a11yInstrumentSummary(String label, String status, String type) {
+    return '$label، $type، $status';
+  }
 }

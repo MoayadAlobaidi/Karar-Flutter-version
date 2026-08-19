@@ -37,6 +37,13 @@
  * rest, and its root key is a required argument rather than something the
  * adapter mints for itself when nobody supplies one.
  *
+ * NO ROUTE ON THIS SURFACE EXECUTES BEFORE THE CAPABILITY IS RESOLVED. The
+ * gate is bound here from the resolver the client bootstrap answers from, so
+ * there is exactly one availability decision in the process. Client-side
+ * navigation gating is a rendering choice, not a control: a deep link, a
+ * replayed request or a script reaches a mounted route without ever reading a
+ * bootstrap document, and the gate is what stands there instead.
+ *
  * THE INGESTION BOUNDS COME FROM THE CENTRAL REGISTRY. The CSV path is handed
  * `INGESTION_LIMIT_POLICIES.csvStatementImport` and the manual paths
  * `INGESTION_LIMIT_POLICIES.manualTransaction`; both are validated at startup
@@ -143,6 +150,10 @@ import {
 } from '@karar/statement-imports';
 
 import { FinancialApiModule } from '../financial/financial.module.js';
+import {
+  resolveFinancialCapabilityGate,
+  type FinancialCapabilityResolution,
+} from './financial-capability-gate.js';
 import { RequestScopedTransactionsPrincipalContext } from '../financial/transactions-principal-context.js';
 import { FinancialAccountsAccessAdapter } from './financial-account-access.js';
 
@@ -153,6 +164,13 @@ export interface Phase5CompositionInput {
   readonly clock: Clock;
   /** Names this process in the outbox envelope. Identifiers only travel there. */
   readonly producer: string;
+  /**
+   * The capability resolver the client bootstrap document is projected from
+   * (composePhase35Modules). Required: this surface refuses to execute for a
+   * principal the capability is not available to, and it must refuse from the
+   * facts the client was told rather than from a lookup of its own.
+   */
+  readonly capabilityResolution: FinancialCapabilityResolution;
 }
 
 export function composePhase5Modules(input: Phase5CompositionInput): DynamicModule[] {
@@ -176,6 +194,18 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   const transactionsRetention = resolveTransactionsRetention({ env: environment });
   const transactionsEncryption = resolveTransactionsEncryption({ env: environment });
   const dedupFingerprints = resolveDedupFingerprintPort({ env: environment });
+
+  // --- the capability gate -------------------------------------------------
+  // Not a port of any module: it is the question of whether this SURFACE may
+  // run at all, asked of the shared resolver before any use case is reached.
+  // Its own resolver follows the same shape as the ones above — `local` gets a
+  // labelled fixture with no legal effect, every other environment gets the
+  // resolved gate and nothing else (financial-capability-gate.ts).
+  const capabilityGate = resolveFinancialCapabilityGate({
+    env: environment,
+    resolution: input.capabilityResolution,
+    clock,
+  });
 
   // --- accounts ------------------------------------------------------------
   const accounts = new PrismaFinancialAccountRepository(prisma, accountsEncryption);
@@ -236,6 +266,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   return [
     FinancialApiModule.register({
       clock,
+      capabilityGate,
       transactionsPrincipalScope,
       useCases: {
         institutions,

@@ -18,12 +18,13 @@
  * nothing would be a false claim about what the platform knows.
  */
 
-import { Controller, Get, Inject, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Query, Req, Res, UseGuards } from '@nestjs/common';
 
 import type { Institution } from '@karar/financial-accounts';
 import { isAssignable } from '@karar/transactions';
 import type { FinancialCategory } from '@karar/transactions';
 
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { categoryWire, type CategoryWire } from './dto/transactions.js';
 import { institutionWire, type InstitutionWire } from './dto/accounts.js';
 import { pageOf, readPageRequest, type Page } from './paging.js';
@@ -68,6 +69,7 @@ const INSTITUTION_KINDS = [
   'OTHER',
 ] as const;
 
+@UseGuards(FinancialCapabilityGuard)
 @Controller('financial')
 export class FinancialCatalogueController {
   constructor(

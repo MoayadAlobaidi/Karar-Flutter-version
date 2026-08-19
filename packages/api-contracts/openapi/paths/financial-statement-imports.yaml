@@ -95,6 +95,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such account for this principal (code ACCOUNT_NOT_FOUND).
         content:
@@ -144,6 +146,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such import for this principal (code IMPORT_NOT_FOUND).
         content:
@@ -187,6 +191,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such import for this principal (code IMPORT_NOT_FOUND).
@@ -258,6 +264,8 @@
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such import for this principal (code IMPORT_NOT_FOUND).
@@ -358,6 +366,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: >-
           No such import for this principal, or the account it targets is gone
@@ -410,6 +420,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such import for this principal (code IMPORT_NOT_FOUND).
         content:
@@ -460,6 +472,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: >-

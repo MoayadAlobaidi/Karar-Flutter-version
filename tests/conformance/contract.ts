@@ -69,6 +69,13 @@ export interface ContractOperation {
   /** The templated path as the contract writes it, e.g. `/users/me`. */
   readonly path: string;
   readonly responses: ReadonlyMap<string, DeclaredResponse>;
+  /**
+   * The media types the operation's request body declares, in document order.
+   * Empty when the operation declares no body — which is itself a fact worth
+   * asserting: a route that grew a body the contract does not describe is the
+   * request-side twin of a response that grew a field.
+   */
+  readonly requestMediaTypes: readonly string[];
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -289,7 +296,32 @@ export class Contract {
       responses.set(status, { status, schemas });
     }
 
-    this.operationsById.set(operationId, { operationId, method, path, responses });
+    const requestMediaTypes: string[] = [];
+    const requestBodyRaw = operation.node['requestBody'];
+    if (requestBodyRaw !== undefined) {
+      const requestBody = this.dereference({
+        node: requestBodyRaw,
+        documentId: operation.documentId,
+      });
+      if (!isPlainObject(requestBody.node)) {
+        throw new ContractError(`Request body of '${operationId}' is not an object`);
+      }
+      const content = requestBody.node['content'];
+      if (content !== undefined) {
+        if (!isPlainObject(content)) {
+          throw new ContractError(`Request body of '${operationId}' has a non-object content`);
+        }
+        requestMediaTypes.push(...Object.keys(content));
+      }
+    }
+
+    this.operationsById.set(operationId, {
+      operationId,
+      method,
+      path,
+      responses,
+      requestMediaTypes,
+    });
   }
 
   /** Follows a chain of `$ref`s at the document level (path items, responses). */

@@ -40,6 +40,7 @@ import {
 } from '@karar/transactions';
 import { describe, expect, it } from 'vitest';
 
+import type { FinancialCapabilityResolution } from './financial-capability-gate.js';
 import { composePhase5Modules } from './phase5-modules.js';
 
 /**
@@ -76,12 +77,33 @@ function unusablePrisma(): PrismaHandle {
 
 const frozenClock: Clock = { now: () => new Date('2026-08-18T09:00:00.000Z') };
 
+/**
+ * The same trap for the shared capability resolver. Composition BINDS it into
+ * the gate; it must never CALL it, because resolving a capability is a
+ * per-request question and a composition that asked it at boot would be
+ * answering it once for every subject that follows.
+ */
+function unusableCapabilityResolution(): FinancialCapabilityResolution {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        throw new Error(
+          `Phase 5 composition called the capability resolver (property '${String(property)}') ` +
+            'at composition time; availability is resolved per request, never once at boot',
+        );
+      },
+    },
+  ) as FinancialCapabilityResolution;
+}
+
 function compose(environment: string): void {
   composePhase5Modules({
     environment,
     prisma: unusablePrisma(),
     clock: frozenClock,
     producer: 'phase5-fail-closed-test',
+    capabilityResolution: unusableCapabilityResolution(),
   });
 }
 
@@ -140,6 +162,7 @@ describe('composePhase5Modules', () => {
       prisma: unusablePrisma(),
       clock: frozenClock,
       producer: 'phase5-fail-closed-test',
+      capabilityResolution: unusableCapabilityResolution(),
     });
     expect(modules.length).toBeGreaterThan(0);
   });

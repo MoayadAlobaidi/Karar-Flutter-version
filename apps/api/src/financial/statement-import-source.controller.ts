@@ -28,7 +28,7 @@
  * would be worse than its absence.
  */
 
-import { Body, Controller, Inject, Param, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Inject, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 
@@ -40,6 +40,7 @@ import {
   isByteStream,
   isUnsupportedBody,
 } from './csv-body.js';
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { statementImportWire } from './dto/imports.js';
 import { hasStoredSource, importAwaitsDecision } from './import-state.js';
 import { readParseInput } from './import-input.js';
@@ -62,6 +63,7 @@ interface RequestLike {
 /** Every bound this ingestion path obeys, from the CENTRAL registry. */
 const LIMITS = INGESTION_LIMIT_POLICIES.csvStatementImport;
 
+@UseGuards(FinancialCapabilityGuard)
 @Controller('financial/statement-imports')
 export class StatementImportSourceController {
   constructor(

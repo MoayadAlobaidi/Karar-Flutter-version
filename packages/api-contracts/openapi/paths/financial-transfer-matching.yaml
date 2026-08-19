@@ -72,6 +72,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -112,6 +114,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such match for this principal (code TRANSFER_MATCH_NOT_FOUND).
@@ -167,6 +171,8 @@
       '400':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such match for this principal (code TRANSFER_MATCH_NOT_FOUND).

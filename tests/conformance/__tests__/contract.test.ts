@@ -218,15 +218,24 @@ describe('the OpenAPI document loads and resolves', () => {
     // 66 before the identity fragment gained schemas; those 17 operations
     // contributed the 48 rows that made it 114. The Phase 5 financial surface
     // adds 27 operations, and — because every one of its failures carries a
-    // schema rather than prose — 145 more rows.
+    // schema rather than prose — 172 more rows, for 286.
     //
-    // 259 rather than 260: deleteOwnTransaction declared schemas on both 200
-    // and 207, and now declares one 2xx whose BODY discriminates complete from
-    // partial. The client generator refuses to guess which of two 2xx schemas
-    // is canonical, and it is right to — but the better reason is that a
-    // client ignoring 207 and a client ignoring 200 behave identically, so a
-    // partial deletion has to be data the caller must read.
-    expect(ledger.length).toBe(259);
+    // The financial 172 is 24 × 200 + 3 × 201 + 27 × 400 + 27 × 401 + 27 × 403
+    // + 18 × 404 + 12 × 409 + 413 + 415 + 5 × 422 + 27 × 503, derived from the
+    // document rather than adjusted by hand. The most recent 27 of those are
+    // the 403s: `FinancialCapabilityGuard` runs on all eight financial
+    // controllers, so EVERY operation can refuse before it executes — with one
+    // body for a capability that is unavailable and one for a session carrying
+    // no tenant binding, and no way to tell the six internal reasons for the
+    // first apart.
+    //
+    // 259 rather than 260 before that: deleteOwnTransaction declared schemas on
+    // both 200 and 207, and now declares one 2xx whose BODY discriminates
+    // complete from partial. The client generator refuses to guess which of two
+    // 2xx schemas is canonical, and it is right to — but the better reason is
+    // that a client ignoring 207 and a client ignoring 200 behave identically,
+    // so a partial deletion has to be data the caller must read.
+    expect(ledger.length).toBe(286);
     for (const row of ledger) {
       expect(
         contract.responseSchema(row.operationId, row.status, row.mediaType),

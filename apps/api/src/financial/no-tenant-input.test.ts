@@ -35,6 +35,10 @@ const SCANNED_ROOTS = [path.join('apps', 'api', 'src', 'financial')];
 const SCANNED_FILES = [
   path.join('apps', 'api', 'src', 'composition', 'phase5-modules.ts'),
   path.join('apps', 'api', 'src', 'composition', 'financial-account-access.ts'),
+  // The capability gate takes the same principal and asks one question with
+  // it; it belongs to this surface's identity discipline as much as the
+  // account-access adapter does.
+  path.join('apps', 'api', 'src', 'composition', 'financial-capability-gate.ts'),
 ];
 
 /** The ONE file allowed to resolve a principal, and where it reads it from. */

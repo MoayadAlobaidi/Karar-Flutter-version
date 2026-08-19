@@ -24,8 +24,9 @@
  * block.
  */
 
-import { Controller, Get, Inject, Param, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { balanceSnapshotWire } from './dto/accounts.js';
 import { accountSourceLinkWire, connectionSummaryWire } from './dto/connections.js';
 import { paymentInstrumentWire } from './dto/instruments.js';
@@ -51,6 +52,7 @@ function equals(value: string | undefined): (candidate: string) => boolean {
   return (candidate) => value === undefined || candidate === value;
 }
 
+@UseGuards(FinancialCapabilityGuard)
 @Controller('financial')
 export class FinancialViewsController {
   constructor(

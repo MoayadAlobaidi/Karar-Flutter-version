@@ -24,11 +24,24 @@
  * source, read the declared inputs, call one use case, map the Result.
  */
 
-import { Body, Controller, Get, Inject, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 import type { FinancialAccount } from '@karar/financial-accounts';
 
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { financialAccountWire } from './dto/accounts.js';
 import { InstitutionLookup } from './institution-lookup.js';
 import { pageOf, readPageRequest } from './paging.js';
@@ -55,6 +68,7 @@ interface ReplyLike {
  */
 const LIMITS = INGESTION_LIMIT_POLICIES.manualTransaction;
 
+@UseGuards(FinancialCapabilityGuard)
 @Controller('financial/accounts')
 export class FinancialAccountsController {
   constructor(

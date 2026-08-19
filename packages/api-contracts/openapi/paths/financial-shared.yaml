@@ -69,6 +69,14 @@ components:
       type: { type: string }
       title: { type: string }
       status: { type: integer }
+      # 403 arrives two ways, and the caller cannot tell the reasons apart
+      # within either: CAPABILITY_UNAVAILABLE when the TRANSACTIONS
+      # capability is not available to this principal — a decided denial, a
+      # rail not implemented, nothing deployed, a jurisdiction that clears
+      # nothing, a pending legal review and a store failure are ONE answer,
+      # because distinguishing them would leak the policy state that
+      # produced it — and TENANT_BINDING_REQUIRED when the session carries
+      # no tenant binding, which is a different remedy.
       code:
         type: string
         description: >-

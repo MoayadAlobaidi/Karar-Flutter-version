@@ -18,11 +18,23 @@
  * field added later cannot slip through.
  */
 
-import { Body, Controller, Get, Inject, Param, Put, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Put,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 import type { AssignmentSource } from '@karar/transactions';
 
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { categoryAssignmentWire, provenanceWire } from './dto/transactions.js';
 import { pageOf, readPageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
@@ -54,6 +66,7 @@ const USER_ASSIGNMENT: AssignmentSource = 'USER';
 
 const CATEGORY_CODE = /^[A-Z][A-Z0-9_]{1,31}(\.[A-Z][A-Z0-9_]{1,31}){0,2}$/;
 
+@UseGuards(FinancialCapabilityGuard)
 @Controller('financial/transactions')
 export class FinancialTransactionDetailController {
   constructor(

@@ -20,11 +20,22 @@
  *     runtime-conformance harness — must get the same parser; one registered
  *     in only one of them would make the conformance suite prove something
  *     about a server nobody runs.
+ *
+ * EVERY CONTROLLER LISTED HERE IS GATED, AND THE LIST IS THE PROOF. The
+ * capability gate (capability.guard.ts) is declared on each controller class
+ * rather than checked inside handlers, and `capability-mounting.test.ts`
+ * reads the `controllers` array below and fails when any entry does not carry
+ * it. Adding a controller to that array without the guard is therefore a
+ * failing test, not a quiet hole — which matters because the surface's
+ * defence in depth (principal, ownership, RLS) says nothing about whether the
+ * capability may be used at all.
  */
 
 import { Module, type DynamicModule, type OnModuleInit } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 
+import { FINANCIAL_CAPABILITY_GATE, type FinancialCapabilityGate } from './capability-gate.js';
+import { FinancialCapabilityGuard } from './capability.guard.js';
 import { registerCsvContentTypeParser } from './csv-body.js';
 import { FinancialAccountsController } from './financial-accounts.controller.js';
 import { FinancialCatalogueController } from './financial-catalogue.controller.js';
@@ -54,6 +65,14 @@ import {
 export interface FinancialApiModuleOptions {
   readonly useCases: FinancialUseCases;
   readonly clock: { now(): Date };
+  /**
+   * Whether the capability behind this surface is available for the caller.
+   * REQUIRED and undefaulted, because either default is a decision somebody
+   * should have to take deliberately: one that permits opens every route the
+   * day a binding is forgotten, and one that refuses turns the same
+   * forgetting into a surface that answers nobody while looking healthy.
+   */
+  readonly capabilityGate: FinancialCapabilityGate;
   /** Defaults to the session-backed source; tests may bind their own. */
   readonly principalSource?: FinancialPrincipalSource;
   /** Defaults to a fresh request-scoped context. */
@@ -89,6 +108,10 @@ export class FinancialApiModule {
       ],
       providers: [
         { provide: FINANCIAL_USE_CASES, useValue: options.useCases },
+        { provide: FINANCIAL_CAPABILITY_GATE, useValue: options.capabilityGate },
+        // Declared here so every controller above can name it; each one does,
+        // and capability-mounting.test.ts reads this same list to prove it.
+        FinancialCapabilityGuard,
         { provide: FINANCIAL_CLOCK, useValue: options.clock },
         {
           provide: FINANCIAL_PRINCIPAL_SOURCE,

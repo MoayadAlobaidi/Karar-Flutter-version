@@ -94,6 +94,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 

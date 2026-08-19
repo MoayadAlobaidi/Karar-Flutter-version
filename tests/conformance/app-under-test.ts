@@ -55,6 +55,7 @@ import { LOCAL_SEED_CONTENT, LOCAL_SEED_STORAGE_REF } from '@karar/consent-local
 
 import { AppModule } from '@karar/api/dist/app.module.js';
 import { composePhase3Modules } from '@karar/api/dist/composition/phase3-modules.js';
+import { FINANCIAL_USE_CASES } from '@karar/api/dist/financial/use-cases.js';
 import { createDbReadinessProbes } from '@karar/api/dist/health/readiness-probes.js';
 
 /** Any header a caller may set; `inject` accepts exactly this shape. */
@@ -242,6 +243,45 @@ export interface Caller {
   readonly accessToken: string;
 }
 
+/** One HSF column's stored triple, exactly as the persistence port produces it. */
+export interface EncryptedFieldFixture {
+  readonly ciphertext: Uint8Array;
+  readonly nonce: Uint8Array;
+  readonly algorithm: string;
+  readonly keyVersion: string;
+  readonly authTag: Uint8Array;
+}
+
+/**
+ * The narrow slice of `HsfFieldEncryptionPort` a fixture needs. Structural on
+ * purpose: `tests/conformance` depends on `@karar/api`, not on the financial
+ * modules behind it, so the port is named by its shape rather than imported
+ * across a package boundary this suite has no business declaring.
+ */
+export interface HsfFieldEncryptor {
+  encryptField(
+    principal: { readonly tenantId: string; readonly userId: string },
+    field: { reveal(): string },
+    context: { readonly table: string; readonly rowId: string; readonly field: string },
+  ): Promise<EncryptedFieldFixture>;
+}
+
+/** The two HSF ports the composed application built for itself, per module. */
+export interface FinancialFieldEncryptors {
+  /** Writes `financial_connections` and `account_source_links`. */
+  readonly connections: HsfFieldEncryptor;
+  /** Writes `payment_instruments`. */
+  readonly instruments: HsfFieldEncryptor;
+}
+
+/** The shape `financialFieldEncryptors` walks. Nothing else is read from it. */
+interface FinancialUseCaseBundleShape {
+  readonly listOwnConnections: { readonly connections: { readonly encryption: HsfFieldEncryptor } };
+  readonly listOwnPaymentInstruments: {
+    readonly instruments: { readonly encryption: HsfFieldEncryptor };
+  };
+}
+
 export class ComposedApp {
   private constructor(
     private readonly app: NestFastifyApplication,
@@ -362,6 +402,39 @@ export class ComposedApp {
       contentType: String(response.headers['content-type'] ?? ''),
       raw,
       body,
+    };
+  }
+
+  /**
+   * The HSF field-encryption ports THIS BOOT built, reached through the Nest
+   * container the routes are served from.
+   *
+   * WHY THIS SEAM EXISTS, and why it is not cheating. Three Phase 5 tables —
+   * `financial_connections`, `account_source_links` and `payment_instruments`
+   * — have no mounted write route, by a decision the contract records: their
+   * use cases are deliberately absent from the surface bundle. Every column
+   * that carries a label or an external reference on them exists ONLY as
+   * ciphertext + nonce + auth tag, under a key the composition root generates
+   * per boot and never serializes. So a fixture has exactly two options: seed
+   * nothing and validate the read routes against empty pages, which proves
+   * roughly nothing, or encrypt with the SAME port the read path will decrypt
+   * with. This returns that port. The bytes a fixture writes are produced by
+   * the application's own adapter, under its own key version, bound to the
+   * same tenant, user, table, row and field as associated data — so a row
+   * seeded here is readable exactly to the extent a row written by a future
+   * write route would be, and unreadable in every way such a row would be.
+   *
+   * Nothing here fabricates a RESPONSE: the response still comes from the
+   * real repository, the real use case, the real controller and the real
+   * serializer.
+   */
+  financialFieldEncryptors(): FinancialFieldEncryptors {
+    const bundle = this.app.get<FinancialUseCaseBundleShape>(FINANCIAL_USE_CASES, {
+      strict: false,
+    });
+    return {
+      connections: bundle.listOwnConnections.connections.encryption,
+      instruments: bundle.listOwnPaymentInstruments.instruments.encryption,
     };
   }
 

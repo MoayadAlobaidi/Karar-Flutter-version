@@ -34,6 +34,24 @@ export function refuse(problem: ProblemResponse): never {
 }
 
 /**
+ * The same refusal, carrying what actually went wrong for the SERVER's
+ * benefit only.
+ *
+ * The wording is fixed and the body is the one the problem author wrote —
+ * nothing from the thrown value is read, formatted or interpolated into it,
+ * because a driver message names tables, constraints and sometimes values,
+ * and a policy failure names the legal posture this surface refuses to
+ * describe. The original travels as a NON-ENUMERABLE `cause`, so the error
+ * boundary can log it with its stack while `JSON.stringify` of the exception
+ * — and therefore anything that could reach a client — cannot see it.
+ */
+export function refuseWithCause(problem: ProblemResponse, cause: unknown): never {
+  const failure = new HttpException(problem.body, problem.status);
+  Object.defineProperty(failure, 'cause', { value: cause, enumerable: false, writable: false });
+  throw failure;
+}
+
+/**
  * The principal, or a refusal.
  *
  * 401 and 403 are different remedies — sign in, versus choose a tenant — and

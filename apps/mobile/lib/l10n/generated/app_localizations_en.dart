@@ -1485,4 +1485,980 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tenantInvitationFailedDescription =>
       'The code was not accepted. It may have been used already, withdrawn, or issued for a different account.';
+
+  @override
+  String get financialHomeTabHome => 'Home';
+
+  @override
+  String get financialHomeTabAccounts => 'Accounts';
+
+  @override
+  String get financialUnavailableTitle => 'Not available';
+
+  @override
+  String get financialUnavailableDescription =>
+      'This part of Karar is not available for your account.';
+
+  @override
+  String get financialUnavailableAction => 'Go back';
+
+  @override
+  String get accountsScreenTitle => 'Accounts & Wallets';
+
+  @override
+  String get accountsEmptyTitle => 'No accounts yet';
+
+  @override
+  String get accountsEmptyDescription =>
+      'Add an account by hand to start keeping track of it.';
+
+  @override
+  String get accountsFilteredEmptyTitle => 'Nothing matches these filters';
+
+  @override
+  String get accountsFilteredEmptyDescription =>
+      'Clear the filters to see everything you hold.';
+
+  @override
+  String get accountsUnavailableTitle => 'Accounts could not be loaded';
+
+  @override
+  String get accountsUnavailableDescription =>
+      'Karar could not read your accounts just now.';
+
+  @override
+  String get accountsGroupByLabel => 'Group by';
+
+  @override
+  String get accountsFiltersLabel => 'Filters';
+
+  @override
+  String get accountsFiltersClear => 'Clear filters';
+
+  @override
+  String financialFiltersActiveCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count filters applied',
+      one: '1 filter applied',
+      zero: 'No filters applied',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get accountsAddManualAction => 'Add an account by hand';
+
+  @override
+  String get accountsPerCurrencyNoticeTitle => 'Shown per currency';
+
+  @override
+  String get accountsPerCurrencyNoticeDescription =>
+      'Karar keeps each currency separate. It does not convert between currencies and does not add them together.';
+
+  @override
+  String get accountsFilterAllOption => 'All';
+
+  @override
+  String get groupByIssuer => 'Issuer';
+
+  @override
+  String get groupByIssuerKind => 'Issuer kind';
+
+  @override
+  String get groupByAccountType => 'Account type';
+
+  @override
+  String get groupByWalletKind => 'Wallet kind';
+
+  @override
+  String get groupByNature => 'Nature';
+
+  @override
+  String get groupByCurrency => 'Currency';
+
+  @override
+  String get groupByLifecycle => 'Status';
+
+  @override
+  String get groupByOrigin => 'Source';
+
+  @override
+  String get accountTypeCurrent => 'Current account';
+
+  @override
+  String get accountTypeSavings => 'Savings account';
+
+  @override
+  String get accountTypeCreditCard => 'Credit card account';
+
+  @override
+  String get accountTypeCash => 'Cash';
+
+  @override
+  String get accountTypeWallet => 'Wallet';
+
+  @override
+  String get accountTypeOther => 'Other';
+
+  @override
+  String get accountTypeUnrecognised => 'Type not recognised';
+
+  @override
+  String get walletKindMobileMoney => 'Mobile money';
+
+  @override
+  String get walletKindEMoney => 'Electronic money';
+
+  @override
+  String get walletKindPrepaid => 'Prepaid';
+
+  @override
+  String get walletKindPayroll => 'Payroll';
+
+  @override
+  String get walletKindSuperApp => 'Super app';
+
+  @override
+  String get walletKindOther => 'Other wallet';
+
+  @override
+  String get walletKindUnrecognised => 'Wallet kind not recognised';
+
+  @override
+  String get walletKindNone => 'Not a wallet';
+
+  @override
+  String get accountNatureAsset => 'Asset';
+
+  @override
+  String get accountNatureLiability => 'Liability';
+
+  @override
+  String get accountNatureNotStated => 'Not stated';
+
+  @override
+  String get accountNatureUnrecognised => 'Nature not recognised';
+
+  @override
+  String get accountLifecycleActive => 'Active';
+
+  @override
+  String get accountLifecycleArchived => 'Archived';
+
+  @override
+  String get accountLifecycleClosed => 'Closed';
+
+  @override
+  String get accountLifecycleUnrecognised => 'Status not recognised';
+
+  @override
+  String get issuerKindBank => 'Bank';
+
+  @override
+  String get issuerKindEMoneyIssuer => 'Electronic money issuer';
+
+  @override
+  String get issuerKindMobileMoneyOperator => 'Mobile money operator';
+
+  @override
+  String get issuerKindTelcoFinancialServices => 'Telecom financial services';
+
+  @override
+  String get issuerKindPaymentInstitution => 'Payment institution';
+
+  @override
+  String get issuerKindFintechWallet => 'Fintech wallet';
+
+  @override
+  String get issuerKindCardIssuer => 'Card issuer';
+
+  @override
+  String get issuerKindExchangeHouse => 'Exchange house';
+
+  @override
+  String get issuerKindOther => 'Other institution';
+
+  @override
+  String get issuerKindUnrecognised => 'Issuer kind not recognised';
+
+  @override
+  String get issuerKindNone => 'No issuer named';
+
+  @override
+  String get issuerNotStated => 'No issuer named';
+
+  @override
+  String get issuerUnlistedHint => 'Named by you';
+
+  @override
+  String get issuerRetiredHint => 'No longer offered';
+
+  @override
+  String get accountMaskLabel => 'Reference';
+
+  @override
+  String get accountMaskAbsent => 'Not provided';
+
+  @override
+  String get accountMaskWithheld => 'Withheld';
+
+  @override
+  String get accountMaskNeverFullNumber =>
+      'Karar never shows a full account, card or IBAN number.';
+
+  @override
+  String get balancesSectionTitle => 'Balances reported by sources';
+
+  @override
+  String get balancesEmptyTitle => 'No balance reported';
+
+  @override
+  String get balancesEmptyDescription =>
+      'No source has reported a figure for this account yet.';
+
+  @override
+  String get balancesNoTotalNotice =>
+      'Each figure is what one source reported, for the kind it reported. Karar does not add them together.';
+
+  @override
+  String get balanceKindBooked => 'Booked';
+
+  @override
+  String get balanceKindAvailable => 'Available';
+
+  @override
+  String get balanceKindCurrent => 'Current';
+
+  @override
+  String get balanceKindOutstanding => 'Outstanding';
+
+  @override
+  String get balanceKindCreditLimit => 'Credit limit';
+
+  @override
+  String get balanceKindOtherSourceReported => 'Other kind reported';
+
+  @override
+  String get balanceKindUnrecognised => 'Kind not recognised';
+
+  @override
+  String balanceAsOfLabel(String when) {
+    return 'True as of $when';
+  }
+
+  @override
+  String balanceCapturedLabel(String when) {
+    return 'Recorded by Karar on $when';
+  }
+
+  @override
+  String get balanceOlderReportsLabel => 'Earlier reports';
+
+  @override
+  String get dataOriginManuallyAdded => 'Manually added';
+
+  @override
+  String get dataOriginImportedFromStatement => 'Imported from statement';
+
+  @override
+  String get dataOriginFileImportOnly => 'File import only';
+
+  @override
+  String get dataOriginNotStated => 'Source not stated';
+
+  @override
+  String get sourceSectionTitle => 'Where this data comes from';
+
+  @override
+  String get sourceLastSynchronisedLabel => 'Last synchronized';
+
+  @override
+  String get sourceNeverImportedTitle => 'No import has completed yet';
+
+  @override
+  String get sourceNoneObservedTitle => 'No source feeds this account';
+
+  @override
+  String get sourceNoLiveLinkNotice =>
+      'Karar has no live link to any bank, wallet or card issuer. Data arrives only when you enter it or import a file.';
+
+  @override
+  String get sourceStatusPendingConfirmation => 'Awaiting your confirmation';
+
+  @override
+  String get sourceStatusAttached => 'Attached to this account';
+
+  @override
+  String get sourceStatusDeclined => 'Declined';
+
+  @override
+  String get sourceStatusDormant => 'Dormant';
+
+  @override
+  String get sourceStatusUnrecognised => 'Status not recognised';
+
+  @override
+  String get sourceAuthorityAuthoritative => 'Authoritative';
+
+  @override
+  String get sourceAuthoritySupplemental => 'Supplemental';
+
+  @override
+  String get sourceAuthorityUnverified => 'Unverified';
+
+  @override
+  String get sourceAuthorityUnrecognised => 'Weight not recognised';
+
+  @override
+  String get sourceCoverageLabel => 'Days covered';
+
+  @override
+  String sourceCoverageRange(String end, String start) {
+    return '$start to $end';
+  }
+
+  @override
+  String get sourceCoverageNone => 'Nothing supplied yet';
+
+  @override
+  String get sourceBalanceObservationLabel => 'Balances seen';
+
+  @override
+  String get sourcePendingObservationLabel => 'Pending transactions seen';
+
+  @override
+  String get sourceObservationObserved => 'Seen';
+
+  @override
+  String get sourceObservationNotObserved => 'Not seen';
+
+  @override
+  String get sourceObservationNotProvided => 'Never offered';
+
+  @override
+  String get sourceObservationUnrecognised => 'Not recognised';
+
+  @override
+  String get instrumentsSectionTitle => 'What spends from this account';
+
+  @override
+  String get instrumentsEmptyTitle => 'No cards or payment identities';
+
+  @override
+  String get instrumentsNoBalanceNotice =>
+      'A card holds no balance of its own. The balance belongs to the account above.';
+
+  @override
+  String instrumentsCountLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count instruments',
+      one: '1 instrument',
+      zero: 'No instruments',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get instrumentTypePhysicalCard => 'Physical card';
+
+  @override
+  String get instrumentTypeVirtualCard => 'Virtual card';
+
+  @override
+  String get instrumentTypePrepaidCard => 'Prepaid card';
+
+  @override
+  String get instrumentTypeTokenizedCard => 'Tokenized card';
+
+  @override
+  String get instrumentTypeQrPaymentIdentity => 'QR payment identity';
+
+  @override
+  String get instrumentTypeOther => 'Other instrument';
+
+  @override
+  String get instrumentTypeUnrecognised => 'Type not recognised';
+
+  @override
+  String get instrumentStatusActive => 'Active';
+
+  @override
+  String get instrumentStatusSuspended => 'Suspended';
+
+  @override
+  String get instrumentStatusExpired => 'Expired';
+
+  @override
+  String get instrumentStatusCancelled => 'Cancelled';
+
+  @override
+  String get instrumentStatusUnrecognised => 'Status not recognised';
+
+  @override
+  String get instrumentSpendable => 'Can be used to spend';
+
+  @override
+  String get instrumentNotSpendable => 'Cannot be used to spend';
+
+  @override
+  String get accountDetailTitle => 'Account';
+
+  @override
+  String get accountDetailIdentitySection => 'Details';
+
+  @override
+  String get accountDetailEditAction => 'Edit account';
+
+  @override
+  String get accountDetailRecentTransactions => 'Recent transactions';
+
+  @override
+  String get accountDetailSeeAllTransactions => 'See all transactions';
+
+  @override
+  String get accountDetailUnavailableTitle => 'Account could not be loaded';
+
+  @override
+  String get accountDetailUnavailableDescription =>
+      'Karar could not read this account just now.';
+
+  @override
+  String get accountCurrencyLabel => 'Currency';
+
+  @override
+  String get accountTypeFieldLabel => 'Type';
+
+  @override
+  String get accountWalletKindFieldLabel => 'Wallet kind';
+
+  @override
+  String get accountNatureFieldLabel => 'Nature';
+
+  @override
+  String get accountLifecycleFieldLabel => 'Status';
+
+  @override
+  String get accountIssuerFieldLabel => 'Issuer';
+
+  @override
+  String get accountSourceFieldLabel => 'Source';
+
+  @override
+  String get accountCreatedLabel => 'Added';
+
+  @override
+  String get accountUpdatedLabel => 'Last changed';
+
+  @override
+  String get accountFormCreateTitle => 'Add an account';
+
+  @override
+  String get accountFormEditTitle => 'Edit account';
+
+  @override
+  String get accountFormDisplayNameLabel => 'Name';
+
+  @override
+  String get accountFormDisplayNameHelper => 'Only you see this name.';
+
+  @override
+  String get accountFormTypeLabel => 'Type';
+
+  @override
+  String get accountFormWalletKindLabel => 'Wallet kind';
+
+  @override
+  String get accountFormWalletKindHelper => 'Only a wallet has a wallet kind.';
+
+  @override
+  String get accountFormNatureLabel => 'Nature';
+
+  @override
+  String get accountFormCurrencyLabel => 'Currency';
+
+  @override
+  String get accountFormCurrencyHelper => 'A three-letter code, such as QAR.';
+
+  @override
+  String get accountFormMaskLabel => 'Reference';
+
+  @override
+  String get accountFormMaskHelper =>
+      'A short masked tail only. Never a full account, card or IBAN number.';
+
+  @override
+  String get accountFormIssuerLabel => 'Issuer';
+
+  @override
+  String get accountFormIssuerCatalogueOption => 'Choose a reviewed issuer';
+
+  @override
+  String get accountFormIssuerUnlistedOption => 'Name an issuer yourself';
+
+  @override
+  String get accountFormIssuerNoneOption => 'No issuer';
+
+  @override
+  String get accountFormIssuerUnlistedLabel => 'Issuer name';
+
+  @override
+  String get accountFormIssuersUnavailable =>
+      'The reviewed issuer list could not be loaded. You can still name an issuer yourself.';
+
+  @override
+  String get accountFormValidationSummaryTitle => 'Check these fields';
+
+  @override
+  String get accountFormErrorDisplayName => 'Enter a name for this account.';
+
+  @override
+  String get accountFormErrorCurrency => 'Enter a three-letter currency code.';
+
+  @override
+  String get accountFormErrorWalletKindRequired => 'Choose a wallet kind.';
+
+  @override
+  String get accountFormErrorWalletKindNotAllowed =>
+      'Only a wallet has a wallet kind.';
+
+  @override
+  String get accountFormErrorIssuerNamedTwice =>
+      'Choose a reviewed issuer or type one, not both.';
+
+  @override
+  String get accountFormSaved => 'Saved.';
+
+  @override
+  String get accountFormVersionConflict =>
+      'This account changed while you were editing it. Reload it and try again.';
+
+  @override
+  String get accountFormNoChange => 'Nothing has changed yet.';
+
+  @override
+  String get accountFormRejected => 'Karar could not save this account.';
+
+  @override
+  String get accountFormCurrencyImmutable =>
+      'The currency cannot be changed once an account holds records.';
+
+  @override
+  String get transactionsScreenTitle => 'Transactions';
+
+  @override
+  String get transactionsEmptyTitle => 'No transactions yet';
+
+  @override
+  String get transactionsEmptyDescription =>
+      'Record a transaction to start keeping track.';
+
+  @override
+  String get transactionsFilteredEmptyTitle => 'Nothing matches these filters';
+
+  @override
+  String get transactionsFilteredEmptyDescription =>
+      'Clear the filters to see everything recorded.';
+
+  @override
+  String get transactionsUnavailableTitle => 'Transactions could not be loaded';
+
+  @override
+  String get transactionsUnavailableDescription =>
+      'Karar could not read your transactions just now.';
+
+  @override
+  String get transactionsLoadMoreAction => 'Load more';
+
+  @override
+  String get transactionsAddManualAction => 'Record a transaction';
+
+  @override
+  String get transactionDetailTitle => 'Transaction';
+
+  @override
+  String get transactionDetailUnavailableTitle =>
+      'Transaction could not be loaded';
+
+  @override
+  String get transactionDetailUnavailableDescription =>
+      'Karar could not read this transaction just now.';
+
+  @override
+  String get transactionAmountLabel => 'Amount';
+
+  @override
+  String get transactionOriginalAmountLabel => 'As the source stated it';
+
+  @override
+  String get transactionOriginalAmountNotice =>
+      'The source used a different currency. Karar shows both and converts neither.';
+
+  @override
+  String get transactionBookedOnLabel => 'Booked on';
+
+  @override
+  String get transactionValueDateLabel => 'Value date';
+
+  @override
+  String get transactionEventOccurredLabel => 'Source timestamp';
+
+  @override
+  String get transactionSourceTimezoneLabel => 'Source time zone';
+
+  @override
+  String get transactionDescriptionLabel => 'Description';
+
+  @override
+  String get transactionMerchantLabel => 'Merchant';
+
+  @override
+  String get transactionNoteLabel => 'Note';
+
+  @override
+  String get transactionAccountLabel => 'Account';
+
+  @override
+  String get transactionStatusPosted => 'Posted';
+
+  @override
+  String get transactionStatusVoided => 'Voided';
+
+  @override
+  String get transactionStatusUnrecognised => 'Status not recognised';
+
+  @override
+  String get directionMoneyIn => 'Money in';
+
+  @override
+  String get directionMoneyOut => 'Money out';
+
+  @override
+  String get directionUnrecognised => 'Direction not recognised';
+
+  @override
+  String get transactionCategoryLabel => 'Category';
+
+  @override
+  String get transactionCategoryNone => 'No category';
+
+  @override
+  String get transactionCategoryChangeAction => 'Choose a category';
+
+  @override
+  String get transactionCategoryByUser => 'Chosen by you';
+
+  @override
+  String get transactionCategoryByRule => 'Set by a rule';
+
+  @override
+  String get transactionCategoryBySourceUnrecognised => 'Source not recognised';
+
+  @override
+  String get transactionCategoryRuleVersionLabel => 'Rule version';
+
+  @override
+  String get transactionRevisionsTitle => 'History';
+
+  @override
+  String transactionRevisionNumber(int number) {
+    return 'Revision $number';
+  }
+
+  @override
+  String get transactionRevisionSourceImport => 'From an imported statement';
+
+  @override
+  String get transactionRevisionManualEntry => 'Entered by hand';
+
+  @override
+  String get transactionRevisionUserInput => 'Corrected by you';
+
+  @override
+  String get transactionRevisionUnrecognised => 'Origin not recognised';
+
+  @override
+  String transactionRevisionChangedFields(String fields) {
+    return 'Changed: $fields';
+  }
+
+  @override
+  String get transactionRevisionNoChangedFields => 'Originally recorded';
+
+  @override
+  String get transactionDivergesFromSource =>
+      'You have corrected a value the source supplied. The values from the source are kept in the history.';
+
+  @override
+  String get revisableFieldAmount => 'amount';
+
+  @override
+  String get revisableFieldBookingDate => 'booking date';
+
+  @override
+  String get revisableFieldValueDate => 'value date';
+
+  @override
+  String get revisableFieldMerchant => 'merchant';
+
+  @override
+  String get revisableFieldDescription => 'description';
+
+  @override
+  String get revisableFieldNote => 'note';
+
+  @override
+  String get revisableFieldStatus => 'status';
+
+  @override
+  String get revisableFieldUnrecognised => 'a field not recognised';
+
+  @override
+  String get transactionProvenanceTitle => 'Provenance';
+
+  @override
+  String get transactionProvenanceUnavailable =>
+      'Provenance could not be loaded';
+
+  @override
+  String get provenanceImportedFromStatement => 'Came from a statement file';
+
+  @override
+  String get provenanceNotImportedFromStatement =>
+      'Did not come from a statement file';
+
+  @override
+  String get provenanceSourceDirectionLabel => 'Direction the source stated';
+
+  @override
+  String get sourceDirectionDebit => 'Debit';
+
+  @override
+  String get sourceDirectionCredit => 'Credit';
+
+  @override
+  String get sourceDirectionNotStated => 'Not stated';
+
+  @override
+  String get sourceDirectionUnrecognised => 'Not recognised';
+
+  @override
+  String get provenanceDirectionMappingLabel => 'How the direction was decided';
+
+  @override
+  String get directionMappingManualEntry => 'Entered by hand';
+
+  @override
+  String get directionMappingSourceDirectionWord =>
+      'From the wording used by the source';
+
+  @override
+  String get directionMappingSourceSignedAmount =>
+      'From the sign used by the source';
+
+  @override
+  String get directionMappingSourceSignedAmountInverted =>
+      'From the sign used by the source, inverted';
+
+  @override
+  String get directionMappingUnrecognised => 'Not recognised';
+
+  @override
+  String get provenanceVersionsLabel => 'Processing versions';
+
+  @override
+  String get provenanceParserVersionLabel => 'Parser';
+
+  @override
+  String get provenanceMappingVersionLabel => 'Mapping';
+
+  @override
+  String get provenanceNormalizationVersionLabel => 'Normalization';
+
+  @override
+  String get provenanceFingerprintVersionLabel => 'Duplicate check';
+
+  @override
+  String get transactionCorrectAction => 'Correct this transaction';
+
+  @override
+  String get transactionCorrectTitle => 'Correct transaction';
+
+  @override
+  String get transactionCorrectNotice =>
+      'A correction is added to the history. Nothing is overwritten.';
+
+  @override
+  String get transactionCorrectionSaved => 'Correction recorded.';
+
+  @override
+  String get transactionVersionConflict =>
+      'This transaction changed while you were editing it. Reload it and try again.';
+
+  @override
+  String get transactionNoChange => 'Nothing has changed yet.';
+
+  @override
+  String get transactionRejected => 'Karar could not save this transaction.';
+
+  @override
+  String get transactionDeleteAction => 'Delete transaction';
+
+  @override
+  String get transactionDeleteConfirmTitle => 'Delete this transaction?';
+
+  @override
+  String get transactionDeleteConfirmMessage =>
+      'The transaction and any transfer matches naming it will be removed.';
+
+  @override
+  String get transactionDeleted => 'Deleted.';
+
+  @override
+  String get transactionDeletePartial =>
+      'Only part of this deletion completed. Some related records may remain.';
+
+  @override
+  String get transactionFormCreateTitle => 'Record a transaction';
+
+  @override
+  String get transactionFormAccountLabel => 'Account';
+
+  @override
+  String get transactionFormMagnitudeLabel => 'Amount';
+
+  @override
+  String get transactionFormMagnitudeHelper =>
+      'A positive amount, in the currency of the account. Choose below whether it came in or went out.';
+
+  @override
+  String get transactionFormDirectionLabel => 'Direction';
+
+  @override
+  String get transactionFormBookingDateLabel => 'Booked on';
+
+  @override
+  String get transactionFormValueDateLabel => 'Value date';
+
+  @override
+  String get transactionFormDayHelper => 'A calendar day, as YYYY-MM-DD.';
+
+  @override
+  String get transactionFormDescriptionLabel => 'Description';
+
+  @override
+  String get transactionFormMerchantLabel => 'Merchant';
+
+  @override
+  String get transactionFormNoteLabel => 'Note';
+
+  @override
+  String get transactionFormOptionalHelper => 'Optional.';
+
+  @override
+  String get transactionFormValidationSummaryTitle => 'Check these fields';
+
+  @override
+  String get transactionFormErrorAccount => 'Choose an account.';
+
+  @override
+  String get transactionFormErrorDescription => 'Enter a description.';
+
+  @override
+  String get transactionFormErrorDirection =>
+      'Choose whether money came in or went out.';
+
+  @override
+  String get transactionFormErrorMagnitude => 'Enter a positive amount.';
+
+  @override
+  String get transactionFormErrorBookingDate =>
+      'Enter the day it was booked, as YYYY-MM-DD.';
+
+  @override
+  String get transactionFormErrorValueDate =>
+      'Enter the value date as YYYY-MM-DD, or leave it empty.';
+
+  @override
+  String get transactionFormSaved => 'Recorded.';
+
+  @override
+  String get transactionFormNoAccounts =>
+      'Add an account before recording a transaction.';
+
+  @override
+  String get transactionFiltersTitle => 'Filters';
+
+  @override
+  String get transactionFilterDirectionLabel => 'Direction';
+
+  @override
+  String get transactionFilterStatusLabel => 'Status';
+
+  @override
+  String get transactionFilterCurrencyLabel => 'Currency';
+
+  @override
+  String get transactionFilterSourceLabel => 'Source';
+
+  @override
+  String get transactionFilterAccountLabel => 'Account';
+
+  @override
+  String get categoryPickerTitle => 'Choose a category';
+
+  @override
+  String get categorySearchLabel => 'Search categories';
+
+  @override
+  String get categoriesEmptyTitle => 'No categories available';
+
+  @override
+  String get categoriesEmptyDescription =>
+      'The reviewed catalogue offers nothing to choose right now.';
+
+  @override
+  String get categoriesUnavailableTitle => 'Categories could not be loaded';
+
+  @override
+  String get categoriesUnavailableDescription =>
+      'Karar could not read the category catalogue just now.';
+
+  @override
+  String get categoryRetiredHint => 'No longer offered';
+
+  @override
+  String get categoryAssigned => 'Category saved.';
+
+  @override
+  String get categoryAssignmentWins => 'Your own choice already stands.';
+
+  @override
+  String get categoryUnknown => 'That category is not available.';
+
+  @override
+  String get categoryCatalogueVersionLabel => 'Catalogue version';
+
+  @override
+  String a11yFinancialAmount(String amount, String direction) {
+    return '$amount, $direction';
+  }
+
+  @override
+  String a11yAccountSummary(String currency, String name, String type) {
+    return '$name, $type, $currency';
+  }
+
+  @override
+  String a11yBalanceSummary(String amount, String asOf, String kind) {
+    return '$kind, $amount, $asOf';
+  }
+
+  @override
+  String a11yInstrumentSummary(String label, String status, String type) {
+    return '$label, $type, $status';
+  }
 }
