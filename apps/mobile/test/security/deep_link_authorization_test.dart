@@ -16,8 +16,11 @@
 // `StartupCoordinator`; the capability answer comes from bootstrap through
 // `financialBootstrapProvider` rather than being injected.
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:karar_mobile/app/composition/feature_surface.dart';
+import 'package:karar_mobile/app/dependency_injection/providers.dart';
 import 'package:karar_mobile/app/lifecycle/bootstrap_snapshot.dart';
 import 'package:karar_mobile/app/lifecycle/startup_state.dart';
 import 'package:karar_mobile/app/routing/route_paths.dart';
@@ -27,14 +30,10 @@ import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/core/security/token_store.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/account_detail_screen.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/accounts_and_wallets_screen.dart';
-import 'package:karar_mobile/features/financial_accounts/presentation/financial_feature_registration.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_routes.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_unavailable_screen.dart';
-import 'package:karar_mobile/features/financial_connections/presentation/financial_connections_feature_registration.dart';
-import 'package:karar_mobile/features/statement_imports/presentation/statement_import_feature_registration.dart';
 import 'package:karar_mobile/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:karar_mobile/features/transactions/presentation/transactions_screen.dart';
-import 'package:karar_mobile/features/transfer_matching/presentation/transfer_matching_feature_registration.dart';
 
 import '../features/financial_accounts/support/financial_fixtures.dart';
 import 'support/deep_link_launch.dart';
@@ -62,12 +61,7 @@ List<String> everyFinancialPath() {
   // live under their own location prefix rather than `/financial…`, and a
   // derivation that read only one of the two functions would have declared the
   // surface covered while leaving half of it unvisited.
-  for (final route in <RouteBase>[
-    ...financialFeatureRoutes(),
-    ...statementImportRoutes(),
-    ...transferMatchingRoutes(),
-    ...financialConnectionRoutes(),
-  ]) {
+  for (final route in everyFinancialRoute()) {
     if (route is! GoRoute) {
       continue;
     }
@@ -112,14 +106,37 @@ Result<BootstrapSnapshot> bindingPending() {
 
 void main() {
   group('the derived route set', () {
+    test('the shell mounts exactly the named contributions, and nothing else', () {
+      // THE HOLE THIS CLOSES. The paths this suite walks are derived from the
+      // FINANCIAL contributions by name, so a route mounted anywhere else was
+      // never visited — and an ungated one added straight into the composition
+      // root's own list passed all ten tests here. Proven by doing it.
+      //
+      // The shell's table is now the concatenation of named contributions, so
+      // there is nowhere to put a route that is not in one. This asserts the
+      // override actually uses that table, which is the part a future edit
+      // could quietly undo by inlining a route back into the override.
+      final ProviderContainer container = ProviderContainer(
+        overrides: featureSurfaceOverrides(),
+      );
+      addTearDown(container.dispose);
+
+      final List<RouteBase> mounted = container.read(featureRoutesProvider);
+      final List<RouteBase> named = everyFeatureRoute();
+
+      expect(mounted.length, named.length,
+          reason: 'the shell mounts a route that belongs to no named '
+              'contribution; add it to one rather than to the override');
+      expect(
+        mounted.whereType<GoRoute>().map((GoRoute route) => route.path).toSet(),
+        named.whereType<GoRoute>().map((GoRoute route) => route.path).toSet(),
+      );
+      expect(mounted, isNotEmpty);
+    });
+
     test('covers every financial route EVERY workstream contributes', () {
       final derived = everyFinancialPath();
-      final declared = <RouteBase>[
-        ...financialFeatureRoutes(),
-        ...statementImportRoutes(),
-        ...transferMatchingRoutes(),
-        ...financialConnectionRoutes(),
-      ].whereType<GoRoute>().length;
+      final declared = everyFinancialRoute().whereType<GoRoute>().length;
 
       expect(derived, hasLength(declared));
       expect(

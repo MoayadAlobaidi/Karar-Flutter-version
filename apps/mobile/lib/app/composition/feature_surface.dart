@@ -50,24 +50,7 @@ import '../routing/app_router.dart';
 /// platform surface has any reason to know they exist. The sets are disjoint,
 /// which the test beside this file asserts rather than assumes.
 List<Override> featureSurfaceOverrides() => <Override>[
-      featureRoutesProvider.overrideWithValue(<RouteBase>[
-        ...platformFeatureRoutes(),
-        ...identityRoutes(),
-        // Contributed unconditionally, and gated inside every builder. The
-        // route table is read once when the router is built, so making its
-        // shape depend on a runtime capability would rebuild the router — and
-        // reset navigation — the moment bootstrap resolved. The gate decides
-        // per build instead, before any financial screen is constructed.
-        ...financialFeatureRoutes(),
-        // Mounted beside the financial routes and gated the same way, but
-        // under its own location prefix: the architecture rule that keeps
-        // contract paths out of the application tree allows exactly one file
-        // to spell `/financial…`, and a second exemption would be a second
-        // place a contract path could hide.
-        ...statementImportRoutes(),
-        ...transferMatchingRoutes(),
-        ...financialConnectionRoutes(),
-      ]),
+      featureRoutesProvider.overrideWithValue(everyFeatureRoute()),
       startupScreenOverridesProvider.overrideWithValue(
         <StartupStage, StartupScreenBuilder>{
           ...platformStartupScreens(),
@@ -81,6 +64,46 @@ List<Override> featureSurfaceOverrides() => <Override>[
       homeScreenBuilderProvider.overrideWithValue(buildFinancialHomeShell),
       tenantScopedDataProvider.overrideWithValue(everyTenantScopedProvider()),
       ...themeOverrides(),
+    ];
+
+/// Every route the shell mounts, from every workstream.
+///
+/// Split out so a test can read THE table rather than reconstructing it. The
+/// capability-gate suite used to derive its paths by calling the four
+/// financial contributions by name, which meant a route added ANYWHERE ELSE —
+/// including here, directly — was never visited: an ungated route mounted
+/// straight into this list passed every test in that suite.
+///
+/// The financial contributions are still named separately below, because the
+/// gate suite needs to know which routes are supposed to refuse. What it can
+/// no longer do is miss one: [everyFeatureRoute] and the sum of the named
+/// contributions are asserted equal, so a route that belongs to no named
+/// contribution fails rather than hiding.
+List<RouteBase> everyFeatureRoute() => <RouteBase>[
+      ...platformFeatureRoutes(),
+      ...identityRoutes(),
+      ...everyFinancialRoute(),
+    ];
+
+/// The financial contributions, which are the routes that must refuse without
+/// the capability.
+///
+/// Contributed unconditionally and gated inside every builder. The route table
+/// is read once when the router is built, so making its shape depend on a
+/// runtime capability would rebuild the router — and reset navigation — the
+/// moment bootstrap resolved. The gate decides per build instead, before any
+/// financial screen is constructed.
+///
+/// Statement imports, transfer matching and connections sit under their own
+/// location prefixes rather than `/financial…`: the architecture rule that
+/// keeps contract paths out of the application tree allows exactly one file to
+/// spell one, and a second exemption would be a second place a contract path
+/// could hide.
+List<RouteBase> everyFinancialRoute() => <RouteBase>[
+      ...financialFeatureRoutes(),
+      ...statementImportRoutes(),
+      ...transferMatchingRoutes(),
+      ...financialConnectionRoutes(),
     ];
 
 /// Every tenant-scoped provider the shell installs, from every workstream.
