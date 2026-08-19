@@ -52,8 +52,8 @@
     security:
       - sessionAuth: []
     parameters:
-      - $ref: '#/components/LimitParameter'
-      - $ref: '#/components/CursorParameter'
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
       - name: rail
         in: query
         required: false
@@ -88,13 +88,13 @@
                   items:
                     $ref: '#/components/ConnectionSummaryView'
                 page:
-                  $ref: '#/components/PageInfo'
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
       '400':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 /financial/accounts/{accountId}/source-links:
   get:
@@ -130,8 +130,8 @@
         required: true
         description: One of the CALLER'S OWN accounts. Any other id answers an empty page.
         schema: { type: string, format: uuid }
-      - $ref: '#/components/LimitParameter'
-      - $ref: '#/components/CursorParameter'
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
       - name: rail
         in: query
         required: false
@@ -157,41 +157,17 @@
                   items:
                     $ref: '#/components/AccountSourceLinkView'
                 page:
-                  $ref: '#/components/PageInfo'
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
       '400':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 # Local component shapes for this fragment; the lead may lift them into the
 # root document's components section when merging.
 components:
-  LimitParameter:
-    name: limit
-    in: query
-    required: false
-    description: >-
-      Page size. Bounded by the central ingestion limit policy
-      (packages/platform/src/ingestion/limits.ts); a larger request is clamped
-      to the declared maximum rather than refused.
-    schema: { type: integer, minimum: 1, maximum: 200 }
-  CursorParameter:
-    name: cursor
-    in: query
-    required: false
-    description: The `page.nextCursor` of the previous response. Opaque.
-    schema: { type: string, minLength: 1 }
-  PageInfo:
-    type: object
-    additionalProperties: false
-    required: [limit, returned, hasMore, nextCursor]
-    properties:
-      limit: { type: integer, minimum: 1 }
-      returned: { type: integer, minimum: 0 }
-      hasMore: { type: boolean }
-      nextCursor: { type: [string, 'null'] }
   ConnectionRail:
     type: string
     description: >-
@@ -396,25 +372,3 @@ components:
         $ref: '#/components/SourceCapabilityObservation'
       pendingTransactions:
         $ref: '#/components/SourceCapabilityObservation'
-  Problem:
-    type: object
-    required: [type, title, status, code]
-    properties:
-      type: { type: string }
-      title: { type: string }
-      status: { type: integer }
-      code:
-        type: string
-        description: >-
-          e.g. AUTHENTICATION_REQUIRED, TENANT_BINDING_REQUIRED,
-          INVALID_REQUEST, STORE_UNAVAILABLE.
-      detail: { type: string }
-      reason: { type: string }
-      retryable: { type: boolean }
-      requestId: { type: string }
-  ProblemResponse:
-    description: RFC 7807 problem document.
-    content:
-      application/problem+json:
-        schema:
-          $ref: '#/components/Problem'

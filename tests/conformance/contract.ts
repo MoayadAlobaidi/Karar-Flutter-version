@@ -184,8 +184,14 @@ export class Contract {
     }
     const filePart = ref.slice(0, hash);
     const pointer = ref.slice(hash + 1);
+    // Resolved against the ROOT document's directory, not the referring
+    // fragment's. That is the convention every existing reference in this
+    // contract already uses, and — more to the point — it is what the Dart
+    // client generator does. Two readers of one contract that disagree about
+    // where a reference points will eventually disagree about what the API is,
+    // and the generated client is the half that ships.
     const documentId =
-      filePart === '' ? from.documentId : resolvePath(dirname(from.documentId), filePart);
+      filePart === '' ? from.documentId : resolvePath(dirname(this.rootPath), filePart);
 
     let node: unknown = this.document(documentId);
     if (pointer !== '' && !pointer.startsWith('/')) {

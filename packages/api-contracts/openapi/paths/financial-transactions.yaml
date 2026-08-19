@@ -67,8 +67,8 @@
     security:
       - sessionAuth: []
     parameters:
-      - $ref: '#/components/LimitParameter'
-      - $ref: '#/components/CursorParameter'
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
       - name: accountId
         in: query
         required: false
@@ -94,7 +94,7 @@
         required: false
         description: The rail the record arrived on.
         schema:
-          $ref: '#/components/SourceKind'
+          $ref: './paths/financial-shared.yaml#/components/SourceKind'
       - name: bookedFrom
         in: query
         required: false
@@ -120,7 +120,7 @@
                   items:
                     $ref: '#/components/TransactionView'
                 page:
-                  $ref: '#/components/PageInfo'
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
       '400':
         description: >-
           A malformed parameter or cursor (codes INVALID_REQUEST,
@@ -128,11 +128,11 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   post:
     operationId: createOwnManualTransaction
     summary: Record a transaction the caller is entering by hand
@@ -164,7 +164,7 @@
             properties:
               accountId: { type: string, format: uuid }
               magnitude:
-                $ref: '#/components/MinorUnitAmount'
+                $ref: './paths/financial-shared.yaml#/components/MinorUnitAmount'
               direction:
                 $ref: '#/components/MoneyDirection'
               bookingDate:
@@ -192,7 +192,7 @@
                   without a currency is refused, not half-recorded.
                 oneOf:
                   - type: 'null'
-                  - $ref: '#/components/MinorUnitAmount'
+                  - $ref: './paths/financial-shared.yaml#/components/MinorUnitAmount'
               occurrenceOrdinal:
                 type: integer
                 minimum: 1
@@ -212,15 +212,15 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such account for this principal (code ACCOUNT_NOT_FOUND).
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '409':
         description: >-
           The write cannot be accepted as stated (codes ACCOUNT_NOT_WRITABLE,
@@ -230,11 +230,11 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '422':
-        $ref: '#/components/RetentionUnresolvedResponse'
+        $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 /financial/transactions/{transactionId}:
   get:
@@ -276,17 +276,17 @@
                     True when a person has corrected a value the source
                     supplied. The source's own values remain in `revisions`.
       '400':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   patch:
     operationId: correctOwnTransaction
     summary: Correct the caller's own transaction, appending a revision
@@ -320,7 +320,7 @@
             properties:
               expectedVersion: { type: integer, minimum: 1 }
               magnitude:
-                $ref: '#/components/MinorUnitAmount'
+                $ref: './paths/financial-shared.yaml#/components/MinorUnitAmount'
               direction:
                 $ref: '#/components/MoneyDirection'
               bookingDate: { type: string, format: date }
@@ -344,23 +344,23 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '409':
         description: The transaction changed under the caller (code TRANSACTION_VERSION_CONFLICT).
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   delete:
     operationId: deleteOwnTransaction
     summary: Delete the caller's own transaction and the transfer matches naming it
@@ -381,32 +381,28 @@
       - $ref: '#/components/TransactionIdParameter'
     responses:
       '200':
-        description: The transaction and its relationships are gone.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/TransactionDeletedView'
-      '207':
         description: >-
-          The delete was applied in part (codes
-          TRANSFER_MATCH_ERASURE_INCOMPLETE, DELETION_PARTIALLY_APPLIED). The
-          counts are what was actually erased; nothing is rounded up.
+          The delete was applied, in full or in part, and the body says which.
+          A partial application is NOT a different status code: a client that
+          ignores 207 and one that ignores 200 look identical, so the outcome
+          is data the caller has to read rather than a code it can skip past.
+          Counts are what was actually erased and are never rounded up.
         content:
           application/json:
             schema:
-              $ref: '#/components/TransactionPartiallyDeletedView'
+              $ref: '#/components/TransactionDeletionOutcomeView'
       '400':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 /financial/transactions/{transactionId}/category:
   put:
@@ -451,9 +447,9 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: >-
           No such transaction for this principal, or no such assignable
@@ -463,7 +459,7 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '409':
         description: >-
           A person's own decision already stands and this request would not
@@ -471,9 +467,9 @@
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 /financial/transactions/{transactionId}/provenance:
   get:
@@ -496,8 +492,8 @@
       - sessionAuth: []
     parameters:
       - $ref: '#/components/TransactionIdParameter'
-      - $ref: '#/components/LimitParameter'
-      - $ref: '#/components/CursorParameter'
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
     responses:
       '200':
         description: The provenance entries, oldest first, paginated.
@@ -513,19 +509,19 @@
                   items:
                     $ref: '#/components/ProvenanceView'
                 page:
-                  $ref: '#/components/PageInfo'
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
       '400':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '404':
         description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
         content:
           application/problem+json:
             schema:
-              $ref: '#/components/Problem'
+              $ref: './paths/financial-shared.yaml#/components/Problem'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 /financial/categories:
   get:
@@ -543,8 +539,8 @@
     security:
       - sessionAuth: []
     parameters:
-      - $ref: '#/components/LimitParameter'
-      - $ref: '#/components/CursorParameter'
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
       - name: assignable
         in: query
         required: false
@@ -565,63 +561,42 @@
                   items:
                     $ref: '#/components/CategoryView'
                 page:
-                  $ref: '#/components/PageInfo'
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
       '400':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '401':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '503':
-        $ref: '#/components/ProblemResponse'
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
 # Local component shapes for this fragment; the lead may lift them into the
 # root document's components section when merging.
 components:
+  TransactionDeletionOutcomeView:
+    type: object
+    additionalProperties: false
+    required: [transactionId, outcome, transferMatchesDeleted]
+    description: >-
+      The result of a delete, complete or partial, in one shape. `outcome`
+      discriminates and `code` is present only when something was left behind.
+      The count is what was really erased.
+    properties:
+      transactionId: { type: string, format: uuid }
+      outcome:
+        type: string
+        enum: [DELETED, PARTIALLY_APPLIED]
+      transferMatchesDeleted: { type: integer, minimum: 0 }
+      code:
+        type: string
+        description: Present only when outcome is PARTIALLY_APPLIED.
+        enum: [TRANSFER_MATCH_ERASURE_INCOMPLETE, DELETION_PARTIALLY_APPLIED]
+
   TransactionIdParameter:
     name: transactionId
     in: path
     required: true
     description: One of the CALLER'S OWN transactions. Any other id answers 404.
     schema: { type: string, format: uuid }
-  LimitParameter:
-    name: limit
-    in: query
-    required: false
-    description: >-
-      Page size. Bounded by the central ingestion limit policy
-      (packages/platform/src/ingestion/limits.ts); a larger request is clamped
-      to the declared maximum rather than refused, and the page reports the
-      size it actually used.
-    schema: { type: integer, minimum: 1, maximum: 200 }
-  CursorParameter:
-    name: cursor
-    in: query
-    required: false
-    description: >-
-      The `page.nextCursor` of the previous response. Opaque, and a position
-      in the CALLER'S OWN result set — it names no subject and no tenant.
-    schema: { type: string, minLength: 1 }
-  PageInfo:
-    type: object
-    additionalProperties: false
-    required: [limit, returned, hasMore, nextCursor]
-    properties:
-      limit: { type: integer, minimum: 1 }
-      returned: { type: integer, minimum: 0 }
-      hasMore: { type: boolean }
-      nextCursor: { type: [string, 'null'] }
-  MinorUnitAmount:
-    type: object
-    additionalProperties: false
-    required: [minorUnits, currency, exponent]
-    description: >-
-      An exact amount. `minorUnits` is the signed integer the ledger holds,
-      serialized as CHARACTERS — never a JSON number (ADR-0006). On a REQUEST
-      body carrying a magnitude, the value must be non-negative: the direction
-      supplies the sign.
-    properties:
-      minorUnits: { type: string, pattern: '^-?[0-9]{1,30}$' }
-      currency: { type: string, pattern: '^[A-Z]{3}$' }
-      exponent: { type: integer, minimum: 0 }
   MoneyDirection:
     type: string
     description: >-
@@ -632,17 +607,6 @@ components:
   TransactionStatus:
     type: string
     enum: [POSTED, VOIDED]
-  SourceKind:
-    type: string
-    description: The rail this record arrived on. Only MANUAL and CSV can be produced.
-    enum: [MANUAL, CSV]
-  RailAvailability:
-    type: string
-    description: >-
-      Whether the platform can run this rail today. Exactly two rails are
-      EXECUTABLE — MANUAL and USER_FILE_UPLOAD — and no response may present
-      any other as usable (ADR-0028).
-    enum: [EXECUTABLE, NOT_IMPLEMENTED]
   SourceDirection:
     type: string
     description: What the source itself said, before any mapping.
@@ -706,7 +670,7 @@ components:
       transactionId: { type: string, format: uuid }
       accountId: { type: string, format: uuid }
       amount:
-        $ref: '#/components/MinorUnitAmount'
+        $ref: './paths/financial-shared.yaml#/components/MinorUnitAmount'
       direction:
         $ref: '#/components/MoneyDirection'
       bookingDate:
@@ -726,11 +690,11 @@ components:
         description: The amount as the source stated it, when its currency differed.
         oneOf:
           - type: 'null'
-          - $ref: '#/components/MinorUnitAmount'
+          - $ref: './paths/financial-shared.yaml#/components/MinorUnitAmount'
       sourceKind:
-        $ref: '#/components/SourceKind'
+        $ref: './paths/financial-shared.yaml#/components/SourceKind'
       availability:
-        $ref: '#/components/RailAvailability'
+        $ref: './paths/financial-connections.yaml#/components/RailAvailability'
       status:
         $ref: '#/components/TransactionStatus'
       createdAt: { type: string, format: date-time }
@@ -774,7 +738,7 @@ components:
     description: A COMPLETE snapshot of the revisable values, never a patch.
     properties:
       amount:
-        $ref: '#/components/MinorUnitAmount'
+        $ref: './paths/financial-shared.yaml#/components/MinorUnitAmount'
       direction:
         $ref: '#/components/MoneyDirection'
       bookingDate: { type: string, format: date }
@@ -810,13 +774,13 @@ components:
     properties:
       revisionNumber: { type: integer, minimum: 1 }
       sourceKind:
-        $ref: '#/components/SourceKind'
+        $ref: './paths/financial-shared.yaml#/components/SourceKind'
       availability:
-        $ref: '#/components/RailAvailability'
+        $ref: './paths/financial-connections.yaml#/components/RailAvailability'
       accountId: { type: string, format: uuid }
       importedFromStatement: { type: boolean }
       versions:
-        $ref: '#/components/ProcessingVersionsView'
+        $ref: './paths/financial-shared.yaml#/components/ProcessingVersionsView'
       sourceDirection:
         $ref: '#/components/SourceDirection'
       directionMapping:
@@ -825,19 +789,6 @@ components:
         type: string
         enum: [NONE, USER, RULE]
       createdAt: { type: string, format: date-time }
-  ProcessingVersionsView:
-    type: object
-    additionalProperties: false
-    required: [parserVersion, mappingVersion, normalizationVersion, fingerprintVersion]
-    description: >-
-      The four versions that produced this value. `fingerprintVersion` is the
-      ALGORITHM version, never a fingerprint: it says how the identity was
-      computed, and reveals nothing about what it is.
-    properties:
-      parserVersion: { type: string }
-      mappingVersion: { type: string }
-      normalizationVersion: { type: string }
-      fingerprintVersion: { type: string }
   CategoryAssignmentView:
     type: object
     additionalProperties: false
@@ -879,64 +830,3 @@ components:
         type: boolean
         description: Whether this entry may be chosen now.
       retiredAt: { type: [string, 'null'], format: date-time }
-  TransactionDeletedView:
-    type: object
-    additionalProperties: false
-    required: [transactionId, outcome, transferMatchesDeleted]
-    properties:
-      transactionId: { type: string, format: uuid }
-      outcome: { type: string, enum: [DELETED] }
-      transferMatchesDeleted: { type: integer, minimum: 0 }
-  TransactionPartiallyDeletedView:
-    type: object
-    additionalProperties: false
-    required: [transactionId, outcome, transferMatchesDeleted, code]
-    description: >-
-      A partial application, said out loud. `outcome` is PARTIALLY_APPLIED and
-      the count is what was really erased — never rounded to the count that
-      was intended.
-    properties:
-      transactionId: { type: string, format: uuid }
-      outcome: { type: string, enum: [PARTIALLY_APPLIED] }
-      transferMatchesDeleted: { type: integer, minimum: 0 }
-      code:
-        type: string
-        enum: [TRANSFER_MATCH_ERASURE_INCOMPLETE, DELETION_PARTIALLY_APPLIED]
-  Problem:
-    type: object
-    required: [type, title, status, code]
-    properties:
-      type: { type: string }
-      title: { type: string }
-      status: { type: integer }
-      code:
-        type: string
-        description: >-
-          e.g. AUTHENTICATION_REQUIRED, TENANT_BINDING_REQUIRED,
-          INVALID_REQUEST, INVALID_CURSOR, TRANSACTION_NOT_FOUND,
-          ACCOUNT_NOT_FOUND, ACCOUNT_NOT_WRITABLE,
-          ACCOUNT_CURRENCY_MISMATCH, DUPLICATE_TRANSACTION,
-          OCCURRENCE_ORDINAL_NOT_NEXT, TRANSACTION_VERSION_CONFLICT,
-          NO_CHANGE, CATEGORY_UNKNOWN, USER_ASSIGNMENT_WINS,
-          RETENTION_UNRESOLVED, STORE_UNAVAILABLE.
-      detail: { type: string }
-      reason: { type: string }
-      retryable: { type: boolean }
-      requestId: { type: string }
-  ProblemResponse:
-    description: RFC 7807 problem document.
-    content:
-      application/problem+json:
-        schema:
-          $ref: '#/components/Problem'
-  RetentionUnresolvedResponse:
-    description: >-
-      No approved retention decision governs this dataset, so nothing durable
-      may be written (code RETENTION_UNRESOLVED). The refusal is deliberate: a
-      retention period is a legal decision, and substituting one would be a
-      fabricated legal answer. The document names no pack version, no basis
-      and no approval reference.
-    content:
-      application/problem+json:
-        schema:
-          $ref: '#/components/Problem'

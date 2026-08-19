@@ -218,8 +218,15 @@ describe('the OpenAPI document loads and resolves', () => {
     // 66 before the identity fragment gained schemas; those 17 operations
     // contributed the 48 rows that made it 114. The Phase 5 financial surface
     // adds 27 operations, and — because every one of its failures carries a
-    // schema rather than prose — 146 more rows.
-    expect(ledger.length).toBe(260);
+    // schema rather than prose — 145 more rows.
+    //
+    // 259 rather than 260: deleteOwnTransaction declared schemas on both 200
+    // and 207, and now declares one 2xx whose BODY discriminates complete from
+    // partial. The client generator refuses to guess which of two 2xx schemas
+    // is canonical, and it is right to — but the better reason is that a
+    // client ignoring 207 and a client ignoring 200 behave identically, so a
+    // partial deletion has to be data the caller must read.
+    expect(ledger.length).toBe(259);
     for (const row of ledger) {
       expect(
         contract.responseSchema(row.operationId, row.status, row.mediaType),

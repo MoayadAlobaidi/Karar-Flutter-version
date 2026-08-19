@@ -3,8 +3,8 @@
 // Data-transfer objects for the Karar API.
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
-// Contract:   Karar API 0.5.0
-// Digest:     82f00bc1
+// Contract:   Karar API 0.6.0
+// Digest:     5b91c963
 // Generator:  tool/generate_api_client.dart 1.0.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -19,6 +19,448 @@
 // through an interpolated string.
 
 import 'package:meta/meta.dart';
+
+/// What this platform's relationship with the issuer actually IS. The vocabulary contains one value, and it is the honest one: no issuer named in the catalogue exposes an interface to Karar, no credential of any kind is stored, and nothing may render "Connected", "Synced" or "Linked" for data a person typed or uploaded. The two booleans-by-enum are stated on the wire so a client cannot infer otherwise from a status it recognises.
+@immutable
+final class AccountLinkStateDto {
+  const AccountLinkStateDto({
+    required this.impliesLiveInstitutionLink,
+    required this.providerAccessStatus,
+    required this.state,
+  });
+
+  /// Decodes the contract representation.
+  factory AccountLinkStateDto.fromJson(Map<String, Object?> json) => AccountLinkStateDto(
+        impliesLiveInstitutionLink: json['impliesLiveInstitutionLink']! as bool,
+        providerAccessStatus: AccountLinkStateProviderAccessStatusDto.fromWire(json['providerAccessStatus']! as String),
+        state: AccountLinkStateStateDto.fromWire(json['state']! as String),
+      );
+
+  final bool impliesLiveInstitutionLink;
+
+  final AccountLinkStateProviderAccessStatusDto providerAccessStatus;
+
+  final AccountLinkStateStateDto state;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'impliesLiveInstitutionLink': impliesLiveInstitutionLink,
+        'providerAccessStatus': providerAccessStatus.toWire(),
+        'state': state.toWire(),
+      };
+
+  @override
+  String toString() => 'AccountLinkStateDto()';
+}
+
+/// Contract enumeration.
+enum AccountLinkStateProviderAccessStatusDto {
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const AccountLinkStateProviderAccessStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountLinkStateProviderAccessStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum AccountLinkStateStateDto {
+  notLinked('NOT_LINKED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const AccountLinkStateStateDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountLinkStateStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class AccountNatureDto {
+  const AccountNatureDto();
+
+  /// Decodes the contract representation.
+  factory AccountNatureDto.fromJson(Map<String, Object?> json) =>
+      const AccountNatureDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'AccountNatureDto()';
+}
+
+/// Contract object.
+@immutable
+final class AccountOriginDto {
+  const AccountOriginDto();
+
+  /// Decodes the contract representation.
+  factory AccountOriginDto.fromJson(Map<String, Object?> json) =>
+      const AccountOriginDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'AccountOriginDto()';
+}
+
+/// The safe source-and-freshness summary. This is the ONLY shape a read path returns for a source link; the stored entity carries the external account reference and its keyed fingerprint, and neither has a field here.
+@immutable
+final class AccountSourceLinkViewDto {
+  const AccountSourceLinkViewDto({
+    required this.accountId,
+    required this.availability,
+    required this.capabilities,
+    required this.connectionId,
+    required this.createdAt,
+    this.historyCoverage,
+    required this.link,
+    required this.matchBasis,
+    required this.observation,
+    required this.rail,
+    required this.sourceAuthority,
+    required this.sourceLinkId,
+    required this.sourcePriority,
+    required this.status,
+    this.subjectConfirmedAt,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory AccountSourceLinkViewDto.fromJson(Map<String, Object?> json) => AccountSourceLinkViewDto(
+        accountId: json['accountId']! as String,
+        availability: RailAvailabilityDto.fromJson(json['availability']! as Map<String, Object?>),
+        capabilities: SourceCapabilitiesViewDto.fromJson(json['capabilities']! as Map<String, Object?>),
+        connectionId: json['connectionId']! as String,
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        historyCoverage: json['historyCoverage'] == null ? null : HistoryCoverageViewDto.fromJson(json['historyCoverage']! as Map<String, Object?>),
+        link: InstitutionLinkClaimDto.fromJson(json['link']! as Map<String, Object?>),
+        matchBasis: MatchBasisDto.fromJson(json['matchBasis']! as Map<String, Object?>),
+        observation: SourceObservationViewDto.fromJson(json['observation']! as Map<String, Object?>),
+        rail: ConnectionRailDto.fromJson(json['rail']! as Map<String, Object?>),
+        sourceAuthority: SourceAuthorityDto.fromJson(json['sourceAuthority']! as Map<String, Object?>),
+        sourceLinkId: json['sourceLinkId']! as String,
+        sourcePriority: json['sourcePriority']! as int,
+        status: SourceLinkStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        subjectConfirmedAt: json['subjectConfirmedAt'] == null ? null : DateTime.parse(json['subjectConfirmedAt']! as String).toUtc(),
+        updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
+        version: json['version']! as int,
+      );
+
+  final String accountId;
+
+  final RailAvailabilityDto availability;
+
+  final SourceCapabilitiesViewDto capabilities;
+
+  final String connectionId;
+
+  final DateTime createdAt;
+
+  /// The calendar range this source has supplied, as DAYS (ADR-0027). Null when nothing has been supplied.
+  final HistoryCoverageViewDto? historyCoverage;
+
+  final InstitutionLinkClaimDto link;
+
+  final MatchBasisDto matchBasis;
+
+  final SourceObservationViewDto observation;
+
+  final ConnectionRailDto rail;
+
+  final SourceAuthorityDto sourceAuthority;
+
+  final String sourceLinkId;
+
+  final int sourcePriority;
+
+  final SourceLinkStatusDto status;
+
+  /// When the person confirmed this link, or null while they have not.
+  final DateTime? subjectConfirmedAt;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'availability': availability.toJson(),
+        'capabilities': capabilities.toJson(),
+        'connectionId': connectionId,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'historyCoverage': historyCoverage?.toJson(),
+        'link': link.toJson(),
+        'matchBasis': matchBasis.toJson(),
+        'observation': observation.toJson(),
+        'rail': rail.toJson(),
+        'sourceAuthority': sourceAuthority.toJson(),
+        'sourceLinkId': sourceLinkId,
+        'sourcePriority': sourcePriority,
+        'status': status.toJson(),
+        'subjectConfirmedAt': subjectConfirmedAt?.toUtc().toIso8601String(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'AccountSourceLinkViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class AccountStatusDto {
+  const AccountStatusDto();
+
+  /// Decodes the contract representation.
+  factory AccountStatusDto.fromJson(Map<String, Object?> json) =>
+      const AccountStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'AccountStatusDto()';
+}
+
+/// Contract object.
+@immutable
+final class AccountTypeDto {
+  const AccountTypeDto();
+
+  /// Decodes the contract representation.
+  factory AccountTypeDto.fromJson(Map<String, Object?> json) =>
+      const AccountTypeDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'AccountTypeDto()';
+}
+
+/// How the amount is expressed in the file. A signed column needs its SIGN FRAME stated — a bank ledger and an account holder disagree about which way is positive — and a debit/credit pair needs both columns.
+@immutable
+sealed class AmountColumnsDto {
+  const AmountColumnsDto();
+
+  /// Decodes the branch named by `kind`.
+  ///
+  /// An unrecognised discriminator throws [FormatException]: a union the
+  /// client cannot classify must not be guessed at, and the transport turns
+  /// the throw into a typed contract-violation failure.
+  factory AmountColumnsDto.fromJson(Map<String, Object?> json) {
+    final discriminator = json['kind'];
+    return switch (discriminator) {
+      'DEBIT_CREDIT' => AmountColumnsDebitCreditDto.fromJson(json),
+      'SIGNED' => AmountColumnsSignedDto.fromJson(json),
+      _ => throw FormatException(
+          'Unknown kind for AmountColumnsDto.',
+        ),
+    };
+  }
+
+  /// The raw discriminator value for this branch.
+  String get kind;
+
+  /// Encodes this branch, including its discriminator.
+  Map<String, Object?> toJson();
+}
+
+/// The `DEBIT_CREDIT` branch of [AmountColumnsDto].
+@immutable
+final class AmountColumnsDebitCreditDto extends AmountColumnsDto {
+  const AmountColumnsDebitCreditDto({
+    required this.creditColumn,
+    required this.debitColumn,
+  });
+
+  /// Decodes this branch.
+  factory AmountColumnsDebitCreditDto.fromJson(Map<String, Object?> json) =>
+      AmountColumnsDebitCreditDto(
+        creditColumn: json['creditColumn']! as int,
+        debitColumn: json['debitColumn']! as int,
+      );
+
+  final int creditColumn;
+
+  final int debitColumn;
+
+  @override
+  String get kind => 'DEBIT_CREDIT';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'kind': 'DEBIT_CREDIT',
+        'creditColumn': creditColumn,
+        'debitColumn': debitColumn,
+      };
+
+  @override
+  String toString() => 'AmountColumnsDebitCreditDto()';
+}
+
+/// The `SIGNED` branch of [AmountColumnsDto].
+@immutable
+final class AmountColumnsSignedDto extends AmountColumnsDto {
+  const AmountColumnsSignedDto({
+    required this.amountColumn,
+    required this.signFrame,
+  });
+
+  /// Decodes this branch.
+  factory AmountColumnsSignedDto.fromJson(Map<String, Object?> json) =>
+      AmountColumnsSignedDto(
+        amountColumn: json['amountColumn']! as int,
+        signFrame: AmountColumnsSignedSignFrameDto.fromWire(json['signFrame']! as String),
+      );
+
+  final int amountColumn;
+
+  final AmountColumnsSignedSignFrameDto signFrame;
+
+  @override
+  String get kind => 'SIGNED';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'kind': 'SIGNED',
+        'amountColumn': amountColumn,
+        'signFrame': signFrame.toWire(),
+      };
+
+  @override
+  String toString() => 'AmountColumnsSignedDto()';
+}
+
+/// Contract enumeration.
+enum AmountColumnsSignedSignFrameDto {
+  accountHolder('ACCOUNT_HOLDER'),
+  bankLedger('BANK_LEDGER'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const AmountColumnsSignedSignFrameDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AmountColumnsSignedSignFrameDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class AssignOwnTransactionCategoryRequestDto {
+  const AssignOwnTransactionCategoryRequestDto({
+    required this.categoryCode,
+  });
+
+  /// Decodes the contract representation.
+  factory AssignOwnTransactionCategoryRequestDto.fromJson(Map<String, Object?> json) => AssignOwnTransactionCategoryRequestDto(
+        categoryCode: CategoryCodeDto.fromJson(json['categoryCode']! as Map<String, Object?>),
+      );
+
+  final CategoryCodeDto categoryCode;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'categoryCode': categoryCode.toJson(),
+      };
+
+  @override
+  String toString() => 'AssignOwnTransactionCategoryRequestDto()';
+}
+
+/// Who decided. There is no AI member and no SUGGESTED member: this platform assigns categories deterministically or a person does.
+@immutable
+final class AssignmentSourceDto {
+  const AssignmentSourceDto();
+
+  /// Decodes the contract representation.
+  factory AssignmentSourceDto.fromJson(Map<String, Object?> json) =>
+      const AssignmentSourceDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'AssignmentSourceDto()';
+}
+
+/// Contract object.
+@immutable
+final class AssignmentStatusDto {
+  const AssignmentStatusDto();
+
+  /// Decodes the contract representation.
+  factory AssignmentStatusDto.fromJson(Map<String, Object?> json) =>
+      const AssignmentStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'AssignmentStatusDto()';
+}
 
 /// Contract object.
 @immutable
@@ -96,6 +538,84 @@ enum AuthenticatedSessionStatusDto {
 
   /// The wire value, or null for [unknown].
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class BalanceKindDto {
+  const BalanceKindDto();
+
+  /// Decodes the contract representation.
+  factory BalanceKindDto.fromJson(Map<String, Object?> json) =>
+      const BalanceKindDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'BalanceKindDto()';
+}
+
+/// One figure a source reported, with the kind it reported and the moment it was true. `asOf` and `capturedAt` are INSTANTS, not calendar days: they are moments, and typing them as days would invent a timezone.
+/// Deliberately absent: the source's own reference (an opaque internal identifier that is not the subject's to read on this route), the row's tenant and user, and anything derived — nothing here sums, nets or converts.
+@immutable
+final class BalanceSnapshotViewDto {
+  const BalanceSnapshotViewDto({
+    required this.accountId,
+    required this.amount,
+    required this.asOf,
+    required this.availability,
+    required this.balanceKind,
+    required this.capturedAt,
+    required this.snapshotId,
+    required this.sourceKind,
+  });
+
+  /// Decodes the contract representation.
+  factory BalanceSnapshotViewDto.fromJson(Map<String, Object?> json) => BalanceSnapshotViewDto(
+        accountId: json['accountId']! as String,
+        amount: MinorUnitAmountDto.fromJson(json['amount']! as Map<String, Object?>),
+        asOf: DateTime.parse(json['asOf']! as String).toUtc(),
+        availability: RailAvailabilityDto.fromJson(json['availability']! as Map<String, Object?>),
+        balanceKind: BalanceKindDto.fromJson(json['balanceKind']! as Map<String, Object?>),
+        capturedAt: DateTime.parse(json['capturedAt']! as String).toUtc(),
+        snapshotId: json['snapshotId']! as String,
+        sourceKind: SourceKindDto.fromJson(json['sourceKind']! as Map<String, Object?>),
+      );
+
+  final String accountId;
+
+  final MinorUnitAmountDto amount;
+
+  /// The moment the source says this figure was true.
+  final DateTime asOf;
+
+  final RailAvailabilityDto availability;
+
+  final BalanceKindDto balanceKind;
+
+  /// The moment this platform recorded it.
+  final DateTime capturedAt;
+
+  final String snapshotId;
+
+  final SourceKindDto sourceKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'amount': amount.toJson(),
+        'asOf': asOf.toUtc().toIso8601String(),
+        'availability': availability.toJson(),
+        'balanceKind': balanceKind.toJson(),
+        'capturedAt': capturedAt.toUtc().toIso8601String(),
+        'snapshotId': snapshotId,
+        'sourceKind': sourceKind.toJson(),
+      };
+
+  @override
+  String toString() => 'BalanceSnapshotViewDto()';
 }
 
 /// Discriminated union keyed on `kind`.
@@ -527,6 +1047,537 @@ final class CapabilityViewRequirementsItemDto {
   String toString() => 'CapabilityViewRequirementsItemDto()';
 }
 
+/// Who decided this category and when. There is no confidence and no score. `ruleVersion` is present only for a RULE assignment and is null for a person's own choice.
+@immutable
+final class CategoryAssignmentViewDto {
+  const CategoryAssignmentViewDto({
+    required this.assignedAt,
+    required this.assignmentId,
+    required this.assignmentSource,
+    required this.categoryCode,
+    this.ruleVersion,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory CategoryAssignmentViewDto.fromJson(Map<String, Object?> json) => CategoryAssignmentViewDto(
+        assignedAt: DateTime.parse(json['assignedAt']! as String).toUtc(),
+        assignmentId: json['assignmentId']! as String,
+        assignmentSource: AssignmentSourceDto.fromJson(json['assignmentSource']! as Map<String, Object?>),
+        categoryCode: CategoryCodeDto.fromJson(json['categoryCode']! as Map<String, Object?>),
+        ruleVersion: json['ruleVersion'] as String?,
+        status: AssignmentStatusDto.fromJson(json['status']! as Map<String, Object?>),
+      );
+
+  final DateTime assignedAt;
+
+  final String assignmentId;
+
+  final AssignmentSourceDto assignmentSource;
+
+  final CategoryCodeDto categoryCode;
+
+  final String? ruleVersion;
+
+  final AssignmentStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'assignedAt': assignedAt.toUtc().toIso8601String(),
+        'assignmentId': assignmentId,
+        'assignmentSource': assignmentSource.toJson(),
+        'categoryCode': categoryCode.toJson(),
+        'ruleVersion': ruleVersion,
+        'status': status.toJson(),
+      };
+
+  @override
+  String toString() => 'CategoryAssignmentViewDto()';
+}
+
+/// A dotted catalogue code, at most three levels deep.
+@immutable
+final class CategoryCodeDto {
+  const CategoryCodeDto();
+
+  /// Decodes the contract representation.
+  factory CategoryCodeDto.fromJson(Map<String, Object?> json) =>
+      const CategoryCodeDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'CategoryCodeDto()';
+}
+
+/// Contract object.
+@immutable
+final class CategoryViewDto {
+  const CategoryViewDto({
+    required this.assignable,
+    required this.catalogueVersion,
+    required this.code,
+    required this.labels,
+    this.parentCode,
+    this.retiredAt,
+  });
+
+  /// Decodes the contract representation.
+  factory CategoryViewDto.fromJson(Map<String, Object?> json) => CategoryViewDto(
+        assignable: json['assignable']! as bool,
+        catalogueVersion: json['catalogueVersion']! as String,
+        code: CategoryCodeDto.fromJson(json['code']! as Map<String, Object?>),
+        labels: CategoryViewLabelsDto.fromJson(json['labels']! as Map<String, Object?>),
+        parentCode: json['parentCode'] == null ? null : CategoryCodeDto.fromJson(json['parentCode']! as Map<String, Object?>),
+        retiredAt: json['retiredAt'] == null ? null : DateTime.parse(json['retiredAt']! as String).toUtc(),
+      );
+
+  /// Whether this entry may be chosen now.
+  final bool assignable;
+
+  final String catalogueVersion;
+
+  final CategoryCodeDto code;
+
+  final CategoryViewLabelsDto labels;
+
+  final CategoryCodeDto? parentCode;
+
+  final DateTime? retiredAt;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'assignable': assignable,
+        'catalogueVersion': catalogueVersion,
+        'code': code.toJson(),
+        'labels': labels.toJson(),
+        'parentCode': parentCode?.toJson(),
+        'retiredAt': retiredAt?.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'CategoryViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class CategoryViewLabelsDto {
+  const CategoryViewLabelsDto({
+    required this.ar,
+    required this.en,
+  });
+
+  /// Decodes the contract representation.
+  factory CategoryViewLabelsDto.fromJson(Map<String, Object?> json) => CategoryViewLabelsDto(
+        ar: json['ar']! as String,
+        en: json['en']! as String,
+      );
+
+  final String ar;
+
+  final String en;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'ar': ar,
+        'en': en,
+      };
+
+  @override
+  String toString() => 'CategoryViewLabelsDto()';
+}
+
+/// Contract object.
+@immutable
+final class CommitOwnStatementImportRequestDto {
+  const CommitOwnStatementImportRequestDto({
+    required this.expectedVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory CommitOwnStatementImportRequestDto.fromJson(Map<String, Object?> json) => CommitOwnStatementImportRequestDto(
+        expectedVersion: json['expectedVersion']! as int,
+      );
+
+  final int expectedVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'expectedVersion': expectedVersion,
+      };
+
+  @override
+  String toString() => 'CommitOwnStatementImportRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class ConfirmOwnTransferMatchRequestDto {
+  const ConfirmOwnTransferMatchRequestDto({
+    required this.expectedVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory ConfirmOwnTransferMatchRequestDto.fromJson(Map<String, Object?> json) => ConfirmOwnTransferMatchRequestDto(
+        expectedVersion: json['expectedVersion']! as int,
+      );
+
+  final int expectedVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'expectedVersion': expectedVersion,
+      };
+
+  @override
+  String toString() => 'ConfirmOwnTransferMatchRequestDto()';
+}
+
+/// How data arrives. Thirteen rails are NAMED because the vocabulary has to describe the world; exactly two may be WRITTEN. Naming a rail is not a claim that it works, which is why `availability` travels beside it everywhere.
+@immutable
+final class ConnectionRailDto {
+  const ConnectionRailDto();
+
+  /// Decodes the contract representation.
+  factory ConnectionRailDto.fromJson(Map<String, Object?> json) =>
+      const ConnectionRailDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'ConnectionRailDto()';
+}
+
+/// The connection's own lifecycle. NOT ONE OF THESE MEANS CONNECTED: ACTIVE means the connection accepts data the subject supplies.
+@immutable
+final class ConnectionStatusDto {
+  const ConnectionStatusDto();
+
+  /// Decodes the contract representation.
+  factory ConnectionStatusDto.fromJson(Map<String, Object?> json) =>
+      const ConnectionStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'ConnectionStatusDto()';
+}
+
+/// A safe summary. Deliberately absent, and to stay absent: `tenantId` and `userId`; any credential of any kind (none is stored); any ciphertext, nonce, auth tag, algorithm or key version; and any synchronisation cursor or last-sync token, which would imply a sync that does not exist.
+@immutable
+final class ConnectionSummaryViewDto {
+  const ConnectionSummaryViewDto({
+    required this.availability,
+    required this.connectionId,
+    required this.createdAt,
+    required this.displayLabel,
+    this.institutionId,
+    required this.link,
+    required this.rail,
+    required this.status,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory ConnectionSummaryViewDto.fromJson(Map<String, Object?> json) => ConnectionSummaryViewDto(
+        availability: RailAvailabilityDto.fromJson(json['availability']! as Map<String, Object?>),
+        connectionId: json['connectionId']! as String,
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        displayLabel: json['displayLabel']! as String,
+        institutionId: json['institutionId'] as String?,
+        link: InstitutionLinkClaimDto.fromJson(json['link']! as Map<String, Object?>),
+        rail: ConnectionRailDto.fromJson(json['rail']! as Map<String, Object?>),
+        status: ConnectionStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
+        version: json['version']! as int,
+      );
+
+  final RailAvailabilityDto availability;
+
+  final String connectionId;
+
+  final DateTime createdAt;
+
+  /// The subject's own name for this connection, decrypted for its owner.
+  final String displayLabel;
+
+  final String? institutionId;
+
+  final InstitutionLinkClaimDto link;
+
+  final ConnectionRailDto rail;
+
+  final ConnectionStatusDto status;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'availability': availability.toJson(),
+        'connectionId': connectionId,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'displayLabel': displayLabel,
+        'institutionId': institutionId,
+        'link': link.toJson(),
+        'rail': rail.toJson(),
+        'status': status.toJson(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'ConnectionSummaryViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class CorrectOwnTransactionRequestDto {
+  const CorrectOwnTransactionRequestDto({
+    this.bookingDate,
+    this.description,
+    this.direction,
+    required this.expectedVersion,
+    this.magnitude,
+    this.merchant,
+    this.note,
+    this.status,
+    this.valueDate,
+  });
+
+  /// Decodes the contract representation.
+  factory CorrectOwnTransactionRequestDto.fromJson(Map<String, Object?> json) => CorrectOwnTransactionRequestDto(
+        bookingDate: json['bookingDate'] as String?,
+        description: json['description'] as String?,
+        direction: json['direction'] == null ? null : MoneyDirectionDto.fromJson(json['direction']! as Map<String, Object?>),
+        expectedVersion: json['expectedVersion']! as int,
+        magnitude: json['magnitude'] == null ? null : MinorUnitAmountDto.fromJson(json['magnitude']! as Map<String, Object?>),
+        merchant: json['merchant'] as String?,
+        note: json['note'] as String?,
+        status: json['status'] == null ? null : TransactionStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        valueDate: json['valueDate'] as String?,
+      );
+
+  final String? bookingDate;
+
+  final String? description;
+
+  final MoneyDirectionDto? direction;
+
+  final int expectedVersion;
+
+  final MinorUnitAmountDto? magnitude;
+
+  final String? merchant;
+
+  final String? note;
+
+  final TransactionStatusDto? status;
+
+  final String? valueDate;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'bookingDate': bookingDate,
+        'description': description,
+        'direction': direction?.toJson(),
+        'expectedVersion': expectedVersion,
+        'magnitude': magnitude?.toJson(),
+        'merchant': merchant,
+        'note': note,
+        'status': status?.toJson(),
+        'valueDate': valueDate,
+      };
+
+  @override
+  String toString() => 'CorrectOwnTransactionRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class CreateOwnManualFinancialAccountRequestDto {
+  const CreateOwnManualFinancialAccountRequestDto({
+    required this.accountType,
+    required this.currency,
+    required this.displayName,
+    this.institutionId,
+    this.mask,
+    this.nature,
+    this.userSuppliedInstitutionLabel,
+    this.walletKind,
+  });
+
+  /// Decodes the contract representation.
+  factory CreateOwnManualFinancialAccountRequestDto.fromJson(Map<String, Object?> json) => CreateOwnManualFinancialAccountRequestDto(
+        accountType: AccountTypeDto.fromJson(json['accountType']! as Map<String, Object?>),
+        currency: json['currency']! as String,
+        displayName: json['displayName']! as String,
+        institutionId: json['institutionId'] as String?,
+        mask: json['mask'] as String?,
+        nature: json['nature'] == null ? null : AccountNatureDto.fromJson(json['nature']! as Map<String, Object?>),
+        userSuppliedInstitutionLabel: json['userSuppliedInstitutionLabel'] as String?,
+        walletKind: json['walletKind'] == null ? null : WalletKindDto.fromJson(json['walletKind']! as Map<String, Object?>),
+      );
+
+  final AccountTypeDto accountType;
+
+  /// ISO 4217 alphabetic code; immutable once records exist.
+  final String currency;
+
+  /// Holder-sensitive. Stored only as ciphertext bound by AAD to tenant, user, table, row and field.
+  final String displayName;
+
+  /// A reviewed catalogue entry, or null.
+  final String? institutionId;
+
+  /// A masked tail, e.g. `**1234`. A value that reads as a full account or card number is refused rather than stored.
+  final String? mask;
+
+  final AccountNatureDto? nature;
+
+  /// The subject's own name for an issuer the catalogue does not hold. Never promoted to reference data.
+  final String? userSuppliedInstitutionLabel;
+
+  /// Required when `accountType` is WALLET and refused otherwise — the database holds the same biconditional (migration 0095).
+  final WalletKindDto? walletKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountType': accountType.toJson(),
+        'currency': currency,
+        'displayName': displayName,
+        'institutionId': institutionId,
+        'mask': mask,
+        'nature': nature?.toJson(),
+        'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel,
+        'walletKind': walletKind?.toJson(),
+      };
+
+  @override
+  String toString() => 'CreateOwnManualFinancialAccountRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class CreateOwnManualTransactionRequestDto {
+  const CreateOwnManualTransactionRequestDto({
+    required this.accountId,
+    required this.bookingDate,
+    required this.description,
+    required this.direction,
+    this.eventOccurredAt,
+    required this.magnitude,
+    this.merchant,
+    this.note,
+    this.occurrenceOrdinal,
+    this.originalAmount,
+    this.sourceTimezone,
+    this.valueDate,
+  });
+
+  /// Decodes the contract representation.
+  factory CreateOwnManualTransactionRequestDto.fromJson(Map<String, Object?> json) => CreateOwnManualTransactionRequestDto(
+        accountId: json['accountId']! as String,
+        bookingDate: json['bookingDate']! as String,
+        description: json['description']! as String,
+        direction: MoneyDirectionDto.fromJson(json['direction']! as Map<String, Object?>),
+        eventOccurredAt: json['eventOccurredAt'] == null ? null : DateTime.parse(json['eventOccurredAt']! as String).toUtc(),
+        magnitude: MinorUnitAmountDto.fromJson(json['magnitude']! as Map<String, Object?>),
+        merchant: json['merchant'] as String?,
+        note: json['note'] as String?,
+        occurrenceOrdinal: json['occurrenceOrdinal'] as int?,
+        originalAmount: json['originalAmount'] == null ? null : MinorUnitAmountDto.fromJson(json['originalAmount']! as Map<String, Object?>),
+        sourceTimezone: json['sourceTimezone'] as String?,
+        valueDate: json['valueDate'] as String?,
+      );
+
+  final String accountId;
+
+  /// The day the institution booked it. A calendar day, never an instant.
+  final String bookingDate;
+
+  final String description;
+
+  final MoneyDirectionDto direction;
+
+  /// A true instant, recorded only when the source stated one. Requires `sourceTimezone` to be meaningful and refuses it when absent.
+  final DateTime? eventOccurredAt;
+
+  final MinorUnitAmountDto magnitude;
+
+  final String? merchant;
+
+  final String? note;
+
+  /// Which occurrence of an otherwise identical movement this is, so a person who genuinely bought the same coffee twice can record both. Must be the next unused ordinal.
+  final int? occurrenceOrdinal;
+
+  /// The amount as the source stated it, when that differs in currency from the booked amount. All-or-nothing: a magnitude without a currency is refused, not half-recorded.
+  final MinorUnitAmountDto? originalAmount;
+
+  /// IANA zone name; refused unless `eventOccurredAt` is present.
+  final String? sourceTimezone;
+
+  final String? valueDate;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'bookingDate': bookingDate,
+        'description': description,
+        'direction': direction.toJson(),
+        'eventOccurredAt': eventOccurredAt?.toUtc().toIso8601String(),
+        'magnitude': magnitude.toJson(),
+        'merchant': merchant,
+        'note': note,
+        'occurrenceOrdinal': occurrenceOrdinal,
+        'originalAmount': originalAmount?.toJson(),
+        'sourceTimezone': sourceTimezone,
+        'valueDate': valueDate,
+      };
+
+  @override
+  String toString() => 'CreateOwnManualTransactionRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class CreateOwnStatementImportRequestDto {
+  const CreateOwnStatementImportRequestDto({
+    required this.accountId,
+    this.connectionId,
+  });
+
+  /// Decodes the contract representation.
+  factory CreateOwnStatementImportRequestDto.fromJson(Map<String, Object?> json) => CreateOwnStatementImportRequestDto(
+        accountId: json['accountId']! as String,
+        connectionId: json['connectionId'] as String?,
+      );
+
+  /// One of the caller's OWN accounts.
+  final String accountId;
+
+  /// The caller's own USER_FILE_UPLOAD connection, when they are attributing this file to one. Null attributes it to none.
+  final String? connectionId;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'connectionId': connectionId,
+      };
+
+  @override
+  String toString() => 'CreateOwnStatementImportRequestDto()';
+}
+
 /// Contract object.
 @immutable
 final class CreateTenantInvitationRequestDto {
@@ -589,6 +1640,34 @@ final class CreateTenantInvitationResponseDto {
 
   @override
   String toString() => 'CreateTenantInvitationResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class CurrencyViewDto {
+  const CurrencyViewDto({
+    required this.code,
+    required this.exponent,
+  });
+
+  /// Decodes the contract representation.
+  factory CurrencyViewDto.fromJson(Map<String, Object?> json) => CurrencyViewDto(
+        code: json['code']! as String,
+        exponent: json['exponent']! as int,
+      );
+
+  final String code;
+
+  final int exponent;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'code': code,
+        'exponent': exponent,
+      };
+
+  @override
+  String toString() => 'CurrencyViewDto()';
 }
 
 /// Contract object.
@@ -801,6 +1880,23 @@ enum DeclaredJurisdictionStateDto {
   String? toWire() => this == unknown ? null : wireValue;
 }
 
+/// How the source's statement was turned into the canonical sign.
+@immutable
+final class DirectionMappingDto {
+  const DirectionMappingDto();
+
+  /// Decodes the contract representation.
+  factory DirectionMappingDto.fromJson(Map<String, Object?> json) =>
+      const DirectionMappingDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'DirectionMappingDto()';
+}
+
 /// Contract object.
 @immutable
 final class EmailVerifiedResultDto {
@@ -852,6 +1948,102 @@ enum EmailVerifiedResultStatusDto {
   String? toWire() => this == unknown ? null : wireValue;
 }
 
+/// The caller's own account. Every optional value is present-and-null rather than omitted, so absence is something the contract states rather than something a client infers from a missing key.
+/// Deliberately absent, and to stay absent: `tenantId` and `userId` (the caller IS the subject); any ciphertext, nonce, auth tag, encryption algorithm or key version; any external account identifier or fingerprint; and any balance — a balance is a reported fact with its own route, and a figure on the account row would be a second number free to disagree with it.
+@immutable
+final class FinancialAccountViewDto {
+  const FinancialAccountViewDto({
+    required this.accountId,
+    required this.accountType,
+    required this.createdAt,
+    required this.currency,
+    required this.displayName,
+    this.institution,
+    required this.link,
+    this.mask,
+    required this.nature,
+    required this.origin,
+    required this.status,
+    required this.updatedAt,
+    this.userSuppliedInstitutionLabel,
+    required this.version,
+    this.walletKind,
+  });
+
+  /// Decodes the contract representation.
+  factory FinancialAccountViewDto.fromJson(Map<String, Object?> json) => FinancialAccountViewDto(
+        accountId: json['accountId']! as String,
+        accountType: AccountTypeDto.fromJson(json['accountType']! as Map<String, Object?>),
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        currency: CurrencyViewDto.fromJson(json['currency']! as Map<String, Object?>),
+        displayName: json['displayName']! as String,
+        institution: json['institution'] == null ? null : InstitutionViewDto.fromJson(json['institution']! as Map<String, Object?>),
+        link: AccountLinkStateDto.fromJson(json['link']! as Map<String, Object?>),
+        mask: json['mask'] as String?,
+        nature: AccountNatureDto.fromJson(json['nature']! as Map<String, Object?>),
+        origin: AccountOriginDto.fromJson(json['origin']! as Map<String, Object?>),
+        status: AccountStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
+        userSuppliedInstitutionLabel: json['userSuppliedInstitutionLabel'] as String?,
+        version: json['version']! as int,
+        walletKind: json['walletKind'] == null ? null : WalletKindDto.fromJson(json['walletKind']! as Map<String, Object?>),
+      );
+
+  final String accountId;
+
+  final AccountTypeDto accountType;
+
+  final DateTime createdAt;
+
+  final CurrencyViewDto currency;
+
+  /// The subject's own name for the account, decrypted for its owner.
+  final String displayName;
+
+  /// The reviewed catalogue entry this account points at, resolved for display, or null when the subject named no catalogue issuer. A RETIRED entry still resolves here — an existing record has to remain readable.
+  final InstitutionViewDto? institution;
+
+  final AccountLinkStateDto link;
+
+  final String? mask;
+
+  final AccountNatureDto nature;
+
+  final AccountOriginDto origin;
+
+  final AccountStatusDto status;
+
+  final DateTime updatedAt;
+
+  final String? userSuppliedInstitutionLabel;
+
+  final int version;
+
+  final WalletKindDto? walletKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'accountType': accountType.toJson(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'currency': currency.toJson(),
+        'displayName': displayName,
+        'institution': institution?.toJson(),
+        'link': link.toJson(),
+        'mask': mask,
+        'nature': nature.toJson(),
+        'origin': origin.toJson(),
+        'status': status.toJson(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel,
+        'version': version,
+        'walletKind': walletKind?.toJson(),
+      };
+
+  @override
+  String toString() => 'FinancialAccountViewDto()';
+}
+
 /// Contract object.
 @immutable
 final class GetOwnTenantResponseDto {
@@ -878,6 +2070,34 @@ final class GetOwnTenantResponseDto {
 
   @override
   String toString() => 'GetOwnTenantResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class HistoryCoverageViewDto {
+  const HistoryCoverageViewDto({
+    required this.end,
+    required this.start,
+  });
+
+  /// Decodes the contract representation.
+  factory HistoryCoverageViewDto.fromJson(Map<String, Object?> json) => HistoryCoverageViewDto(
+        end: json['end']! as String,
+        start: json['start']! as String,
+      );
+
+  final String end;
+
+  final String start;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'end': end,
+        'start': start,
+      };
+
+  @override
+  String toString() => 'HistoryCoverageViewDto()';
 }
 
 /// Contract object.
@@ -1306,6 +2526,272 @@ final class IdentityVerifyEmailRequestDto {
   String toString() => 'IdentityVerifyEmailRequestDto()';
 }
 
+/// Counts only. `probableDuplicateCount` is present and is 0: probable- duplicate detection is not implemented, and a field that quietly did not exist would read as "none found" rather than "none looked for".
+@immutable
+final class ImportCountsViewDto {
+  const ImportCountsViewDto({
+    required this.committedTransactionCount,
+    required this.exactDuplicateCount,
+    required this.invalidRowCount,
+    required this.probableDuplicateCount,
+    required this.rowCount,
+    required this.validRowCount,
+  });
+
+  /// Decodes the contract representation.
+  factory ImportCountsViewDto.fromJson(Map<String, Object?> json) => ImportCountsViewDto(
+        committedTransactionCount: json['committedTransactionCount']! as int,
+        exactDuplicateCount: json['exactDuplicateCount']! as int,
+        invalidRowCount: json['invalidRowCount']! as int,
+        probableDuplicateCount: json['probableDuplicateCount']! as int,
+        rowCount: json['rowCount']! as int,
+        validRowCount: json['validRowCount']! as int,
+      );
+
+  final int committedTransactionCount;
+
+  final int exactDuplicateCount;
+
+  final int invalidRowCount;
+
+  final int probableDuplicateCount;
+
+  final int rowCount;
+
+  final int validRowCount;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'committedTransactionCount': committedTransactionCount,
+        'exactDuplicateCount': exactDuplicateCount,
+        'invalidRowCount': invalidRowCount,
+        'probableDuplicateCount': probableDuplicateCount,
+        'rowCount': rowCount,
+        'validRowCount': validRowCount,
+      };
+
+  @override
+  String toString() => 'ImportCountsViewDto()';
+}
+
+/// Why an import was refused. A closed vocabulary; never free prose from a file.
+@immutable
+final class ImportRefusalCodeDto {
+  const ImportRefusalCodeDto();
+
+  /// Decodes the contract representation.
+  factory ImportRefusalCodeDto.fromJson(Map<String, Object?> json) =>
+      const ImportRefusalCodeDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'ImportRefusalCodeDto()';
+}
+
+/// Contract object.
+@immutable
+final class ImportStateDto {
+  const ImportStateDto();
+
+  /// Decodes the contract representation.
+  factory ImportStateDto.fromJson(Map<String, Object?> json) =>
+      const ImportStateDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'ImportStateDto()';
+}
+
+/// Contract object.
+@immutable
+final class InstitutionKindDto {
+  const InstitutionKindDto();
+
+  /// Decodes the contract representation.
+  factory InstitutionKindDto.fromJson(Map<String, Object?> json) =>
+      const InstitutionKindDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'InstitutionKindDto()';
+}
+
+/// Emitted on the wire so the claim is checkable rather than merely stated in prose. `impliesLiveInstitutionLink` is false for every value of every status vocabulary on this surface, and no issuer exposes an interface to this platform.
+@immutable
+final class InstitutionLinkClaimDto {
+  const InstitutionLinkClaimDto({
+    required this.impliesLiveInstitutionLink,
+    required this.providerAccessStatus,
+  });
+
+  /// Decodes the contract representation.
+  factory InstitutionLinkClaimDto.fromJson(Map<String, Object?> json) => InstitutionLinkClaimDto(
+        impliesLiveInstitutionLink: json['impliesLiveInstitutionLink']! as bool,
+        providerAccessStatus: InstitutionLinkClaimProviderAccessStatusDto.fromWire(json['providerAccessStatus']! as String),
+      );
+
+  final bool impliesLiveInstitutionLink;
+
+  final InstitutionLinkClaimProviderAccessStatusDto providerAccessStatus;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'impliesLiveInstitutionLink': impliesLiveInstitutionLink,
+        'providerAccessStatus': providerAccessStatus.toWire(),
+      };
+
+  @override
+  String toString() => 'InstitutionLinkClaimDto()';
+}
+
+/// Contract enumeration.
+enum InstitutionLinkClaimProviderAccessStatusDto {
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const InstitutionLinkClaimProviderAccessStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstitutionLinkClaimProviderAccessStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// A reviewed catalogue row. It carries no tenant, no user, no country and no market: market presence is a separate per-country concern (`institution_markets`) and is not fabricated here.
+@immutable
+final class InstitutionViewDto {
+  const InstitutionViewDto({
+    required this.code,
+    required this.displayNameAr,
+    required this.displayNameEn,
+    required this.institutionId,
+    required this.kind,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory InstitutionViewDto.fromJson(Map<String, Object?> json) => InstitutionViewDto(
+        code: json['code']! as String,
+        displayNameAr: json['displayNameAr']! as String,
+        displayNameEn: json['displayNameEn']! as String,
+        institutionId: json['institutionId']! as String,
+        kind: InstitutionKindDto.fromJson(json['kind']! as Map<String, Object?>),
+        status: InstitutionViewStatusDto.fromWire(json['status']! as String),
+      );
+
+  final String code;
+
+  final String displayNameAr;
+
+  final String displayNameEn;
+
+  final String institutionId;
+
+  final InstitutionKindDto kind;
+
+  final InstitutionViewStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'code': code,
+        'displayNameAr': displayNameAr,
+        'displayNameEn': displayNameEn,
+        'institutionId': institutionId,
+        'kind': kind.toJson(),
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'InstitutionViewDto()';
+}
+
+/// Contract enumeration.
+enum InstitutionViewStatusDto {
+  active('ACTIVE'),
+  retired('RETIRED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const InstitutionViewStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstitutionViewStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The instrument's own lifecycle. TOKENIZED_CARD is a TYPE, not a live provisioning state, and no member of this vocabulary means the issuer is reachable.
+@immutable
+final class InstrumentStatusDto {
+  const InstrumentStatusDto();
+
+  /// Decodes the contract representation.
+  factory InstrumentStatusDto.fromJson(Map<String, Object?> json) =>
+      const InstrumentStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'InstrumentStatusDto()';
+}
+
+/// Contract object.
+@immutable
+final class InstrumentTypeDto {
+  const InstrumentTypeDto();
+
+  /// Decodes the contract representation.
+  factory InstrumentTypeDto.fromJson(Map<String, Object?> json) =>
+      const InstrumentTypeDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'InstrumentTypeDto()';
+}
+
 /// Contract object.
 @immutable
 final class InvitationDto {
@@ -1363,6 +2849,62 @@ final class InvitationDto {
 
   @override
   String toString() => 'InvitationDto()';
+}
+
+/// Emitted on the wire so the claim is checkable rather than merely stated. `impliesLiveIssuerLink` is false for every status the vocabulary permits; no issuer exposes an interface to this platform and no credential of any kind is stored.
+@immutable
+final class IssuerLinkClaimDto {
+  const IssuerLinkClaimDto({
+    required this.impliesLiveIssuerLink,
+    required this.providerAccessStatus,
+  });
+
+  /// Decodes the contract representation.
+  factory IssuerLinkClaimDto.fromJson(Map<String, Object?> json) => IssuerLinkClaimDto(
+        impliesLiveIssuerLink: json['impliesLiveIssuerLink']! as bool,
+        providerAccessStatus: IssuerLinkClaimProviderAccessStatusDto.fromWire(json['providerAccessStatus']! as String),
+      );
+
+  final bool impliesLiveIssuerLink;
+
+  final IssuerLinkClaimProviderAccessStatusDto providerAccessStatus;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'impliesLiveIssuerLink': impliesLiveIssuerLink,
+        'providerAccessStatus': providerAccessStatus.toWire(),
+      };
+
+  @override
+  String toString() => 'IssuerLinkClaimDto()';
+}
+
+/// Contract enumeration.
+enum IssuerLinkClaimProviderAccessStatusDto {
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const IssuerLinkClaimProviderAccessStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static IssuerLinkClaimProviderAccessStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
 }
 
 /// Contract object.
@@ -1547,6 +3089,230 @@ final class ListDeclarableJurisdictionReferencesResponseDto {
 
 /// Contract object.
 @immutable
+final class ListFinancialCategoriesResponseDto {
+  const ListFinancialCategoriesResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListFinancialCategoriesResponseDto.fromJson(Map<String, Object?> json) => ListFinancialCategoriesResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => CategoryViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<CategoryViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((CategoryViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListFinancialCategoriesResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListFinancialInstitutionsResponseDto {
+  const ListFinancialInstitutionsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListFinancialInstitutionsResponseDto.fromJson(Map<String, Object?> json) => ListFinancialInstitutionsResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => InstitutionViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<InstitutionViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((InstitutionViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListFinancialInstitutionsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnAccountBalanceSnapshotsResponseDto {
+  const ListOwnAccountBalanceSnapshotsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnAccountBalanceSnapshotsResponseDto.fromJson(Map<String, Object?> json) => ListOwnAccountBalanceSnapshotsResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => BalanceSnapshotViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<BalanceSnapshotViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((BalanceSnapshotViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnAccountBalanceSnapshotsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnAccountPaymentInstrumentsResponseDto {
+  const ListOwnAccountPaymentInstrumentsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnAccountPaymentInstrumentsResponseDto.fromJson(Map<String, Object?> json) => ListOwnAccountPaymentInstrumentsResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => PaymentInstrumentViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<PaymentInstrumentViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((PaymentInstrumentViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnAccountPaymentInstrumentsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnAccountSourceLinksResponseDto {
+  const ListOwnAccountSourceLinksResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnAccountSourceLinksResponseDto.fromJson(Map<String, Object?> json) => ListOwnAccountSourceLinksResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => AccountSourceLinkViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<AccountSourceLinkViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((AccountSourceLinkViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnAccountSourceLinksResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnFinancialAccountsResponseDto {
+  const ListOwnFinancialAccountsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnFinancialAccountsResponseDto.fromJson(Map<String, Object?> json) => ListOwnFinancialAccountsResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => FinancialAccountViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<FinancialAccountViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((FinancialAccountViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnFinancialAccountsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnFinancialConnectionsResponseDto {
+  const ListOwnFinancialConnectionsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnFinancialConnectionsResponseDto.fromJson(Map<String, Object?> json) => ListOwnFinancialConnectionsResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => ConnectionSummaryViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<ConnectionSummaryViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((ConnectionSummaryViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnFinancialConnectionsResponseDto()';
+}
+
+/// Contract object.
+@immutable
 final class ListOwnTenantMembershipsResponseDto {
   const ListOwnTenantMembershipsResponseDto({
     required this.memberships,
@@ -1570,6 +3336,102 @@ final class ListOwnTenantMembershipsResponseDto {
 
   @override
   String toString() => 'ListOwnTenantMembershipsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnTransactionProvenanceResponseDto {
+  const ListOwnTransactionProvenanceResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTransactionProvenanceResponseDto.fromJson(Map<String, Object?> json) => ListOwnTransactionProvenanceResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => ProvenanceViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<ProvenanceViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((ProvenanceViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnTransactionProvenanceResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnTransactionsResponseDto {
+  const ListOwnTransactionsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTransactionsResponseDto.fromJson(Map<String, Object?> json) => ListOwnTransactionsResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => TransactionViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<TransactionViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((TransactionViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnTransactionsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnTransferMatchesResponseDto {
+  const ListOwnTransferMatchesResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTransferMatchesResponseDto.fromJson(Map<String, Object?> json) => ListOwnTransferMatchesResponseDto(
+        items: (json['items']! as List<Object?>)
+            .map((Object? element) => TransferMatchViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+      );
+
+  final List<TransferMatchViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((TransferMatchViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnTransferMatchesResponseDto()';
 }
 
 /// Contract object.
@@ -1648,6 +3510,73 @@ enum LoggedOutResultStatusDto {
 
   /// The wire value, or null for [unknown].
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Why this source was linked to this account. EXACT_EXTERNAL_REFERENCE or PROBABLE, and nothing in between — there is no confidence score in this platform and none may be invented for display.
+@immutable
+final class MatchBasisDto {
+  const MatchBasisDto();
+
+  /// Decodes the contract representation.
+  factory MatchBasisDto.fromJson(Map<String, Object?> json) =>
+      const MatchBasisDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'MatchBasisDto()';
+}
+
+/// One side of the relationship. It carries no amount and no date: those belong to the transaction it names, which the caller can read on the transactions surface. A copy here would be free to disagree with it.
+@immutable
+final class MatchSideViewDto {
+  const MatchSideViewDto({
+    required this.accountId,
+    required this.currency,
+    required this.transactionId,
+  });
+
+  /// Decodes the contract representation.
+  factory MatchSideViewDto.fromJson(Map<String, Object?> json) => MatchSideViewDto(
+        accountId: json['accountId']! as String,
+        currency: json['currency']! as String,
+        transactionId: json['transactionId']! as String,
+      );
+
+  final String accountId;
+
+  final String currency;
+
+  final String transactionId;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'currency': currency,
+        'transactionId': transactionId,
+      };
+
+  @override
+  String toString() => 'MatchSideViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class MatchStateDto {
+  const MatchStateDto();
+
+  /// Decodes the contract representation.
+  factory MatchStateDto.fromJson(Map<String, Object?> json) =>
+      const MatchStateDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'MatchStateDto()';
 }
 
 /// Contract object.
@@ -1911,6 +3840,73 @@ enum MfaEnrolmentStartedStatusDto {
   String? toWire() => this == unknown ? null : wireValue;
 }
 
+/// An exact amount. `minorUnits` is the signed integer the ledger holds, serialized as CHARACTERS — never a JSON number, because a number is a float and a float is not a ledger value (ADR-0006). `exponent` is the currency's ISO 4217 minor-unit exponent, supplied so a client can render without a currency table of its own; it is not a licence to divide.
+@immutable
+final class MinorUnitAmountDto {
+  const MinorUnitAmountDto({
+    required this.currency,
+    required this.exponent,
+    required this.minorUnits,
+  });
+
+  /// Decodes the contract representation.
+  factory MinorUnitAmountDto.fromJson(Map<String, Object?> json) => MinorUnitAmountDto(
+        currency: json['currency']! as String,
+        exponent: json['exponent']! as int,
+        minorUnits: json['minorUnits']! as String,
+      );
+
+  final String currency;
+
+  final int exponent;
+
+  final String minorUnits;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'currency': currency,
+        'exponent': exponent,
+        'minorUnits': minorUnits,
+      };
+
+  @override
+  String toString() => 'MinorUnitAmountDto()';
+}
+
+/// An exact integer count of minor units, serialized as CHARACTERS. Never a JSON number: a number is a float, and a float is not a ledger value (ADR-0006).
+@immutable
+final class MinorUnitStringDto {
+  const MinorUnitStringDto();
+
+  /// Decodes the contract representation.
+  factory MinorUnitStringDto.fromJson(Map<String, Object?> json) =>
+      const MinorUnitStringDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'MinorUnitStringDto()';
+}
+
+/// MONEY_OUT is money leaving the account and is stored negative; MONEY_IN is money arriving and is stored positive. One convention, named on the wire, so nobody has to infer it from a sign.
+@immutable
+final class MoneyDirectionDto {
+  const MoneyDirectionDto();
+
+  /// Decodes the contract representation.
+  factory MoneyDirectionDto.fromJson(Map<String, Object?> json) =>
+      const MoneyDirectionDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'MoneyDirectionDto()';
+}
+
 /// Contract object.
 @immutable
 final class NeutralReceiptDto {
@@ -2123,6 +4119,73 @@ enum OtherSessionsRevokedStatusDto {
   String? toWire() => this == unknown ? null : wireValue;
 }
 
+/// What this page IS, stated rather than inferred. `hasMore` is explicit so an empty page is a stated end rather than something a client guesses at, and `nextCursor` is null exactly when there is no next page.
+@immutable
+final class PageInfoDto {
+  const PageInfoDto({
+    required this.hasMore,
+    required this.limit,
+    this.nextCursor,
+    required this.returned,
+  });
+
+  /// Decodes the contract representation.
+  factory PageInfoDto.fromJson(Map<String, Object?> json) => PageInfoDto(
+        hasMore: json['hasMore']! as bool,
+        limit: json['limit']! as int,
+        nextCursor: json['nextCursor'] as String?,
+        returned: json['returned']! as int,
+      );
+
+  final bool hasMore;
+
+  final int limit;
+
+  final String? nextCursor;
+
+  final int returned;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'hasMore': hasMore,
+        'limit': limit,
+        'nextCursor': nextCursor,
+        'returned': returned,
+      };
+
+  @override
+  String toString() => 'PageInfoDto()';
+}
+
+/// Contract object.
+@immutable
+final class ParseOwnStatementImportSourceRequestDto {
+  const ParseOwnStatementImportSourceRequestDto({
+    required this.mapping,
+    this.statedBalance,
+  });
+
+  /// Decodes the contract representation.
+  factory ParseOwnStatementImportSourceRequestDto.fromJson(Map<String, Object?> json) => ParseOwnStatementImportSourceRequestDto(
+        mapping: StatementColumnMappingDto.fromJson(json['mapping']! as Map<String, Object?>),
+        statedBalance: json['statedBalance'] == null ? null : StatedStatementBalanceDto.fromJson(json['statedBalance']! as Map<String, Object?>),
+      );
+
+  final StatementColumnMappingDto mapping;
+
+  /// The balance the statement itself states, for reconciliation. Null when the statement states none.
+  final StatedStatementBalanceDto? statedBalance;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'mapping': mapping.toJson(),
+        'statedBalance': statedBalance?.toJson(),
+      };
+
+  @override
+  String toString() => 'ParseOwnStatementImportSourceRequestDto()';
+}
+
 /// Contract object.
 @immutable
 final class PasswordChangedResultDto {
@@ -2223,6 +4286,236 @@ enum PasswordResetResultStatusDto {
 
   /// The wire value, or null for [unknown].
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One instrument. `version` is the ONLY number in this object, and that is the point: the question "how much is on this card" has no answer in this platform and must not acquire one here.
+@immutable
+final class PaymentInstrumentViewDto {
+  const PaymentInstrumentViewDto({
+    required this.accountId,
+    required this.createdAt,
+    required this.displayLabel,
+    required this.instrumentId,
+    required this.instrumentType,
+    required this.issuerLink,
+    required this.mask,
+    required this.spendable,
+    required this.status,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory PaymentInstrumentViewDto.fromJson(Map<String, Object?> json) => PaymentInstrumentViewDto(
+        accountId: json['accountId']! as String,
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        displayLabel: json['displayLabel']! as String,
+        instrumentId: json['instrumentId']! as String,
+        instrumentType: InstrumentTypeDto.fromJson(json['instrumentType']! as Map<String, Object?>),
+        issuerLink: IssuerLinkClaimDto.fromJson(json['issuerLink']! as Map<String, Object?>),
+        mask: json['mask']! as String,
+        spendable: json['spendable']! as bool,
+        status: InstrumentStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
+        version: json['version']! as int,
+      );
+
+  /// The single balance-bearing account this instrument spends from. Singular and required; there is no field through which it could be re-pointed.
+  final String accountId;
+
+  final DateTime createdAt;
+
+  /// The subject's own name for the instrument, decrypted for its owner.
+  final String displayLabel;
+
+  final String instrumentId;
+
+  final InstrumentTypeDto instrumentType;
+
+  final IssuerLinkClaimDto issuerLink;
+
+  /// A short masked tail, e.g. `**1234`, decrypted for its owner. Never a full number: a value that reads as one is refused at the domain.
+  final String mask;
+
+  /// Whether this instrument may currently be used to spend, stated rather than derived from the status vocabulary.
+  final bool spendable;
+
+  final InstrumentStatusDto status;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'displayLabel': displayLabel,
+        'instrumentId': instrumentId,
+        'instrumentType': instrumentType.toJson(),
+        'issuerLink': issuerLink.toJson(),
+        'mask': mask,
+        'spendable': spendable,
+        'status': status.toJson(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'PaymentInstrumentViewDto()';
+}
+
+/// How this import was processed. `fingerprintVersion` is the ALGORITHM version, never a fingerprint.
+@immutable
+final class ProcessingVersionsViewDto {
+  const ProcessingVersionsViewDto({
+    required this.fingerprintVersion,
+    required this.mappingVersion,
+    required this.normalizationVersion,
+    required this.parserVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory ProcessingVersionsViewDto.fromJson(Map<String, Object?> json) => ProcessingVersionsViewDto(
+        fingerprintVersion: json['fingerprintVersion']! as String,
+        mappingVersion: json['mappingVersion']! as String,
+        normalizationVersion: json['normalizationVersion']! as String,
+        parserVersion: json['parserVersion']! as String,
+      );
+
+  final String fingerprintVersion;
+
+  final String mappingVersion;
+
+  final String normalizationVersion;
+
+  final String parserVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'fingerprintVersion': fingerprintVersion,
+        'mappingVersion': mappingVersion,
+        'normalizationVersion': normalizationVersion,
+        'parserVersion': parserVersion,
+      };
+
+  @override
+  String toString() => 'ProcessingVersionsViewDto()';
+}
+
+/// Contract enumeration.
+enum ProvenanceViewCategoryAssignmentSourceDto {
+  none('NONE'),
+  rule('RULE'),
+  user('USER'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const ProvenanceViewCategoryAssignmentSourceDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ProvenanceViewCategoryAssignmentSourceDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The safe projection. `importedFromStatement` reports EXISTENCE of a statement origin as a boolean; the import id and the row reference are not carried, because a row reference is a handle into staged source content.
+@immutable
+final class ProvenanceViewDto {
+  const ProvenanceViewDto({
+    required this.accountId,
+    required this.availability,
+    required this.categoryAssignmentSource,
+    required this.createdAt,
+    required this.directionMapping,
+    required this.importedFromStatement,
+    required this.revisionNumber,
+    required this.sourceDirection,
+    required this.sourceKind,
+    required this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory ProvenanceViewDto.fromJson(Map<String, Object?> json) => ProvenanceViewDto(
+        accountId: json['accountId']! as String,
+        availability: RailAvailabilityDto.fromJson(json['availability']! as Map<String, Object?>),
+        categoryAssignmentSource: ProvenanceViewCategoryAssignmentSourceDto.fromWire(json['categoryAssignmentSource']! as String),
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        directionMapping: DirectionMappingDto.fromJson(json['directionMapping']! as Map<String, Object?>),
+        importedFromStatement: json['importedFromStatement']! as bool,
+        revisionNumber: json['revisionNumber']! as int,
+        sourceDirection: SourceDirectionDto.fromJson(json['sourceDirection']! as Map<String, Object?>),
+        sourceKind: SourceKindDto.fromJson(json['sourceKind']! as Map<String, Object?>),
+        versions: ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>),
+      );
+
+  final String accountId;
+
+  final RailAvailabilityDto availability;
+
+  final ProvenanceViewCategoryAssignmentSourceDto categoryAssignmentSource;
+
+  final DateTime createdAt;
+
+  final DirectionMappingDto directionMapping;
+
+  final bool importedFromStatement;
+
+  final int revisionNumber;
+
+  final SourceDirectionDto sourceDirection;
+
+  final SourceKindDto sourceKind;
+
+  final ProcessingVersionsViewDto versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'availability': availability.toJson(),
+        'categoryAssignmentSource': categoryAssignmentSource.toWire(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'directionMapping': directionMapping.toJson(),
+        'importedFromStatement': importedFromStatement,
+        'revisionNumber': revisionNumber,
+        'sourceDirection': sourceDirection.toJson(),
+        'sourceKind': sourceKind.toJson(),
+        'versions': versions.toJson(),
+      };
+
+  @override
+  String toString() => 'ProvenanceViewDto()';
+}
+
+/// Whether this platform can actually run the rail today. EXECUTABLE for MANUAL and USER_FILE_UPLOAD, NOT_IMPLEMENTED for every other rail — and the database enforces the same split, so an unimplemented rail cannot be written even by direct SQL.
+@immutable
+final class RailAvailabilityDto {
+  const RailAvailabilityDto();
+
+  /// Decodes the contract representation.
+  factory RailAvailabilityDto.fromJson(Map<String, Object?> json) =>
+      const RailAvailabilityDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'RailAvailabilityDto()';
 }
 
 /// Contract object.
@@ -2413,6 +4706,66 @@ enum ReadOwnConsentStatusResponseStateDto {
 
   /// The wire value, or null for [unknown].
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class ReadOwnTransactionResponseDto {
+  const ReadOwnTransactionResponseDto({
+    this.activeCategory,
+    required this.divergesFromSource,
+    required this.revisions,
+    required this.transaction,
+  });
+
+  /// Decodes the contract representation.
+  factory ReadOwnTransactionResponseDto.fromJson(Map<String, Object?> json) => ReadOwnTransactionResponseDto(
+        activeCategory: json['activeCategory'] == null ? null : CategoryAssignmentViewDto.fromJson(json['activeCategory']! as Map<String, Object?>),
+        divergesFromSource: json['divergesFromSource']! as bool,
+        revisions: (json['revisions']! as List<Object?>)
+            .map((Object? element) => TransactionRevisionViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        transaction: TransactionViewDto.fromJson(json['transaction']! as Map<String, Object?>),
+      );
+
+  final CategoryAssignmentViewDto? activeCategory;
+
+  /// True when a person has corrected a value the source supplied. The source's own values remain in `revisions`.
+  final bool divergesFromSource;
+
+  final List<TransactionRevisionViewDto> revisions;
+
+  final TransactionViewDto transaction;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'activeCategory': activeCategory?.toJson(),
+        'divergesFromSource': divergesFromSource,
+        'revisions': revisions
+            .map((TransactionRevisionViewDto element) => element.toJson())
+            .toList(growable: false),
+        'transaction': transaction.toJson(),
+      };
+
+  @override
+  String toString() => 'ReadOwnTransactionResponseDto()';
+}
+
+/// Whether the statement's own stated balance agrees with its rows. NOT_AVAILABLE is a real answer — the statement stated no balance, or there was nothing to compare against — and is not the same as MATCHED.
+@immutable
+final class ReconciliationStatusDto {
+  const ReconciliationStatusDto();
+
+  /// Decodes the contract representation.
+  factory ReconciliationStatusDto.fromJson(Map<String, Object?> json) =>
+      const ReconciliationStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'ReconciliationStatusDto()';
 }
 
 /// Contract object.
@@ -2655,6 +5008,29 @@ enum RefreshedSessionStatusDto {
 
 /// Contract object.
 @immutable
+final class RejectOwnTransferMatchRequestDto {
+  const RejectOwnTransferMatchRequestDto({
+    required this.expectedVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory RejectOwnTransferMatchRequestDto.fromJson(Map<String, Object?> json) => RejectOwnTransferMatchRequestDto(
+        expectedVersion: json['expectedVersion']! as int,
+      );
+
+  final int expectedVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'expectedVersion': expectedVersion,
+      };
+
+  @override
+  String toString() => 'RejectOwnTransferMatchRequestDto()';
+}
+
+/// Contract object.
+@immutable
 final class RequestOwnAccountDisableRequestDto {
   const RequestOwnAccountDisableRequestDto({
     this.reason,
@@ -2740,6 +5116,108 @@ enum RequestOwnAccountDisableResponseStatusDto {
 
 /// Contract object.
 @immutable
+final class RevisableFieldDto {
+  const RevisableFieldDto();
+
+  /// Decodes the contract representation.
+  factory RevisableFieldDto.fromJson(Map<String, Object?> json) =>
+      const RevisableFieldDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'RevisableFieldDto()';
+}
+
+/// Contract object.
+@immutable
+final class RevisionAttributionDto {
+  const RevisionAttributionDto();
+
+  /// Decodes the contract representation.
+  factory RevisionAttributionDto.fromJson(Map<String, Object?> json) =>
+      const RevisionAttributionDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'RevisionAttributionDto()';
+}
+
+/// A COMPLETE snapshot of the revisable values, never a patch.
+@immutable
+final class RevisionValuesViewDto {
+  const RevisionValuesViewDto({
+    required this.amount,
+    required this.bookingDate,
+    required this.description,
+    required this.direction,
+    this.eventOccurredAt,
+    this.merchant,
+    this.note,
+    this.sourceTimezone,
+    required this.status,
+    this.valueDate,
+  });
+
+  /// Decodes the contract representation.
+  factory RevisionValuesViewDto.fromJson(Map<String, Object?> json) => RevisionValuesViewDto(
+        amount: MinorUnitAmountDto.fromJson(json['amount']! as Map<String, Object?>),
+        bookingDate: json['bookingDate']! as String,
+        description: json['description']! as String,
+        direction: MoneyDirectionDto.fromJson(json['direction']! as Map<String, Object?>),
+        eventOccurredAt: json['eventOccurredAt'] == null ? null : DateTime.parse(json['eventOccurredAt']! as String).toUtc(),
+        merchant: json['merchant'] as String?,
+        note: json['note'] as String?,
+        sourceTimezone: json['sourceTimezone'] as String?,
+        status: TransactionStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        valueDate: json['valueDate'] as String?,
+      );
+
+  final MinorUnitAmountDto amount;
+
+  final String bookingDate;
+
+  final String description;
+
+  final MoneyDirectionDto direction;
+
+  final DateTime? eventOccurredAt;
+
+  final String? merchant;
+
+  final String? note;
+
+  final String? sourceTimezone;
+
+  final TransactionStatusDto status;
+
+  final String? valueDate;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'amount': amount.toJson(),
+        'bookingDate': bookingDate,
+        'description': description,
+        'direction': direction.toJson(),
+        'eventOccurredAt': eventOccurredAt?.toUtc().toIso8601String(),
+        'merchant': merchant,
+        'note': note,
+        'sourceTimezone': sourceTimezone,
+        'status': status.toJson(),
+        'valueDate': valueDate,
+      };
+
+  @override
+  String toString() => 'RevisionValuesViewDto()';
+}
+
+/// Contract object.
+@immutable
 final class RevokeTenantInvitationResponseDto {
   const RevokeTenantInvitationResponseDto({
     required this.invitation,
@@ -2759,6 +5237,73 @@ final class RevokeTenantInvitationResponseDto {
 
   @override
   String toString() => 'RevokeTenantInvitationResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class RowErrorReasonCodeDto {
+  const RowErrorReasonCodeDto();
+
+  /// Decodes the contract representation.
+  factory RowErrorReasonCodeDto.fromJson(Map<String, Object?> json) =>
+      const RowErrorReasonCodeDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'RowErrorReasonCodeDto()';
+}
+
+/// Exactly three fields, and there is never a fourth. `rowNumber` is 1-based among DATA rows — never an offset into the file — and no cell value accompanies it.
+@immutable
+final class RowErrorViewDto {
+  const RowErrorViewDto({
+    required this.reasonCode,
+    required this.rowNumber,
+    required this.safeField,
+  });
+
+  /// Decodes the contract representation.
+  factory RowErrorViewDto.fromJson(Map<String, Object?> json) => RowErrorViewDto(
+        reasonCode: RowErrorReasonCodeDto.fromJson(json['reasonCode']! as Map<String, Object?>),
+        rowNumber: json['rowNumber']! as int,
+        safeField: SafeFieldDto.fromJson(json['safeField']! as Map<String, Object?>),
+      );
+
+  final RowErrorReasonCodeDto reasonCode;
+
+  final int rowNumber;
+
+  final SafeFieldDto safeField;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'reasonCode': reasonCode.toJson(),
+        'rowNumber': rowNumber,
+        'safeField': safeField.toJson(),
+      };
+
+  @override
+  String toString() => 'RowErrorViewDto()';
+}
+
+/// WHICH field of a row failed, from a CLOSED module vocabulary — never the file's own header text, which can itself contain an account number.
+@immutable
+final class SafeFieldDto {
+  const SafeFieldDto();
+
+  /// Decodes the contract representation.
+  factory SafeFieldDto.fromJson(Map<String, Object?> json) =>
+      const SafeFieldDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SafeFieldDto()';
 }
 
 /// Contract object.
@@ -3046,6 +5591,879 @@ final class SetPlatformTenantBindingResponseSwitchedTokensDto {
   String toString() => 'SetPlatformTenantBindingResponseSwitchedTokensDto()';
 }
 
+/// How much weight this source's version of a fact carries.
+@immutable
+final class SourceAuthorityDto {
+  const SourceAuthorityDto();
+
+  /// Decodes the contract representation.
+  factory SourceAuthorityDto.fromJson(Map<String, Object?> json) =>
+      const SourceAuthorityDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SourceAuthorityDto()';
+}
+
+/// Contract object.
+@immutable
+final class SourceCapabilitiesViewDto {
+  const SourceCapabilitiesViewDto({
+    required this.balance,
+    required this.pendingTransactions,
+  });
+
+  /// Decodes the contract representation.
+  factory SourceCapabilitiesViewDto.fromJson(Map<String, Object?> json) => SourceCapabilitiesViewDto(
+        balance: SourceCapabilityObservationDto.fromJson(json['balance']! as Map<String, Object?>),
+        pendingTransactions: SourceCapabilityObservationDto.fromJson(json['pendingTransactions']! as Map<String, Object?>),
+      );
+
+  final SourceCapabilityObservationDto balance;
+
+  final SourceCapabilityObservationDto pendingTransactions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'balance': balance.toJson(),
+        'pendingTransactions': pendingTransactions.toJson(),
+      };
+
+  @override
+  String toString() => 'SourceCapabilitiesViewDto()';
+}
+
+/// What was OBSERVED, not what is supported. NOT_PROVIDED means the source never offered it; NOT_OBSERVED means this platform has not seen it. The two are different answers and are kept apart.
+@immutable
+final class SourceCapabilityObservationDto {
+  const SourceCapabilityObservationDto();
+
+  /// Decodes the contract representation.
+  factory SourceCapabilityObservationDto.fromJson(Map<String, Object?> json) =>
+      const SourceCapabilityObservationDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SourceCapabilityObservationDto()';
+}
+
+/// What the source itself said, before any mapping.
+@immutable
+final class SourceDirectionDto {
+  const SourceDirectionDto();
+
+  /// Decodes the contract representation.
+  factory SourceDirectionDto.fromJson(Map<String, Object?> json) =>
+      const SourceDirectionDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SourceDirectionDto()';
+}
+
+/// The rail a stored figure arrived on. EXTERNAL_PROVIDER is in the vocabulary because the column can hold it; no path in this platform can produce it, and `availability` on every rail-bearing response says so.
+@immutable
+final class SourceKindDto {
+  const SourceKindDto();
+
+  /// Decodes the contract representation.
+  factory SourceKindDto.fromJson(Map<String, Object?> json) =>
+      const SourceKindDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SourceKindDto()';
+}
+
+/// Contract object.
+@immutable
+final class SourceLinkStatusDto {
+  const SourceLinkStatusDto();
+
+  /// Decodes the contract representation.
+  factory SourceLinkStatusDto.fromJson(Map<String, Object?> json) =>
+      const SourceLinkStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SourceLinkStatusDto()';
+}
+
+/// Freshness as OBSERVATION, not as health. These are instants, not days.
+@immutable
+final class SourceObservationViewDto {
+  const SourceObservationViewDto({
+    required this.firstObservedAt,
+    required this.lastObservedAt,
+    this.lastSuccessfulImportAt,
+  });
+
+  /// Decodes the contract representation.
+  factory SourceObservationViewDto.fromJson(Map<String, Object?> json) => SourceObservationViewDto(
+        firstObservedAt: DateTime.parse(json['firstObservedAt']! as String).toUtc(),
+        lastObservedAt: DateTime.parse(json['lastObservedAt']! as String).toUtc(),
+        lastSuccessfulImportAt: json['lastSuccessfulImportAt'] == null ? null : DateTime.parse(json['lastSuccessfulImportAt']! as String).toUtc(),
+      );
+
+  final DateTime firstObservedAt;
+
+  final DateTime lastObservedAt;
+
+  /// Null when no import has yet succeeded. Never approximated.
+  final DateTime? lastSuccessfulImportAt;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'firstObservedAt': firstObservedAt.toUtc().toIso8601String(),
+        'lastObservedAt': lastObservedAt.toUtc().toIso8601String(),
+        'lastSuccessfulImportAt': lastSuccessfulImportAt?.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'SourceObservationViewDto()';
+}
+
+/// What the STATEMENT says its balance is, for reconciliation only.
+@immutable
+final class StatedStatementBalanceDto {
+  const StatedStatementBalanceDto({
+    required this.currency,
+    required this.kind,
+    required this.minorUnits,
+  });
+
+  /// Decodes the contract representation.
+  factory StatedStatementBalanceDto.fromJson(Map<String, Object?> json) => StatedStatementBalanceDto(
+        currency: json['currency']! as String,
+        kind: StatedStatementBalanceKindDto.fromWire(json['kind']! as String),
+        minorUnits: MinorUnitStringDto.fromJson(json['minorUnits']! as Map<String, Object?>),
+      );
+
+  final String currency;
+
+  final StatedStatementBalanceKindDto kind;
+
+  final MinorUnitStringDto minorUnits;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'currency': currency,
+        'kind': kind.toWire(),
+        'minorUnits': minorUnits.toJson(),
+      };
+
+  @override
+  String toString() => 'StatedStatementBalanceDto()';
+}
+
+/// Contract enumeration.
+enum StatedStatementBalanceKindDto {
+  available('AVAILABLE'),
+  closing('CLOSING'),
+  ledger('LEDGER'),
+  opening('OPENING'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatedStatementBalanceKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatedStatementBalanceKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Stated rather than inferred. `03/04` is two different days depending on the answer, and guessing it wrong moves a person's money.
+enum StatementColumnMappingDateOrderDto {
+  dayFirst('DAY_FIRST'),
+  iso('ISO'),
+  monthFirst('MONTH_FIRST'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatementColumnMappingDateOrderDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementColumnMappingDateOrderDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Column INDEXES, 0-based. Deliberately not header names: a header is untrusted text from a file, and matching on it is how a column of dates becomes a column of amounts.
+/// `accountIdentifierColumn` exists for DETECTION only — it lets the parse notice that a file covers more than one account and refuse. It never selects an account: the account is the one the draft was created against, and a file cannot redirect itself.
+@immutable
+final class StatementColumnMappingDto {
+  const StatementColumnMappingDto({
+    this.accountIdentifierColumn,
+    required this.amount,
+    required this.bookingDateColumn,
+    this.currencyColumn,
+    this.dateOrder,
+    required this.descriptionColumn,
+    this.eventOccurredAtColumn,
+    required this.hasHeaderRow,
+    this.instrumentMaskColumn,
+    this.merchantColumn,
+    this.sourceBalanceColumn,
+    this.sourceBalanceKind,
+    this.sourceReferenceColumn,
+    this.sourceTimezoneColumn,
+    this.statedCurrency,
+    this.valueDateColumn,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementColumnMappingDto.fromJson(Map<String, Object?> json) => StatementColumnMappingDto(
+        accountIdentifierColumn: json['accountIdentifierColumn'] as int?,
+        amount: AmountColumnsDto.fromJson(json['amount']! as Map<String, Object?>),
+        bookingDateColumn: json['bookingDateColumn']! as int,
+        currencyColumn: json['currencyColumn'] as int?,
+        dateOrder: json['dateOrder'] == null ? null : StatementColumnMappingDateOrderDto.fromWire(json['dateOrder']! as String),
+        descriptionColumn: json['descriptionColumn']! as int,
+        eventOccurredAtColumn: json['eventOccurredAtColumn'] as int?,
+        hasHeaderRow: json['hasHeaderRow']! as bool,
+        instrumentMaskColumn: json['instrumentMaskColumn'] as int?,
+        merchantColumn: json['merchantColumn'] as int?,
+        sourceBalanceColumn: json['sourceBalanceColumn'] as int?,
+        sourceBalanceKind: json['sourceBalanceKind'] == null ? null : StatementColumnMappingSourceBalanceKindDto.fromWire(json['sourceBalanceKind']! as String),
+        sourceReferenceColumn: json['sourceReferenceColumn'] as int?,
+        sourceTimezoneColumn: json['sourceTimezoneColumn'] as int?,
+        statedCurrency: json['statedCurrency'] as String?,
+        valueDateColumn: json['valueDateColumn'] as int?,
+      );
+
+  final int? accountIdentifierColumn;
+
+  final AmountColumnsDto amount;
+
+  final int bookingDateColumn;
+
+  /// Exactly one of `currencyColumn` and `statedCurrency` must be given. Two sources for one currency is an ambiguity, not a fallback.
+  final int? currencyColumn;
+
+  /// Stated rather than inferred. `03/04` is two different days depending on the answer, and guessing it wrong moves a person's money.
+  final StatementColumnMappingDateOrderDto? dateOrder;
+
+  final int descriptionColumn;
+
+  final int? eventOccurredAtColumn;
+
+  final bool hasHeaderRow;
+
+  final int? instrumentMaskColumn;
+
+  final int? merchantColumn;
+
+  final int? sourceBalanceColumn;
+
+  /// Required when a balance column is given; a balance of unstated kind is unusable.
+  final StatementColumnMappingSourceBalanceKindDto? sourceBalanceKind;
+
+  final int? sourceReferenceColumn;
+
+  final int? sourceTimezoneColumn;
+
+  final String? statedCurrency;
+
+  final int? valueDateColumn;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountIdentifierColumn': accountIdentifierColumn,
+        'amount': amount.toJson(),
+        'bookingDateColumn': bookingDateColumn,
+        'currencyColumn': currencyColumn,
+        'dateOrder': dateOrder?.toWire(),
+        'descriptionColumn': descriptionColumn,
+        'eventOccurredAtColumn': eventOccurredAtColumn,
+        'hasHeaderRow': hasHeaderRow,
+        'instrumentMaskColumn': instrumentMaskColumn,
+        'merchantColumn': merchantColumn,
+        'sourceBalanceColumn': sourceBalanceColumn,
+        'sourceBalanceKind': sourceBalanceKind?.toWire(),
+        'sourceReferenceColumn': sourceReferenceColumn,
+        'sourceTimezoneColumn': sourceTimezoneColumn,
+        'statedCurrency': statedCurrency,
+        'valueDateColumn': valueDateColumn,
+      };
+
+  @override
+  String toString() => 'StatementColumnMappingDto()';
+}
+
+/// Required when a balance column is given; a balance of unstated kind is unusable.
+enum StatementColumnMappingSourceBalanceKindDto {
+  available('AVAILABLE'),
+  closing('CLOSING'),
+  ledger('LEDGER'),
+  running('RUNNING'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatementColumnMappingSourceBalanceKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementColumnMappingSourceBalanceKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// What the commit wrote. `alreadyCommitted` true means this was an idempotent retry and nothing was written a second time.
+@immutable
+final class StatementImportCommittedViewDto {
+  const StatementImportCommittedViewDto({
+    required this.alreadyCommitted,
+    required this.committedTransactionCount,
+    required this.importId,
+    required this.transactionIds,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportCommittedViewDto.fromJson(Map<String, Object?> json) => StatementImportCommittedViewDto(
+        alreadyCommitted: json['alreadyCommitted']! as bool,
+        committedTransactionCount: json['committedTransactionCount']! as int,
+        importId: json['importId']! as String,
+        transactionIds: (json['transactionIds']! as List<Object?>)
+            .map((Object? element) => element! as String)
+            .toList(growable: false),
+      );
+
+  final bool alreadyCommitted;
+
+  final int committedTransactionCount;
+
+  final String importId;
+
+  /// The caller's own new transactions, addressable on the transactions surface.
+  final List<String> transactionIds;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'alreadyCommitted': alreadyCommitted,
+        'committedTransactionCount': committedTransactionCount,
+        'importId': importId,
+        'transactionIds': transactionIds
+            .map((String element) => element)
+            .toList(growable: false),
+      };
+
+  @override
+  String toString() => 'StatementImportCommittedViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class StatementImportErasedViewDto {
+  const StatementImportErasedViewDto({
+    required this.importId,
+    required this.rowsDeleted,
+    required this.storedObjectDeleted,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportErasedViewDto.fromJson(Map<String, Object?> json) => StatementImportErasedViewDto(
+        importId: json['importId']! as String,
+        rowsDeleted: json['rowsDeleted']! as bool,
+        storedObjectDeleted: json['storedObjectDeleted']! as bool,
+      );
+
+  final String importId;
+
+  final bool rowsDeleted;
+
+  final bool storedObjectDeleted;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'importId': importId,
+        'rowsDeleted': rowsDeleted,
+        'storedObjectDeleted': storedObjectDeleted,
+      };
+
+  @override
+  String toString() => 'StatementImportErasedViewDto()';
+}
+
+/// The review surface. `rowErrors` is one PAGE of the bounded report; `reportedErrorCount` is how many the report holds and `totalErrorCount` is how many rows really failed. Both are carried because collapsing them turns a truncated report into a complete-looking one.
+@immutable
+final class StatementImportPreviewViewDto {
+  const StatementImportPreviewViewDto({
+    required this.accountId,
+    required this.awaitsDecision,
+    this.connectionId,
+    required this.counts,
+    required this.hasStoredSource,
+    required this.importId,
+    required this.page,
+    required this.reconciliationStatus,
+    this.refusalCode,
+    required this.reportedErrorCount,
+    required this.rowErrors,
+    required this.state,
+    required this.totalErrorCount,
+    this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportPreviewViewDto.fromJson(Map<String, Object?> json) => StatementImportPreviewViewDto(
+        accountId: json['accountId']! as String,
+        awaitsDecision: json['awaitsDecision']! as bool,
+        connectionId: json['connectionId'] as String?,
+        counts: ImportCountsViewDto.fromJson(json['counts']! as Map<String, Object?>),
+        hasStoredSource: json['hasStoredSource']! as bool,
+        importId: json['importId']! as String,
+        page: PageInfoDto.fromJson(json['page']! as Map<String, Object?>),
+        reconciliationStatus: ReconciliationStatusDto.fromJson(json['reconciliationStatus']! as Map<String, Object?>),
+        refusalCode: json['refusalCode'] == null ? null : ImportRefusalCodeDto.fromJson(json['refusalCode']! as Map<String, Object?>),
+        reportedErrorCount: json['reportedErrorCount']! as int,
+        rowErrors: (json['rowErrors']! as List<Object?>)
+            .map((Object? element) => RowErrorViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        state: ImportStateDto.fromJson(json['state']! as Map<String, Object?>),
+        totalErrorCount: json['totalErrorCount']! as int,
+        versions: json['versions'] == null ? null : ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>),
+      );
+
+  final String accountId;
+
+  final bool awaitsDecision;
+
+  final String? connectionId;
+
+  final ImportCountsViewDto counts;
+
+  final bool hasStoredSource;
+
+  final String importId;
+
+  final PageInfoDto page;
+
+  final ReconciliationStatusDto reconciliationStatus;
+
+  final ImportRefusalCodeDto? refusalCode;
+
+  final int reportedErrorCount;
+
+  final List<RowErrorViewDto> rowErrors;
+
+  final ImportStateDto state;
+
+  final int totalErrorCount;
+
+  final ProcessingVersionsViewDto? versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'awaitsDecision': awaitsDecision,
+        'connectionId': connectionId,
+        'counts': counts.toJson(),
+        'hasStoredSource': hasStoredSource,
+        'importId': importId,
+        'page': page.toJson(),
+        'reconciliationStatus': reconciliationStatus.toJson(),
+        'refusalCode': refusalCode?.toJson(),
+        'reportedErrorCount': reportedErrorCount,
+        'rowErrors': rowErrors
+            .map((RowErrorViewDto element) => element.toJson())
+            .toList(growable: false),
+        'state': state.toJson(),
+        'totalErrorCount': totalErrorCount,
+        'versions': versions?.toJson(),
+      };
+
+  @override
+  String toString() => 'StatementImportPreviewViewDto()';
+}
+
+/// The import's state, without its row errors and without `version` (see the operation's description). Deliberately absent, and to stay absent: the stored source's locator, store kind, byte length, algorithm, key version, nonce, auth tag, integrity checksum and file fingerprint; every staged row and every cell; and the row's `tenantId` and `userId`.
+@immutable
+final class StatementImportStatusViewDto {
+  const StatementImportStatusViewDto({
+    required this.accountId,
+    required this.awaitsDecision,
+    this.connectionId,
+    required this.counts,
+    required this.hasStoredSource,
+    required this.importId,
+    required this.reconciliationStatus,
+    this.refusalCode,
+    required this.reportedErrorCount,
+    required this.state,
+    required this.totalErrorCount,
+    this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportStatusViewDto.fromJson(Map<String, Object?> json) => StatementImportStatusViewDto(
+        accountId: json['accountId']! as String,
+        awaitsDecision: json['awaitsDecision']! as bool,
+        connectionId: json['connectionId'] as String?,
+        counts: ImportCountsViewDto.fromJson(json['counts']! as Map<String, Object?>),
+        hasStoredSource: json['hasStoredSource']! as bool,
+        importId: json['importId']! as String,
+        reconciliationStatus: ReconciliationStatusDto.fromJson(json['reconciliationStatus']! as Map<String, Object?>),
+        refusalCode: json['refusalCode'] == null ? null : ImportRefusalCodeDto.fromJson(json['refusalCode']! as Map<String, Object?>),
+        reportedErrorCount: json['reportedErrorCount']! as int,
+        state: ImportStateDto.fromJson(json['state']! as Map<String, Object?>),
+        totalErrorCount: json['totalErrorCount']! as int,
+        versions: json['versions'] == null ? null : ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>),
+      );
+
+  final String accountId;
+
+  final bool awaitsDecision;
+
+  final String? connectionId;
+
+  final ImportCountsViewDto counts;
+
+  final bool hasStoredSource;
+
+  final String importId;
+
+  final ReconciliationStatusDto reconciliationStatus;
+
+  final ImportRefusalCodeDto? refusalCode;
+
+  final int reportedErrorCount;
+
+  final ImportStateDto state;
+
+  final int totalErrorCount;
+
+  final ProcessingVersionsViewDto? versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'awaitsDecision': awaitsDecision,
+        'connectionId': connectionId,
+        'counts': counts.toJson(),
+        'hasStoredSource': hasStoredSource,
+        'importId': importId,
+        'reconciliationStatus': reconciliationStatus.toJson(),
+        'refusalCode': refusalCode?.toJson(),
+        'reportedErrorCount': reportedErrorCount,
+        'state': state.toJson(),
+        'totalErrorCount': totalErrorCount,
+        'versions': versions?.toJson(),
+      };
+
+  @override
+  String toString() => 'StatementImportStatusViewDto()';
+}
+
+/// USER_FILE_UPLOAD is one of the two rails this platform can actually run.
+enum StatementImportViewAvailabilityDto {
+  executable('EXECUTABLE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatementImportViewAvailabilityDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewAvailabilityDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Deliberately absent, and to stay absent: the stored source's locator, store kind, byte length, algorithm, key version, nonce, auth tag, integrity checksum and file fingerprint; every staged row and every cell; the row's `tenantId` and `userId`; and the retention decision's basis, approval reference and pack version, which are internal review artefacts.
+@immutable
+final class StatementImportViewDto {
+  const StatementImportViewDto({
+    required this.accountId,
+    required this.availability,
+    required this.awaitsDecision,
+    this.committedAt,
+    this.connectionId,
+    required this.counts,
+    required this.createdAt,
+    this.erasedAt,
+    required this.hasStoredSource,
+    required this.importId,
+    required this.mediaType,
+    required this.rail,
+    required this.reconciliationStatus,
+    this.refusalCode,
+    required this.retentionState,
+    required this.state,
+    required this.stateChangedAt,
+    this.statedBalance,
+    required this.version,
+    this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportViewDto.fromJson(Map<String, Object?> json) => StatementImportViewDto(
+        accountId: json['accountId']! as String,
+        availability: StatementImportViewAvailabilityDto.fromWire(json['availability']! as String),
+        awaitsDecision: json['awaitsDecision']! as bool,
+        committedAt: json['committedAt'] == null ? null : DateTime.parse(json['committedAt']! as String).toUtc(),
+        connectionId: json['connectionId'] as String?,
+        counts: ImportCountsViewDto.fromJson(json['counts']! as Map<String, Object?>),
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        erasedAt: json['erasedAt'] == null ? null : DateTime.parse(json['erasedAt']! as String).toUtc(),
+        hasStoredSource: json['hasStoredSource']! as bool,
+        importId: json['importId']! as String,
+        mediaType: StatementImportViewMediaTypeDto.fromWire(json['mediaType']! as String),
+        rail: StatementImportViewRailDto.fromWire(json['rail']! as String),
+        reconciliationStatus: ReconciliationStatusDto.fromJson(json['reconciliationStatus']! as Map<String, Object?>),
+        refusalCode: json['refusalCode'] == null ? null : ImportRefusalCodeDto.fromJson(json['refusalCode']! as Map<String, Object?>),
+        retentionState: StatementImportViewRetentionStateDto.fromWire(json['retentionState']! as String),
+        state: ImportStateDto.fromJson(json['state']! as Map<String, Object?>),
+        stateChangedAt: DateTime.parse(json['stateChangedAt']! as String).toUtc(),
+        statedBalance: json['statedBalance'] == null ? null : StatedStatementBalanceDto.fromJson(json['statedBalance']! as Map<String, Object?>),
+        version: json['version']! as int,
+        versions: json['versions'] == null ? null : ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>),
+      );
+
+  final String accountId;
+
+  /// USER_FILE_UPLOAD is one of the two rails this platform can actually run.
+  final StatementImportViewAvailabilityDto availability;
+
+  /// Whether this import is waiting for the subject to commit or erase it.
+  final bool awaitsDecision;
+
+  final DateTime? committedAt;
+
+  final String? connectionId;
+
+  final ImportCountsViewDto counts;
+
+  final DateTime createdAt;
+
+  final DateTime? erasedAt;
+
+  /// Whether encrypted source bytes exist. EXISTENCE only: a locator is enough to ask a store for somebody's bank statement, so none is carried.
+  final bool hasStoredSource;
+
+  final String importId;
+
+  final StatementImportViewMediaTypeDto mediaType;
+
+  /// A statement import is a file the SUBJECT uploaded. It is not a bank connection.
+  final StatementImportViewRailDto rail;
+
+  final ReconciliationStatusDto reconciliationStatus;
+
+  final ImportRefusalCodeDto? refusalCode;
+
+  /// Whether an approved retention decision governs this import's durable data. The decision's period, basis, approval reference and pack version stay server-side.
+  final StatementImportViewRetentionStateDto retentionState;
+
+  final ImportStateDto state;
+
+  final DateTime stateChangedAt;
+
+  final StatedStatementBalanceDto? statedBalance;
+
+  final int version;
+
+  final ProcessingVersionsViewDto? versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'availability': availability.toWire(),
+        'awaitsDecision': awaitsDecision,
+        'committedAt': committedAt?.toUtc().toIso8601String(),
+        'connectionId': connectionId,
+        'counts': counts.toJson(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'erasedAt': erasedAt?.toUtc().toIso8601String(),
+        'hasStoredSource': hasStoredSource,
+        'importId': importId,
+        'mediaType': mediaType.toWire(),
+        'rail': rail.toWire(),
+        'reconciliationStatus': reconciliationStatus.toJson(),
+        'refusalCode': refusalCode?.toJson(),
+        'retentionState': retentionState.toWire(),
+        'state': state.toJson(),
+        'stateChangedAt': stateChangedAt.toUtc().toIso8601String(),
+        'statedBalance': statedBalance?.toJson(),
+        'version': version,
+        'versions': versions?.toJson(),
+      };
+
+  @override
+  String toString() => 'StatementImportViewDto()';
+}
+
+/// Contract enumeration.
+enum StatementImportViewMediaTypeDto {
+  textCsv('text/csv'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatementImportViewMediaTypeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewMediaTypeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// A statement import is a file the SUBJECT uploaded. It is not a bank connection.
+enum StatementImportViewRailDto {
+  userFileUpload('USER_FILE_UPLOAD'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatementImportViewRailDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewRailDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Whether an approved retention decision governs this import's durable data. The decision's period, basis, approval reference and pack version stay server-side.
+enum StatementImportViewRetentionStateDto {
+  decided('DECIDED'),
+  undecided('UNDECIDED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const StatementImportViewRetentionStateDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewRetentionStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Why the platform suggested this pair. One value today, and it is a RULE, not a guess: two amounts equal and opposite, in the same currency, within a stated window.
+@immutable
+final class SuggestionBasisDto {
+  const SuggestionBasisDto();
+
+  /// Decodes the contract representation.
+  factory SuggestionBasisDto.fromJson(Map<String, Object?> json) =>
+      const SuggestionBasisDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'SuggestionBasisDto()';
+}
+
 /// Contract object.
 @immutable
 final class TenantChoiceDto {
@@ -3183,6 +6601,423 @@ enum TenantTypeDto {
   String? toWire() => this == unknown ? null : wireValue;
 }
 
+/// Present only when outcome is PARTIALLY_APPLIED.
+enum TransactionDeletionOutcomeViewCodeDto {
+  deletionPartiallyApplied('DELETION_PARTIALLY_APPLIED'),
+  transferMatchErasureIncomplete('TRANSFER_MATCH_ERASURE_INCOMPLETE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const TransactionDeletionOutcomeViewCodeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static TransactionDeletionOutcomeViewCodeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The result of a delete, complete or partial, in one shape. `outcome` discriminates and `code` is present only when something was left behind. The count is what was really erased.
+@immutable
+final class TransactionDeletionOutcomeViewDto {
+  const TransactionDeletionOutcomeViewDto({
+    this.code,
+    required this.outcome,
+    required this.transactionId,
+    required this.transferMatchesDeleted,
+  });
+
+  /// Decodes the contract representation.
+  factory TransactionDeletionOutcomeViewDto.fromJson(Map<String, Object?> json) => TransactionDeletionOutcomeViewDto(
+        code: json['code'] == null ? null : TransactionDeletionOutcomeViewCodeDto.fromWire(json['code']! as String),
+        outcome: TransactionDeletionOutcomeViewOutcomeDto.fromWire(json['outcome']! as String),
+        transactionId: json['transactionId']! as String,
+        transferMatchesDeleted: json['transferMatchesDeleted']! as int,
+      );
+
+  /// Present only when outcome is PARTIALLY_APPLIED.
+  final TransactionDeletionOutcomeViewCodeDto? code;
+
+  final TransactionDeletionOutcomeViewOutcomeDto outcome;
+
+  final String transactionId;
+
+  final int transferMatchesDeleted;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'code': code?.toWire(),
+        'outcome': outcome.toWire(),
+        'transactionId': transactionId,
+        'transferMatchesDeleted': transferMatchesDeleted,
+      };
+
+  @override
+  String toString() => 'TransactionDeletionOutcomeViewDto()';
+}
+
+/// Contract enumeration.
+enum TransactionDeletionOutcomeViewOutcomeDto {
+  deleted('DELETED'),
+  partiallyApplied('PARTIALLY_APPLIED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  unknown('');
+
+  const TransactionDeletionOutcomeViewOutcomeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static TransactionDeletionOutcomeViewOutcomeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown].
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One entry of the append-only history. Revision 1 is what was originally recorded and lists no changed fields. The acting actor reference is deliberately absent: it identifies a principal, and the caller is already the only principal who can read this.
+@immutable
+final class TransactionRevisionViewDto {
+  const TransactionRevisionViewDto({
+    required this.attribution,
+    required this.changedFields,
+    required this.recordedAt,
+    required this.revisionNumber,
+    required this.values,
+  });
+
+  /// Decodes the contract representation.
+  factory TransactionRevisionViewDto.fromJson(Map<String, Object?> json) => TransactionRevisionViewDto(
+        attribution: RevisionAttributionDto.fromJson(json['attribution']! as Map<String, Object?>),
+        changedFields: (json['changedFields']! as List<Object?>)
+            .map((Object? element) => RevisableFieldDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false),
+        recordedAt: DateTime.parse(json['recordedAt']! as String).toUtc(),
+        revisionNumber: json['revisionNumber']! as int,
+        values: RevisionValuesViewDto.fromJson(json['values']! as Map<String, Object?>),
+      );
+
+  final RevisionAttributionDto attribution;
+
+  final List<RevisableFieldDto> changedFields;
+
+  final DateTime recordedAt;
+
+  final int revisionNumber;
+
+  final RevisionValuesViewDto values;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'attribution': attribution.toJson(),
+        'changedFields': changedFields
+            .map((RevisableFieldDto element) => element.toJson())
+            .toList(growable: false),
+        'recordedAt': recordedAt.toUtc().toIso8601String(),
+        'revisionNumber': revisionNumber,
+        'values': values.toJson(),
+      };
+
+  @override
+  String toString() => 'TransactionRevisionViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class TransactionStatusDto {
+  const TransactionStatusDto();
+
+  /// Decodes the contract representation.
+  factory TransactionStatusDto.fromJson(Map<String, Object?> json) =>
+      const TransactionStatusDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'TransactionStatusDto()';
+}
+
+/// One of the caller's own transactions. `amount` is SIGNED under the canonical convention and `direction` restates it in words, so a client renders an honest arrow without arithmetic.
+/// Deliberately absent, and to stay absent: `tenantId` and `userId`; the dedup fingerprint, its version and the occurrence ordinal; any ciphertext, nonce, auth tag, algorithm or key version; the import reference and the source row reference; and any category confidence.
+@immutable
+final class TransactionViewDto {
+  const TransactionViewDto({
+    required this.accountId,
+    required this.amount,
+    required this.availability,
+    required this.bookingDate,
+    required this.createdAt,
+    required this.description,
+    required this.direction,
+    this.eventOccurredAt,
+    this.merchant,
+    this.note,
+    this.originalAmount,
+    required this.sourceKind,
+    this.sourceTimezone,
+    required this.status,
+    required this.transactionId,
+    this.valueDate,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory TransactionViewDto.fromJson(Map<String, Object?> json) => TransactionViewDto(
+        accountId: json['accountId']! as String,
+        amount: MinorUnitAmountDto.fromJson(json['amount']! as Map<String, Object?>),
+        availability: RailAvailabilityDto.fromJson(json['availability']! as Map<String, Object?>),
+        bookingDate: json['bookingDate']! as String,
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        description: json['description']! as String,
+        direction: MoneyDirectionDto.fromJson(json['direction']! as Map<String, Object?>),
+        eventOccurredAt: json['eventOccurredAt'] == null ? null : DateTime.parse(json['eventOccurredAt']! as String).toUtc(),
+        merchant: json['merchant'] as String?,
+        note: json['note'] as String?,
+        originalAmount: json['originalAmount'] == null ? null : MinorUnitAmountDto.fromJson(json['originalAmount']! as Map<String, Object?>),
+        sourceKind: SourceKindDto.fromJson(json['sourceKind']! as Map<String, Object?>),
+        sourceTimezone: json['sourceTimezone'] as String?,
+        status: TransactionStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        transactionId: json['transactionId']! as String,
+        valueDate: json['valueDate'] as String?,
+        version: json['version']! as int,
+      );
+
+  final String accountId;
+
+  final MinorUnitAmountDto amount;
+
+  final RailAvailabilityDto availability;
+
+  /// The day the institution booked it (ADR-0027).
+  final String bookingDate;
+
+  final DateTime createdAt;
+
+  final String description;
+
+  final MoneyDirectionDto direction;
+
+  /// A true instant, present only when the source stated one.
+  final DateTime? eventOccurredAt;
+
+  final String? merchant;
+
+  final String? note;
+
+  /// The amount as the source stated it, when its currency differed.
+  final MinorUnitAmountDto? originalAmount;
+
+  final SourceKindDto sourceKind;
+
+  final String? sourceTimezone;
+
+  final TransactionStatusDto status;
+
+  final String transactionId;
+
+  final String? valueDate;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'amount': amount.toJson(),
+        'availability': availability.toJson(),
+        'bookingDate': bookingDate,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'description': description,
+        'direction': direction.toJson(),
+        'eventOccurredAt': eventOccurredAt?.toUtc().toIso8601String(),
+        'merchant': merchant,
+        'note': note,
+        'originalAmount': originalAmount?.toJson(),
+        'sourceKind': sourceKind.toJson(),
+        'sourceTimezone': sourceTimezone,
+        'status': status.toJson(),
+        'transactionId': transactionId,
+        'valueDate': valueDate,
+        'version': version,
+      };
+
+  @override
+  String toString() => 'TransactionViewDto()';
+}
+
+/// Deliberately absent, and to stay absent: any amount, total, net or converted figure; any exchange rate (cross-currency movements are not matchable, so there is nothing to convert); any confidence or score; any category; and the row's `tenantId` and `userId`.
+@immutable
+final class TransferMatchViewDto {
+  const TransferMatchViewDto({
+    required this.authoritative,
+    required this.createdAt,
+    required this.firstSuggestedAt,
+    required this.inflow,
+    required this.matchId,
+    required this.outflow,
+    required this.state,
+    this.subjectDecidedAt,
+    required this.suggestionBasis,
+    required this.suggestionWindow,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory TransferMatchViewDto.fromJson(Map<String, Object?> json) => TransferMatchViewDto(
+        authoritative: json['authoritative']! as bool,
+        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
+        firstSuggestedAt: DateTime.parse(json['firstSuggestedAt']! as String).toUtc(),
+        inflow: MatchSideViewDto.fromJson(json['inflow']! as Map<String, Object?>),
+        matchId: json['matchId']! as String,
+        outflow: MatchSideViewDto.fromJson(json['outflow']! as Map<String, Object?>),
+        state: MatchStateDto.fromJson(json['state']! as Map<String, Object?>),
+        subjectDecidedAt: json['subjectDecidedAt'] == null ? null : DateTime.parse(json['subjectDecidedAt']! as String).toUtc(),
+        suggestionBasis: SuggestionBasisDto.fromJson(json['suggestionBasis']! as Map<String, Object?>),
+        suggestionWindow: json['suggestionWindow']! as String,
+        updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
+        version: json['version']! as int,
+      );
+
+  /// True only for CONFIRMED. Stated on the wire so nothing downstream has to decide for itself whether a suggestion counts.
+  final bool authoritative;
+
+  final DateTime createdAt;
+
+  final DateTime firstSuggestedAt;
+
+  final MatchSideViewDto inflow;
+
+  final String matchId;
+
+  final MatchSideViewDto outflow;
+
+  final MatchStateDto state;
+
+  /// When the person decided. Null while they have not.
+  final DateTime? subjectDecidedAt;
+
+  final SuggestionBasisDto suggestionBasis;
+
+  /// The VERSION LABEL of the rule that produced the suggestion, e.g. `equal-and-opposite/same-currency/P3D/v1`. A person can tell later which rule looked at their data.
+  final String suggestionWindow;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'authoritative': authoritative,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'firstSuggestedAt': firstSuggestedAt.toUtc().toIso8601String(),
+        'inflow': inflow.toJson(),
+        'matchId': matchId,
+        'outflow': outflow.toJson(),
+        'state': state.toJson(),
+        'subjectDecidedAt': subjectDecidedAt?.toUtc().toIso8601String(),
+        'suggestionBasis': suggestionBasis.toJson(),
+        'suggestionWindow': suggestionWindow,
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'TransferMatchViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class UpdateOwnFinancialAccountRequestDto {
+  const UpdateOwnFinancialAccountRequestDto({
+    this.accountType,
+    this.currency,
+    this.displayName,
+    required this.expectedVersion,
+    this.institutionId,
+    this.mask,
+    this.nature,
+    this.status,
+    this.userSuppliedInstitutionLabel,
+    this.walletKind,
+  });
+
+  /// Decodes the contract representation.
+  factory UpdateOwnFinancialAccountRequestDto.fromJson(Map<String, Object?> json) => UpdateOwnFinancialAccountRequestDto(
+        accountType: json['accountType'] == null ? null : AccountTypeDto.fromJson(json['accountType']! as Map<String, Object?>),
+        currency: json['currency'] as String?,
+        displayName: json['displayName'] as String?,
+        expectedVersion: json['expectedVersion']! as int,
+        institutionId: json['institutionId'] as String?,
+        mask: json['mask'] as String?,
+        nature: json['nature'] == null ? null : AccountNatureDto.fromJson(json['nature']! as Map<String, Object?>),
+        status: json['status'] == null ? null : AccountStatusDto.fromJson(json['status']! as Map<String, Object?>),
+        userSuppliedInstitutionLabel: json['userSuppliedInstitutionLabel'] as String?,
+        walletKind: json['walletKind'] == null ? null : WalletKindDto.fromJson(json['walletKind']! as Map<String, Object?>),
+      );
+
+  final AccountTypeDto? accountType;
+
+  final String? currency;
+
+  final String? displayName;
+
+  final int expectedVersion;
+
+  final String? institutionId;
+
+  final String? mask;
+
+  final AccountNatureDto? nature;
+
+  final AccountStatusDto? status;
+
+  final String? userSuppliedInstitutionLabel;
+
+  final WalletKindDto? walletKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountType': accountType?.toJson(),
+        'currency': currency,
+        'displayName': displayName,
+        'expectedVersion': expectedVersion,
+        'institutionId': institutionId,
+        'mask': mask,
+        'nature': nature?.toJson(),
+        'status': status?.toJson(),
+        'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel,
+        'walletKind': walletKind?.toJson(),
+      };
+
+  @override
+  String toString() => 'UpdateOwnFinancialAccountRequestDto()';
+}
+
 /// Contract object.
 @immutable
 final class UpdateOwnUserProfileRequestDto {
@@ -3302,6 +7137,23 @@ enum UserProfileStatusDto {
 
   /// The wire value, or null for [unknown].
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class WalletKindDto {
+  const WalletKindDto();
+
+  /// Decodes the contract representation.
+  factory WalletKindDto.fromJson(Map<String, Object?> json) =>
+      const WalletKindDto();
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+      };
+
+  @override
+  String toString() => 'WalletKindDto()';
 }
 
 /// Contract object.

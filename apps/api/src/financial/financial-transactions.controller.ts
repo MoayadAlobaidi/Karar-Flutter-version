@@ -20,7 +20,7 @@
  *
  * A DELETE CAN BE PARTIAL, AND SAYS SO. The transaction and the transfer
  * matches naming it live in different modules behind separate ports and are
- * not one unit of work. A partial application answers 207 with the count that
+ * not one unit of work. A partial application answers 200 with an outcome saying so, and the count that
  * was really erased; rounding it to 200 would tell a person their data is
  * gone when some of it is not.
  */
@@ -188,13 +188,17 @@ export class FinancialTransactionsController {
       });
       return;
     }
-    // The two partial-application arms are neither a failure nor a success,
-    // and are answered as a 207 body carrying what was REALLY erased.
+    // The two partial-application arms are neither a failure nor a success.
+    // They answer 200 with a body that SAYS so, rather than a second status
+    // code: a client that ignores 207 and one that ignores 200 behave
+    // identically, so the outcome has to be data the caller must read. The
+    // count is what was really erased and is never rounded up to what was
+    // intended.
     if (
       result.error.kind === 'TRANSFER_MATCH_ERASURE_INCOMPLETE' ||
       result.error.kind === 'DELETION_PARTIALLY_APPLIED'
     ) {
-      reply.status(207).send({
+      reply.status(200).send({
         transactionId: id,
         outcome: 'PARTIALLY_APPLIED',
         transferMatchesDeleted: result.error.transferMatchesDeleted,

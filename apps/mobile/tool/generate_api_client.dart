@@ -358,6 +358,28 @@ final class ContractReader {
     return 'openapi.yaml';
   }
 
+  /// Resolves a `$ref` in a parameter position, in whichever fragment declares it.
+  ///
+  /// Parameters may be shared the same way schemas and path items already are.
+  /// The reader assumed they were always inline and dereferenced `name` with
+  /// `!`, so the first shared parameter crashed the generator with a null-check
+  /// error naming no file — a failure that says nothing about the contract that
+  /// caused it. Resolution here is the same pointer walk the schema and
+  /// path-item readers use, so a parameter behaves like every other reference.
+  YamlMap _resolveParameter(Object? raw, String owner, String fragmentKey) {
+    final parameter = _asMap(raw, 'parameter of $owner');
+    final ref = parameter[r'$ref'];
+    if (ref is! String) {
+      return parameter;
+    }
+    final parts = ref.split('#');
+    if (parts.length != 2) {
+      throw ContractError('Parameter of $owner has an unsupported \$ref: $ref');
+    }
+    final fragment = parts[0].isEmpty ? _loadFragment(fragmentKey) : _loadFragment(parts[0]);
+    return _asMap(_resolvePointer(fragment, parts[1], ref), 'parameter $ref');
+  }
+
   YamlMap _resolvePathItem(Object? value, String path) {
     if (value is! YamlMap) {
       throw ContractError('Path $path is not a mapping.');
@@ -421,9 +443,18 @@ final class ContractReader {
     final parameters = operation['parameters'];
     if (parameters is YamlList) {
       for (final raw in parameters) {
-        final parameter = _asMap(raw, 'parameter of $id');
-        final name = parameter['name']!.toString();
-        final location = parameter['in']!.toString();
+        final parameter = _resolveParameter(raw, id, fragmentKey);
+        final rawName = parameter['name'];
+        final rawLocation = parameter['in'];
+        if (rawName == null || rawLocation == null) {
+          throw ContractError(
+            'A parameter of $id declares no name or no location. A \$ref that '
+            'does not resolve to a parameter object reaches here as an empty '
+            'map, so the reference is the thing to check.',
+          );
+        }
+        final name = rawName.toString();
+        final location = rawLocation.toString();
         final schema = parameter['schema'];
         final type = schema is YamlMap
             ? _typeOf(schema, owner: _pascal(id), property: name, fragmentKey: fragmentKey)

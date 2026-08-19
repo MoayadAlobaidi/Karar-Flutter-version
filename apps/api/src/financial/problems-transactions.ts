@@ -10,7 +10,7 @@
  * reaches across a module boundary to the transfer matches that name it, and
  * the two are not one unit of work. `TRANSFER_MATCH_ERASURE_INCOMPLETE` and
  * `DELETION_PARTIALLY_APPLIED` therefore have no problem document at all:
- * they are answered as a 207 body carrying what was really erased, because
+ * they are answered as a 200 body whose outcome says so, carrying what was really erased, because
  * rounding a partial delete to 200 tells a person their data is gone when
  * some of it is not, and rounding it to 500 tells them nothing happened when
  * some of it did.
@@ -48,7 +48,8 @@ import {
 
 /**
  * Every arm reachable through the transaction routes this surface mounts,
- * MINUS the two partial-application arms, which are answered as a 207 body.
+ * MINUS the two partial-application arms, which are answered as a 200 body
+ * whose outcome discriminates.
  */
 export type TransactionsSurfaceError =
   | PrincipalContextMissing
