@@ -79,14 +79,23 @@ List<Override> featureSurfaceOverrides() => <Override>[
       // returns `buildPlatformHomeScreen` unchanged, so the surface a person
       // without it sees is the platform home and nothing else.
       homeScreenBuilderProvider.overrideWithValue(buildFinancialHomeShell),
-      tenantScopedDataProvider.overrideWithValue(<TenantScopedProvider>[
-        ...platformTenantScopedProviders(),
-        ...financialTenantScopedProviders(),
-        ...statementImportFeatureTenantScopedProviders(),
-        ...transferMatchingTenantScopedProviders(),
-        ...financialConnectionTenantScopedProviders(),
-      ]),
+      tenantScopedDataProvider.overrideWithValue(everyTenantScopedProvider()),
       ...themeOverrides(),
+    ];
+
+/// Every tenant-scoped provider the shell installs, from every workstream.
+///
+/// Named and exported so a test can assert against THE list rather than
+/// restating part of it. A test that rebuilt this by hand covered one of the
+/// five contributions while its comment said "exactly as the composition root
+/// installs it", and that gap is why an entire later workstream was never held
+/// to the discard discipline.
+List<TenantScopedProvider> everyTenantScopedProvider() => <TenantScopedProvider>[
+      ...platformTenantScopedProviders(),
+      ...financialTenantScopedProviders(),
+      ...statementImportFeatureTenantScopedProviders(),
+      ...transferMatchingTenantScopedProviders(),
+      ...financialConnectionTenantScopedProviders(),
     ];
 
 /// Installs the design system's themes on the shell.

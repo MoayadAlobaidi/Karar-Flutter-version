@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart'
     show Override, ProviderListenable, ProviderOrFamily;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karar_mobile/app/composition/feature_surface.dart';
 import 'package:karar_mobile/app/lifecycle/tenant_data_scope.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/account_source_link.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/balance_snapshot.dart';
@@ -100,9 +101,13 @@ void main() {
           instruments: instruments,
           categories: categories,
         ),
-        // The real registry, exactly as the composition root installs it.
-        tenantScopedDataProvider
-            .overrideWithValue(<TenantScopedProvider>[...financialTenantScopedProviders()]),
+        // THE real registry — the same function the composition root calls, not
+        // a restatement of part of it. This used to spread
+        // `financialTenantScopedProviders()` alone while claiming to be
+        // "exactly as the composition root installs it": one of five
+        // contributions, which is why the statement-import workstream was
+        // never held to the discard discipline by this suite.
+        tenantScopedDataProvider.overrideWithValue(everyTenantScopedProvider()),
       ],
     );
     container.read(_refProbe);
@@ -169,6 +174,51 @@ void main() {
 
   /// Whether a provider is holding nothing: a null, or an empty collection.
   bool isEmptied(Object? value) => value == null || (value is Iterable && value.isEmpty);
+
+  group('what this suite proves, and what it does not', () {
+    // THE HONEST BOUNDARY OF THIS SUITE.
+    //
+    // The shell registers 29 tenant-scoped providers across five workstreams.
+    // This suite builds 11 of them — the accounts, transactions, categories
+    // and instruments surfaces, whose repositories it doubles. It does NOT
+    // build statement imports, transfer matching, connections, profile or
+    // consent, because it doubles none of their dependencies.
+    //
+    // That gap used to be invisible: the registry override spread ONE of the
+    // five contributions while its comment claimed to be "exactly as the
+    // composition root installs it", so a workstream could register a provider
+    // and never be held to the discard discipline by anything. One did, and
+    // its controller shipped holding a bank statement across a sign-out.
+    //
+    // The override now IS the real registry. This test states the remaining
+    // gap as a number, so registering a provider without either exercising it
+    // here or deliberately widening the gap fails the build.
+    const int registeredProviders = 29;
+    const int exercisedHere = 11;
+
+    test('the gap between what is registered and what is exercised is stated', () {
+      expect(
+        everyTenantScopedProvider().length,
+        registeredProviders,
+        reason: 'a tenant-scoped provider was added or removed. Either exercise '
+            'it in exposedValues() — which is what actually proves its discard '
+            'works — or raise this number deliberately, knowing that its '
+            'discard is then unproven by this suite',
+      );
+      expect(
+        exposedValues().length,
+        exercisedHere,
+        reason: 'the set this suite builds changed; keep the two numbers above '
+            'honest about each other',
+      );
+      expect(
+        exercisedHere,
+        lessThan(registeredProviders),
+        reason: 'if these are equal the suite covers everything and this test '
+            'should be replaced by that stronger claim',
+      );
+    });
+  });
 
   group('the discard', () {
     test('leaves every registered provider holding an answer first', () async {
