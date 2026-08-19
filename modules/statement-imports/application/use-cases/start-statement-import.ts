@@ -1,7 +1,7 @@
 /**
  * StartStatementImport — a person says "I have a statement for this account".
  *
- * Nothing about the FILE happens here. What happens is the two gates that
+ * Nothing about the FILE happens here. What happens is the three gates that
  * decide whether a durable record of this import may exist at all, and the
  * order between them is deliberate.
  *
@@ -35,6 +35,43 @@
  * again at commit, because an import can sit in review for days and an
  * account's currency can be corrected in that time — a copy taken now would
  * be a stale fact used to validate a fresh file.
+ *
+ * ## GATE 3 — the connection, when one is named
+ *
+ * Only when one is named. `connectionId` is optional and stays optional: a
+ * person can import a file before any connection exists, and refusing that
+ * would make a connection a prerequisite for reading one's own statement. An
+ * absent connection is `null` on the row and skips this gate entirely.
+ *
+ * When one IS named it is resolved through `ConnectionAccessPort` and must be
+ * the caller's own, exist, and be on a rail a file can arrive on — which is
+ * `USER_FILE_UPLOAD` and nothing else. Until this gate existed the id was
+ * checked for UUID SHAPE at the edge and written straight onto the row, so an
+ * import could claim it arrived through a connection that names nothing, or
+ * through one of the subject's own `MANUAL` connections — a rail whose
+ * definition is that the person typed their entries and no file arrives on
+ * it. That claim is not inert: at commit it moves
+ * `last_successful_import_at` on the matching link.
+ *
+ * **No cross-subject read was ever possible here and none is added.** The
+ * column carries no foreign key, so a bad id was never an existence oracle,
+ * and the one write that reads it back is scoped by tenant, user, connection
+ * and account. What was wrong is narrower and worse for a platform that sells
+ * provenance: the row could say something untrue about the subject's own
+ * data, in the same shape as the things that are true.
+ *
+ * Asked AFTER the account, which costs nothing and reads correctly: the
+ * account is the required argument and the connection is the optional
+ * qualifier on it, so a caller who names neither correctly hears about the
+ * one they had to supply. Neither refusal tells anybody anything about
+ * another subject, so the order carries no oracle either way.
+ *
+ * **The connection is not required to relate to the account.** See
+ * `ConnectionAccessPort` for the argument; in short, a connection is a route
+ * and one route legitimately feeds many accounts (ADR-0028), the link that
+ * would express the relation is minted from the file's own content and
+ * therefore cannot exist yet at DRAFT, and `SourceObservationWriterPort`
+ * already declares "no link at all" an ordinary outcome.
  */
 
 import { Result } from '@karar/shared-kernel';
@@ -49,12 +86,17 @@ import {
 } from '../../domain/refs.js';
 import {
   ACCOUNT_NOT_FOUND,
+  CONNECTION_NOT_FOUND,
   accountAccessUnavailable,
+  connectionAccessUnavailable,
   retentionUnresolved,
   storeFailure,
   type AccountAccessUnavailable,
   type AccountNotFound,
   type AccountNotWritable,
+  type ConnectionAccessUnavailable,
+  type ConnectionNotFound,
+  type ConnectionNotUsable,
   type RetentionUnresolved,
   type StoreFailure,
 } from '../errors.js';
@@ -63,6 +105,11 @@ import {
   type CanonicalAccountAccessPort,
   type CanonicalAccountSummary,
 } from '../ports/canonical-account-access.js';
+import {
+  isImportableRail,
+  type ConnectionAccessPort,
+  type ConnectionSummary,
+} from '../ports/connection-access.js';
 import type { IdSource } from '../ports/id-source.js';
 import type { StatementImportRepository } from '../ports/statement-import-repository.js';
 import {
@@ -87,12 +134,26 @@ export type StartStatementImportError =
   | AccountNotFound
   | AccountNotWritable
   | AccountAccessUnavailable
+  | ConnectionNotFound
+  | ConnectionNotUsable
+  | ConnectionAccessUnavailable
   | StoreFailure;
 
 export class StartStatementImport {
   constructor(
     private readonly imports: StatementImportRepository,
     private readonly accounts: CanonicalAccountAccessPort,
+    /**
+     * REQUIRED, with no default and nothing optional about it.
+     *
+     * A defaulted port here would be a gate a composition root could drop by
+     * omission — and a dropped gate is invisible, because an import with an
+     * unchecked connection looks exactly like one with a checked connection.
+     * That is the same reasoning that makes `DeleteOwnAccount`'s three
+     * erasers required arguments: the failure mode of the convenient version
+     * is silence.
+     */
+    private readonly connections: ConnectionAccessPort,
     private readonly retention: StatementRetentionDecisionPort,
     private readonly ids: IdSource,
     private readonly clock: Clock,
@@ -142,16 +203,31 @@ export class StartStatementImport {
       return Result.err(refuseUnwritableAccount(account));
     }
 
+    // GATE 3 — the connection, only when the person named one.
+    const connectionRef =
+      input.connectionId === null || input.connectionId === undefined
+        ? null
+        : ConnectionRef.of(input.connectionId);
+    if (connectionRef !== null) {
+      let connection: ConnectionSummary | null;
+      try {
+        connection = await this.connections.resolveOwnConnection(acting, connectionRef);
+      } catch (error) {
+        return Result.err(connectionAccessUnavailable(error));
+      }
+      if (connection === null) return Result.err(CONNECTION_NOT_FOUND);
+      if (!isImportableRail(connection.rail)) {
+        return Result.err(refuseUnimportableConnection(connection));
+      }
+    }
+
     const now = this.clock.now();
     const imported = startImport({
       id: StatementImportId.of(this.ids.nextId()),
       tenantId: acting.tenantId,
       userId: acting.userId,
       accountRef,
-      connectionRef:
-        input.connectionId === null || input.connectionId === undefined
-          ? null
-          : ConnectionRef.of(input.connectionId),
+      connectionRef,
       retention: {
         state: 'DECIDED',
         decidedAt: now,
@@ -192,5 +268,34 @@ function refuseUnwritableAccount(account: CanonicalAccountSummary): AccountNotWr
       `this account is ${account.lifecycleState.toLowerCase()}, so a statement may not be ` +
       'imported into it. Importing would produce records the account holder believes they ' +
       'stopped keeping — and at the scale of a statement that is a month of movements, not one',
+  };
+}
+
+/**
+ * The refusal for a connection the principal owns but on which no file
+ * arrives.
+ *
+ * The rail is named, and naming it is safe: it is a word from a closed
+ * vocabulary describing the caller's OWN connection, which they can already
+ * read from their own connection list. What the message must not become is a
+ * suggestion to pick a different id until one is accepted — so it says what
+ * the rail MEANS rather than which rail would work.
+ *
+ * `MANUAL` is the case this exists for. A manual connection is a ledger the
+ * person keeps by hand; attributing an uploaded statement to it records that
+ * Karar received a file through a route on which no file arrives, and the
+ * claim outlives the import — at commit it stamps
+ * `last_successful_import_at` on that link, which is a report of a successful
+ * import on a connection that has never had one.
+ */
+function refuseUnimportableConnection(connection: ConnectionSummary): ConnectionNotUsable {
+  return {
+    kind: 'connection_not_usable',
+    rail: connection.rail,
+    message:
+      `this connection is on the ${connection.rail} rail, and a statement file does not arrive ` +
+      'on it. Attributing an upload to it would record that this platform received a file ' +
+      'through a route that carries none, and the claim does not stay on the import: it reports ' +
+      'a successful delivery against that connection when the import commits',
   };
 }

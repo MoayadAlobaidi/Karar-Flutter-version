@@ -57,11 +57,7 @@ import type {
   AccountSourceLink,
   SourceAccountFingerprint,
 } from '../../domain/account-source-link.js';
-import type {
-  AccountSourceLinkId,
-  CanonicalAccountRef,
-  FinancialConnectionId,
-} from '../../domain/refs.js';
+import type { AccountSourceLinkId, CanonicalAccountRef } from '../../domain/refs.js';
 import {
   calendarDayToDate,
   encryptSourceLinkFields,

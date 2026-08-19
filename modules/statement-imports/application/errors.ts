@@ -5,7 +5,8 @@
  * **Denial kinds deliberately avoid oracles.** An import id that does not
  * exist, one belonging to another user in the same tenant, and one belonging
  * to another tenant all answer `import_not_found` — identically, with the same
- * message; the same holds for the account an import is asked to target.
+ * message; the same holds for the account an import is asked to target and
+ * for the connection it is asked to name.
  * Anything else turns a guessed identifier into a membership test. RLS
  * produces this outcome structurally (the row is simply not visible), and
  * these types keep the application layer from reintroducing the distinction
@@ -78,6 +79,51 @@ export const ACCOUNT_NOT_FOUND: AccountNotFound = Object.freeze({
 export interface AccountNotWritable {
   readonly kind: 'account_not_writable';
   readonly lifecycleState: string;
+  readonly message: string;
+}
+
+/**
+ * The connection this import was asked to name is not visible to the acting
+ * principal — absent, another user's, another tenant's, or never minted,
+ * indistinguishably.
+ *
+ * One arm rather than two, following `ACCOUNT_NOT_FOUND` exactly. "That
+ * connection is not yours" and "no such connection" are the same answer here
+ * because separating them would let a caller walk identifiers until one
+ * changed the wording, and "this person holds a connection" is a fact about
+ * their finances even stripped of every other field.
+ */
+export interface ConnectionNotFound {
+  readonly kind: 'connection_not_found';
+  readonly message: string;
+}
+
+export const CONNECTION_NOT_FOUND: ConnectionNotFound = Object.freeze({
+  kind: 'connection_not_found' as const,
+  message:
+    'no connection with that id is visible to this principal, so no statement import was ' +
+    'started. The refusal reveals nothing about whether such a connection exists for anybody ' +
+    'else',
+});
+
+/**
+ * The connection is the caller's own, and no file arrives on its rail.
+ *
+ * Distinct from `connection_not_found` for the reason `account_not_writable`
+ * is distinct from `account_not_found`: the remedies differ, and naming the
+ * rail reveals nothing — a caller who reached this arm already owns the
+ * connection and can read its rail from their own connection list.
+ *
+ * `MANUAL` is the case that matters. It means the person typed their entries,
+ * so an import attributed to it claims this platform received a file through
+ * a route on which no file arrives — and at commit that claim reaches
+ * `last_successful_import_at` on a hand-kept ledger. An unrecognised rail is
+ * refused too: a rail this module has no rule for is not permission to
+ * attribute a statement to it.
+ */
+export interface ConnectionNotUsable {
+  readonly kind: 'connection_not_usable';
+  readonly rail: string;
   readonly message: string;
 }
 
@@ -191,6 +237,14 @@ export interface AccountAccessUnavailable {
   readonly cause?: unknown;
 }
 
+/** Whether the named connection is one the caller owns could not be established. */
+export interface ConnectionAccessUnavailable {
+  readonly kind: 'connection_access_unavailable';
+  readonly message: string;
+  /** Non-enumerable; present for the boundary logger, invisible to serialization. */
+  readonly cause?: unknown;
+}
+
 /**
  * The commit did not complete, and NO SUBSET of it was written.
  *
@@ -286,6 +340,30 @@ export function accountAccessUnavailable(error: unknown): AccountAccessUnavailab
 }
 
 /**
+ * The refusal when connection visibility could not be established.
+ *
+ * Fails closed for the same reason the account one does, and the consequence
+ * is the narrower but more insidious of the two: an import written against an
+ * unverified connection reference is a provenance claim nobody checked. It
+ * would say a person's statement arrived through a particular route, and it
+ * would say it in exactly the same shape as the claims that ARE checked, so
+ * nothing downstream — a review screen, an export, an audit — could tell the
+ * two apart.
+ */
+export function connectionAccessUnavailable(error: unknown): ConnectionAccessUnavailable {
+  const failure = {
+    kind: 'connection_access_unavailable' as const,
+    message:
+      'whether this connection is one the caller owns could not be established, so no import ' +
+      'was started. Recording it unchecked would attribute a statement to a route nobody ' +
+      'verified, in the same shape as an attribution that was verified. Why the question went ' +
+      'unanswered is logged once at the boundary',
+  };
+  Object.defineProperty(failure, 'cause', { value: error, enumerable: false, writable: false });
+  return failure as ConnectionAccessUnavailable;
+}
+
+/**
  * The refusal when a commit did not complete.
  *
  * The message states the atomicity guarantee rather than the failure, because
@@ -358,6 +436,9 @@ export type StatementImportError =
   | AccountNotFound
   | AccountNotWritable
   | AccountAccessUnavailable
+  | ConnectionNotFound
+  | ConnectionNotUsable
+  | ConnectionAccessUnavailable
   | CurrencyMismatch
   | ImportNotInExpectedState
   | MappingUnusable

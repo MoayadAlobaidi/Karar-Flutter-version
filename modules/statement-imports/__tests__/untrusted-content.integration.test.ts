@@ -88,6 +88,7 @@ import {
   testDedupFingerprints,
   testEncryption,
   testFileFingerprints,
+  testNoConnections,
   testRetention,
   testSourceStore,
   testTransactionsEncryption,
@@ -238,7 +239,15 @@ function wire(handle: PrismaHandle, clock: Clock): Wiring {
   const ids = new Uuidv7IdSource();
 
   return {
-    start: new StartStatementImport(repository, accounts, retention, ids, clock),
+    start: new StartStatementImport(
+      repository,
+      accounts,
+      // Never names a connection here; the fixture refuses every id.
+      testNoConnections(),
+      retention,
+      ids,
+      clock,
+    ),
     store: new StoreImportSource(
       repository,
       sourceStore,

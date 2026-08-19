@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.6.0
-// Digest:     18e39b12
+// Digest:     dac4b00a
 // Generator:  tool/generate_api_client.dart 1.2.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -201,6 +201,7 @@ final class KararApiClient {
   ///
   /// Starts the sequence in state DRAFT. The retention decision for the source bytes and the staged rows is resolved HERE, before a single durable source byte can exist: an environment with no approved decision is refused (422) rather than allowed to write and decide later.
   /// The target account is resolved through a port and must be writable; an archived or closed account refuses the import rather than accepting one that could never be committed.
+  /// A `connectionId`, WHEN ONE IS SUPPLIED, is resolved the same way and is held to the same standard as the account: it must be the caller's own, it must exist, and it must be on the `USER_FILE_UPLOAD` rail. The field is a claim about where a person's statement came from, and an unchecked claim is indistinguishable from a checked one everywhere downstream — so a `MANUAL` connection, which means the person typed their entries, is refused rather than recorded as the route a file arrived through. Supplying no connection stays entirely legal: a person may import a file before any connection exists, and the connection is NOT required to be linked to the target account (one route legitimately feeds many accounts, and the link that would express the relation is derived from the file's own content, which does not exist yet at this step).
   ///
   /// `POST /financial/statement-imports` — requires a session.
   Future<StatementImportViewDto> createOwnStatementImport({

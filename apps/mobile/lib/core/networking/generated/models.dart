@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.6.0
-// Digest:     18e39b12
+// Digest:     dac4b00a
 // Generator:  tool/generate_api_client.dart 1.2.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
@@ -2027,7 +2027,7 @@ final class CreateOwnStatementImportRequestDto {
   /// One of the caller's OWN accounts.
   final String accountId;
 
-  /// The caller's own USER_FILE_UPLOAD connection, when they are attributing this file to one. Null attributes it to none.
+  /// The caller's own USER_FILE_UPLOAD connection, when they are attributing this file to one. Null attributes it to none. Every word of that is enforced: an id that is not the caller's own or names nothing answers 404 CONNECTION_NOT_FOUND — one arm for both, so a guessed identifier is not a membership test — and one of the caller's own connections on any other rail answers 409 CONNECTION_NOT_USABLE.
   final Omittable<String> connectionId;
 
   /// Encodes the contract representation.

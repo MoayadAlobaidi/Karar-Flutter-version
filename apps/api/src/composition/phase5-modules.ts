@@ -156,6 +156,7 @@ import {
 } from './financial-capability-gate.js';
 import { RequestScopedTransactionsPrincipalContext } from '../financial/transactions-principal-context.js';
 import { FinancialAccountsAccessAdapter } from './financial-account-access.js';
+import { FinancialConnectionsAccessAdapter } from './financial-connection-access.js';
 
 export interface Phase5CompositionInput {
   /** The resolved deployment environment; every fail-closed resolver reads it. */
@@ -242,6 +243,12 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   const imports = new PrismaStatementImportRepository(prisma, importsEncryption);
   const importIds = new ImportsIdSource();
   const canonicalAccounts = new FinancialAccountsCanonicalAccountAdapter(accounts);
+  // The connection an import may NAME as its provenance, resolved through the
+  // module that owns connections. `StartStatementImport` takes this as a
+  // required argument: the field is a claim about where a person's statement
+  // came from, and an unchecked claim is indistinguishable from a checked one
+  // everywhere downstream of the row.
+  const importConnections = new FinancialConnectionsAccessAdapter(connections);
   const canonicalDedup = new PrismaCanonicalDedupLookupReader(prisma);
   // The TRANSACTIONS module's encryption seam for the canonical rows: a
   // ciphertext written for a staged row must not authenticate against
@@ -335,6 +342,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
         startStatementImport: new StartStatementImport(
           imports,
           canonicalAccounts,
+          importConnections,
           importsRetention,
           importIds,
           clock,

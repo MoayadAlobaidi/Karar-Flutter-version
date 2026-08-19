@@ -64,6 +64,7 @@ import {
   testDedupFingerprints,
   testEncryption,
   testFileFingerprints,
+  testNoConnections,
   testRetention,
   testSourceStore,
   testTransactionsEncryption,
@@ -203,7 +204,16 @@ function wire(
     new PlatformOutboxStatementImportRecorder(syntheticEventCatalogue(), clock, 'karar-tests');
 
   return {
-    start: new StartStatementImport(repository, accounts, retention, ids, clock),
+    start: new StartStatementImport(
+      repository,
+      accounts,
+      // Never names a connection here; the fixture refuses every id, so this
+      // wiring cannot make the gate pass by accident.
+      testNoConnections(),
+      retention,
+      ids,
+      clock,
+    ),
     store: new StoreImportSource(
       repository,
       sourceStore,

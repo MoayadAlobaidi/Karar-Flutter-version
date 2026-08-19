@@ -26,6 +26,15 @@
  *   is exported so a composition root can bind a key-management-backed
  *   adapter; no use case returns plaintext, and the preview reports whether a
  *   source exists as a BOOLEAN rather than as a handle.
+ * - **No way to ask whether a connection feeds an account.**
+ *   `ConnectionAccessPort` reports that a connection is the caller's own and
+ *   what rail it is on, and takes no account argument, so a rule requiring an
+ *   import's connection to be linked to its account is unwritable here rather
+ *   than merely unwritten. A connection is a route and one route legitimately
+ *   feeds many accounts (ADR-0028); the link that would express the relation
+ *   is minted from the file's own content, so it cannot exist at DRAFT; and
+ *   `SourceObservationWriterPort` already calls "no link at all" an ordinary
+ *   outcome. The port's own header carries the full argument.
  * - **No value read out of the file.** `StatementImportPreview` carries
  *   counts, states, versions and `(row number, safe field, reason code)`. No
  *   cell, no header text, no amount, no merchant, no balance, no fingerprint.
@@ -228,9 +237,11 @@ export {
 } from './application/principal.js';
 export {
   ACCOUNT_NOT_FOUND,
+  CONNECTION_NOT_FOUND,
   IMPORT_NOT_FOUND,
   accountAccessUnavailable,
   commitFailed,
+  connectionAccessUnavailable,
   fingerprintUnavailable,
   notInExpectedState,
   retentionUnresolved,
@@ -240,6 +251,9 @@ export {
   type AccountNotFound,
   type AccountNotWritable,
   type CommitFailed,
+  type ConnectionAccessUnavailable,
+  type ConnectionNotFound,
+  type ConnectionNotUsable,
   type CurrencyMismatch,
   type FingerprintUnavailable,
   type ImportNotFound,
@@ -299,6 +313,13 @@ export {
   type CanonicalAccountAccessPort,
   type CanonicalAccountSummary,
 } from './application/ports/canonical-account-access.js';
+export {
+  IMPORTABLE_CONNECTION_RAILS,
+  isImportableRail,
+  type ConnectionAccessPort,
+  type ConnectionSummary,
+  type ImportableConnectionRail,
+} from './application/ports/connection-access.js';
 export type {
   CanonicalDedupLookupPort,
   RecordedOccurrences,

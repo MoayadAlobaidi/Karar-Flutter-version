@@ -30,6 +30,9 @@ import type {
   AccountNotFound,
   AccountNotWritable,
   CommitFailed,
+  ConnectionAccessUnavailable,
+  ConnectionNotFound,
+  ConnectionNotUsable,
   CurrencyMismatch,
   FingerprintUnavailable,
   ImportNotFound,
@@ -65,6 +68,9 @@ export type ImportsSurfaceError =
   | ImportNotFound
   | AccountNotFound
   | AccountNotWritable
+  | ConnectionNotFound
+  | ConnectionNotUsable
+  | ConnectionAccessUnavailable
   | ImportNotInExpectedState
   | MappingUnusable
   | SourceRefused
@@ -148,6 +154,25 @@ export function problemForImportsError(error: ImportsSurfaceError): ProblemRespo
         'ACCOUNT_NOT_WRITABLE',
         `the account cannot receive an import while it is ${error.lifecycleState}`,
       );
+    case 'connection_not_found':
+      // 404 and the same wording an absent account gets, for the same reason:
+      // "not yours" and "no such thing" must not be distinguishable, or a
+      // caller can walk identifiers until the wording changes.
+      return codedProblem(
+        404,
+        'Connection not found',
+        'CONNECTION_NOT_FOUND',
+        'no such connection for this principal',
+      );
+    case 'connection_not_usable':
+      // The caller owns this connection, so naming its rail tells them
+      // nothing they cannot read from their own connection list.
+      return codedProblem(
+        409,
+        'Connection not usable for an import',
+        'CONNECTION_NOT_USABLE',
+        `a statement file does not arrive on the ${error.rail} rail`,
+      );
     case 'import_not_in_expected_state':
       return codedProblem(
         409,
@@ -214,6 +239,7 @@ export function problemForImportsError(error: ImportsSurfaceError): ProblemRespo
       );
     case 'fingerprint_unavailable':
     case 'account_access_unavailable':
+    case 'connection_access_unavailable':
     case 'store_failure':
       return storeUnavailableProblem();
   }

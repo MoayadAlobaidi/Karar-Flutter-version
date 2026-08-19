@@ -59,6 +59,7 @@ import {
 } from '@karar/transactions';
 
 import type { ImportsPrincipal } from '../application/principal.js';
+import type { ConnectionAccessPort } from '../application/ports/connection-access.js';
 import type { StatementRetentionDecisionPort } from '../application/ports/statement-retention-decision.js';
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { LocalEncryptedSourceStore } from '../infrastructure/providers/local-encrypted-source-store.js';
@@ -125,6 +126,21 @@ export function testTransactionsEncryption(): TransactionsEncryptionProvider {
 /** The LOCAL retention fixture — a labelled synthetic answer, no legal effect. */
 export function testRetention(): StatementRetentionDecisionPort {
   return new LocalSyntheticRetentionDecisionProvider({ env: 'local' });
+}
+
+/**
+ * A connection-access port for the suites that never NAME a connection.
+ *
+ * It answers `null` for every id, which is the REFUSING answer, not a
+ * permissive one. That direction is chosen deliberately: a suite that starts
+ * naming a connection will fail loudly against this fixture rather than pass
+ * against a stub that says yes to everything, which is how a gate quietly
+ * stops being exercised. The suite that actually drives the connection gate
+ * builds its own port with the answers it wants
+ * (`__tests__/connection-provenance.test.ts`).
+ */
+export function testNoConnections(): ConnectionAccessPort {
+  return { resolveOwnConnection: () => Promise.resolve(null) };
 }
 
 /**

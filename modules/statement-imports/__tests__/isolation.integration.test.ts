@@ -48,6 +48,7 @@ import {
   testDedupFingerprints,
   testEncryption,
   testFileFingerprints,
+  testNoConnections,
   testRetention,
   testSourceStore,
 } from './fixtures.js';
@@ -114,6 +115,10 @@ describe.skipIf(unreachable !== null)('statement-imports isolation', () => {
     const start = new StartStatementImport(
       repository,
       accounts,
+      // This suite never names a connection; the fixture REFUSES every id, so a
+      // future edit that starts naming one fails here instead of passing
+      // against a stub that says yes.
+      testNoConnections(),
       testRetention(),
       ids,
       clock,
