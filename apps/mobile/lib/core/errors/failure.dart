@@ -238,6 +238,28 @@ final class RequestCancelledFailure extends Failure {
   String get diagnosticLabel => 'request_cancelled';
 }
 
+/// The answer arrived after the session that asked for it had ended.
+///
+/// A tenant switch adopts a new server-issued session and a sign-out discards
+/// the session entirely. Either way a response still in flight belongs to a
+/// session that no longer exists, and it carries one organisation's figures
+/// into a moment when a DIFFERENT organisation — or nobody — is signed in.
+///
+/// It is refused rather than returned, because the caller cannot tell from a
+/// response body which session asked for it: every controller that wrote the
+/// answer into state would be writing a cross-tenant leak, and each would
+/// have to remember to check. Refusing once, here, is the only place the
+/// check cannot be forgotten.
+///
+/// A token REFRESH is not this: refreshing rotates the access token and keeps
+/// the session, so the session identifier is what is compared, not the token.
+final class SessionChangedFailure extends Failure {
+  const SessionChangedFailure({super.code, super.correlationId});
+
+  @override
+  String get diagnosticLabel => 'session_changed';
+}
+
 /// A token refresh succeeded while a non-idempotent request was in flight.
 ///
 /// The request was NOT replayed: repeating an unsafe operation whose outcome
