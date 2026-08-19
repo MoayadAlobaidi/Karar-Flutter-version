@@ -2579,7 +2579,12 @@ function readCentralPolicies(root) {
   const policies = new Map();
   // Each entry is `key: { ... }` inside the registry object.
   const entry = /([A-Za-z_$][\w$]*)\s*:\s*\{([\s\S]*?)\n\s{2}\}/g;
-  entry.lastIndex = start;
+  // NO `entry.lastIndex = start` here. `matchAll` copies `lastIndex` onto the
+  // iterator's own regex, so setting it AND slicing applies the offset twice:
+  // matching would begin at `2 * start`, past the end of a registry that sits
+  // near the end of the file. It read ZERO policies, silently, and every rule
+  // below that walks them became unreachable while the check went on passing
+  // and reporting a scanned count that hid the zero.
   for (const match of src.slice(start).matchAll(entry)) {
     const [, key, body] = match;
     const fields = new Map();
@@ -3140,6 +3145,23 @@ function buildSelfTestFixture() {
   write(
     'packages/platform/src/ingestion/limits.ts',
     [
+      // A HEADER, deliberately, so the registry does not begin at offset zero.
+      // The real file opens with a long explanatory comment and the registry
+      // sits two thirds of the way down it. This fixture used to start with
+      // the registry, which made every offset bug in the reader invisible:
+      // a defect that skipped `start` characters twice still landed inside a
+      // fixture whose `start` was 0, so the self-test passed while the reader
+      // read nothing from the real file. A fixture that is easier to parse
+      // than the thing it stands for tests the fixture.
+      `/**`,
+      ` * Ingestion limit policies.`,
+      ` *`,
+      ` * Padding that mirrors the real file's shape: the registry below must`,
+      ` * not be the first thing in this source, or an offset applied twice`,
+      ` * still lands before it and the reader appears to work.`,
+      ` */`,
+      `export const INGESTION_PATH_IDS = ['fixture/manual', 'fixture/zero'] as const;`,
+      ``,
       `export const INGESTION_LIMIT_POLICIES = {`,
       `  manualTransaction: {`,
       `    pathId: 'fixture/manual',`,
