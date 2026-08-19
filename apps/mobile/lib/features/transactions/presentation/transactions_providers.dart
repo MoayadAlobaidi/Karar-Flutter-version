@@ -6,10 +6,14 @@
 // month and tell them nothing about why.
 //
 // Everything here is tenant-scoped and is registered as such at composition
-// time.
+// time. Every asynchronous read is a [TenantScopedAsyncNotifier] rather than a
+// `FutureProvider`: only a notifier can EMPTY itself, and `ref.invalidate`
+// reloads rather than empties — see `app/lifecycle/tenant_data_scope.dart`.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show AsyncNotifierProviderFamily;
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../../financial_accounts/domain/page.dart';
@@ -108,11 +112,18 @@ final class TransactionsUnavailable extends TransactionListing {
 }
 
 /// Accumulates the pages of the listing.
-final class TransactionListingController extends AsyncNotifier<TransactionListing> {
+final class TransactionListingController
+    extends TenantScopedAsyncNotifier<TransactionListing> {
   String? _nextCursor;
 
+  /// No organisation's transactions are held. Not an empty page: an empty page
+  /// is a claim that the organisation has no transactions in range.
   @override
-  Future<TransactionListing> build() async {
+  TransactionListing get discarded =>
+      const TransactionsUnavailable(SessionChangedFailure());
+
+  @override
+  Future<TransactionListing> load() async {
     final filter = ref.watch(transactionFilterProvider);
     _nextCursor = null;
     final result = await ref.watch(loadTransactionPageProvider)(filter: filter);
@@ -137,6 +148,7 @@ final class TransactionListingController extends AsyncNotifier<TransactionListin
     if (cursor == null) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = AsyncData<TransactionListing>(
       TransactionsLoaded(
         transactions: current.transactions,
@@ -148,6 +160,12 @@ final class TransactionListingController extends AsyncNotifier<TransactionListin
     final filter = ref.read(transactionFilterProvider);
     final result =
         await ref.read(loadTransactionPageProvider)(filter: filter, cursor: cursor);
+    if (issued.hasEnded) {
+      // The page was asked for under an organisation the session has left. It
+      // would be APPENDED to whatever the new organisation has loaded, which is
+      // one listing holding two organisations' transactions.
+      return;
+    }
     state = AsyncData<TransactionListing>(
       switch (result) {
         Failed<Page<Transaction>>(:final failure) => TransactionsUnavailable(failure),
@@ -158,8 +176,18 @@ final class TransactionListingController extends AsyncNotifier<TransactionListin
   }
 
   Future<void> refresh() async {
+    final TenantDataGeneration issued = binding;
     state = const AsyncLoading<TransactionListing>();
-    state = await AsyncValue.guard<TransactionListing>(build);
+    final AsyncValue<TransactionListing> answer =
+        await AsyncValue.guard<TransactionListing>(load);
+    if (issued.hasEnded) {
+      // Riverpod reuses this notifier across an invalidation, so `ref.mounted`
+      // is still true for an element that has already been discarded and
+      // rebuilt. Without this the previous organisation's transactions replace
+      // the new organisation's in the state its screens read.
+      return;
+    }
+    state = answer;
   }
 
   TransactionsLoaded _accumulate(
@@ -187,9 +215,17 @@ final AsyncNotifierProvider<TransactionListingController, TransactionListing>
 );
 
 /// The most recent transactions on one account, for the account detail screen.
-final accountRecentTransactionsProvider =
-    FutureProvider.family<List<Transaction>, String>(
-  (Ref ref, String accountId) async {
+final class AccountRecentTransactionsController
+    extends TenantScopedAsyncNotifier<List<Transaction>> {
+  AccountRecentTransactionsController(this.accountId);
+
+  final String accountId;
+
+  @override
+  List<Transaction> get discarded => const <Transaction>[];
+
+  @override
+  Future<List<Transaction>> load() async {
     final result = await ref.watch(loadTransactionPageProvider)(
       filter: TransactionFilter(accountId: accountId),
     );
@@ -197,33 +233,74 @@ final accountRecentTransactionsProvider =
       Success<Page<Transaction>>(:final value) => value.items,
       Failed<Page<Transaction>>() => const <Transaction>[],
     };
-  },
+  }
+}
+
+final AsyncNotifierProviderFamily<AccountRecentTransactionsController,
+        List<Transaction>, String> accountRecentTransactionsProvider =
+    AsyncNotifierProvider.family<AccountRecentTransactionsController,
+        List<Transaction>, String>(
+  AccountRecentTransactionsController.new,
 );
 
 /// One transaction with its history, its active category and the divergence
 /// the platform stated.
-final transactionDetailProvider =
-    FutureProvider.family<TransactionDetail, String>(
-  (Ref ref, String transactionId) async {
+///
+/// Nullable so that "no organisation's transaction is held here" is a value the
+/// provider can be written to hold; writing a fresh `AsyncData` is the only
+/// thing that erases a cached answer.
+final class TransactionDetailController
+    extends TenantScopedAsyncNotifier<TransactionDetail?> {
+  TransactionDetailController(this.transactionId);
+
+  final String transactionId;
+
+  @override
+  TransactionDetail? get discarded => null;
+
+  @override
+  Future<TransactionDetail?> load() async {
     final result = await ref.watch(loadTransactionDetailProvider)(transactionId);
     return switch (result) {
       Success<TransactionDetail>(:final value) => value,
       Failed<TransactionDetail>(:final failure) => throw TransactionReadFailure(failure),
     };
-  },
+  }
+}
+
+final AsyncNotifierProviderFamily<TransactionDetailController, TransactionDetail?,
+        String> transactionDetailProvider =
+    AsyncNotifierProvider.family<TransactionDetailController, TransactionDetail?,
+        String>(
+  TransactionDetailController.new,
 );
 
 /// The safe provenance of one transaction.
-final transactionProvenanceProvider =
-    FutureProvider.family<List<TransactionProvenance>, String>(
-  (Ref ref, String transactionId) async {
+final class TransactionProvenanceController
+    extends TenantScopedAsyncNotifier<List<TransactionProvenance>> {
+  TransactionProvenanceController(this.transactionId);
+
+  final String transactionId;
+
+  @override
+  List<TransactionProvenance> get discarded => const <TransactionProvenance>[];
+
+  @override
+  Future<List<TransactionProvenance>> load() async {
     final result = await ref.watch(loadTransactionProvenanceProvider)(transactionId);
     return switch (result) {
       Success<List<TransactionProvenance>>(:final value) => value,
       Failed<List<TransactionProvenance>>(:final failure) =>
         throw TransactionReadFailure(failure),
     };
-  },
+  }
+}
+
+final AsyncNotifierProviderFamily<TransactionProvenanceController,
+        List<TransactionProvenance>, String> transactionProvenanceProvider =
+    AsyncNotifierProvider.family<TransactionProvenanceController,
+        List<TransactionProvenance>, String>(
+  TransactionProvenanceController.new,
 );
 
 /// Carries a typed failure through `AsyncValue.error`.
@@ -292,16 +369,30 @@ final class TransactionWriteRejected extends TransactionWriteState {
 }
 
 /// Sequences one transaction write.
+///
+/// EVERY WRITE THAT FOLLOWS AN `await` IS GUARDED. Riverpod reuses this
+/// notifier instance across an invalidation — only `build` re-runs — so
+/// `ref.mounted` is still true after the tenant-scoped discard, and an
+/// unguarded `state = …` reports a write confirmed under the PREVIOUS
+/// organisation as this organisation's, and refreshes this organisation's
+/// listings on the strength of it.
 final class TransactionWriteController extends Notifier<TransactionWriteState> {
   @override
   TransactionWriteState build() => const TransactionWriteIdle();
+
+  /// The binding this controller is currently acting for.
+  TenantDataGeneration get binding => ref.tenantBinding();
 
   Future<void> create(ManualTransactionDraft draft) async {
     if (state is TransactionWriteSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = const TransactionWriteSubmitting();
     final result = await ref.read(recordManualTransactionProvider)(draft);
+    if (issued.hasEnded) {
+      return;
+    }
     switch (result) {
       case Failed<Transaction>(:final failure):
         state = TransactionWriteRejected(failure);
@@ -318,8 +409,12 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
     if (state is TransactionWriteSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = const TransactionWriteSubmitting();
     final result = await ref.read(correctTransactionProvider)(transactionId, correction);
+    if (issued.hasEnded) {
+      return;
+    }
     switch (result) {
       case Failed<Transaction>(:final failure):
         state = TransactionWriteRejected(failure);
@@ -335,9 +430,13 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
     if (state is TransactionWriteSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = const TransactionWriteSubmitting();
     final result =
         await ref.read(assignTransactionCategoryProvider)(transactionId, categoryCode);
+    if (issued.hasEnded) {
+      return;
+    }
     switch (result) {
       case Failed<CategoryAssignment>(:final failure):
         state = TransactionWriteRejected(failure);
@@ -351,8 +450,12 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
     if (state is TransactionWriteSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = const TransactionWriteSubmitting();
     final result = await ref.read(deleteTransactionProvider)(transactionId);
+    if (issued.hasEnded) {
+      return;
+    }
     switch (result) {
       case Failed<TransactionDeletionOutcome>(:final failure):
         state = TransactionWriteRejected(failure);

@@ -6,10 +6,20 @@
 //   1. the platform is asked, with an identifier IT supplied;
 //   2. on a switch the data layer has already replaced the credential, so the
 //      old access context is gone before this code runs again;
-//   3. every tenant-scoped provider is invalidated, so no screen can render
-//      the previous organisation's answer under the new binding;
+//   3. every tenant-scoped provider is DISCARDED — emptied of the previous
+//      organisation's answer, and only then re-read;
 //   4. the startup coordinator re-reads bootstrap, which is the only authority
 //      on what the new session may see.
+//
+// STEP 3 USED TO BE `ref.invalidate` AND THE COMMENT HERE USED TO CLAIM THAT
+// "no screen can render the previous organisation's answer under the new
+// binding". That claim was false. Riverpod's invalidation is a RELOAD: it
+// re-runs `build` and carries the previous value forward so a screen can show
+// stale-while-revalidate data, so `AsyncValue.value` went on answering with
+// organisation A's accounts for the whole post-switch reload and
+// `AsyncValue.when` rendered them. `test/security/tenant_switch_isolation_test.dart`
+// characterises the framework behaviour, and `app/lifecycle/tenant_data_scope.dart`
+// holds the discard that does what this comment now describes.
 //
 // Step 3 is registered rather than hardcoded: features declare their own
 // tenant-scoped providers at composition time, so this file never grows an
@@ -18,6 +28,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_tenant_binding_repository.dart';
@@ -48,13 +59,20 @@ final Provider<SwitchTenant> switchTenantProvider = Provider<SwitchTenant>(
   ),
 );
 
-/// Providers whose value belongs to one organisation.
+/// Providers whose value belongs to one organisation, as bare references.
 ///
-/// Overridden at composition time with every tenant-scoped provider in the
-/// build. A provider that is not listed here survives a switch and will be
-/// read under the wrong organisation.
+/// DERIVED, not declared: the authority is [tenantScopedDataProvider], where
+/// each entry also carries the operation that discards it. Two independently
+/// maintained lists would be two chances to forget one, so this one is a view
+/// of that one — everything registered is named here, and nothing can be named
+/// here without saying how it is discarded.
 final Provider<List<ProviderOrFamily>> tenantScopedProvidersProvider =
-    Provider<List<ProviderOrFamily>>((Ref ref) => const <ProviderOrFamily>[]);
+    Provider<List<ProviderOrFamily>>(
+  (Ref ref) => <ProviderOrFamily>[
+    for (final TenantScopedProvider entry in ref.watch(tenantScopedDataProvider))
+      entry.provider,
+  ],
+);
 
 /// The state of one binding attempt.
 sealed class TenantBindingUiState {
@@ -125,9 +143,18 @@ final class TenantBindingController extends Notifier<TenantBindingUiState> {
         // nothing is invalidated and nothing is refreshed.
         state = TenantBindingRejected(failure);
       case Success<TenantBindingOutcome>(:final value):
-        for (final provider in ref.read(tenantScopedProvidersProvider)) {
-          ref.invalidate(provider);
-        }
+        // EMPTIED, then re-read. `ref.invalidate` alone left organisation A's
+        // accounts as the value every screen read until organisation B's
+        // answer arrived; see `app/lifecycle/tenant_data_scope.dart`.
+        //
+        // THIS WRITE IS DELIBERATELY NOT GENERATION-GUARDED, unlike every
+        // tenant-scoped controller. A switch ENDS the old session before it
+        // adopts the replacement (`ApiTenantBindingRepository._adopt`), so the
+        // session-end discard has already moved the generation on by the time a
+        // successful switch returns: a guard here would refuse every switch
+        // there is. Nothing leaks by writing it — this state is the record of
+        // which binding was just established, not an answer read under one.
+        discardTenantScopedData(ref, TenantDataDiscardReason.bindingChanged);
         state = TenantBindingConfirmed(value);
         // The coordinator is the only authority on what the new session may
         // see; it re-reads bootstrap and moves the router.
@@ -190,8 +217,17 @@ final class InvitationRedemptionController extends Notifier<InvitationRedemption
     if (state is InvitationRedemptionSubmitting) {
       return;
     }
+    // A redemption rotates no credential, so unlike a switch the generation
+    // only moves here if the session ENDED while the request was in flight.
+    // Without the check below, a membership accepted under a session that has
+    // gone is reported as this session's and sends the coordinator to re-read
+    // bootstrap with no credential to read it under.
+    final TenantDataGeneration issued = ref.tenantBinding();
     state = const InvitationRedemptionSubmitting();
     final result = await ref.read(redeemInvitationProvider)(token);
+    if (issued.hasEnded) {
+      return;
+    }
     switch (result) {
       case Failed<RedeemedMembership>(:final failure):
         state = InvitationRedemptionRejected(failure);

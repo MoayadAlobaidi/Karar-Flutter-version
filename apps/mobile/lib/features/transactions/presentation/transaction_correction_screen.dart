@@ -91,7 +91,12 @@ class _TransactionCorrectionScreenState
               ),
             ),
           ),
-          data: (TransactionDetail value) => _form(context, l10n, value, write),
+          // Null is the DISCARDED state; see `accountDetailProvider`. Seeding
+          // the form from an emptied read would put the previous
+          // organisation's figures into this organisation's fields.
+          data: (TransactionDetail? value) => value == null
+              ? KararLoadingView(subject: l10n.transactionCorrectTitle)
+              : _form(context, l10n, value, write),
         ),
       ),
     );

@@ -5,12 +5,22 @@
 // registers these so a tenant switch discards them; a financial provider that
 // survived a switch would show one organisation's money under another.
 //
+// Every asynchronous read here is a [TenantScopedAsyncNotifier] rather than a
+// `FutureProvider`, because only a notifier can EMPTY itself and `ref.invalidate`
+// reloads rather than empties — see `app/lifecycle/tenant_data_scope.dart`. The
+// two detail reads answer with null once discarded; their screens render the
+// loading state for it, because a discarded read is one that is about to be
+// re-issued or one whose session has ended, and in neither case is there
+// anything to show.
+//
 // No widget in this feature performs a request. A screen reads a provider, the
 // provider reads a use case, the use case reads a repository, and only the
 // repository touches the transport.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show AsyncNotifierProviderFamily;
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_financial_accounts_repository.dart';
@@ -86,9 +96,15 @@ final class AccountsUnavailable extends AccountsView {
 }
 
 /// Every account the principal owns.
-final class OwnAccountsController extends AsyncNotifier<AccountsView> {
+final class OwnAccountsController extends TenantScopedAsyncNotifier<AccountsView> {
+  /// No organisation's portfolio is held. Deliberately not `AccountsLoaded([])`:
+  /// an empty list is a claim that the organisation owns no accounts, and this
+  /// state is the absence of an answer, not an answer of absence.
   @override
-  Future<AccountsView> build() async {
+  AccountsView get discarded => const AccountsUnavailable(SessionChangedFailure());
+
+  @override
+  Future<AccountsView> load() async {
     final result = await ref.watch(loadOwnAccountsProvider)();
     return switch (result) {
       Success<List<FinancialAccount>>(:final value) => AccountsLoaded(value),
@@ -97,8 +113,19 @@ final class OwnAccountsController extends AsyncNotifier<AccountsView> {
   }
 
   Future<void> refresh() async {
+    final TenantDataGeneration issued = binding;
     state = const AsyncLoading<AccountsView>();
-    state = await AsyncValue.guard<AccountsView>(build);
+    final AsyncValue<AccountsView> answer =
+        await AsyncValue.guard<AccountsView>(load);
+    if (issued.hasEnded) {
+      // The portfolio this read asked for belongs to an organisation the
+      // session has left, or to a session that has ended. Riverpod reuses the
+      // notifier across an invalidation, so without this the write lands on the
+      // LIVE element and replaces the new organisation's accounts with the
+      // previous one's.
+      return;
+    }
+    state = answer;
   }
 }
 
@@ -171,14 +198,33 @@ final Provider<AccountPortfolio?> portfolioProvider = Provider<AccountPortfolio?
 ///
 /// The typed failure travels through the error branch as [AccountReadFailure],
 /// so a screen switches on the failure taxonomy rather than on a message.
-final accountDetailProvider = FutureProvider.family<FinancialAccount, String>(
-  (Ref ref, String accountId) async {
+///
+/// The value is NULLABLE because null is what "no organisation's account is
+/// held here" looks like, and writing a fresh `AsyncData` is the only thing
+/// that erases a cached answer. Without a value meaning nothing, the previous
+/// organisation's account stays readable through the whole post-switch reload.
+final class AccountDetailController extends TenantScopedAsyncNotifier<FinancialAccount?> {
+  AccountDetailController(this.accountId);
+
+  final String accountId;
+
+  @override
+  FinancialAccount? get discarded => null;
+
+  @override
+  Future<FinancialAccount?> load() async {
     final result = await ref.watch(loadAccountProvider)(accountId);
     return switch (result) {
       Success<FinancialAccount>(:final value) => value,
       Failed<FinancialAccount>(:final failure) => throw AccountReadFailure(failure),
     };
-  },
+  }
+}
+
+final AsyncNotifierProviderFamily<AccountDetailController, FinancialAccount?, String>
+    accountDetailProvider =
+    AsyncNotifierProvider.family<AccountDetailController, FinancialAccount?, String>(
+  AccountDetailController.new,
 );
 
 /// Carries a typed failure through `AsyncValue.error`.
@@ -197,27 +243,58 @@ final class AccountReadFailure implements Exception {
 }
 
 /// The figures sources reported for one account, grouped by kind.
-final accountBalancesProvider = FutureProvider.family<BalancesByKind, String>(
-  (Ref ref, String accountId) async {
+final class AccountBalancesController extends TenantScopedAsyncNotifier<BalancesByKind> {
+  AccountBalancesController(this.accountId);
+
+  final String accountId;
+
+  /// No figures at all. A balance is the single most disclosive thing on this
+  /// surface, so it is the one that must not survive a change of organisation.
+  @override
+  BalancesByKind get discarded => const BalancesByKind(<BalanceKindGroup>[]);
+
+  @override
+  Future<BalancesByKind> load() async {
     final result = await ref.watch(loadAccountBalancesProvider)(accountId);
     return switch (result) {
       Success<BalancesByKind>(:final value) => value,
       Failed<BalancesByKind>(:final failure) => throw AccountReadFailure(failure),
     };
-  },
+  }
+}
+
+final AsyncNotifierProviderFamily<AccountBalancesController, BalancesByKind, String>
+    accountBalancesProvider =
+    AsyncNotifierProvider.family<AccountBalancesController, BalancesByKind, String>(
+  AccountBalancesController.new,
 );
 
 /// Which sources feed one account.
-final accountSourceLinksProvider =
-    FutureProvider.family<List<AccountSourceLink>, String>(
-  (Ref ref, String accountId) async {
+final class AccountSourceLinksController
+    extends TenantScopedAsyncNotifier<List<AccountSourceLink>> {
+  AccountSourceLinksController(this.accountId);
+
+  final String accountId;
+
+  @override
+  List<AccountSourceLink> get discarded => const <AccountSourceLink>[];
+
+  @override
+  Future<List<AccountSourceLink>> load() async {
     final result = await ref.watch(loadAccountSourceLinksProvider)(accountId);
     return switch (result) {
       Success<List<AccountSourceLink>>(:final value) => value,
       Failed<List<AccountSourceLink>>(:final failure) =>
         throw AccountReadFailure(failure),
     };
-  },
+  }
+}
+
+final AsyncNotifierProviderFamily<AccountSourceLinksController,
+        List<AccountSourceLink>, String> accountSourceLinksProvider =
+    AsyncNotifierProvider.family<AccountSourceLinksController, List<AccountSourceLink>,
+        String>(
+  AccountSourceLinksController.new,
 );
 
 /// The issuers a new account may name.
@@ -225,14 +302,25 @@ final accountSourceLinksProvider =
 /// A catalogue that cannot be read is not a blocked form: the person can still
 /// name an issuer themselves, so this answers with nothing rather than failing
 /// the whole screen.
-final FutureProvider<List<Issuer>> selectableIssuersProvider =
-    FutureProvider<List<Issuer>>((Ref ref) async {
-  final result = await ref.watch(loadSelectableIssuersProvider)();
-  return switch (result) {
-    Success<List<Issuer>>(:final value) => value,
-    Failed<List<Issuer>>() => const <Issuer>[],
-  };
-});
+final class SelectableIssuersController extends TenantScopedAsyncNotifier<List<Issuer>> {
+  @override
+  List<Issuer> get discarded => const <Issuer>[];
+
+  @override
+  Future<List<Issuer>> load() async {
+    final result = await ref.watch(loadSelectableIssuersProvider)();
+    return switch (result) {
+      Success<List<Issuer>>(:final value) => value,
+      Failed<List<Issuer>>() => const <Issuer>[],
+    };
+  }
+}
+
+final AsyncNotifierProvider<SelectableIssuersController, List<Issuer>>
+    selectableIssuersProvider =
+    AsyncNotifierProvider<SelectableIssuersController, List<Issuer>>(
+  SelectableIssuersController.new,
+);
 
 /// The state of one account create or edit.
 sealed class AccountFormState {
@@ -269,16 +357,29 @@ final class AccountFormRejected extends AccountFormState {
 }
 
 /// Sequences one create or edit.
+///
+/// EVERY WRITE THAT FOLLOWS AN `await` IS GUARDED. Riverpod reuses this
+/// notifier instance across an invalidation — only `build` re-runs — so
+/// `ref.mounted` is still true after the tenant-scoped discard and an unguarded
+/// `state = AccountFormSaved(…)` reports an account created under the PREVIOUS
+/// organisation as saved on the new organisation's form.
 final class AccountFormController extends Notifier<AccountFormState> {
   @override
   AccountFormState build() => const AccountFormIdle();
+
+  /// The binding this controller is currently acting for.
+  TenantDataGeneration get binding => ref.tenantBinding();
 
   Future<void> create(ManualAccountDraft draft) async {
     if (state is AccountFormSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = const AccountFormSubmitting();
     final result = await ref.read(createManualAccountProvider)(draft);
+    if (issued.hasEnded) {
+      return;
+    }
     await _settle(result);
   }
 
@@ -286,8 +387,12 @@ final class AccountFormController extends Notifier<AccountFormState> {
     if (state is AccountFormSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = binding;
     state = const AccountFormSubmitting();
     final result = await ref.read(updateAccountProvider)(accountId, edit);
+    if (issued.hasEnded) {
+      return;
+    }
     await _settle(result);
     if (result is Success<FinancialAccount>) {
       ref.invalidate(accountDetailProvider(accountId));

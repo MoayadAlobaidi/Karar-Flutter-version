@@ -25,7 +25,7 @@
 // `platformTenantScopedProviders` and `buildPlatformHomeScreen` are its public
 // contributions, and every one of them is merged below.
 
-import 'package:flutter_riverpod/misc.dart' show Override, ProviderOrFamily;
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:go_router/go_router.dart';
 
 import '../../features/authentication/presentation/routes/identity_module.dart';
@@ -33,10 +33,10 @@ import '../../features/financial_accounts/presentation/financial_feature_registr
 import '../../features/financial_accounts/presentation/financial_home_shell.dart';
 import '../../features/platform_bootstrap/presentation/platform_feature_registration.dart';
 import '../../features/session_management/presentation/security_state_screens.dart';
-import '../../features/tenant_selection/presentation/tenant_providers.dart';
 import '../../shared/design_system/theme/karar_theme.dart';
 import '../dependency_injection/providers.dart';
 import '../lifecycle/startup_state.dart';
+import '../lifecycle/tenant_data_scope.dart';
 import '../routing/app_router.dart';
 
 /// Every feature contribution the shell mounts, merged into one override list.
@@ -68,7 +68,7 @@ List<Override> featureSurfaceOverrides() => <Override>[
       // returns `buildPlatformHomeScreen` unchanged, so the surface a person
       // without it sees is the platform home and nothing else.
       homeScreenBuilderProvider.overrideWithValue(buildFinancialHomeShell),
-      tenantScopedProvidersProvider.overrideWithValue(<ProviderOrFamily>[
+      tenantScopedDataProvider.overrideWithValue(<TenantScopedProvider>[
         ...platformTenantScopedProviders(),
         ...financialTenantScopedProviders(),
       ]),

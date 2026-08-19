@@ -65,7 +65,14 @@ final class AccountDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
-          data: (FinancialAccount value) => _Body(account: value, l10n: l10n),
+          // Null is the DISCARDED state: the account read under the previous
+          // organisation has been emptied and the replacement read is either
+          // in flight or will never be issued because the session ended. There
+          // is nothing to render and nothing to say that the loading view does
+          // not already say.
+          data: (FinancialAccount? value) => value == null
+              ? KararLoadingView(subject: l10n.accountDetailTitle)
+              : _Body(account: value, l10n: l10n),
         ),
       ),
     );

@@ -6,6 +6,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_transaction_categories_repository.dart';
@@ -45,9 +46,14 @@ final AsyncNotifierProvider<CategoryCatalogueController, CategoryCatalogueView>
   CategoryCatalogueController.new,
 );
 
-final class CategoryCatalogueController extends AsyncNotifier<CategoryCatalogueView> {
+final class CategoryCatalogueController
+    extends TenantScopedAsyncNotifier<CategoryCatalogueView> {
   @override
-  Future<CategoryCatalogueView> build() async {
+  CategoryCatalogueView get discarded =>
+      const CategoryCatalogueUnavailable(SessionChangedFailure());
+
+  @override
+  Future<CategoryCatalogueView> load() async {
     final result = await ref.watch(loadCategoryCatalogueProvider)();
     return switch (result) {
       Success<CategoryCatalogue>(:final value) => CategoryCatalogueLoaded(value),
@@ -56,8 +62,16 @@ final class CategoryCatalogueController extends AsyncNotifier<CategoryCatalogueV
   }
 
   Future<void> refresh() async {
+    final TenantDataGeneration issued = binding;
     state = const AsyncLoading<CategoryCatalogueView>();
-    state = await AsyncValue.guard<CategoryCatalogueView>(build);
+    final AsyncValue<CategoryCatalogueView> answer =
+        await AsyncValue.guard<CategoryCatalogueView>(load);
+    if (issued.hasEnded) {
+      // The notifier survives the discard, so without this the catalogue read
+      // under the previous binding is written back over the new one's.
+      return;
+    }
+    state = answer;
   }
 }
 

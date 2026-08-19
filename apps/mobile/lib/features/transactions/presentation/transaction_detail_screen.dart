@@ -63,7 +63,12 @@ final class TransactionDetailScreen extends ConsumerWidget {
               ),
             ),
           ),
-          data: (TransactionDetail value) => _Body(detail: value, l10n: l10n),
+          // Null is the DISCARDED state; see `accountDetailProvider`. The
+          // transaction read under the previous organisation has been emptied,
+          // so there is nothing to render.
+          data: (TransactionDetail? value) => value == null
+              ? KararLoadingView(subject: l10n.transactionDetailTitle)
+              : _Body(detail: value, l10n: l10n),
         ),
       ),
     );

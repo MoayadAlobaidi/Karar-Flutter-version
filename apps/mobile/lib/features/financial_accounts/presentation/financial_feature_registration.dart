@@ -12,8 +12,9 @@
 // no financial provider at all, so no repository is built and no request is
 // issued.
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/misc.dart' show ProviderOrFamily;
 import 'package:go_router/go_router.dart';
+
+import '../../../app/lifecycle/tenant_data_scope.dart';
 
 import '../../payment_instruments/presentation/instruments_providers.dart';
 import '../../transaction_categories/presentation/categories_providers.dart';
@@ -105,30 +106,38 @@ List<RouteBase> financialFeatureRoutes() => <RouteBase>[
       ),
     ];
 
-/// Providers whose value belongs to one organisation.
+/// Providers whose value belongs to one organisation, with the operation that
+/// discards each one.
 ///
 /// An account, a balance, a transaction and a category assignment are all read
 /// under the session's tenant binding and are invalid the moment it changes. A
 /// financial provider missing from this list would survive a tenant switch and
 /// show one organisation's money under another.
-List<ProviderOrFamily> financialTenantScopedProviders() => <ProviderOrFamily>[
-      ownAccountsProvider,
-      portfolioArrangementProvider,
-      accountFormControllerProvider,
-      accountDetailProvider,
-      accountBalancesProvider,
-      accountSourceLinksProvider,
-      selectableIssuersProvider,
-      accountInstrumentsProvider,
-      transactionListingProvider,
-      transactionFilterProvider,
-      transactionDetailProvider,
-      transactionProvenanceProvider,
-      accountRecentTransactionsProvider,
-      transactionWriteControllerProvider,
+///
+/// WHY EACH ENTRY NAMES ITS KIND. `tenantScopedAsync` and
+/// `tenantScopedAsyncFamily` accept only a provider whose notifier is a
+/// [TenantScopedAsyncNotifier] — the only shape that can EMPTY itself, because
+/// `ref.invalidate` reloads an asynchronous provider and leaves the previous
+/// organisation's value readable throughout. A bare reference cannot be added
+/// here, so "registered but not actually discarded" is not reachable.
+List<TenantScopedProvider> financialTenantScopedProviders() => <TenantScopedProvider>[
+      tenantScopedAsync(ownAccountsProvider),
+      tenantScopedNotifier(portfolioArrangementProvider),
+      tenantScopedNotifier(accountFormControllerProvider),
+      tenantScopedAsyncFamily(accountDetailProvider),
+      tenantScopedAsyncFamily(accountBalancesProvider),
+      tenantScopedAsyncFamily(accountSourceLinksProvider),
+      tenantScopedAsync(selectableIssuersProvider),
+      tenantScopedAsyncFamily(accountInstrumentsProvider),
+      tenantScopedAsync(transactionListingProvider),
+      tenantScopedNotifier(transactionFilterProvider),
+      tenantScopedAsyncFamily(transactionDetailProvider),
+      tenantScopedAsyncFamily(transactionProvenanceProvider),
+      tenantScopedAsyncFamily(accountRecentTransactionsProvider),
+      tenantScopedNotifier(transactionWriteControllerProvider),
       // The category catalogue is non-personal reference data, but it is read
       // through the tenant-bound financial surface and its search state is a
       // person's own; discarding both on a switch costs one request.
-      categoryCatalogueProvider,
-      categorySearchProvider,
+      tenantScopedAsync(categoryCatalogueProvider),
+      tenantScopedNotifier(categorySearchProvider),
     ];
