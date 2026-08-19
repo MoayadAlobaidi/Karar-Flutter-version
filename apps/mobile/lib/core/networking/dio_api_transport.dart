@@ -175,7 +175,7 @@ final class DioApiTransport implements ApiTransport {
     try {
       response = await _dio.request<String>(
         request.path,
-        data: request.body,
+        data: request.rawBody?.bytes ?? request.body,
         queryParameters: <String, Object?>{
           for (final entry in request.query.entries)
             if (entry.value != null) entry.key: entry.value,
@@ -186,7 +186,10 @@ final class DioApiTransport implements ApiTransport {
           headers: headers,
           sendTimeout: request.timeouts.send,
           receiveTimeout: request.timeouts.receive,
-          contentType: request.body == null ? null : Headers.jsonContentType,
+          // A raw body states its own media type; a JSON body is always
+          // JSON; a request with no body declares no content type at all.
+          contentType: request.rawBody?.mediaType ??
+              (request.body == null ? null : Headers.jsonContentType),
         ),
       );
     } on DioException catch (error) {

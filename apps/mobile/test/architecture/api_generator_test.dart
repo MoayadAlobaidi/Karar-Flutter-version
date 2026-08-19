@@ -95,6 +95,32 @@ paths:
                 required: [thingId]
                 properties:
                   thingId: { type: string }
+  /things/{thingId}/ambiguous-source:
+    post:
+      operationId: uploadThingAmbiguousSource
+      parameters:
+        - name: thingId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+          application/vnd.ms-excel:
+            schema: { type: string }
+      responses:
+        '200':
+          description: The thing.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [thingId]
+                properties:
+                  thingId: { type: string }
   /things/{thingId}:
     patch:
       operationId: updateThing
@@ -147,6 +173,16 @@ String operationBody(String source, String operationId) {
   // The method ends at a closing brace on its own line; the parameter list
   // ends at `}) async {`, which is why that is not what is searched for.
   return source.substring(start, source.indexOf('\n  }\n', start));
+}
+
+/// The parameter list of one generated operation, and nothing else.
+///
+/// Separate from [operationBody] so an assertion about what a caller must
+/// PASS cannot be satisfied by text from the method's body.
+String operationSignature(String source, String operationId) {
+  final start = source.indexOf(' $operationId({');
+  expect(start, isNot(-1), reason: '$operationId is not in the generated client');
+  return source.substring(start, source.indexOf('}) async {', start));
 }
 
 /// The doc comment immediately above one generated operation.
@@ -265,31 +301,68 @@ void main() {
     });
   });
 
-  group('a request body the generator cannot send is stated, not hidden', () {
-    // `ApiTransport` carries a JSON-encodable body and nothing else, so a
-    // `text/csv` body cannot be sent at all. What must never happen is the
-    // generator emitting an operation that LOOKS complete and issues a request
-    // with no body: an upload that silently sends nothing is worse than one
-    // that was never offered.
-    test('the operation carries no body parameter', () {
-      final body = operationBody(client, 'uploadThingSource');
-      expect(body, isNot(contains('body:')));
+  group('a body the contract declares as bytes is sent as bytes', () {
+    // `ApiTransport` once carried a JSON-encodable body and nothing else, so
+    // a `text/csv` body could not be sent at all and the generator stated the
+    // gap rather than emitting an upload that silently sent nothing. The
+    // transport now carries raw bytes under a declared media type, so the
+    // generator carries them — but only when the contract leaves it no
+    // choice about which type to send.
+    test('the operation takes the bytes', () {
+      expect(operationSignature(client, 'uploadThingSource'),
+          contains('required Uint8List body'));
     });
 
-    test('and the generated documentation says so', () {
-      expect(operationDocumentation(client, 'uploadThingSource'),
-          allOf(<Matcher>[
-            contains('NOT MODELLED'),
-            contains('text/csv'),
-            contains('sends NO BODY'),
-          ]));
+    test('and sends them under the media type the contract names', () {
+      expect(
+        operationBody(client, 'uploadThingSource'),
+        contains("rawBody: RawRequestBody(bytes: body, mediaType: 'text/csv')"),
+      );
     });
 
-    test('an operation with a JSON body carries no such note', () {
+    test('never as a JSON body', () {
+      // The distinction the whole change exists for: a raw body must not
+      // travel through the JSON field, which the transport sends as
+      // application/json regardless of what the contract declares.
+      expect(operationBody(client, 'uploadThingSource'), isNot(contains('body: body')));
+      expect(operationBody(client, 'uploadThingSource'), isNot(contains('body.toJson()')));
+    });
+
+    test('and the note about an unsendable body is gone', () {
+      expect(
+        operationDocumentation(client, 'uploadThingSource'),
+        isNot(contains('NOT MODELLED')),
+      );
+    });
+
+    test('two declared media types is a CHOICE, and the generator refuses it', () {
+      // One declared type is a statement the contract makes. Two is a
+      // decision, and a generator that picks one has invented a fact about
+      // the wire — the same reason it refuses to choose between two 2xx
+      // schemas or invent a response type.
+      final body = operationBody(client, 'uploadThingAmbiguousSource');
+      expect(body, isNot(contains('rawBody')));
+      expect(
+        operationSignature(client, 'uploadThingAmbiguousSource'),
+        isNot(contains('Uint8List')),
+      );
+      expect(
+        operationDocumentation(client, 'uploadThingAmbiguousSource'),
+        allOf(<Matcher>[
+          contains('NOT MODELLED'),
+          contains('text/csv'),
+          contains('application/vnd.ms-excel'),
+          contains('sends NO BODY'),
+        ]),
+      );
+    });
+
+    test('an operation with a JSON body carries neither', () {
       expect(
         operationDocumentation(client, 'updateThing'),
         isNot(contains('NOT MODELLED')),
       );
+      expect(operationBody(client, 'updateThing'), isNot(contains('rawBody')));
     });
   });
 

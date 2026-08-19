@@ -5,7 +5,7 @@
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.6.0
 // Digest:     18e39b12
-// Generator:  tool/generate_api_client.dart 1.1.0
+// Generator:  tool/generate_api_client.dart 1.2.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
 // Drift check: dart run tool/generate_api_client.dart --check
@@ -21,6 +21,8 @@
 // An operation whose contract documents no response schema returns the decoded
 // JSON object as `JsonMap`. That is deliberate: inventing a type for a
 // prose-only response would be a claim the contract does not make.
+
+import 'dart:typed_data';
 
 import '../../utilities/cancellation.dart';
 import '../api_transport.dart';
@@ -1608,11 +1610,10 @@ final class KararApiClient {
   /// The bytes are stored only as authenticated ciphertext, outside PostgreSQL. Nothing about that storage — its locator, its algorithm, its key version, its nonce, its auth tag, its checksum — appears in any response.
   /// Re-uploading a file this subject has already committed answers 200 with the import in state DUPLICATE and refusal code SOURCE_ALREADY_IMPORTED, rather than silently importing the same statement twice.
   ///
-  /// NOT MODELLED: the contract declares this request body as `text/csv`, which is not JSON. This method sends NO BODY. Sending one needs a transport that carries raw bytes; until there is one, this operation cannot be called for its intended effect.
-  ///
   /// `POST /financial/statement-imports/{importId}/source` — requires a session.
   Future<StatementImportViewDto> uploadOwnStatementImportSource({
     required String importId,
+    required Uint8List body,
     String? idempotencyKey,
     CancellationToken? cancellation,
     TimeoutProfile timeouts = TimeoutProfile.standard,
@@ -1621,6 +1622,7 @@ final class KararApiClient {
       ApiRequest(
         method: HttpMethod.post,
         path: '/financial/statement-imports/${Uri.encodeComponent(importId)}/source',
+        rawBody: RawRequestBody(bytes: body, mediaType: 'text/csv'),
         requiresAuthentication: true,
         idempotencyKey: idempotencyKey,
         cancellation: cancellation,

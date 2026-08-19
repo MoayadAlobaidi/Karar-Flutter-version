@@ -35,7 +35,7 @@ import 'package:yaml/yaml.dart';
 
 /// Bumped whenever the emitted shape changes. Recorded in every output file so
 /// a stale checkout is visible in a diff.
-const String generatorVersion = '1.1.0';
+const String generatorVersion = '1.2.0';
 
 /// Component schemas the client does not model as DTOs.
 ///
@@ -180,6 +180,7 @@ final class Operation {
     required this.requestType,
     required this.requestRequired,
     required this.unmodelledRequestMediaTypes,
+    required this.rawRequestMediaType,
     required this.successStatus,
     required this.responseType,
   });
@@ -208,6 +209,16 @@ final class Operation {
   /// at all. The emitted doc comment now says what it cannot send, so a caller
   /// finds out by reading rather than by watching an upload arrive empty.
   final List<String> unmodelledRequestMediaTypes;
+
+  /// The media type of a request body that is raw bytes rather than JSON, or
+  /// null.
+  ///
+  /// Set only when the contract declares EXACTLY ONE non-JSON media type for
+  /// the body. One is a statement the contract makes and this generator can
+  /// carry out; two would be a choice, and choosing between two declared
+  /// media types is the kind of guess this generator refuses to make — those
+  /// stay unmodelled and say so.
+  final String? rawRequestMediaType;
   final int successStatus;
 
   /// Null when the contract documents no schema for the success response.
@@ -549,15 +560,22 @@ final class ContractReader {
     DartType? requestType;
     var requestRequired = false;
     final unmodelledRequestMediaTypes = <String>[];
+    String? rawRequestMediaType;
     final requestBody = operation['requestBody'];
     if (requestBody is YamlMap) {
       requestRequired = requestBody['required'] == true;
       final schema = _jsonSchemaOf(requestBody['content'], '$id request body');
       final content = requestBody['content'];
       if (schema == null && content is YamlMap) {
-        unmodelledRequestMediaTypes.addAll(
-          content.keys.map((Object? key) => key.toString()).toList()..sort(),
-        );
+        final declared = content.keys.map((Object? key) => key.toString()).toList()..sort();
+        if (declared.length == 1) {
+          // The contract names one media type for the body. Carrying bytes
+          // under the type the contract states is not a guess.
+          rawRequestMediaType = declared.single;
+          requestRequired = requestBody['required'] == true;
+        } else {
+          unmodelledRequestMediaTypes.addAll(declared);
+        }
       }
       if (schema != null) {
         requestType = _typeOf(
@@ -627,6 +645,7 @@ final class ContractReader {
       requestType: requestType,
       requestRequired: requestRequired,
       unmodelledRequestMediaTypes: unmodelledRequestMediaTypes,
+      rawRequestMediaType: rawRequestMediaType,
       successStatus: chosenStatus,
       responseType: responseType,
     );
@@ -1621,6 +1640,8 @@ T decodeField<T>(String path, T Function() read) {
 // JSON object as `JsonMap`. That is deliberate: inventing a type for a
 // prose-only response would be a claim the contract does not make.
 ''')
+      ..writeln("import 'dart:typed_data';")
+      ..writeln('')
       ..writeln("import '../../utilities/cancellation.dart';")
       ..writeln("import '../api_transport.dart';")
       ..writeln("import '../http_method.dart';")
@@ -1670,6 +1691,10 @@ T decodeField<T>(String path, T Function() read) {
             ? 'required ${operation.requestType!.declaration} body'
             : '${operation.requestType!.declaration}? body',
       );
+    } else if (operation.rawRequestMediaType != null) {
+      parameters.add(
+        operation.requestRequired ? 'required Uint8List body' : 'Uint8List? body',
+      );
     }
     for (final parameter in operation.queryParameters) {
       parameters.add(
@@ -1705,6 +1730,15 @@ T decodeField<T>(String path, T Function() read) {
         operation.requestRequired
             ? '        body: body.toJson(),'
             : '        body: body?.toJson(),',
+      );
+    } else if (operation.rawRequestMediaType != null) {
+      final mediaType = operation.rawRequestMediaType!;
+      buffer.writeln(
+        operation.requestRequired
+            ? "        rawBody: RawRequestBody(bytes: body, mediaType: '$mediaType'),"
+            : '        rawBody: body == null\n'
+                '            ? null\n'
+                "            : RawRequestBody(bytes: body, mediaType: '$mediaType'),",
       );
     }
     buffer.writeln('        requiresAuthentication: ${operation.requiresAuthentication},');
