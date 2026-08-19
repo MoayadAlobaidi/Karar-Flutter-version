@@ -32,7 +32,7 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 | If you want to… | Read |
 |---|---|
 | Understand the system | [`docs/architecture/overview.md`](docs/architecture/overview.md) |
-| Know why something is the way it is | [`docs/adr/`](docs/adr/README.md) — 28 decision records |
+| Know why something is the way it is | [`docs/adr/`](docs/adr/README.md) — 29 decision records |
 | Onboard as an engineer | [`docs/onboarding/developer.md`](docs/onboarding/developer.md) |
 | Work on the Flutter client | [`docs/onboarding/flutter.md`](docs/onboarding/flutter.md) |
 | Run it locally | [Developer quick start](#developer-quick-start) below |

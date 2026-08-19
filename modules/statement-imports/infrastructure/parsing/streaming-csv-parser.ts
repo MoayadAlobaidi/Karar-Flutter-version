@@ -71,6 +71,7 @@ import type {
   ParsedRow,
 } from '../../application/ports/csv-parser.js';
 import { CsvParseRefusedError } from '../../application/ports/csv-parser.js';
+import { UPLOADED_FILE_CONTENT, UntrustedSourceText } from '../../domain/content-trust.js';
 
 /** Stored on every committed transaction's provenance. */
 export const CSV_PARSER_VERSION = 'statement-csv/rfc4180-streaming/v1';
@@ -376,7 +377,18 @@ class ParseState {
       // NEVER used to decide what a column MEANS: a header is content from
       // the file, and matching on its text is how a mapping starts depending
       // on a string that can carry an account number.
-      this.#header = { fields: Object.freeze([...fields]) };
+      //
+      // It is wrapped rather than kept as a string, and the wrapper is not
+      // decoration: this is the one value in the module that no code consumes
+      // and no rule validates, which makes it the one that reaches a log line
+      // by accident. `UntrustedSourceText` renders as a redaction everywhere
+      // but an explicit `reveal()`. The text itself is untouched — nothing is
+      // trimmed, escaped or prefixed, because what the file said is the fact.
+      this.#header = {
+        fields: Object.freeze(
+          fields.map((field) => UntrustedSourceText.of(field, UPLOADED_FILE_CONTENT)),
+        ),
+      };
       return null;
     }
     if (this.#headerColumnCount === null) this.#headerColumnCount = fields.length;

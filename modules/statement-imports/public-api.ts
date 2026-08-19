@@ -32,6 +32,13 @@
  * - **Nothing that scores, ranks, or guesses.** Categorisation is an exact
  *   reviewed rule or nothing. There is no confidence, no similarity, no
  *   nearest match, and no model.
+ * - **No way for content to acquire instruction authority.**
+ *   `ContentTrust`'s trusted arm is minted only by `platformInstruction`, which
+ *   accepts a member of a closed source-declared registry — so a `string` read
+ *   out of a file cannot reach it, and a bare object literal is not one either
+ *   (the origin is nominally branded). There is no classifier that reads text
+ *   and decides it looks safe, no keyword list, and no numeric trust score.
+ *   ADR-0029.
  * - **No reconciliation figure this platform derived.** `reconcile` compares
  *   only figures the FILE stated; there is no exported function that sums
  *   rows into a balance, because that number compared against itself is a
@@ -166,6 +173,38 @@ export {
   InvalidHsfFieldError,
   hsfFieldsEqual,
 } from './domain/hsf-field.js';
+export {
+  CONTENT_TRUST_CLASSES,
+  PLATFORM_FACT_DERIVATIONS,
+  PLATFORM_INSTRUCTION_ORIGINS,
+  RECORDED_NARRATIVE_ORIGINS,
+  SUBJECT_TYPED_CONTENT,
+  UNTRUSTED_ACQUISITIONS,
+  UNTRUSTED_REDACTION,
+  UPLOADED_FILE_CONTENT,
+  InvalidPlatformInstructionOriginError,
+  UntrustedSourceText,
+  carriesInstructionAuthority,
+  isContentTrustClass,
+  isUntrusted,
+  platformInstruction,
+  structuredPlatformFact,
+  trustClassOf,
+  trustOfRecordedNarrative,
+  untrustedContent,
+  type ContentTrust,
+  type ContentTrustClass,
+  type PlatformFactDerivation,
+  type PlatformInstructionOrigin,
+  type PlatformInstructionOriginId,
+  type RecordedNarrativeOrigin,
+  type TrustedPlatformInstruction,
+  type TrustedStructuredPlatformFact,
+  type UntrustedAcquisition,
+  type UntrustedContentTrust,
+  type UntrustedExternalContent,
+  type UntrustedUserContent,
+} from './domain/content-trust.js';
 export {
   CANONICAL_ACCOUNT_REFERENCE_TYPES,
   CONNECTION_REFERENCE_TYPES,

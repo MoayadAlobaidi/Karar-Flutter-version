@@ -50,6 +50,7 @@
 
 import type { IngestionLimitPolicy } from '@karar/platform/dist/ingestion/limits.js';
 
+import type { UntrustedSourceText } from '../../domain/content-trust.js';
 import type { ImportRefusalCode } from '../../domain/reason-codes.js';
 
 /** One parsed line: its 1-based data-row number and its fields, in order. */
@@ -58,9 +59,25 @@ export interface ParsedRow {
   readonly fields: readonly string[];
 }
 
-/** The header line, when the caller said the file has one. */
+/**
+ * The header line, when the caller said the file has one.
+ *
+ * **The fields are wrapped, and the row's are not, and the asymmetry is the
+ * whole point.** A data row's fields go straight into `mapStatementRow`, which
+ * reads them BY INDEX and turns each into a typed fact or a typed refusal — a
+ * closed pipeline with one entrance and one exit. A header goes nowhere: no
+ * mapping consults it, no refusal quotes it, and nothing in this module
+ * decides anything from its text (see `reason-codes.ts`). It is carried only
+ * so a client can show a person which columns exist.
+ *
+ * That makes it the one value in this module with no destination and no
+ * validation — which is exactly the value that ends up in a log line, an
+ * exception message or an analytics event by accident. `UntrustedSourceText`
+ * renders as a redaction everywhere except an explicit `reveal()`, so the
+ * accident is not available.
+ */
 export interface ParsedHeader {
-  readonly fields: readonly string[];
+  readonly fields: readonly UntrustedSourceText[];
 }
 
 /** Why a parse stopped short. Always names the bound or the content problem. */
