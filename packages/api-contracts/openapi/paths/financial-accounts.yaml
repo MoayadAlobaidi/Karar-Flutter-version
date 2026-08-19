@@ -1,0 +1,747 @@
+# financial-accounts surface — path-item fragments (ADR-0009: authored by
+# hand, never generated from code). The phase lead merges these into
+# openapi.yaml via $ref per path, e.g.:
+#   /financial/accounts:
+#     $ref: './paths/financial-accounts.yaml#/~1financial~1accounts'
+#
+# Contract rules made visible here:
+#   * EVERY operation acts for the AUTHENTICATED principal and nobody else.
+#     No operation accepts a `userId` or a `tenantId` — not in a path, a
+#     query, a header, or a body. The subject and the tenant come from the
+#     session's server-side binding; a `?userId=`, an `x-tenant-id` header,
+#     and a body `tenantId` are ignored by construction (asserted by test).
+#   * Money is an EXACT MINOR-UNIT STRING plus its currency (ADR-0006). No
+#     monetary value is ever a JSON number: a `number` is a float, and a float
+#     is the wrong type for a ledger. `minorUnits` is the integer the store
+#     holds, as characters.
+#   * Instants are `format: date-time` with an explicit offset. Calendar days
+#     are `format: date` (ADR-0027) — a date an institution wrote on its books
+#     is not a moment in time, and typing it as one moves a line across a
+#     month boundary for a reader at another offset.
+#   * NOTHING HERE SAYS "CONNECTED". Every account carries an explicit `link`
+#     block whose `state` vocabulary contains exactly `NOT_LINKED`, whose
+#     `impliesLiveInstitutionLink` is `false` by contract, and whose
+#     `providerAccessStatus` is `NOT_IMPLEMENTED`. No issuer exposes an
+#     interface to this platform, no credential of any kind is stored, and a
+#     field that could be rendered as a live link would be a false claim
+#     (ADR-0028).
+#   * THE CLOSED FIELD SETS ARE THE LEAK CONTROL. Every response object
+#     declares `additionalProperties: false`. The fields deliberately absent,
+#     and to stay absent: the row's `tenantId` and `userId` (the caller is the
+#     subject — repeating it back is an invitation to key on it), any
+#     ciphertext, nonce, auth tag, encryption algorithm or key version (those
+#     live only on the persistence port's `EncryptedField`, never on a read
+#     model), any fingerprint, any raw external account identifier, and any
+#     object-storage handle.
+#   * There is NO account-deletion operation on this surface, deliberately.
+#     The cross-module cascade `DeleteOwnAccount` performs is not atomic —
+#     records, source links and instruments are erased through separate ports
+#     and a partial outcome is a real answer — and the contract for reporting
+#     that outcome has not been chosen. Leaving it unexposed is the sanctioned
+#     state; inventing a 200 that might mean "some of it" is not.
+#   * There is no institution WRITE path and never will be: the catalogue
+#     changes by reviewed migration, and `karar_app` holds SELECT on it.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`,
+#     served under the media type the single writer in
+#     apps/api/src/errors/problem-response.ts emits.
+
+/financial/institutions:
+  get:
+    operationId: listFinancialInstitutions
+    summary: List the reviewed issuers a new account may point at
+    description: >-
+      The platform's reviewed issuer catalogue — one row per issuer globally
+      (ADR-0028). This is PUBLIC reference data with no tenant, user or
+      subject column: every principal reads the same rows, and authentication
+      is required only because the whole financial surface is authenticated.
+
+      Only entries selectable for a NEW account are listed. A RETIRED entry is
+      still resolvable through an account that already points at it (an
+      existing record has to render its issuer's name), but it is not offered
+      here.
+
+      Market presence per country lives in a separate table
+      (`institution_markets`, migration 0094) and is NOT exposed by this
+      operation: the module declares no reader for it, and an operation that
+      answered from nothing would be a false claim.
+    tags: [financial-accounts]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+      - name: kind
+        in: query
+        required: false
+        description: Restrict to one issuer kind.
+        schema:
+          $ref: '#/components/InstitutionKind'
+    responses:
+      '200':
+        description: The reviewed issuers, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/InstitutionView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/accounts:
+  get:
+    operationId: listOwnFinancialAccounts
+    summary: List the caller's own accounts and wallets
+    description: >-
+      The accounts and wallets the AUTHENTICATED principal owns, and no
+      others. There is no operation anywhere on this surface that reads
+      another subject's accounts, and no parameter that could name one.
+
+      Ordering is stable (oldest first) so the cursor means the same thing
+      between calls. Filters narrow the caller's OWN set; they never widen it.
+    tags: [financial-accounts]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+      - name: institutionId
+        in: query
+        required: false
+        description: Restrict to accounts held at one reviewed issuer.
+        schema: { type: string, format: uuid }
+      - name: institutionKind
+        in: query
+        required: false
+        description: Restrict to accounts held at issuers of one kind.
+        schema:
+          $ref: '#/components/InstitutionKind'
+      - name: accountType
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/AccountType'
+      - name: walletKind
+        in: query
+        required: false
+        description: Only WALLET accounts carry one; any other type has none.
+        schema:
+          $ref: '#/components/WalletKind'
+      - name: nature
+        in: query
+        required: false
+        description: >-
+          ASSET, LIABILITY or UNKNOWN. Nothing on this surface sums or nets
+          across natures — a net worth is a different concept with its own
+          correctness problem, and it is not computed here.
+        schema:
+          $ref: '#/components/AccountNature'
+      - name: currency
+        in: query
+        required: false
+        schema: { type: string, pattern: '^[A-Z]{3}$' }
+      - name: status
+        in: query
+        required: false
+        description: The account's lifecycle state.
+        schema:
+          $ref: '#/components/AccountStatus'
+      - name: origin
+        in: query
+        required: false
+        description: >-
+          How the account first came to exist — an immutable historical fact,
+          never a live data route. An account of origin MANUAL or CSV has no
+          issuer link of any kind.
+        schema:
+          $ref: '#/components/AccountOrigin'
+    responses:
+      '200':
+        description: The caller's own accounts, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/FinancialAccountView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+  post:
+    operationId: createOwnManualFinancialAccount
+    summary: Create an account the caller is entering by hand
+    description: >-
+      A MANUAL account. `origin` is fixed to MANUAL by the use case and is not
+      accepted from the caller; neither is `status`, which starts ACTIVE. An
+      account of origin EXTERNAL_PROVIDER is not constructible anywhere in
+      this platform, and there is no request field through which it could be
+      asked for.
+
+      An issuer may be named EITHER by catalogue reference OR by the subject's
+      own label, never both: two names for one issuer is a rule violation, not
+      a merge.
+    tags: [financial-accounts]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [accountType, currency, displayName]
+            properties:
+              accountType:
+                $ref: '#/components/AccountType'
+              walletKind:
+                description: >-
+                  Required when `accountType` is WALLET and refused otherwise —
+                  the database holds the same biconditional (migration 0095).
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/WalletKind'
+              nature:
+                $ref: '#/components/AccountNature'
+              currency:
+                type: string
+                pattern: '^[A-Z]{3}$'
+                description: ISO 4217 alphabetic code; immutable once records exist.
+              displayName:
+                type: string
+                minLength: 1
+                maxLength: 120
+                description: >-
+                  Holder-sensitive. Stored only as ciphertext bound by AAD to
+                  tenant, user, table, row and field.
+              institutionId:
+                type: [string, 'null']
+                format: uuid
+                description: A reviewed catalogue entry, or null.
+              userSuppliedInstitutionLabel:
+                type: [string, 'null']
+                maxLength: 120
+                description: >-
+                  The subject's own name for an issuer the catalogue does not
+                  hold. Never promoted to reference data.
+              mask:
+                type: [string, 'null']
+                maxLength: 8
+                description: >-
+                  A masked tail, e.g. `**1234`. A value that reads as a full
+                  account or card number is refused rather than stored.
+    responses:
+      '201':
+        description: The account, as stored.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/FinancialAccountView'
+      '400':
+        description: >-
+          The body is malformed or violates a domain rule (codes
+          INVALID_REQUEST, ACCOUNT_RULE_VIOLATED, UNSUPPORTED_CURRENCY).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '409':
+        description: >-
+          The named issuer is not selectable for a new account (code
+          INSTITUTION_NOT_SELECTABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '422':
+        $ref: '#/components/RetentionUnresolvedResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/accounts/{accountId}:
+  get:
+    operationId: readOwnFinancialAccount
+    summary: Read one of the caller's own accounts
+    description: >-
+      Another subject's account answers 404, exactly as an unknown id does.
+      The route is not an existence oracle for anybody else's records.
+    tags: [financial-accounts]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/AccountIdParameter'
+    responses:
+      '200':
+        description: The account.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/FinancialAccountView'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such account for this principal (code ACCOUNT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+  patch:
+    operationId: updateOwnFinancialAccount
+    summary: Update the caller's own account under an optimistic version
+    description: >-
+      `expectedVersion` is required: a blind write would silently discard a
+      concurrent edit. A field ABSENT from the body is left alone; a field
+      present as `null` is CLEARED. The two are different requests and the
+      server does not conflate them.
+
+      `origin` is immutable and has no field here. `currency` may not change
+      once the account carries records — the refusal is a rule violation, not
+      a conversion.
+    tags: [financial-accounts]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/AccountIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion: { type: integer, minimum: 1 }
+              displayName: { type: string, minLength: 1, maxLength: 120 }
+              accountType:
+                $ref: '#/components/AccountType'
+              walletKind:
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/WalletKind'
+              nature:
+                $ref: '#/components/AccountNature'
+              status:
+                $ref: '#/components/AccountStatus'
+              mask: { type: [string, 'null'], maxLength: 8 }
+              currency: { type: string, pattern: '^[A-Z]{3}$' }
+              institutionId: { type: [string, 'null'], format: uuid }
+              userSuppliedInstitutionLabel: { type: [string, 'null'], maxLength: 120 }
+    responses:
+      '200':
+        description: The updated account.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/FinancialAccountView'
+      '400':
+        description: >-
+          Malformed body or a violated domain rule (codes INVALID_REQUEST,
+          ACCOUNT_RULE_VIOLATED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such account for this principal (code ACCOUNT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: >-
+          The account changed under the caller, or the named issuer is not
+          selectable (codes ACCOUNT_VERSION_CONFLICT,
+          INSTITUTION_NOT_SELECTABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/accounts/{accountId}/balances:
+  get:
+    operationId: listOwnAccountBalanceSnapshots
+    summary: List the balances a SOURCE reported for the caller's account
+    description: >-
+      Source-REPORTED balances, most recently true first. Nothing here is
+      derived: no figure on this route is computed from transactions, and no
+      `balanceKind` is substituted for another. A caller asking what is
+      available receives what a source said was available, or nothing —
+      never a settled figure wearing another label (ADR-0028).
+
+      `balanceKind` is stated on every row and is never defaulted. `sourceKind`
+      says where the figure came from; MANUAL and CSV are the only values a
+      figure can currently carry, because they are the only rails that run.
+    tags: [financial-accounts]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/AccountIdParameter'
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+      - name: balanceKind
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/BalanceKind'
+      - name: sourceKind
+        in: query
+        required: false
+        description: The rail the figure arrived on.
+        schema:
+          $ref: '#/components/SourceKind'
+    responses:
+      '200':
+        description: The reported balances, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/BalanceSnapshotView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such account for this principal (code ACCOUNT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  AccountIdParameter:
+    name: accountId
+    in: path
+    required: true
+    description: One of the CALLER'S OWN accounts. Any other id answers 404.
+    schema: { type: string, format: uuid }
+  LimitParameter:
+    name: limit
+    in: query
+    required: false
+    description: >-
+      Page size. Bounded by the central ingestion limit policy
+      (packages/platform/src/ingestion/limits.ts); a larger request is clamped
+      to the declared maximum rather than refused, and the page reports the
+      size it actually used.
+    schema: { type: integer, minimum: 1, maximum: 200 }
+  CursorParameter:
+    name: cursor
+    in: query
+    required: false
+    description: >-
+      The `page.nextCursor` of the previous response. Opaque: it encodes a
+      position in the caller's OWN result set and carries no identity — a
+      cursor from another session names nothing here.
+    schema: { type: string, minLength: 1 }
+  PageInfo:
+    type: object
+    additionalProperties: false
+    required: [limit, returned, hasMore, nextCursor]
+    description: >-
+      What this page IS, stated rather than inferred. `hasMore` is explicit so
+      an empty page is a stated end rather than something a client guesses at,
+      and `nextCursor` is null exactly when there is no next page.
+    properties:
+      limit: { type: integer, minimum: 1 }
+      returned: { type: integer, minimum: 0 }
+      hasMore: { type: boolean }
+      nextCursor: { type: [string, 'null'] }
+  MinorUnitAmount:
+    type: object
+    additionalProperties: false
+    required: [minorUnits, currency, exponent]
+    description: >-
+      An exact amount. `minorUnits` is the signed integer the ledger holds,
+      serialized as CHARACTERS — never a JSON number, because a number is a
+      float and a float is not a ledger value (ADR-0006). `exponent` is the
+      currency's ISO 4217 minor-unit exponent, supplied so a client can render
+      without a currency table of its own; it is not a licence to divide.
+    properties:
+      minorUnits:
+        type: string
+        pattern: '^-?[0-9]{1,30}$'
+      currency:
+        type: string
+        pattern: '^[A-Z]{3}$'
+      exponent:
+        type: integer
+        minimum: 0
+  CurrencyView:
+    type: object
+    additionalProperties: false
+    required: [code, exponent]
+    properties:
+      code: { type: string, pattern: '^[A-Z]{3}$' }
+      exponent: { type: integer, minimum: 0 }
+  AccountType:
+    type: string
+    enum: [CURRENT, SAVINGS, CREDIT_CARD, CASH, WALLET, OTHER]
+  AccountStatus:
+    type: string
+    enum: [ACTIVE, ARCHIVED, CLOSED]
+  AccountOrigin:
+    type: string
+    enum: [MANUAL, CSV, EXTERNAL_PROVIDER]
+  AccountNature:
+    type: string
+    enum: [ASSET, LIABILITY, UNKNOWN]
+  WalletKind:
+    type: string
+    enum: [MOBILE_MONEY, E_MONEY, PREPAID, PAYROLL, SUPER_APP, OTHER]
+  InstitutionKind:
+    type: string
+    enum:
+      [
+        BANK,
+        E_MONEY_ISSUER,
+        MOBILE_MONEY_OPERATOR,
+        TELCO_FINANCIAL_SERVICES,
+        PAYMENT_INSTITUTION,
+        FINTECH_WALLET,
+        CARD_ISSUER,
+        EXCHANGE_HOUSE,
+        OTHER,
+      ]
+  BalanceKind:
+    type: string
+    enum: [BOOKED, AVAILABLE, CURRENT, OUTSTANDING, CREDIT_LIMIT, OTHER_SOURCE_REPORTED]
+  SourceKind:
+    type: string
+    description: >-
+      The rail a stored figure arrived on. EXTERNAL_PROVIDER is in the
+      vocabulary because the column can hold it; no path in this platform can
+      produce it, and `availability` on every rail-bearing response says so.
+    enum: [MANUAL, CSV, EXTERNAL_PROVIDER]
+  RailAvailability:
+    type: string
+    description: >-
+      Whether the platform can actually run this rail today. Exactly two rails
+      are EXECUTABLE — MANUAL and USER_FILE_UPLOAD — and the database refuses
+      to write any other (ADR-0028). Everything else is NOT_IMPLEMENTED, and
+      no response may present it as usable.
+    enum: [EXECUTABLE, NOT_IMPLEMENTED]
+  AccountLinkState:
+    type: object
+    additionalProperties: false
+    required: [state, impliesLiveInstitutionLink, providerAccessStatus]
+    description: >-
+      What this platform's relationship with the issuer actually IS. The
+      vocabulary contains one value, and it is the honest one: no issuer named
+      in the catalogue exposes an interface to Karar, no credential of any
+      kind is stored, and nothing may render "Connected", "Synced" or
+      "Linked" for data a person typed or uploaded. The two booleans-by-enum
+      are stated on the wire so a client cannot infer otherwise from a status
+      it recognises.
+    properties:
+      state:
+        type: string
+        enum: [NOT_LINKED]
+      impliesLiveInstitutionLink:
+        type: boolean
+        enum: [false]
+      providerAccessStatus:
+        type: string
+        enum: [NOT_IMPLEMENTED]
+  InstitutionView:
+    type: object
+    additionalProperties: false
+    required: [institutionId, code, kind, displayNameEn, displayNameAr, status]
+    description: >-
+      A reviewed catalogue row. It carries no tenant, no user, no country and
+      no market: market presence is a separate per-country concern
+      (`institution_markets`) and is not fabricated here.
+    properties:
+      institutionId: { type: string, format: uuid }
+      code: { type: string, pattern: '^[A-Z][A-Z0-9_]{2,47}$' }
+      kind:
+        $ref: '#/components/InstitutionKind'
+      displayNameEn: { type: string }
+      displayNameAr: { type: string }
+      status: { type: string, enum: [ACTIVE, RETIRED] }
+  FinancialAccountView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        accountId,
+        accountType,
+        walletKind,
+        nature,
+        currency,
+        displayName,
+        mask,
+        institution,
+        userSuppliedInstitutionLabel,
+        status,
+        origin,
+        link,
+        createdAt,
+        updatedAt,
+        version,
+      ]
+    description: >-
+      The caller's own account. Every optional value is present-and-null
+      rather than omitted, so absence is something the contract states rather
+      than something a client infers from a missing key.
+
+      Deliberately absent, and to stay absent: `tenantId` and `userId` (the
+      caller IS the subject); any ciphertext, nonce, auth tag, encryption
+      algorithm or key version; any external account identifier or
+      fingerprint; and any balance — a balance is a reported fact with its own
+      route, and a figure on the account row would be a second number free to
+      disagree with it.
+    properties:
+      accountId: { type: string, format: uuid }
+      accountType:
+        $ref: '#/components/AccountType'
+      walletKind:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/WalletKind'
+      nature:
+        $ref: '#/components/AccountNature'
+      currency:
+        $ref: '#/components/CurrencyView'
+      displayName:
+        type: string
+        description: The subject's own name for the account, decrypted for its owner.
+      mask: { type: [string, 'null'] }
+      institution:
+        description: >-
+          The reviewed catalogue entry this account points at, resolved for
+          display, or null when the subject named no catalogue issuer. A
+          RETIRED entry still resolves here — an existing record has to remain
+          readable.
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/InstitutionView'
+      userSuppliedInstitutionLabel: { type: [string, 'null'] }
+      status:
+        $ref: '#/components/AccountStatus'
+      origin:
+        $ref: '#/components/AccountOrigin'
+      link:
+        $ref: '#/components/AccountLinkState'
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }
+  BalanceSnapshotView:
+    type: object
+    additionalProperties: false
+    required:
+      [snapshotId, accountId, amount, balanceKind, sourceKind, availability, asOf, capturedAt]
+    description: >-
+      One figure a source reported, with the kind it reported and the moment
+      it was true. `asOf` and `capturedAt` are INSTANTS, not calendar days:
+      they are moments, and typing them as days would invent a timezone.
+
+      Deliberately absent: the source's own reference (an opaque internal
+      identifier that is not the subject's to read on this route), the row's
+      tenant and user, and anything derived — nothing here sums, nets or
+      converts.
+    properties:
+      snapshotId: { type: string, format: uuid }
+      accountId: { type: string, format: uuid }
+      amount:
+        $ref: '#/components/MinorUnitAmount'
+      balanceKind:
+        $ref: '#/components/BalanceKind'
+      sourceKind:
+        $ref: '#/components/SourceKind'
+      availability:
+        $ref: '#/components/RailAvailability'
+      asOf:
+        type: string
+        format: date-time
+        description: The moment the source says this figure was true.
+      capturedAt:
+        type: string
+        format: date-time
+        description: The moment this platform recorded it.
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    description: >-
+      RFC 7807. `code` is the machine-readable reason; a client renders an
+      honest state from it rather than from prose. Store, provider and driver
+      text never crosses this boundary, and neither does a stack or a cause.
+    properties:
+      type: { type: string }
+      title: { type: string }
+      status: { type: integer }
+      code:
+        type: string
+        description: >-
+          e.g. AUTHENTICATION_REQUIRED, TENANT_BINDING_REQUIRED,
+          INVALID_REQUEST, ACCOUNT_NOT_FOUND, ACCOUNT_VERSION_CONFLICT,
+          INSTITUTION_NOT_SELECTABLE, ACCOUNT_RULE_VIOLATED,
+          RETENTION_UNRESOLVED, STORE_UNAVAILABLE.
+      detail: { type: string }
+      reason: { type: string }
+      retryable:
+        type: boolean
+        description: Present only where retrying could change the answer.
+      requestId: { type: string }
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'
+  RetentionUnresolvedResponse:
+    description: >-
+      No approved retention decision governs this dataset, so nothing durable
+      may be written (code RETENTION_UNRESOLVED). This is a legal decision
+      nobody in this system may take on the subject's behalf: the platform
+      refuses the write rather than substituting a period. The document names
+      the dataset and nothing else — the pack version, the basis and the
+      approval reference are internal review artefacts and stay server-side.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

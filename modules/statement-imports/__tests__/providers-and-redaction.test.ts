@@ -43,6 +43,11 @@ import {
   resolveRetentionDecisionPort,
 } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
 import { ACTOR_A1, ACTOR_A2, ACTOR_B1, bytesOf, streamOf } from './fixtures.js';
+// The marker is IMPORTED, never typed. `tsc` emits these tests into the same
+// dist/ a deployment ships, so a fixture value written here travels exactly as
+// far as one written in source — which the retention closure test proves by
+// scanning every dist/ in the production closure.
+import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
 
 const NON_LOCAL = ['dev', 'staging', 'production', 'prod', 'test', ''] as const;
 
@@ -97,9 +102,9 @@ describe('the retention fixture labels itself as having no legal effect', () => 
     // A field rather than a naming convention, so the fact survives a log
     // line, a serialized payload, and a reader who never opened the adapter.
     expect(decision.effect).toBe('SYNTHETIC_NO_LEGAL_EFFECT');
-    expect(decision.basis).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
-    expect(decision.approvalReference).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
-    expect(decision.packVersion).toContain('SYNTHETIC-NO-LEGAL-EFFECT');
+    expect(decision.basis).toContain(SYNTHETIC_RETENTION_MARKER);
+    expect(decision.approvalReference).toContain(SYNTHETIC_RETENTION_MARKER);
+    expect(decision.packVersion).toContain(SYNTHETIC_RETENTION_MARKER);
     // Zero, deliberately: a plausible-looking period is the one value here
     // somebody could paste into a deployment and believe.
     expect(decision.retentionPeriod).toBe('P0D');

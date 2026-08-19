@@ -31,6 +31,11 @@ import {
   superuserMaintenanceProfile,
   withAdapter,
 } from './fixtures.js';
+// The marker is IMPORTED, never typed. `tsc` emits these tests into the same
+// dist/ a deployment ships, so a fixture value written here travels exactly as
+// far as one written in source — which the retention closure test proves by
+// scanning every dist/ in the production closure.
+import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
 
 const unreachable = await probePostgres();
 if (unreachable !== null) {
@@ -95,7 +100,7 @@ async function insertImport(
           retention_pack_version, parser_version, mapping_version, normalization_version,
           staged_row_fingerprint_version, refusal_code, committed_at, erased_at, updated_at)
        VALUES ($1, $2, $3, $4, 'FINANCIAL_ACCOUNT', $5, now(), 'text/csv',
-               ${decided ? `'DECIDED', now(), 'P0D', 'SYNTHETIC-NO-LEGAL-EFFECT', 'synthetic'` : `'UNDECIDED', NULL, NULL, NULL, NULL`},
+               ${decided ? `'DECIDED', now(), 'P0D', '${SYNTHETIC_RETENTION_MARKER}', 'synthetic'` : `'UNDECIDED', NULL, NULL, NULL, NULL`},
                ${versionsNeeded ? `'p/1', 'm/1', 'n/1', 'f/1'` : 'NULL, NULL, NULL, NULL'},
                $6, ${timestamps}, now())`,
       [id, TENANT, USER, ACCOUNT, state, refusalCode],

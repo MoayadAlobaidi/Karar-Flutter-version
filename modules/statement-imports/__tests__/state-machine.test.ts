@@ -27,6 +27,11 @@ import {
   type StatementImport,
 } from '../domain/statement-import.js';
 import { CanonicalAccountRef, StatementImportId } from '../domain/refs.js';
+// The marker is IMPORTED, never typed. `tsc` emits these tests into the same
+// dist/ a deployment ships, so a fixture value written here travels exactly as
+// far as one written in source — which the retention closure test proves by
+// scanning every dist/ in the production closure.
+import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
 
 const AT = new Date('2026-08-12T09:00:00.000Z');
 
@@ -34,8 +39,8 @@ const DECIDED = {
   state: 'DECIDED' as const,
   decidedAt: AT,
   retentionPeriod: 'P0D',
-  basis: 'SYNTHETIC-NO-LEGAL-EFFECT: test fixture',
-  packVersion: 'synthetic-local/SYNTHETIC-NO-LEGAL-EFFECT',
+  basis: `${SYNTHETIC_RETENTION_MARKER}: test fixture`,
+  packVersion: `synthetic-local/${SYNTHETIC_RETENTION_MARKER}`,
 };
 
 function draft(): StatementImport {

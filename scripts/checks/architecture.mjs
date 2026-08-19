@@ -2529,7 +2529,214 @@ export function checkAdminNoDbDriver(ctx) {
 // BOTH sides. Test 24 refuses a phase-5 tree whose ingestion paths declare no
 // limits; this refuses a pre-phase-5 tree that mounts an ingestion path at all.
 // The next commit that mounts one must move the marker in the same change.
-const PHASE5_INGESTION_MODULES = ['financial-accounts', 'transactions'];
+// ---------------------------------------------------------------------------
+// Test 24 — Resource limits declared
+// ---------------------------------------------------------------------------
+// Every REAL ingestion path declares every bound, in the CENTRAL policy, and
+// every central policy belongs to a real path.
+//
+// The failure this exists to prevent is not an unbounded upload — it is an
+// unbounded upload that nobody notices, because the path was added months
+// after the limits were written and simply never joined the inventory. So the
+// check works from the paths that actually exist in the tree rather than from
+// a list somebody maintains, and it fails in BOTH directions: a mounted path
+// with no policy, and a policy naming a path that no longer exists.
+//
+// It also fails when the tree contains no real path at all while the registry
+// claims phase 5. A resource-limit test that scans nothing passes vacuously,
+// which is the exact shape of failure this repository has been bitten by
+// before — and the phase marker is supposed to move only WITH a real mounted
+// ingestion path, so zero paths means the marker moved without one.
+const INGESTION_LIMIT_FIELDS = [
+  'maxBytes',
+  'maxRows',
+  'maxColumns',
+  'maxFieldBytes',
+  'maxPageSize',
+  'defaultPageSize',
+  'maxBufferedRows',
+  'maxBufferedBytes',
+  'deadlineMs',
+  'maxReportedErrors',
+  'maxBatchSize',
+];
+const CENTRAL_LIMITS_REL = path.join('packages', 'platform', 'src', 'ingestion', 'limits.ts');
+const CENTRAL_POLICY_REFERENCE =
+  /\bINGESTION_LIMIT_POLICIES\s*(?:\.\s*([A-Za-z_$][\w$]*)|\[\s*'([^']+)'\s*\])/g;
+// A bound written INTO a path instead of taken from the policy. Matching the
+// assignment shape rather than the bare number keeps ordinary arithmetic and
+// array indexes out of it.
+const INLINE_LIMIT =
+  /\b(max(?:Bytes|Rows|Columns|FieldBytes|PageSize|BufferedRows|BufferedBytes|ReportedErrors|BatchSize)|deadlineMs)\b\s*[:=]\s*(?!.*INGESTION_LIMIT_POLICIES)[0-9_]/;
+
+/** The declared policies, by object key, with the fields each actually carries. */
+function readCentralPolicies(root) {
+  const file = path.join(root, CENTRAL_LIMITS_REL);
+  if (!fs.existsSync(file)) return null;
+  const src = loadStripped(file);
+  const start = src.indexOf('INGESTION_LIMIT_POLICIES');
+  if (start === -1) return new Map();
+  const policies = new Map();
+  // Each entry is `key: { ... }` inside the registry object.
+  const entry = /([A-Za-z_$][\w$]*)\s*:\s*\{([\s\S]*?)\n\s{2}\}/g;
+  entry.lastIndex = start;
+  for (const match of src.slice(start).matchAll(entry)) {
+    const [, key, body] = match;
+    const fields = new Map();
+    for (const field of INGESTION_LIMIT_FIELDS) {
+      const found = new RegExp(`\\b${field}\\s*:\\s*([^,\n]+)`).exec(body);
+      if (found) fields.set(field, found[1].trim());
+    }
+    const pathId = /\bpathId\s*:\s*'([^']+)'/.exec(body);
+    policies.set(key, { pathId: pathId ? pathId[1] : null, fields, body });
+  }
+  return policies;
+}
+
+/** A numeric limit that is a real bound: finite, positive, integral. */
+function limitIsSound(raw) {
+  if (raw === undefined) return false;
+  const cleaned = raw.replace(/_/g, '').trim();
+  if (/Infinity|Number\.MAX|NaN|null|undefined/.test(cleaned)) return false;
+  // Allow simple products such as `10 * 1024 * 1024`.
+  if (!/^[0-9\s*+]+$/.test(cleaned)) return false;
+  let value;
+  try {
+    value = Function(`"use strict";return (${cleaned});`)();
+  } catch {
+    return false;
+  }
+  return Number.isFinite(value) && Number.isInteger(value) && value > 0;
+}
+
+export function checkResourceLimits(ctx) {
+  const { root } = ctx;
+  const violations = [];
+
+  const policies = readCentralPolicies(root);
+  if (policies === null) {
+    return violationsResult(
+      [{ file: CENTRAL_LIMITS_REL, detail: 'the central ingestion limit policy file is missing' }],
+      0,
+    );
+  }
+
+  // Real paths: a mounted write route, or a composition that wires an
+  // ingestion use case. Same definition the pre-phase-5 guard uses, so the two
+  // controls cannot disagree about what counts.
+  const candidates = [];
+  for (const moduleName of PHASE5_INGESTION_MODULES) {
+    const dir = path.join(root, 'modules', moduleName, 'presentation');
+    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
+  }
+  for (const dir of [
+    path.join(root, 'apps', 'api', 'src', 'composition'),
+    path.join(root, 'apps', 'api', 'src', 'financial'),
+  ]) {
+    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
+  }
+
+  const realPaths = [];
+  // The inline-bound scan covers the WHOLE ingestion surface, not only the
+  // files that mount a route. A controller that dutifully references the
+  // central policy can still call a helper that hardcodes a byte bound, and
+  // that helper is where the bound actually bites — scanning only the mounting
+  // file would miss it, which a mutation of exactly that shape proved.
+  const surface = [];
+  for (const file of candidates) {
+    if (file.endsWith('.test.ts') || file.endsWith('.d.ts')) continue;
+    const source = loadStripped(file);
+    surface.push({ file, rel: rel(root, file), source });
+    const mountsRoute = /@Controller\s*\(/.test(source) && INGESTION_WRITE_ROUTE.test(source);
+    if (mountsRoute || INGESTION_USE_CASE.test(source)) {
+      realPaths.push({ file, rel: rel(root, file), source });
+    }
+  }
+
+  // Non-vacuity. Deferred phases are handled by the registry, so reaching here
+  // at all means the suite claims to be enforcing this.
+  if (realPaths.length === 0) {
+    violations.push({
+      file: CENTRAL_LIMITS_REL,
+      detail:
+        'no real ingestion path exists in the tree, so this check would pass without examining ' +
+        'anything. The phase marker moves only WITH a first real mounted ingestion path; zero ' +
+        'paths means it moved without one',
+    });
+  }
+
+  const referenced = new Set();
+  for (const { rel: relative, source } of realPaths) {
+    const names = [...source.matchAll(CENTRAL_POLICY_REFERENCE)].map((m) => m[1] ?? m[2]);
+    for (const name of names) referenced.add(name);
+    if (names.length === 0) {
+      violations.push({
+        file: relative,
+        detail:
+          'mounts a real ingestion path but references no policy from INGESTION_LIMIT_POLICIES — ' +
+          'its byte, row, column, field, page, buffer, deadline, error and batch bounds are ' +
+          'therefore unenforced',
+      });
+    }
+  }
+
+  for (const { rel: relative, source } of surface) {
+    if (INLINE_LIMIT.test(source)) {
+      violations.push({
+        file: relative,
+        detail:
+          'writes a numeric ingestion bound inline instead of taking it from the central policy. ' +
+          'A limit that lives beside the path it guards drifts from every other path and from ' +
+          'this check',
+      });
+    }
+  }
+
+  const seenPathIds = new Map();
+  for (const [key, policy] of policies) {
+    const where = `${CENTRAL_LIMITS_REL} (${key})`;
+    for (const field of INGESTION_LIMIT_FIELDS) {
+      const raw = policy.fields.get(field);
+      if (raw === undefined) {
+        violations.push({ file: where, detail: `declares no ${field}` });
+      } else if (!limitIsSound(raw)) {
+        violations.push({
+          file: where,
+          detail: `${field} is '${raw}', which is not a finite positive integer bound`,
+        });
+      }
+    }
+    if (policy.pathId === null) {
+      violations.push({ file: where, detail: 'declares no pathId' });
+    } else if (seenPathIds.has(policy.pathId)) {
+      violations.push({
+        file: where,
+        detail: `duplicate pathId '${policy.pathId}', already declared by '${seenPathIds.get(policy.pathId)}'`,
+      });
+    } else {
+      seenPathIds.set(policy.pathId, key);
+    }
+    if (realPaths.length > 0 && !referenced.has(key)) {
+      violations.push({
+        file: where,
+        detail:
+          `declares limits for a path nothing references. Either the path was removed and this ` +
+          `policy is dead, or it was renamed and some real path is now running unbounded`,
+      });
+    }
+  }
+
+  return violationsResult(violations, surface.length + policies.size);
+}
+
+const PHASE5_INGESTION_MODULES = [
+  'financial-accounts',
+  'transactions',
+  'statement-imports',
+  'financial-connections',
+  'payment-instruments',
+  'transfer-matching',
+];
 const INGESTION_WRITE_ROUTE = /@(Post|Put|Patch)\s*\(/;
 const INGESTION_USE_CASE =
   /\b(CreateManual\w*|StartStatementImport|CommitStatementImport|UploadStatementSource|ParseStatement\w*)\b/;
@@ -2611,6 +2818,7 @@ const CHECKS = {
   checkGuardCallSites,
   checkLifecycleDeclarations,
   checkAssuranceClaims,
+  checkResourceLimits,
 };
 
 // ---------------------------------------------------------------------------
@@ -2698,6 +2906,86 @@ function buildSelfTestFixture() {
     fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, content);
   };
+
+  // Test 24 fixture: every failure shape at once, so a single seeded tree
+  // proves each arm rather than only the first one the checker happens to hit.
+  //
+  //   * a mounted path that references NO central policy
+  //   * a mounted path that writes its bound INLINE, bypassing the policy
+  //   * a policy missing a required field (no maxBatchSize)
+  //   * a policy whose deadline is zero, and one whose rows are Infinity
+  //   * two policies sharing one pathId
+  //   * a policy no real path references
+  write(
+    'modules/statement-imports/presentation/http/unbounded-import.controller.ts',
+    [
+      `@Controller('imports')`,
+      `export class UnboundedImportController {`,
+      `  @Post('source')`,
+      `  upload() { return null; }`,
+      `}`,
+    ].join('\n'),
+  );
+  write(
+    'modules/transactions/presentation/http/inline-limit.controller.ts',
+    [
+      `import { INGESTION_LIMIT_POLICIES } from '@karar/platform';`,
+      `@Controller('manual')`,
+      `export class InlineLimitController {`,
+      `  private readonly maxBytes = 5242880;`,
+      `  @Post('entry')`,
+      `  create() { return INGESTION_LIMIT_POLICIES.manualTransaction; }`,
+      `}`,
+    ].join('\n'),
+  );
+  write(
+    'packages/platform/src/ingestion/limits.ts',
+    [
+      `export const INGESTION_LIMIT_POLICIES = {`,
+      `  manualTransaction: {`,
+      `    pathId: 'fixture/manual',`,
+      `    maxBytes: 1024,`,
+      `    maxRows: 1,`,
+      `    maxColumns: 8,`,
+      `    maxFieldBytes: 256,`,
+      `    maxPageSize: 50,`,
+      `    defaultPageSize: 25,`,
+      `    maxBufferedRows: 1,`,
+      `    maxBufferedBytes: 1024,`,
+      `    deadlineMs: 1000,`,
+      `    maxReportedErrors: 10,`,
+      `  },`,
+      `  zeroDeadline: {`,
+      `    pathId: 'fixture/zero',`,
+      `    maxBytes: 1024,`,
+      `    maxRows: 10,`,
+      `    maxColumns: 8,`,
+      `    maxFieldBytes: 256,`,
+      `    maxPageSize: 50,`,
+      `    defaultPageSize: 25,`,
+      `    maxBufferedRows: 1,`,
+      `    maxBufferedBytes: 1024,`,
+      `    deadlineMs: 0,`,
+      `    maxReportedErrors: 10,`,
+      `    maxBatchSize: 5,`,
+      `  },`,
+      `  infiniteRows: {`,
+      `    pathId: 'fixture/zero',`,
+      `    maxBytes: 1024,`,
+      `    maxRows: Infinity,`,
+      `    maxColumns: 8,`,
+      `    maxFieldBytes: 256,`,
+      `    maxPageSize: 50,`,
+      `    defaultPageSize: 25,`,
+      `    maxBufferedRows: 1,`,
+      `    maxBufferedBytes: 1024,`,
+      `    deadlineMs: 1000,`,
+      `    maxReportedErrors: 10,`,
+      `    maxBatchSize: 5,`,
+      `  },`,
+      `};`,
+    ].join('\n'),
+  );
 
   // Pre-activation guard fixture: registry still at phase 4 while a Phase 5
   // ingestion controller is mounted — exactly the state that would let an
@@ -3167,6 +3455,17 @@ const SELF_TEST_CASES = [
   { fn: 'checkStorageBoundary', expect: /client-s3/ },
   // Test 20 in both directions: an export that does not belong…
   { fn: 'checkKernelSurface', expect: /ExtraTenthExport/ },
+  // Test 24, every failure shape, each proven separately against one tree.
+  { fn: 'checkResourceLimits', expect: /unbounded-import\.controller.*references no policy/s },
+  {
+    fn: 'checkResourceLimits',
+    expect: /inline-limit\.controller.*numeric ingestion bound inline/s,
+  },
+  { fn: 'checkResourceLimits', expect: /manualTransaction.*declares no maxBatchSize/s },
+  { fn: 'checkResourceLimits', expect: /zeroDeadline.*deadlineMs is '0'/s },
+  { fn: 'checkResourceLimits', expect: /infiniteRows.*maxRows is 'Infinity'/s },
+  { fn: 'checkResourceLimits', expect: /duplicate pathId 'fixture\/zero'/ },
+  { fn: 'checkResourceLimits', expect: /declares limits for a path nothing references/ },
   // …and a universal that is absent.
   { fn: 'checkKernelSurface', expect: /universal 'CalendarDay' is missing/ },
   // Test 19: a pack clearing a disclosure-bearing capability with no entry…

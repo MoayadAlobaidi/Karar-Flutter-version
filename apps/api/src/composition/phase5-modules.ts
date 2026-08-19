@@ -1,0 +1,357 @@
+/**
+ * Phase 5 composition — the financial modules meet their infrastructure, once,
+ * here.
+ *
+ * WHAT THIS FILE IS RESPONSIBLE FOR, and what it must never do:
+ *
+ * EVERY PORT IS BOUND TO A REAL IMPLEMENTATION OR THE BOOT FAILS. Nothing is
+ * stubbed to succeed. Five modules resolve their encryption, retention and
+ * source-store ports through their OWN fail-closed resolvers, and every one
+ * of those resolvers THROWS outside `KARAR_ENV=local` unless a deployment has
+ * wired an approved provider. That is the whole point: a deployed environment
+ * with no key-management adapter and no approved retention decision must
+ * refuse to compose this surface at boot, rather than discover it at the
+ * first write. A synthetic retention period carries no legal effect, and a
+ * process that substituted one would be fabricating the answer to a question
+ * only counsel may answer.
+ *
+ * TWO OF THE TRANSACTIONS MODULE'S LOCAL PROVIDERS CARRY NO ENVIRONMENT GUARD
+ * OF THEIR OWN — its AES field-encryption provider and its keyed dedup
+ * fingerprint provider both construct anywhere. They are therefore built
+ * BELOW the guarded constructions, and only after them: the accounts,
+ * connections, instruments and statement-import resolvers, and the
+ * transactions retention fixture, all refuse outside `local`, so control
+ * never reaches those two lines in any other environment. The ordering is
+ * load-bearing and is stated here so a future edit does not quietly reorder
+ * it into a hole.
+ *
+ * THE INGESTION BOUNDS COME FROM THE CENTRAL REGISTRY. The CSV path is handed
+ * `INGESTION_LIMIT_POLICIES.csvStatementImport` and the manual paths
+ * `INGESTION_LIMIT_POLICIES.manualTransaction`; both are validated at startup
+ * rather than at the first upload. No bound is written in this file.
+ *
+ * ACCOUNT DELETION IS NOT COMPOSED. `DeleteOwnAccount` needs three
+ * cross-module erasers as REQUIRED constructor arguments, and it is not
+ * wired at all — not with no-ops, and not with a partial set. There is no
+ * HTTP route for it (see apps/api/src/financial/use-cases.ts), and a no-op
+ * eraser would report a successful deletion while the rows survive: cards
+ * still spending from an account the subject was told is gone. The two
+ * erasers that ARE constructed — `TransactionsTransferMatchEraser` and the
+ * `EraseTransferMatches` use case behind it — are the real adapters, used by
+ * the transaction delete path that IS mounted.
+ *
+ * TRANSFER-MATCHING'S RETENTION RESOLVER IS NOT CONSULTED, and that is
+ * correct rather than an omission: the only transfer-match writes this
+ * surface mounts are confirm and reject, which change the state of a row that
+ * already exists. Creating a match is `SuggestTransferMatch`, which is not
+ * mounted; the moment it is, its retention port becomes a required argument
+ * and this file will refuse to compose without one.
+ */
+
+import type { DynamicModule } from '@nestjs/common';
+import { readDefaultEventCatalogue } from '@karar/api-contracts';
+import type { Clock } from '@karar/shared-kernel';
+import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
+import {
+  INGESTION_LIMIT_POLICIES,
+  assertIngestionLimitPoliciesValid,
+} from '@karar/platform/dist/ingestion/limits.js';
+
+import {
+  CreateManualAccount,
+  ListOwnAccounts,
+  ListOwnBalanceSnapshots,
+  PrismaBalanceSnapshotRepository,
+  PrismaFinancialAccountRepository,
+  PrismaInstitutionCatalogueReader,
+  ReadOwnAccount,
+  UpdateOwnAccount,
+  Uuidv7IdSource as AccountsIdSource,
+  resolveHsfFieldEncryptionPort as resolveAccountsEncryption,
+  resolveRetentionDecisionPort as resolveAccountsRetention,
+} from '@karar/financial-accounts';
+import {
+  ListOwnAccountSourceLinks,
+  ListOwnConnections,
+  PrismaAccountSourceLinkRepository,
+  PrismaFinancialConnectionRepository,
+  resolveHsfFieldEncryptionPort as resolveConnectionsEncryption,
+} from '@karar/financial-connections';
+import {
+  ListOwnPaymentInstruments,
+  PrismaPaymentInstrumentRepository,
+  resolveHsfFieldEncryptionPort as resolveInstrumentsEncryption,
+} from '@karar/payment-instruments';
+import {
+  AssignCategory,
+  CreateManualTransaction,
+  DeleteOwnTransaction,
+  ListOwnTransactions,
+  LocalAesGcmFieldEncryptionProvider as TransactionsEncryptionProvider,
+  LocalKeyedDedupFingerprintProvider,
+  LocalSyntheticRetentionDecisionProvider as TransactionsRetentionFixture,
+  PrismaCategoryAssignmentRepository,
+  PrismaFinancialCategoryCatalogue,
+  PrismaFinancialRecordPresenceReader,
+  PrismaMerchantRuleDirectory,
+  PrismaStatementCommitWriter,
+  PrismaTransactionRepository,
+  ReadOwnTransaction,
+  UpdateOwnTransaction,
+  Uuidv7IdSource as TransactionsIdSource,
+} from '@karar/transactions';
+import {
+  ConfirmTransferMatch,
+  EraseTransferMatches,
+  ListOwnTransferMatches,
+  PrismaTransferMatchRepository,
+  RejectTransferMatch,
+  TransactionsTransferMatchEraser,
+} from '@karar/transfer-matching';
+import {
+  CommitStatementImport,
+  EraseStatementImport,
+  FinancialAccountsCanonicalAccountAdapter,
+  LocalKeyedFileFingerprintProvider,
+  ParseStatementSource,
+  PlatformOutboxStatementImportRecorder,
+  PreviewStatementImport,
+  PrismaCanonicalDedupLookupReader,
+  PrismaStatementCommitUnitOfWork,
+  PrismaStatementImportRepository,
+  StartStatementImport,
+  StoreImportSource,
+  StreamingCsvParser,
+  TransactionsCanonicalNarrativeAdapter,
+  TransactionsDeterministicCategoryAdapter,
+  Uuidv7IdSource as ImportsIdSource,
+  resolveEncryptedSourceStorePort,
+  resolveHsfFieldEncryptionPort as resolveImportsEncryption,
+  resolveRetentionDecisionPort as resolveImportsRetention,
+} from '@karar/statement-imports';
+
+import { FinancialApiModule } from '../financial/financial.module.js';
+import { RequestScopedTransactionsPrincipalContext } from '../financial/transactions-principal-context.js';
+import { FinancialAccountsAccessAdapter } from './financial-account-access.js';
+
+export interface Phase5CompositionInput {
+  /** The resolved deployment environment; every fail-closed resolver reads it. */
+  readonly environment: string;
+  readonly prisma: PrismaHandle;
+  readonly clock: Clock;
+  /** Names this process in the outbox envelope. Identifiers only travel there. */
+  readonly producer: string;
+}
+
+export function composePhase5Modules(input: Phase5CompositionInput): DynamicModule[] {
+  const { environment, prisma, clock } = input;
+
+  // A malformed bound stops the process here rather than at the first upload.
+  assertIngestionLimitPoliciesValid();
+
+  // --- fail-closed ports, FIRST -------------------------------------------
+  // Each of these throws outside `local` unless an approved provider is
+  // wired. Nothing below them can be reached in a deployed environment
+  // without one, which is what makes the two unguarded transactions
+  // providers further down safe to construct.
+  const accountsEncryption = resolveAccountsEncryption({ env: environment });
+  const accountsRetention = resolveAccountsRetention({ env: environment });
+  const connectionsEncryption = resolveConnectionsEncryption({ env: environment });
+  const instrumentsEncryption = resolveInstrumentsEncryption({ env: environment });
+  const importsEncryption = resolveImportsEncryption({ env: environment });
+  const importsRetention = resolveImportsRetention({ env: environment });
+  const importsSourceStore = resolveEncryptedSourceStorePort({ env: environment });
+  // The transactions module declares no resolver; its fixture refuses outside
+  // `local` on its own, and it is constructed BEFORE the two unguarded
+  // providers below so the refusal precedes them.
+  const transactionsRetention = new TransactionsRetentionFixture({ environment });
+
+  // Unguarded by construction — see the file header. Reached only after every
+  // refusal above has passed.
+  const transactionsEncryption = new TransactionsEncryptionProvider();
+  const dedupFingerprints = new LocalKeyedDedupFingerprintProvider();
+
+  // --- accounts ------------------------------------------------------------
+  const accounts = new PrismaFinancialAccountRepository(prisma, accountsEncryption);
+  const snapshots = new PrismaBalanceSnapshotRepository(prisma);
+  const institutions = new PrismaInstitutionCatalogueReader(prisma);
+  const accountIds = new AccountsIdSource();
+
+  // --- transactions --------------------------------------------------------
+  const transactionRepository = new PrismaTransactionRepository(prisma, transactionsEncryption);
+  const assignments = new PrismaCategoryAssignmentRepository(prisma);
+  const categories = new PrismaFinancialCategoryCatalogue(prisma);
+  const merchantRules = new PrismaMerchantRuleDirectory(prisma);
+  const transactionIds = new TransactionsIdSource();
+  const transactionsPrincipalScope = new RequestScopedTransactionsPrincipalContext();
+  const accountAccess = new FinancialAccountsAccessAdapter(accounts);
+  // The presence port the accounts module declares and this module fills: it
+  // is what stops a currency change on an account that already has records.
+  const recordPresence = new PrismaFinancialRecordPresenceReader(prisma);
+
+  // --- transfer matching ---------------------------------------------------
+  const matches = new PrismaTransferMatchRepository(prisma);
+  const eraseTransferMatches = new EraseTransferMatches(matches);
+  // The REAL eraser, never a no-op: deleting a transaction must take the
+  // relationships that name it, and a no-op would report success over rows
+  // that survive.
+  const transferMatchEraser = new TransactionsTransferMatchEraser(eraseTransferMatches);
+
+  // --- connections and instruments ----------------------------------------
+  const connections = new PrismaFinancialConnectionRepository(prisma, connectionsEncryption);
+  const sourceLinks = new PrismaAccountSourceLinkRepository(prisma, connectionsEncryption);
+  const instruments = new PrismaPaymentInstrumentRepository(prisma, instrumentsEncryption);
+
+  // --- statement imports ---------------------------------------------------
+  const imports = new PrismaStatementImportRepository(prisma, importsEncryption);
+  const importIds = new ImportsIdSource();
+  const canonicalAccounts = new FinancialAccountsCanonicalAccountAdapter(accounts);
+  const canonicalDedup = new PrismaCanonicalDedupLookupReader(prisma);
+  // The TRANSACTIONS module's encryption seam for the canonical rows: a
+  // ciphertext written for a staged row must not authenticate against
+  // `public.transactions`, so the two labels stay apart.
+  const canonicalNarrative = new TransactionsCanonicalNarrativeAdapter(transactionsEncryption);
+  const deterministicCategory = new TransactionsDeterministicCategoryAdapter(merchantRules);
+  const outbox = new PlatformOutboxStatementImportRecorder(
+    readDefaultEventCatalogue(),
+    clock,
+    input.producer,
+  );
+  // The unit of work opens the ONE transaction and hands the open handle to
+  // the transactions module's writer, so an import commit is one unit of work
+  // across two bounded contexts.
+  const statementCommits = new PrismaStatementCommitUnitOfWork(
+    prisma,
+    canonicalNarrative,
+    new PrismaStatementCommitWriter(),
+    outbox,
+  );
+
+  return [
+    FinancialApiModule.register({
+      clock,
+      transactionsPrincipalScope,
+      useCases: {
+        institutions,
+        categories,
+
+        listOwnAccounts: new ListOwnAccounts(accounts),
+        readOwnAccount: new ReadOwnAccount(accounts),
+        createManualAccount: new CreateManualAccount(
+          accounts,
+          institutions,
+          accountsRetention,
+          accountIds,
+          clock,
+        ),
+        updateOwnAccount: new UpdateOwnAccount(
+          accounts,
+          snapshots,
+          recordPresence,
+          institutions,
+          clock,
+        ),
+        listOwnBalanceSnapshots: new ListOwnBalanceSnapshots(accounts, snapshots),
+
+        listOwnTransactions: new ListOwnTransactions(
+          transactionsPrincipalScope,
+          transactionRepository,
+        ),
+        createManualTransaction: new CreateManualTransaction(
+          transactionsPrincipalScope,
+          transactionRepository,
+          dedupFingerprints,
+          transactionIds,
+          clock,
+          transactionsRetention,
+          accountAccess,
+        ),
+        readOwnTransaction: new ReadOwnTransaction(
+          transactionsPrincipalScope,
+          transactionRepository,
+          assignments,
+        ),
+        updateOwnTransaction: new UpdateOwnTransaction(
+          transactionsPrincipalScope,
+          transactionRepository,
+          transactionIds,
+          clock,
+        ),
+        deleteOwnTransaction: new DeleteOwnTransaction(
+          transactionsPrincipalScope,
+          transactionRepository,
+          transferMatchEraser,
+        ),
+        assignCategory: new AssignCategory(
+          transactionsPrincipalScope,
+          transactionRepository,
+          assignments,
+          categories,
+          transactionIds,
+          clock,
+        ),
+
+        listOwnConnections: new ListOwnConnections(connections),
+        listOwnAccountSourceLinks: new ListOwnAccountSourceLinks(sourceLinks),
+        listOwnPaymentInstruments: new ListOwnPaymentInstruments(instruments),
+
+        startStatementImport: new StartStatementImport(
+          imports,
+          canonicalAccounts,
+          importsRetention,
+          importIds,
+          clock,
+        ),
+        storeImportSource: new StoreImportSource(
+          imports,
+          importsSourceStore,
+          new LocalKeyedFileFingerprintProvider(),
+          importsRetention,
+          importIds,
+          clock,
+        ),
+        parseStatementSource: new ParseStatementSource(
+          imports,
+          importsSourceStore,
+          new StreamingCsvParser(),
+          canonicalAccounts,
+          dedupFingerprints,
+          canonicalDedup,
+          importIds,
+          clock,
+        ),
+        previewStatementImport: new PreviewStatementImport(imports),
+        commitStatementImport: new CommitStatementImport(
+          imports,
+          statementCommits,
+          canonicalAccounts,
+          importsSourceStore,
+          canonicalDedup,
+          deterministicCategory,
+          importsRetention,
+          importIds,
+          clock,
+        ),
+        eraseStatementImport: new EraseStatementImport(imports, importsSourceStore, clock),
+
+        listOwnTransferMatches: new ListOwnTransferMatches(matches),
+        confirmTransferMatch: new ConfirmTransferMatch(matches, clock),
+        rejectTransferMatch: new RejectTransferMatch(matches, clock),
+      },
+    }),
+  ];
+}
+
+/**
+ * The two declared ingestion policies this surface mounts, named so a reader
+ * — and the architecture suite's resource-limit inventory — can see which
+ * central policies these routes are actually held to.
+ *
+ * `manualTransaction` bounds the hand-entered paths and supplies every page
+ * bound on the surface; `csvStatementImport` bounds the statement upload, its
+ * parse and its review. Neither number is written here.
+ */
+export const PHASE5_MOUNTED_POLICIES = Object.freeze([
+  INGESTION_LIMIT_POLICIES.manualTransaction,
+  INGESTION_LIMIT_POLICIES.csvStatementImport,
+]);

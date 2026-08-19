@@ -2,7 +2,7 @@
   "name": "@karar/payment-instruments",
   "version": "0.0.0",
   "private": true,
-  "description": "What SPENDS from a balance-bearing financial account — cards and QR payment identities as instruments, never as balances. There is no balance column and there must never be one; no PAN, CVV, token or wallet credential is stored anywhere.",
+  "description": "What SPENDS from a balance-bearing financial account \u2014 cards and QR payment identities as instruments, never as balances. There is no balance column and there must never be one; no PAN, CVV, token or wallet credential is stored anywhere.",
   "type": "module",
   "main": "dist/public-api.js",
   "types": "dist/public-api.d.ts",

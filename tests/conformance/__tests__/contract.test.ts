@@ -45,8 +45,17 @@ function deref(node: SchemaNode): SchemaNode {
 
 /** Every operationId openapi.yaml merges, as of this document version. */
 const EXPECTED_OPERATIONS = [
+  'assignOwnTransactionCategory',
+  'commitOwnStatementImport',
+  'confirmOwnTransferMatch',
+  'correctOwnTransaction',
+  'createOwnManualFinancialAccount',
+  'createOwnManualTransaction',
+  'createOwnStatementImport',
   'createTenantInvitation',
   'declareOwnJurisdiction',
+  'deleteOwnTransaction',
+  'eraseOwnStatementImport',
   'getOwnTenant',
   'getOwnUserProfile',
   'getPlatformBootstrap',
@@ -69,16 +78,34 @@ const EXPECTED_OPERATIONS = [
   'identityVerifyEmail',
   'listApplicableConsentDocuments',
   'listDeclarableJurisdictionReferences',
+  'listFinancialCategories',
+  'listFinancialInstitutions',
+  'listOwnAccountBalanceSnapshots',
+  'listOwnAccountPaymentInstruments',
+  'listOwnAccountSourceLinks',
+  'listOwnFinancialAccounts',
+  'listOwnFinancialConnections',
+  'listOwnStatementImportPreview',
   'listOwnTenantMemberships',
+  'listOwnTransactionProvenance',
+  'listOwnTransactions',
+  'listOwnTransferMatches',
   'listTenantMembers',
+  'parseOwnStatementImportSource',
   'readConsentDocumentContent',
   'readOwnConsentStatus',
+  'readOwnFinancialAccount',
+  'readOwnStatementImport',
+  'readOwnTransaction',
   'recordOwnConsentAcceptance',
   'redeemTenantInvitation',
+  'rejectOwnTransferMatch',
   'requestOwnAccountDisable',
   'revokeTenantInvitation',
   'setPlatformTenantBinding',
+  'updateOwnFinancialAccount',
   'updateOwnUserProfile',
+  'uploadOwnStatementImportSource',
   'withdrawOwnConsent',
 ];
 
@@ -153,6 +180,23 @@ describe('the OpenAPI document loads and resolves', () => {
         'listDeclarableJurisdictionReferences 200 -> references[]',
         ['properties', 'references', 'items'],
       ],
+      // The Phase 5 financial surface. Each of these is the object whose
+      // closure is the ONLY written reason a sensitive field does not ship:
+      // an account never carries ciphertext or a key version, a source link
+      // never carries the external reference or its keyed fingerprint, an
+      // instrument never carries a balance, an import never carries the
+      // stored object's locator, provenance never carries the dedup
+      // fingerprint, and a match never carries an amount. Delete one of these
+      // `additionalProperties: false` lines and the leak assertions in the
+      // runtime suite go quietly vacuous — so losing one fails HERE first.
+      ['listOwnFinancialAccounts 200 -> items[]', ['properties', 'items', 'items']],
+      ['listOwnAccountSourceLinks 200 -> items[]', ['properties', 'items', 'items']],
+      ['listOwnAccountPaymentInstruments 200 -> items[]', ['properties', 'items', 'items']],
+      ['listOwnTransactions 200 -> items[]', ['properties', 'items', 'items']],
+      ['listOwnTransactionProvenance 200 -> items[]', ['properties', 'items', 'items']],
+      ['listOwnTransferMatches 200 -> items[]', ['properties', 'items', 'items']],
+      ['listOwnStatementImportPreview 200 -> the whole body', []],
+      ['readOwnStatementImport 200 -> the whole body', []],
     ];
 
     for (const [where, path] of closedResponseShapes) {
@@ -172,8 +216,10 @@ describe('the OpenAPI document loads and resolves', () => {
     // A number, not merely "> 0": a loader that stopped resolving half the
     // fragments would still be non-empty, and would still look fine. It was
     // 66 before the identity fragment gained schemas; those 17 operations
-    // contribute the 48 rows that make it 114.
-    expect(ledger.length).toBe(114);
+    // contributed the 48 rows that made it 114. The Phase 5 financial surface
+    // adds 27 operations, and — because every one of its failures carries a
+    // schema rather than prose — 146 more rows.
+    expect(ledger.length).toBe(260);
     for (const row of ledger) {
       expect(
         contract.responseSchema(row.operationId, row.status, row.mediaType),

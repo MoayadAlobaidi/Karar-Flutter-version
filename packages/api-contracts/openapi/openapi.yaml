@@ -8,7 +8,7 @@
 openapi: 3.1.0
 info:
   title: Karar API
-  version: 0.5.0
+  version: 0.6.0
   description: >-
     Contract-first API surface for the Karar platform. Phase 3 exposes
     authentication and session lifecycle (identity), own-profile management
@@ -21,6 +21,19 @@ info:
     selection state, and POST /platform/tenant-binding binds or switches
     explicitly. A session that is still unbound reaches no tenant-scoped
     endpoint.
+
+    Phase 5 adds the FINANCIAL surface under /financial: the reviewed issuer
+    and category catalogues, the caller's own accounts and wallets, their
+    source-reported balances, their transactions with revision history and
+    provenance, the safe summaries of how their data arrives and what spends
+    from it, CSV statement ingestion, and transfer matching. Every one of
+    those operations is SELF-SCOPED: the subject and the tenant come from the
+    session's server-side binding, and no operation anywhere accepts a userId
+    or a tenantId. Money is an exact minor-unit string with its currency,
+    never a JSON number; a booking or value date is a calendar day and a true
+    instant is a date-time (ADR-0027). Only MANUAL and USER_FILE_UPLOAD are
+    executable rails, every rail-bearing response says so, and nothing on the
+    surface may be rendered as a live institution link.
 paths:
   /auth/register:
     $ref: './paths/identity.yaml#/~1auth~1register'
@@ -98,3 +111,76 @@ paths:
     $ref: './paths/jurisdiction.yaml#/~1jurisdiction~1declarable-references'
   /jurisdiction/self-declaration:
     $ref: './paths/jurisdiction.yaml#/~1jurisdiction~1self-declaration'
+  # ---------------------------------------------------------------------------
+  # Phase 5 — the financial surface, self-scoped throughout.
+  #
+  # Every operation below acts for the AUTHENTICATED principal and nobody
+  # else. There is no `userId` and no `tenantId` on any of them — not in a
+  # path, a query, a header, or a body — and no operation reads, writes, or
+  # confirms the existence of another subject's financial data. Another
+  # subject's id answers 404, the same answer an unknown id gets.
+  #
+  # Two rails run: MANUAL and USER_FILE_UPLOAD. Every response that names a
+  # rail also states its availability, and nothing on this surface can be
+  # rendered as "Connected" — no issuer exposes an interface to this platform
+  # and no credential of any kind is stored (ADR-0028).
+  #
+  # DELIBERATELY NOT MERGED, and each absence is a decision rather than an
+  # oversight:
+  #   * account DELETION. The cross-module cascade is not atomic and the
+  #     contract for reporting a partial outcome has not been chosen; an
+  #     operation that might mean "some of it" is worse than none.
+  #   * institution MARKET presence. The table exists (migration 0094) and the
+  #     module declares no reader for it; a path answering from nothing would
+  #     be a false claim.
+  #   * a statement-import MAPPING update. There is no stored draft mapping —
+  #     the mapping is an argument to the parse — so an endpoint that appeared
+  #     to save one would change nothing.
+  #   * transfer-match SUGGESTION as a client verb, and every payment-instrument
+  #     and connection WRITE. Their contracts are unresolved; the read surface
+  #     stands alone until they are.
+  /financial/institutions:
+    $ref: './paths/financial-accounts.yaml#/~1financial~1institutions'
+  /financial/accounts:
+    $ref: './paths/financial-accounts.yaml#/~1financial~1accounts'
+  /financial/accounts/{accountId}:
+    $ref: './paths/financial-accounts.yaml#/~1financial~1accounts~1{accountId}'
+  /financial/accounts/{accountId}/balances:
+    $ref: './paths/financial-accounts.yaml#/~1financial~1accounts~1{accountId}~1balances'
+  # Which source feeds this account and how fresh it is — the SAFE projection,
+  # with the external account reference and its keyed fingerprint absent by
+  # construction rather than by filtering.
+  /financial/accounts/{accountId}/source-links:
+    $ref: './paths/financial-connections.yaml#/~1financial~1accounts~1{accountId}~1source-links'
+  /financial/accounts/{accountId}/payment-instruments:
+    $ref: './paths/financial-payment-instruments.yaml#/~1financial~1accounts~1{accountId}~1payment-instruments'
+  /financial/connections:
+    $ref: './paths/financial-connections.yaml#/~1financial~1connections'
+  /financial/transactions:
+    $ref: './paths/financial-transactions.yaml#/~1financial~1transactions'
+  /financial/transactions/{transactionId}:
+    $ref: './paths/financial-transactions.yaml#/~1financial~1transactions~1{transactionId}'
+  /financial/transactions/{transactionId}/category:
+    $ref: './paths/financial-transactions.yaml#/~1financial~1transactions~1{transactionId}~1category'
+  /financial/transactions/{transactionId}/provenance:
+    $ref: './paths/financial-transactions.yaml#/~1financial~1transactions~1{transactionId}~1provenance'
+  /financial/categories:
+    $ref: './paths/financial-transactions.yaml#/~1financial~1categories'
+  /financial/statement-imports:
+    $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports'
+  /financial/statement-imports/{importId}:
+    $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports~1{importId}'
+  /financial/statement-imports/{importId}/source:
+    $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports~1{importId}~1source'
+  /financial/statement-imports/{importId}/parse:
+    $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports~1{importId}~1parse'
+  /financial/statement-imports/{importId}/preview:
+    $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports~1{importId}~1preview'
+  /financial/statement-imports/{importId}/commit:
+    $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports~1{importId}~1commit'
+  /financial/transfer-matches:
+    $ref: './paths/financial-transfer-matching.yaml#/~1financial~1transfer-matches'
+  /financial/transfer-matches/{matchId}/confirmation:
+    $ref: './paths/financial-transfer-matching.yaml#/~1financial~1transfer-matches~1{matchId}~1confirmation'
+  /financial/transfer-matches/{matchId}/rejection:
+    $ref: './paths/financial-transfer-matching.yaml#/~1financial~1transfer-matches~1{matchId}~1rejection'

@@ -58,6 +58,26 @@ No change to the protected architecture. The foundation is ordinary Clean Archit
 One cross-module arrangement is worth naming because it is easy to get wrong, and it now repeats three times. `modules/financial-accounts` must not import `modules/transactions`, `modules/financial-connections` or `modules/payment-instruments`, yet it owns rules that depend on all three — an account's currency may not change while records exist, and deleting an account must take its records, its source links and its instruments with it. Accounts therefore *declares* every one of those ports and the other modules *implement* them, resolved through the accounts module's `public-api`. The dependency runs one way only, and architecture test 5 (ports declared inward) is what keeps it that way.
 
 **Every cross-module eraser is a REQUIRED constructor dependency of `DeleteOwnAccount`.** An earlier revision made the payment-instrument eraser optional with a do-nothing default, reasoning that zero is the true answer for a deployment composing no instruments. That reasoning is wrong in the case that matters: the default cannot distinguish a deployment with no instruments from one that has them and forgot a line of wiring, and in the second it erases nothing, reports success, and leaves cards spending from an account the subject was told is gone. The default has been deleted. Focused suites that genuinely have nothing to erase inject a **named** no-op (`ERASES_NO_SOURCE_LINKS`, `ERASES_NO_INSTRUMENTS`) so the decision is visible in the test rather than absent from the production path.
+## Phase activation — architecture test 24 and `currentPhase` 5
+
+**The marker moved to 5 in the same commit that mounted the first real ingestion path**, which is the whole rule. Architecture test 24 (resource limits declared) activates at phase 5, and a limits test with no path to scan proves nothing — so the marker could not move earlier without making the suite claim an enforcement it was not performing.
+
+That commit contains, together: the CSV upload and parse routes; `checkResourceLimits` implemented in `scripts/checks/architecture.mjs`; test 24 flipped to `ACTIVE` with its `implementedIn`; `currentPhase` 4 → 5; and the README status row.
+
+**What test 24 enforces.** It discovers real ingestion paths from the tree rather than from a list somebody maintains — the same definition the pre-activation guard used, so the two controls cannot disagree about what counts — and then fails in both directions: a mounted path with no central policy, and a central policy naming a path that no longer exists. It also fails when the tree contains **no** real path at all while the registry claims phase 5, because a resource-limit test that scans nothing passes vacuously.
+
+**Non-vacuity, proven against the real path rather than asserted.** Two mutations of the live tree:
+
+| Mutation | Result |
+|---|---|
+| A helper hardcodes `maxBytes`/`maxRows` instead of reading the central policy | **FAIL**, naming `apps/api/src/financial/csv-body.ts` |
+| A mounted controller stops referencing `INGESTION_LIMIT_POLICIES` | **FAIL**, naming `statement-import-source.controller.ts` |
+| Neither mutation | PASS, 45 files scanned |
+
+The first mutation is why the check is shaped the way it is. It originally scanned only files that mount a route, and **passed** while a helper carried an inline bound — a controller can dutifully reference the central policy and then call a helper that hardcodes the number, and the helper is where the bound actually bites. The scan now covers the whole ingestion surface. That hole was found by mutating the real tree, not by the seeded self-tests, which is the argument for doing both.
+
+Seven failure shapes are additionally seeded in the runner's own self-test — path without policy, inline bypass, missing field, zero, `Infinity`, duplicate `pathId`, and a policy nothing references — taking it to 65 cases.
+
 ## ADRs added/amended
 
 **[ADR-0027](../adr/0027-calendar-day-and-instant.md) — calendar days and instants are different types.** ACCEPTED, approved by the Platform Owner. A date on a statement is what an institution wrote on its books, not a moment in time; stored as an instant it shifts across day and month boundaries for readers at different offsets, so a statement for August gains or loses a line depending on where it is read.

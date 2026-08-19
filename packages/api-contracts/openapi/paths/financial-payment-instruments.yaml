@@ -1,0 +1,226 @@
+# payment-instruments surface — path-item fragments (ADR-0009: authored by
+# hand, never generated from code). The phase lead merges these into
+# openapi.yaml via $ref per path, e.g.:
+#   /financial/accounts/{accountId}/payment-instruments:
+#     $ref: './paths/financial-payment-instruments.yaml#/~1financial~1accounts~1{accountId}~1payment-instruments'
+#
+# WHAT AN INSTRUMENT IS HERE: something that SPENDS from a balance-bearing
+# account. It is never a balance.
+#
+# Contract rules made visible here, each of which the module holds by
+# construction and this contract simply refuses to undo:
+#   * NO BALANCE, NO AMOUNT, NO LIMIT, NO AVAILABLE FIGURE, and no field from
+#     which one could be derived. The table has no balance column and the
+#     module has no arithmetic. Two virtual cards on one wallet share ONE
+#     balance, so a per-card figure would either repeat it twice or invent a
+#     split nobody stated. `version` is the only number in the response.
+#   * NO PAN, CVV, EXPIRY, NETWORK TOKEN OR WALLET CREDENTIAL, in any field,
+#     under any name. The only card-shaped value that exists is a short mask,
+#     and a value that reads as a full card, account or phone number is
+#     refused at the domain rather than stored and hidden.
+#   * NO STATUS MEANS CONNECTED, PROVISIONED, TOKENIZED, SYNCED OR AUTHORIZED.
+#     `impliesLiveIssuerLink` answers false for every value the vocabulary
+#     permits and is emitted on the wire so the claim is checkable.
+#   * The instrument points at exactly ONE account, and re-pointing is not
+#     merely refused — it is unexpressible. There is no field for it here
+#     either.
+#   * This surface is READ-ONLY. Recording, updating and deleting an
+#     instrument have no route this phase; erasure happens as part of account
+#     deletion, through an inward port, not as a client verb.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`,
+#     served under the media type the single writer in
+#     apps/api/src/errors/problem-response.ts emits.
+
+/financial/accounts/{accountId}/payment-instruments:
+  get:
+    operationId: listOwnAccountPaymentInstruments
+    summary: List the safe instrument summaries that spend from one of the caller's accounts
+    description: >-
+      The cards and QR payment identities that spend from ONE of the
+      AUTHENTICATED principal's own accounts. Another subject's account
+      answers an empty page — the route is not an existence oracle — and there
+      is no operation anywhere that reads somebody else's instruments.
+
+      Deliberately absent from every row, and to stay absent: any balance,
+      amount, credit limit, available figure or total; any PAN, CVV, expiry,
+      network token or wallet credential; any issuer reference implying a live
+      link; and the row's `tenantId` and `userId`.
+    tags: [payment-instruments]
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: accountId
+        in: path
+        required: true
+        description: One of the CALLER'S OWN accounts. Any other id answers an empty page.
+        schema: { type: string, format: uuid }
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+      - name: instrumentType
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/InstrumentType'
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/InstrumentStatus'
+      - name: spendable
+        in: query
+        required: false
+        description: >-
+          Restrict to instruments that may currently be used to spend. Stated
+          as a filter so a client never has to derive spendability from a
+          status vocabulary it might read wrongly.
+        schema: { type: boolean }
+    responses:
+      '200':
+        description: The safe instrument summaries, oldest first, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/PaymentInstrumentView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  LimitParameter:
+    name: limit
+    in: query
+    required: false
+    description: >-
+      Page size. Bounded by the central ingestion limit policy
+      (packages/platform/src/ingestion/limits.ts); a larger request is clamped
+      to the declared maximum rather than refused.
+    schema: { type: integer, minimum: 1, maximum: 200 }
+  CursorParameter:
+    name: cursor
+    in: query
+    required: false
+    description: The `page.nextCursor` of the previous response. Opaque.
+    schema: { type: string, minLength: 1 }
+  PageInfo:
+    type: object
+    additionalProperties: false
+    required: [limit, returned, hasMore, nextCursor]
+    properties:
+      limit: { type: integer, minimum: 1 }
+      returned: { type: integer, minimum: 0 }
+      hasMore: { type: boolean }
+      nextCursor: { type: [string, 'null'] }
+  InstrumentType:
+    type: string
+    enum: [PHYSICAL_CARD, VIRTUAL_CARD, PREPAID_CARD, TOKENIZED_CARD, QR_PAYMENT_IDENTITY, OTHER]
+  InstrumentStatus:
+    type: string
+    description: >-
+      The instrument's own lifecycle. TOKENIZED_CARD is a TYPE, not a live
+      provisioning state, and no member of this vocabulary means the issuer is
+      reachable.
+    enum: [ACTIVE, SUSPENDED, EXPIRED, CANCELLED]
+  IssuerLinkClaim:
+    type: object
+    additionalProperties: false
+    required: [impliesLiveIssuerLink, providerAccessStatus]
+    description: >-
+      Emitted on the wire so the claim is checkable rather than merely stated.
+      `impliesLiveIssuerLink` is false for every status the vocabulary
+      permits; no issuer exposes an interface to this platform and no
+      credential of any kind is stored.
+    properties:
+      impliesLiveIssuerLink:
+        type: boolean
+        enum: [false]
+      providerAccessStatus:
+        type: string
+        enum: [NOT_IMPLEMENTED]
+  PaymentInstrumentView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        instrumentId,
+        accountId,
+        instrumentType,
+        status,
+        spendable,
+        mask,
+        displayLabel,
+        issuerLink,
+        createdAt,
+        updatedAt,
+        version,
+      ]
+    description: >-
+      One instrument. `version` is the ONLY number in this object, and that is
+      the point: the question "how much is on this card" has no answer in this
+      platform and must not acquire one here.
+    properties:
+      instrumentId: { type: string, format: uuid }
+      accountId:
+        type: string
+        format: uuid
+        description: >-
+          The single balance-bearing account this instrument spends from.
+          Singular and required; there is no field through which it could be
+          re-pointed.
+      instrumentType:
+        $ref: '#/components/InstrumentType'
+      status:
+        $ref: '#/components/InstrumentStatus'
+      spendable:
+        type: boolean
+        description: >-
+          Whether this instrument may currently be used to spend, stated
+          rather than derived from the status vocabulary.
+      mask:
+        type: string
+        description: >-
+          A short masked tail, e.g. `**1234`, decrypted for its owner. Never a
+          full number: a value that reads as one is refused at the domain.
+      displayLabel:
+        type: string
+        description: The subject's own name for the instrument, decrypted for its owner.
+      issuerLink:
+        $ref: '#/components/IssuerLinkClaim'
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type: { type: string }
+      title: { type: string }
+      status: { type: integer }
+      code:
+        type: string
+        description: >-
+          e.g. AUTHENTICATION_REQUIRED, TENANT_BINDING_REQUIRED,
+          INVALID_REQUEST, STORE_UNAVAILABLE.
+      detail: { type: string }
+      reason: { type: string }
+      retryable: { type: boolean }
+      requestId: { type: string }
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

@@ -1,6 +1,6 @@
 {
   "description": "Machine-readable registry of the 26 architecture tests (docs/testing/architecture-tests.md) plus the canary-purity test. Read by scripts/checks/architecture.mjs, which enforces the activation gate: a test whose activationPhase has been reached without an implementation fails the run.",
-  "currentPhase": 4,
+  "currentPhase": 5,
   "source": "docs/testing/architecture-tests.md",
   "statusValues": {
     "ACTIVE": "The guarded structure exists now; the check runs on every invocation and must pass.",
@@ -193,10 +193,10 @@
     {
       "id": 24,
       "name": "Resource limits declared",
-      "status": "NOT_APPLICABLE_UNTIL_PHASE_5",
+      "status": "ACTIVE",
       "owner": "Engineering Owner",
-      "activationPhase": 5,
-      "activationCriterion": "First ingestion path (manual/CSV) or rendering path exists; explicit byte/row/page/wall-clock/memory limits become declarable and checkable."
+      "implementedIn": "scripts/checks/architecture.mjs#checkResourceLimits",
+      "notes": "Every real mounted ingestion path declares every bound in the CENTRAL policy (packages/platform/src/ingestion/limits.ts), and every central policy belongs to a real path. Fails in both directions, and fails when the tree contains no real path at all \u2014 a resource-limit test that scans nothing passes vacuously, and the phase marker moves only WITH a first real mounted ingestion path. Activated with the CSV upload and parse routes."
     },
     {
       "id": 25,

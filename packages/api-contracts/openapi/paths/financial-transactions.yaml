@@ -1,0 +1,942 @@
+# transactions surface — path-item fragments (ADR-0009: authored by hand,
+# never generated from code). The phase lead merges these into openapi.yaml
+# via $ref per path, e.g.:
+#   /financial/transactions:
+#     $ref: './paths/financial-transactions.yaml#/~1financial~1transactions'
+#
+# Contract rules made visible here:
+#   * EVERY operation acts for the AUTHENTICATED principal. No `userId`, no
+#     `tenantId`, in any path, query, header or body. There is no staff read,
+#     no accept-on-behalf-of, and no parameter that could name another
+#     subject. Another subject's transaction answers 404 — the same answer an
+#     unknown id gets — so the route is not an existence oracle.
+#   * MONEY IS A MAGNITUDE PLUS A DIRECTION ON THE WAY IN, and an exact signed
+#     minor-unit string on the way out. The canonical sign convention is money
+#     LEAVING the account is negative; a client never has to guess whether a
+#     positive number is a credit, and never has to encode a sign it might get
+#     backwards. No monetary value is a JSON number anywhere.
+#   * `bookingDate` and `valueDate` are `format: date` — calendar days, not
+#     instants (ADR-0027). `eventOccurredAt`, `createdAt`, `recordedAt` and
+#     `assignedAt` are true instants and are `format: date-time` with an
+#     explicit offset. A statement for August must not gain or lose a line
+#     because of where it is read.
+#   * NOTHING HERE IS "CONNECTED". `sourceKind` is MANUAL or CSV — the only
+#     two rails that run — and every response carrying one also carries its
+#     `availability`, which is NOT_IMPLEMENTED for anything else.
+#   * THE CLOSED FIELD SETS ARE THE LEAK CONTROL. Every response object
+#     declares `additionalProperties: false`. Deliberately absent, and to stay
+#     absent: the row's `tenantId` and `userId`; any ciphertext, nonce, auth
+#     tag, encryption algorithm or key version; the DEDUP FINGERPRINT and its
+#     occurrence ordinal (a per-subject keyed MAC — publishing it turns a
+#     private identity into a confirmation oracle); the import's raw row
+#     reference and any raw source cell; and any category confidence or score,
+#     which do not exist in this platform and must not be invented.
+#   * Categories are a reviewed catalogue that changes by migration. There is
+#     no category WRITE path here, and a person's choice beats a rule.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`,
+#     served under the media type the single writer in
+#     apps/api/src/errors/problem-response.ts emits.
+
+/financial/transactions:
+  get:
+    operationId: listOwnTransactions
+    summary: List the caller's own transactions
+    description: >-
+      Keyset pagination by `(bookingDate DESC, id DESC)`. The cursor is opaque
+      and encodes a position in the CALLER'S OWN result set; a malformed one
+      is refused (code INVALID_CURSOR) rather than silently reset to the
+      first page, because a silent reset shows a person the wrong month and
+      tells them nothing.
+
+      WHERE THE FILTERS ARE APPLIED, stated because it changes how a client
+      pages. `accountId` is applied by the STORE, inside the keyset query.
+      The remaining filters narrow the page the store returned, so a page may
+      come back with fewer items than `limit` — or with none — while
+      `hasMore` is still true. `hasMore` and `nextCursor` always describe the
+      store's own cursor, never the filtered count, so a client keeps
+      following `nextCursor` until it is null rather than stopping at the
+      first sparse page. Pushing the remaining predicates into the keyset
+      query is a change to the store, and this description will change with
+      it.
+
+      There is deliberately no category filter. A transaction's active
+      category lives in another table and is read per transaction; a filter
+      here would issue one query per row of every page, and a parameter that
+      quietly cost that much is worse than one that does not exist.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+      - name: accountId
+        in: query
+        required: false
+        description: Restrict to one of the caller's own accounts.
+        schema: { type: string, format: uuid }
+      - name: currency
+        in: query
+        required: false
+        schema: { type: string, pattern: '^[A-Z]{3}$' }
+      - name: direction
+        in: query
+        required: false
+        description: MONEY_OUT selects negative amounts, MONEY_IN positive ones.
+        schema:
+          $ref: '#/components/MoneyDirection'
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/TransactionStatus'
+      - name: sourceKind
+        in: query
+        required: false
+        description: The rail the record arrived on.
+        schema:
+          $ref: '#/components/SourceKind'
+      - name: bookedFrom
+        in: query
+        required: false
+        description: Inclusive lower bound on the booking DAY, not an instant.
+        schema: { type: string, format: date }
+      - name: bookedTo
+        in: query
+        required: false
+        description: Inclusive upper bound on the booking DAY, not an instant.
+        schema: { type: string, format: date }
+    responses:
+      '200':
+        description: The caller's own transactions, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/TransactionView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        description: >-
+          A malformed parameter or cursor (codes INVALID_REQUEST,
+          INVALID_CURSOR).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+  post:
+    operationId: createOwnManualTransaction
+    summary: Record a transaction the caller is entering by hand
+    description: >-
+      Manual entry. The caller supplies a NON-NEGATIVE magnitude and a
+      direction; the server applies the canonical sign. A signed amount is not
+      accepted, because a client that gets the sign backwards writes a wrong
+      financial record that looks exactly like a right one.
+
+      `sourceKind` is fixed to MANUAL by the use case and is not a request
+      field. Provenance is written for every stored value, and the revision
+      history starts at revision 1.
+
+      The account is resolved through a port before the write is accepted:
+      an account that is archived, closed or in a state this platform does not
+      recognise refuses the write rather than accepting a record nobody can
+      correct.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [accountId, magnitude, direction, bookingDate, description]
+            properties:
+              accountId: { type: string, format: uuid }
+              magnitude:
+                $ref: '#/components/MinorUnitAmount'
+              direction:
+                $ref: '#/components/MoneyDirection'
+              bookingDate:
+                type: string
+                format: date
+                description: The day the institution booked it. A calendar day, never an instant.
+              valueDate: { type: [string, 'null'], format: date }
+              eventOccurredAt:
+                type: [string, 'null']
+                format: date-time
+                description: >-
+                  A true instant, recorded only when the source stated one.
+                  Requires `sourceTimezone` to be meaningful and refuses it
+                  when absent.
+              sourceTimezone:
+                type: [string, 'null']
+                description: IANA zone name; refused unless `eventOccurredAt` is present.
+              merchant: { type: [string, 'null'], maxLength: 512 }
+              description: { type: string, minLength: 1, maxLength: 512 }
+              note: { type: [string, 'null'], maxLength: 512 }
+              originalAmount:
+                description: >-
+                  The amount as the source stated it, when that differs in
+                  currency from the booked amount. All-or-nothing: a magnitude
+                  without a currency is refused, not half-recorded.
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/MinorUnitAmount'
+              occurrenceOrdinal:
+                type: integer
+                minimum: 1
+                description: >-
+                  Which occurrence of an otherwise identical movement this is,
+                  so a person who genuinely bought the same coffee twice can
+                  record both. Must be the next unused ordinal.
+    responses:
+      '201':
+        description: The stored transaction.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/TransactionView'
+      '400':
+        description: Malformed body (code INVALID_REQUEST).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such account for this principal (code ACCOUNT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: >-
+          The write cannot be accepted as stated (codes ACCOUNT_NOT_WRITABLE,
+          ACCOUNT_CURRENCY_MISMATCH, DUPLICATE_TRANSACTION,
+          OCCURRENCE_ORDINAL_NOT_NEXT). A duplicate names the fingerprint
+          VERSION, never the fingerprint.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '422':
+        $ref: '#/components/RetentionUnresolvedResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/transactions/{transactionId}:
+  get:
+    operationId: readOwnTransaction
+    summary: Read one of the caller's own transactions with its revision history
+    description: >-
+      The transaction, its append-only revision history oldest first, its
+      active category assignment, and whether the current values DIVERGE from
+      what the source supplied. Divergence is stated rather than implied: an
+      imported value stays attributable after a person corrects it.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/TransactionIdParameter'
+    responses:
+      '200':
+        description: The transaction and its history.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [transaction, revisions, activeCategory, divergesFromSource]
+              properties:
+                transaction:
+                  $ref: '#/components/TransactionView'
+                revisions:
+                  type: array
+                  items:
+                    $ref: '#/components/TransactionRevisionView'
+                activeCategory:
+                  oneOf:
+                    - type: 'null'
+                    - $ref: '#/components/CategoryAssignmentView'
+                divergesFromSource:
+                  type: boolean
+                  description: >-
+                    True when a person has corrected a value the source
+                    supplied. The source's own values remain in `revisions`.
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+  patch:
+    operationId: correctOwnTransaction
+    summary: Correct the caller's own transaction, appending a revision
+    description: >-
+      A CORRECTION, not an overwrite: the previous values stay in the revision
+      history and the imported value remains attributable. `expectedVersion`
+      is required — a blind correction would silently discard a concurrent
+      one.
+
+      The correctable set is deliberately narrow. The account, the currency,
+      the source instant and the source timezone are NOT correctable: changing
+      them would make the record a different record while keeping its history,
+      which is how a corrected row becomes an untraceable one. A body that
+      changes nothing is refused (code NO_CHANGE) rather than recorded as a
+      revision that says nothing.
+
+      `magnitude` and `direction` travel together or not at all.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/TransactionIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion: { type: integer, minimum: 1 }
+              magnitude:
+                $ref: '#/components/MinorUnitAmount'
+              direction:
+                $ref: '#/components/MoneyDirection'
+              bookingDate: { type: string, format: date }
+              valueDate: { type: [string, 'null'], format: date }
+              merchant: { type: [string, 'null'], maxLength: 512 }
+              description: { type: string, minLength: 1, maxLength: 512 }
+              note: { type: [string, 'null'], maxLength: 512 }
+              status:
+                $ref: '#/components/TransactionStatus'
+    responses:
+      '200':
+        description: The corrected transaction.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/TransactionView'
+      '400':
+        description: >-
+          Malformed body, or nothing to change (codes INVALID_REQUEST,
+          NO_CHANGE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: The transaction changed under the caller (code TRANSACTION_VERSION_CONFLICT).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+  delete:
+    operationId: deleteOwnTransaction
+    summary: Delete the caller's own transaction and the transfer matches naming it
+    description: >-
+      The transaction and the transfer-match relationships that name it. The
+      two are NOT one unit of work — they live in different modules behind
+      separate ports — so a partial outcome is a real answer and this contract
+      states it rather than rounding it to success.
+
+      A 200 means everything named below was erased. A 207 means the delete
+      began and did not finish; the body says exactly how far it got, so an
+      operator has something to act on instead of a retry that may or may not
+      be idempotent.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/TransactionIdParameter'
+    responses:
+      '200':
+        description: The transaction and its relationships are gone.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/TransactionDeletedView'
+      '207':
+        description: >-
+          The delete was applied in part (codes
+          TRANSFER_MATCH_ERASURE_INCOMPLETE, DELETION_PARTIALLY_APPLIED). The
+          counts are what was actually erased; nothing is rounded up.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/TransactionPartiallyDeletedView'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/transactions/{transactionId}/category:
+  put:
+    operationId: assignOwnTransactionCategory
+    summary: Assign a category to the caller's own transaction
+    description: >-
+      A person's choice. `assignmentSource` is USER on this route and nothing
+      else: a rule-sourced assignment is written by the deterministic
+      categoriser during an import, never by a client claiming to be one.
+      There is no confidence, no score and no suggestion here — none exists in
+      this platform, and a client that invented one would be presenting a
+      guess as a fact.
+
+      A USER assignment already in place is not superseded by anything but
+      another USER assignment. The previous assignment is preserved and marked
+      SUPERSEDED; nothing is overwritten.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/TransactionIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [categoryCode]
+            properties:
+              categoryCode:
+                $ref: '#/components/CategoryCode'
+    responses:
+      '200':
+        description: The active assignment.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/CategoryAssignmentView'
+      '400':
+        description: Malformed body (code INVALID_REQUEST).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: >-
+          No such transaction for this principal, or no such assignable
+          category (codes TRANSACTION_NOT_FOUND, CATEGORY_UNKNOWN). A
+          malformed code, an absent code and a retired code answer alike:
+          the catalogue is not a probing surface.
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '409':
+        description: >-
+          A person's own decision already stands and this request would not
+          replace it (code USER_ASSIGNMENT_WINS).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/transactions/{transactionId}/provenance:
+  get:
+    operationId: listOwnTransactionProvenance
+    summary: List the safe provenance of the caller's own transaction
+    description: >-
+      Where each revision of this record came from — the rail, the acting
+      subject's own account reference, the four processing versions, the
+      direction the source stated and how it was mapped onto the canonical
+      sign, and whether the category was chosen by a person or by a rule.
+
+      SAFE means the field set is closed and the identifying parts are not in
+      it. Deliberately absent: the dedup fingerprint and the occurrence
+      ordinal (a per-subject keyed MAC, whose publication would make this
+      route a confirmation oracle), the import's row reference and any raw
+      source cell or header text, the acting actor reference, and the row's
+      tenant and user.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/TransactionIdParameter'
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+    responses:
+      '200':
+        description: The provenance entries, oldest first, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/ProvenanceView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '404':
+        description: No such transaction for this principal (code TRANSACTION_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: '#/components/Problem'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+/financial/categories:
+  get:
+    operationId: listFinancialCategories
+    summary: List the reviewed category catalogue
+    description: >-
+      Non-personal reference data, identical for every principal. The
+      catalogue changes by reviewed migration; there is no runtime write path,
+      and a subject's own label never becomes a catalogue row.
+
+      A RETIRED entry is listed with its `retiredAt` so an existing assignment
+      remains readable, and `assignable` states plainly whether it may be
+      chosen now — a client should not have to derive that from a timestamp.
+    tags: [transactions]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/LimitParameter'
+      - $ref: '#/components/CursorParameter'
+      - name: assignable
+        in: query
+        required: false
+        description: Restrict to entries that may be chosen right now.
+        schema: { type: boolean }
+    responses:
+      '200':
+        description: The catalogue, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/CategoryView'
+                page:
+                  $ref: '#/components/PageInfo'
+      '400':
+        $ref: '#/components/ProblemResponse'
+      '401':
+        $ref: '#/components/ProblemResponse'
+      '503':
+        $ref: '#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  TransactionIdParameter:
+    name: transactionId
+    in: path
+    required: true
+    description: One of the CALLER'S OWN transactions. Any other id answers 404.
+    schema: { type: string, format: uuid }
+  LimitParameter:
+    name: limit
+    in: query
+    required: false
+    description: >-
+      Page size. Bounded by the central ingestion limit policy
+      (packages/platform/src/ingestion/limits.ts); a larger request is clamped
+      to the declared maximum rather than refused, and the page reports the
+      size it actually used.
+    schema: { type: integer, minimum: 1, maximum: 200 }
+  CursorParameter:
+    name: cursor
+    in: query
+    required: false
+    description: >-
+      The `page.nextCursor` of the previous response. Opaque, and a position
+      in the CALLER'S OWN result set — it names no subject and no tenant.
+    schema: { type: string, minLength: 1 }
+  PageInfo:
+    type: object
+    additionalProperties: false
+    required: [limit, returned, hasMore, nextCursor]
+    properties:
+      limit: { type: integer, minimum: 1 }
+      returned: { type: integer, minimum: 0 }
+      hasMore: { type: boolean }
+      nextCursor: { type: [string, 'null'] }
+  MinorUnitAmount:
+    type: object
+    additionalProperties: false
+    required: [minorUnits, currency, exponent]
+    description: >-
+      An exact amount. `minorUnits` is the signed integer the ledger holds,
+      serialized as CHARACTERS — never a JSON number (ADR-0006). On a REQUEST
+      body carrying a magnitude, the value must be non-negative: the direction
+      supplies the sign.
+    properties:
+      minorUnits: { type: string, pattern: '^-?[0-9]{1,30}$' }
+      currency: { type: string, pattern: '^[A-Z]{3}$' }
+      exponent: { type: integer, minimum: 0 }
+  MoneyDirection:
+    type: string
+    description: >-
+      MONEY_OUT is money leaving the account and is stored negative;
+      MONEY_IN is money arriving and is stored positive. One convention, named
+      on the wire, so nobody has to infer it from a sign.
+    enum: [MONEY_OUT, MONEY_IN]
+  TransactionStatus:
+    type: string
+    enum: [POSTED, VOIDED]
+  SourceKind:
+    type: string
+    description: The rail this record arrived on. Only MANUAL and CSV can be produced.
+    enum: [MANUAL, CSV]
+  RailAvailability:
+    type: string
+    description: >-
+      Whether the platform can run this rail today. Exactly two rails are
+      EXECUTABLE — MANUAL and USER_FILE_UPLOAD — and no response may present
+      any other as usable (ADR-0028).
+    enum: [EXECUTABLE, NOT_IMPLEMENTED]
+  SourceDirection:
+    type: string
+    description: What the source itself said, before any mapping.
+    enum: [DEBIT, CREDIT, NOT_STATED]
+  DirectionMapping:
+    type: string
+    description: How the source's statement was turned into the canonical sign.
+    enum: [MANUAL_ENTRY, SOURCE_DIRECTION_WORD, SOURCE_SIGNED_AMOUNT, SOURCE_SIGNED_AMOUNT_INVERTED]
+  RevisionAttribution:
+    type: string
+    enum: [SOURCE_IMPORT, MANUAL_ENTRY, USER_INPUT]
+  RevisableField:
+    type: string
+    enum: [amount, bookingDate, valueDate, merchant, description, note, status]
+  AssignmentSource:
+    type: string
+    description: >-
+      Who decided. There is no AI member and no SUGGESTED member: this
+      platform assigns categories deterministically or a person does.
+    enum: [USER, RULE]
+  AssignmentStatus:
+    type: string
+    enum: [ACTIVE, SUPERSEDED]
+  CategoryCode:
+    type: string
+    pattern: '^[A-Z][A-Z0-9_]{1,31}(\.[A-Z][A-Z0-9_]{1,31}){0,2}$'
+    description: A dotted catalogue code, at most three levels deep.
+  TransactionView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        transactionId,
+        accountId,
+        amount,
+        direction,
+        bookingDate,
+        valueDate,
+        eventOccurredAt,
+        sourceTimezone,
+        merchant,
+        description,
+        note,
+        originalAmount,
+        sourceKind,
+        availability,
+        status,
+        createdAt,
+        version,
+      ]
+    description: >-
+      One of the caller's own transactions. `amount` is SIGNED under the
+      canonical convention and `direction` restates it in words, so a client
+      renders an honest arrow without arithmetic.
+
+      Deliberately absent, and to stay absent: `tenantId` and `userId`; the
+      dedup fingerprint, its version and the occurrence ordinal; any
+      ciphertext, nonce, auth tag, algorithm or key version; the import
+      reference and the source row reference; and any category confidence.
+    properties:
+      transactionId: { type: string, format: uuid }
+      accountId: { type: string, format: uuid }
+      amount:
+        $ref: '#/components/MinorUnitAmount'
+      direction:
+        $ref: '#/components/MoneyDirection'
+      bookingDate:
+        type: string
+        format: date
+        description: The day the institution booked it (ADR-0027).
+      valueDate: { type: [string, 'null'], format: date }
+      eventOccurredAt:
+        type: [string, 'null']
+        format: date-time
+        description: A true instant, present only when the source stated one.
+      sourceTimezone: { type: [string, 'null'] }
+      merchant: { type: [string, 'null'] }
+      description: { type: string }
+      note: { type: [string, 'null'] }
+      originalAmount:
+        description: The amount as the source stated it, when its currency differed.
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/MinorUnitAmount'
+      sourceKind:
+        $ref: '#/components/SourceKind'
+      availability:
+        $ref: '#/components/RailAvailability'
+      status:
+        $ref: '#/components/TransactionStatus'
+      createdAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }
+  TransactionRevisionView:
+    type: object
+    additionalProperties: false
+    required: [revisionNumber, attribution, changedFields, values, recordedAt]
+    description: >-
+      One entry of the append-only history. Revision 1 is what was originally
+      recorded and lists no changed fields. The acting actor reference is
+      deliberately absent: it identifies a principal, and the caller is
+      already the only principal who can read this.
+    properties:
+      revisionNumber: { type: integer, minimum: 1 }
+      attribution:
+        $ref: '#/components/RevisionAttribution'
+      changedFields:
+        type: array
+        items:
+          $ref: '#/components/RevisableField'
+      values:
+        $ref: '#/components/RevisionValuesView'
+      recordedAt: { type: string, format: date-time }
+  RevisionValuesView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        amount,
+        direction,
+        bookingDate,
+        valueDate,
+        eventOccurredAt,
+        sourceTimezone,
+        merchant,
+        description,
+        note,
+        status,
+      ]
+    description: A COMPLETE snapshot of the revisable values, never a patch.
+    properties:
+      amount:
+        $ref: '#/components/MinorUnitAmount'
+      direction:
+        $ref: '#/components/MoneyDirection'
+      bookingDate: { type: string, format: date }
+      valueDate: { type: [string, 'null'], format: date }
+      eventOccurredAt: { type: [string, 'null'], format: date-time }
+      sourceTimezone: { type: [string, 'null'] }
+      merchant: { type: [string, 'null'] }
+      description: { type: string }
+      note: { type: [string, 'null'] }
+      status:
+        $ref: '#/components/TransactionStatus'
+  ProvenanceView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        revisionNumber,
+        sourceKind,
+        availability,
+        accountId,
+        importedFromStatement,
+        versions,
+        sourceDirection,
+        directionMapping,
+        categoryAssignmentSource,
+        createdAt,
+      ]
+    description: >-
+      The safe projection. `importedFromStatement` reports EXISTENCE of a
+      statement origin as a boolean; the import id and the row reference are
+      not carried, because a row reference is a handle into staged source
+      content.
+    properties:
+      revisionNumber: { type: integer, minimum: 1 }
+      sourceKind:
+        $ref: '#/components/SourceKind'
+      availability:
+        $ref: '#/components/RailAvailability'
+      accountId: { type: string, format: uuid }
+      importedFromStatement: { type: boolean }
+      versions:
+        $ref: '#/components/ProcessingVersionsView'
+      sourceDirection:
+        $ref: '#/components/SourceDirection'
+      directionMapping:
+        $ref: '#/components/DirectionMapping'
+      categoryAssignmentSource:
+        type: string
+        enum: [NONE, USER, RULE]
+      createdAt: { type: string, format: date-time }
+  ProcessingVersionsView:
+    type: object
+    additionalProperties: false
+    required: [parserVersion, mappingVersion, normalizationVersion, fingerprintVersion]
+    description: >-
+      The four versions that produced this value. `fingerprintVersion` is the
+      ALGORITHM version, never a fingerprint: it says how the identity was
+      computed, and reveals nothing about what it is.
+    properties:
+      parserVersion: { type: string }
+      mappingVersion: { type: string }
+      normalizationVersion: { type: string }
+      fingerprintVersion: { type: string }
+  CategoryAssignmentView:
+    type: object
+    additionalProperties: false
+    required: [assignmentId, categoryCode, assignmentSource, ruleVersion, status, assignedAt]
+    description: >-
+      Who decided this category and when. There is no confidence and no score.
+      `ruleVersion` is present only for a RULE assignment and is null for a
+      person's own choice.
+    properties:
+      assignmentId: { type: string, format: uuid }
+      categoryCode:
+        $ref: '#/components/CategoryCode'
+      assignmentSource:
+        $ref: '#/components/AssignmentSource'
+      ruleVersion: { type: [string, 'null'] }
+      status:
+        $ref: '#/components/AssignmentStatus'
+      assignedAt: { type: string, format: date-time }
+  CategoryView:
+    type: object
+    additionalProperties: false
+    required: [code, parentCode, labels, catalogueVersion, assignable, retiredAt]
+    properties:
+      code:
+        $ref: '#/components/CategoryCode'
+      parentCode:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/CategoryCode'
+      labels:
+        type: object
+        additionalProperties: false
+        required: [en, ar]
+        properties:
+          en: { type: string }
+          ar: { type: string }
+      catalogueVersion: { type: string }
+      assignable:
+        type: boolean
+        description: Whether this entry may be chosen now.
+      retiredAt: { type: [string, 'null'], format: date-time }
+  TransactionDeletedView:
+    type: object
+    additionalProperties: false
+    required: [transactionId, outcome, transferMatchesDeleted]
+    properties:
+      transactionId: { type: string, format: uuid }
+      outcome: { type: string, enum: [DELETED] }
+      transferMatchesDeleted: { type: integer, minimum: 0 }
+  TransactionPartiallyDeletedView:
+    type: object
+    additionalProperties: false
+    required: [transactionId, outcome, transferMatchesDeleted, code]
+    description: >-
+      A partial application, said out loud. `outcome` is PARTIALLY_APPLIED and
+      the count is what was really erased — never rounded to the count that
+      was intended.
+    properties:
+      transactionId: { type: string, format: uuid }
+      outcome: { type: string, enum: [PARTIALLY_APPLIED] }
+      transferMatchesDeleted: { type: integer, minimum: 0 }
+      code:
+        type: string
+        enum: [TRANSFER_MATCH_ERASURE_INCOMPLETE, DELETION_PARTIALLY_APPLIED]
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    properties:
+      type: { type: string }
+      title: { type: string }
+      status: { type: integer }
+      code:
+        type: string
+        description: >-
+          e.g. AUTHENTICATION_REQUIRED, TENANT_BINDING_REQUIRED,
+          INVALID_REQUEST, INVALID_CURSOR, TRANSACTION_NOT_FOUND,
+          ACCOUNT_NOT_FOUND, ACCOUNT_NOT_WRITABLE,
+          ACCOUNT_CURRENCY_MISMATCH, DUPLICATE_TRANSACTION,
+          OCCURRENCE_ORDINAL_NOT_NEXT, TRANSACTION_VERSION_CONFLICT,
+          NO_CHANGE, CATEGORY_UNKNOWN, USER_ASSIGNMENT_WINS,
+          RETENTION_UNRESOLVED, STORE_UNAVAILABLE.
+      detail: { type: string }
+      reason: { type: string }
+      retryable: { type: boolean }
+      requestId: { type: string }
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'
+  RetentionUnresolvedResponse:
+    description: >-
+      No approved retention decision governs this dataset, so nothing durable
+      may be written (code RETENTION_UNRESOLVED). The refusal is deliberate: a
+      retention period is a legal decision, and substituting one would be a
+      fabricated legal answer. The document names no pack version, no basis
+      and no approval reference.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'

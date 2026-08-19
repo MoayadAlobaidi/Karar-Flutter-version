@@ -68,6 +68,11 @@ import {
   testTransactionsEncryption,
   withAdapter,
 } from './fixtures.js';
+// The marker is IMPORTED, never typed. `tsc` emits these tests into the same
+// dist/ a deployment ships, so a fixture value written here travels exactly as
+// far as one written in source — which the retention closure test proves by
+// scanning every dist/ in the production closure.
+import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
 
 const unreachable = await probePostgres();
 if (unreachable !== null) {
@@ -249,7 +254,7 @@ const REFUSING_RETENTION: StatementRetentionDecisionPort = {
       state: 'PENDING_LEGAL_REVIEW',
       dataset,
       reason: 'the financial-data retention decision is with legal review',
-      packVersion: 'synthetic-local/SYNTHETIC-NO-LEGAL-EFFECT',
+      packVersion: `synthetic-local/${SYNTHETIC_RETENTION_MARKER}`,
     }),
 };
 

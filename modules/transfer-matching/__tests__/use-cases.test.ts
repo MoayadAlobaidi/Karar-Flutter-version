@@ -39,6 +39,11 @@ import { EraseTransferMatches } from '../application/use-cases/erase-transfer-ma
 import { ListOwnTransferMatches } from '../application/use-cases/list-own-transfer-matches.js';
 import { RejectTransferMatch } from '../application/use-cases/reject-transfer-match.js';
 import { SuggestTransferMatch } from '../application/use-cases/suggest-transfer-match.js';
+// The marker is IMPORTED, never typed. `tsc` emits these tests into the same
+// dist/ a deployment ships, so a fixture value written here travels exactly as
+// far as one written in source — which the retention closure test proves by
+// scanning every dist/ in the production closure.
+import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
 
 const TENANT = TenantId.of('aaaaaaaa-0000-4000-8000-00000000000a');
 const USER = UserId.of('a1a1a1a1-0000-4000-8000-0000000000a1');
@@ -188,8 +193,8 @@ class FakeRetention implements TransferMatchRetentionDecisionPort {
         state: 'DECIDED',
         dataset,
         retentionPeriod: 'P0D',
-        basis: 'SYNTHETIC-NO-LEGAL-EFFECT: unit-test fixture, not a legal determination',
-        approvalReference: 'karar-ref:approval:SYNTHETIC-NO-LEGAL-EFFECT/unit-test@v1',
+        basis: `${SYNTHETIC_RETENTION_MARKER}: unit-test fixture, not a legal determination`,
+        approvalReference: `karar-ref:approval:${SYNTHETIC_RETENTION_MARKER}/unit-test@v1`,
         packVersion: 'synthetic-unit-test',
       });
     }

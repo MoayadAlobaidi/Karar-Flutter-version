@@ -2,7 +2,7 @@
   "name": "@karar/statement-imports",
   "version": "0.0.0",
   "private": true,
-  "description": "CSV statement ingestion: source, parse, normalize, stage, preview, subject review, commit. Parsing never writes a financial record — only a reviewed commit does, atomically and idempotently. The retention decision is resolved before the first durable source byte exists, the raw file lives only as authenticated ciphertext outside PostgreSQL, and deduplication reuses the transactions module's canonical fingerprint rather than inventing a second one.",
+  "description": "CSV statement ingestion: source, parse, normalize, stage, preview, subject review, commit. Parsing never writes a financial record \u2014 only a reviewed commit does, atomically and idempotently. The retention decision is resolved before the first durable source byte exists, the raw file lives only as authenticated ciphertext outside PostgreSQL, and deduplication reuses the transactions module's canonical fingerprint rather than inventing a second one.",
   "type": "module",
   "main": "dist/public-api.js",
   "types": "dist/public-api.d.ts",

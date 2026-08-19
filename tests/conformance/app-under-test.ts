@@ -71,7 +71,7 @@ export interface WireResponse {
 }
 
 export interface RequestSpec {
-  readonly method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly url: string;
   readonly accessToken?: string;
   readonly payload?: unknown;
@@ -331,7 +331,13 @@ export class ComposedApp {
   async request(spec: RequestSpec): Promise<WireResponse> {
     const headers: Headers = { ...(spec.headers ?? {}) };
     if (spec.accessToken !== undefined) headers['authorization'] = `Bearer ${spec.accessToken}`;
-    if (spec.payload !== undefined) headers['content-type'] = 'application/json';
+    // JSON is the DEFAULT, not an override. A caller that states its own
+    // content type means it: the CSV statement route accepts `text/csv` and
+    // nothing else, and a harness that silently relabelled the body would
+    // have "proved" that route works while never once exercising it.
+    if (spec.payload !== undefined && headers['content-type'] === undefined) {
+      headers['content-type'] = 'application/json';
+    }
     const response = await this.app
       .getHttpAdapter()
       .getInstance()

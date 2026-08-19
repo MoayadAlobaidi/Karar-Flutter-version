@@ -266,12 +266,36 @@ describe('payload schema validation', () => {
 });
 
 describe('the canonical catalogue file', () => {
-  it('parses, and contains exactly the platform diagnostic event in Phase 2', () => {
+  it('parses, and holds exactly the events declared so far', () => {
+    // An exhaustive list, deliberately. A `toContain` would let an event be
+    // added without anyone reading its classification or payload rule, and the
+    // catalogue is the one place those are reviewed.
     const catalogue = readDefaultEventCatalogue();
-    expect(catalogue.events.map((entry) => entry.name)).toEqual([PLATFORM_DIAGNOSTIC_PING]);
+    expect(catalogue.events.map((entry) => entry.name)).toEqual([
+      PLATFORM_DIAGNOSTIC_PING,
+      'statement_import.committed',
+    ]);
     const ping = catalogue.events[0];
     expect(ping?.classification).toBe('INTERNAL');
     expect(ping?.piiFlag).toBe(false);
     expect(ping?.allowedConsumers).toEqual(['platform-tests', 'worker-diagnostics']);
+  });
+
+  it('the statement-import notice carries identifiers and nothing else', () => {
+    // The first HIGHLY_SENSITIVE_FINANCIAL event. Its payload is two ids
+    // because everything else a commit knows — how many rows, how much money,
+    // which merchant — is a fact about someone's spending rather than a
+    // reference to it. An earlier draft carried the committed-row count and
+    // the platform's payload rule refused it, which is the rule working.
+    const entry = readDefaultEventCatalogue().events.find(
+      (candidate) => candidate.name === 'statement_import.committed',
+    );
+    expect(entry?.classification).toBe('HIGHLY_SENSITIVE_FINANCIAL');
+    expect(entry?.payloadRule).toBe('identifier-only');
+    expect(entry?.payloadExemption).toBeNull();
+    expect(Object.keys(entry?.payloadSchema.properties ?? {}).sort()).toEqual([
+      'accountId',
+      'importId',
+    ]);
   });
 });

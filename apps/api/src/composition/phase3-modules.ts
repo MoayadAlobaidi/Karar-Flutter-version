@@ -120,6 +120,7 @@ import {
 import { PrincipalEnrichmentGuard } from '../auth/request-principal.js';
 import { JurisdictionConsentPinSource } from './consent-pin-source.js';
 import { composePhase35Modules } from './phase35-modules.js';
+import { composePhase5Modules } from './phase5-modules.js';
 
 export interface ShutdownResource {
   readonly name: string;
@@ -317,6 +318,17 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       entities: new PrismaOperatingEntityRepository(prisma.client),
       licences: new PrismaEntityLicenceRepository(prisma.client),
       edgeContext: new IdentityEdgeContext(trustedProxies, identityRuntime.deps.digester),
+    }),
+    // Phase 5: the financial surface. Its composition resolves every
+    // encryption, retention and source-store port through the modules' OWN
+    // fail-closed resolvers, so a deployed environment with no approved
+    // provider refuses to boot here rather than discovering it at the first
+    // write (phase5-modules.ts states the ordering that makes that hold).
+    ...composePhase5Modules({
+      environment: config.env,
+      prisma,
+      clock,
+      producer: config.service.name,
     }),
   ];
 

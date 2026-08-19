@@ -44,6 +44,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@karar/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
       '@karar/audit':
         specifier: workspace:*
         version: link:../../modules/audit
@@ -65,6 +68,12 @@ importers:
       '@karar/control-plane':
         specifier: workspace:*
         version: link:../../modules/control-plane
+      '@karar/financial-accounts':
+        specifier: workspace:*
+        version: link:../../modules/financial-accounts
+      '@karar/financial-connections':
+        specifier: workspace:*
+        version: link:../../modules/financial-connections
       '@karar/identity':
         specifier: workspace:*
         version: link:../../modules/identity
@@ -77,15 +86,27 @@ importers:
       '@karar/operating-entity':
         specifier: workspace:*
         version: link:../../modules/operating-entity
+      '@karar/payment-instruments':
+        specifier: workspace:*
+        version: link:../../modules/payment-instruments
       '@karar/platform':
         specifier: workspace:*
         version: link:../../packages/platform
       '@karar/shared-kernel':
         specifier: workspace:*
         version: link:../../packages/shared-kernel
+      '@karar/statement-imports':
+        specifier: workspace:*
+        version: link:../../modules/statement-imports
       '@karar/tenancy':
         specifier: workspace:*
         version: link:../../modules/tenancy
+      '@karar/transactions':
+        specifier: workspace:*
+        version: link:../../modules/transactions
+      '@karar/transfer-matching':
+        specifier: workspace:*
+        version: link:../../modules/transfer-matching
       '@karar/users':
         specifier: workspace:*
         version: link:../../modules/users
