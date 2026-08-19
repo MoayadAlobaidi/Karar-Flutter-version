@@ -103,14 +103,33 @@ The same test asserts the other half: **the match changes NEITHER transaction.**
 
 ## One transaction, at most one live match
 
-A transaction matched twice would have its movement explained away twice, and the person would see one real movement disappear from what they earned and spent. Enforced in two layers, because neither alone is enough:
+A transaction matched twice would have its movement explained away twice, and the person would see one real movement disappear from what they earned and spent. Enforced in **three** layers, because no two of them are enough:
 
 - **Two PARTIAL unique indexes** over the non-`REJECTED` rows, one per side. These settle a concurrent race properly — two writers contend for the same index entry and exactly one wins — and cover the common case.
 - **`transfer_matches_guard` (SQLSTATE `KAR42`)** for the case no index can express: the same transaction as the OUTFLOW of one match and the INFLOW of another. It runs `SECURITY INVOKER`, so the rows informing the answer are the caller's own.
+- **`transfer_matches_lock_transaction_pair`** — the mutual exclusion that makes that guard right *under concurrency* rather than only when nobody else is writing.
 
-**The residual is stated rather than hidden.** The trigger performs a `SELECT`, so two concurrent inserts that cross sides can both pass it before either commits. Closing that would need a serializable transaction or a lock the writer takes deliberately, and neither is a schema constraint; it is a repository decision and it has not been taken. In practice the suggestion path is not concurrent with itself today — there is no ingestion pipeline — so the gap is recorded here rather than papered over.
+### The cross-side residual this section used to record is closed
 
-Because the trigger is `BEFORE INSERT`, it fires before the unique index is checked, so even the same-side collision arrives as `KAR42` rather than `23505`. That ordering is deliberate: the caller gets a structured code instead of an index name it would have to parse, and the index remains the concurrency backstop. The schema suite asserts both — the code that actually fires, and the indexes' existence and partiality.
+It read: _"the trigger performs a `SELECT`, so two concurrent inserts that cross sides can both pass it before either commits … it is a repository decision and it has not been taken"_. The defect was real: a `SELECT` cannot see a row another session has written and not yet committed, so two writers proposing A→B and B→A at the same instant both found nothing, both passed the guard, and both committed. The indexes did not catch it either — the two rows collide on no single index entry, which is exactly why the crossing needed a trigger in the first place.
+
+The decision taken is **transaction-scoped advisory locks over both transactions**, claimed by `PrismaTransferMatchRepository.create` inside the same transaction as the insert. Three parts of it are load-bearing:
+
+| Choice | Why that one |
+|---|---|
+| `pg_advisory_xact_lock`, not a row lock and not a lease | there is no row to lock — the conflict is between two rows that do not exist yet. PostgreSQL releases the claim when the transaction ends: `COMMIT`, `ROLLBACK`, a statement timeout, a killed backend, alike. Nothing is written to take it, so there is nothing to clean up and no lease that can expire while the work is still running |
+| both locks taken in ascending **lock key** order | two sessions taking the same two locks in opposite orders deadlock. Sorting the two transaction **ids** looks like the fix and is not: the lock is over a HASH of the id, the hash is not monotonic in the id, so an order over ids is not an order over locks — three sessions holding `{A,B}`, `{B,C}`, `{C,A}` can still wait in a ring. The suite runs exactly that ring |
+| the ordering lives in the **database function**, not in the repository | the two writers a crossing pits against each other disagree about which transaction is the outflow, so any ordering derived from the sides would let both proceed. The function is symmetric in its arguments, and a PL/pgSQL loop is what makes the order real — a `SELECT` calling the lock function in its target list evaluates it once per row in an order the planner chooses, and `ORDER BY` sorts the *result* rather than the calls |
+
+**SERIALIZABLE with a bounded retry was the alternative, and was not chosen.** It would work. It would also put a retry loop in the one place this module must not have one: a retried suggestion is a second attempt to write a row about a person's money, and "how many times may this be retried, and what does the caller see on the last one" is a question with no good answer here. The claim has no such question — the loser is refused once, in this module's own vocabulary.
+
+**The loser receives the SAME typed refusal the serial path produces**: `transaction_already_matched`, naming the match it lost to and whether the collision was on the same side or across the two. Never a `store_failure`, never a driver error. That is the requirement the mechanism exists to satisfy rather than a side effect of it — a caller cannot act on "the store did not answer", and a bulk suggestion pass is built entirely on the difference between _already spoken for, skip it_ and _the store broke, stop_.
+
+**The claim is not the rule, and the difference is stated rather than glossed.** It is mutual exclusion between writers; the indexes and the guard are what decide who may exist. A writer that skips it — a direct `INSERT`, an importer nobody has written yet — is still refused. It merely reopens the race for itself.
+
+Because the trigger is `BEFORE INSERT`, it fires before the unique index is checked, so even the same-side collision arrives as `KAR42` rather than `23505`. That ordering is deliberate: the caller gets a structured code instead of an index name it would have to parse, and the index remains the concurrency backstop. It is also why the repository reads **which** collision it was off the surviving row rather than off the SQLSTATE — deriving the label from the code would report every race loser as a crossing, including the ones that were not. The schema suite asserts both — the code that actually fires, and the indexes' existence and partiality.
+
+**Proved against live PostgreSQL, not asserted.** `__tests__/one-live-match-under-concurrency.integration.test.ts` gives every contender its own `PrismaHandle` — its own pool, its own backend — and starts them with `Promise.all`, because two promises on one pooled connection queue instead of racing. It covers the same transaction proposed twice as the outflow and twice as the inflow, both crossings, six unrelated pairs that must all still succeed (a lock taken over the wrong thing would pass every other assertion while turning every suggestion into a queue of one), a rejection that must not block a later pairing, and the three-way waiting ring. The crossed-side race runs **50 consecutive times**, counting how often both committed, how many refusals were store failures, and how many deadlocked. Removing the claim from the repository moves that count from 0/50 to 47/50 both-committed — which is the only evidence that the test tests anything.
 
 ## A match may never span two subjects or two tenants
 
@@ -223,7 +242,7 @@ Cross-module references carry a raw UUID plus a reference type declared **in thi
 
 **No automatic suggestion pass.** Nothing in this module scans a person's transactions looking for candidate pairs. `SuggestTransferMatch` takes two ids a caller has already chosen, and the ingestion or review workstream that will find candidates is not written. That is deliberate for this phase: the rule is complete and enforced, and the thing that finds candidates can be built against a model that already refuses everything it must.
 
-**The cross-side concurrency residual**, stated above: the guard's `SELECT` is not race-proof, and closing it is a repository decision that has not been taken.
+**A writer that does not claim the pair is not protected by the claim.** The cross-side residual this file used to record is closed for every path that exists — `SuggestTransferMatch` through `PrismaTransferMatchRepository` is the only writer — and the *rule* is still enforced against any other, because the indexes and `transfer_matches_guard` refuse a crossing whoever writes it. What a skipping writer loses is the race, not the rule. Recorded here rather than in the closure above, because it is the shape of the remaining exposure and a future ingestion path is exactly where it would first matter.
 
 **Nothing resolves a chain.** Three transactions that form A → B → C are two separate movements and two separate matches; nothing here recognises a chain, and a "transfer path" would be a derived conclusion with its own correctness problem and its own name.
 

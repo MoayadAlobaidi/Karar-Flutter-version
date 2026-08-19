@@ -104,7 +104,7 @@
 -- ONE TRANSACTION, AT MOST ONE LIVE MATCH.
 --
 -- A transaction matched twice in a live state would have its movement
--- explained away twice. Enforced in two layers because neither alone is
+-- explained away twice. Enforced in THREE layers, because no two of them are
 -- enough:
 --
 --   * two PARTIAL UNIQUE INDEXES over the non-REJECTED rows, one per side.
@@ -115,12 +115,24 @@
 --     express: the same transaction appearing as the OUTFLOW of one match and
 --     the INFLOW of another. It runs SECURITY INVOKER, so the rows informing
 --     the answer are the caller's own.
+--   * transfer_matches_lock_transaction_pair — the mutual exclusion that guard
+--     needs in order to be right under concurrency. The guard answers with a
+--     SELECT, and no SELECT sees a row another session has written and not yet
+--     committed, so two inserts that CROSS SIDES (A→B in one, B→A in the
+--     other) could both pass it and both commit. A writer takes a
+--     transaction-scoped advisory lock over EACH of the two transactions
+--     before it inserts, so the second writer does not reach the guard until
+--     the first has committed or rolled back — and then the guard's SELECT
+--     sees the winner's row and raises the same KAR42 the serial path raises.
 --
--- The residual is stated rather than hidden: two concurrent inserts that
--- cross sides can both pass the trigger's SELECT before either commits.
--- Closing that would need a serializable transaction or a lock the writer
--- takes deliberately, and neither is a schema constraint; the module's
--- repository is where the choice belongs and MODULE.md records it.
+-- The third layer is a lock a WRITER takes and not a constraint the table
+-- carries, which is stated here rather than glossed: a direct INSERT that
+-- skips it is still refused by the indexes and by the guard, it merely reopens
+-- the crossed-side race for whoever wrote it. That is why the lock lives in a
+-- function next to the table instead of in one repository's source — the
+-- ordering rule it encodes is not a thing each caller should re-derive — and
+-- why the owning module's concurrency suite asserts the LOSER'S refusal is the
+-- typed one rather than asserting the lock was taken.
 --
 -- REJECTED rows are EXCLUDED from the live-state rules and are KEPT rather
 -- than deleted, for the reason 0097 gives about a declined source link:
@@ -177,11 +189,12 @@
 --     Erasure strategy: CASCADE_DELETE.
 --
 -- rollback: forward-only (README.md). A failed apply leaves nothing — one
--- transaction. Deliberate reversal would be DROP TRIGGER, DROP FUNCTION, DROP
--- POLICY, DROP TABLE public.transfer_matches — which destroys every
--- confirmation a person gave, leaving their own transfers reading as income
--- and expense again. The transactions themselves are untouched. Restore from
--- backup.
+-- transaction. Deliberate reversal would be DROP TRIGGER, DROP FUNCTION
+-- public.transfer_matches_guard(), DROP FUNCTION
+-- public.transfer_matches_lock_transaction_pair(uuid, uuid), DROP POLICY, DROP
+-- TABLE public.transfer_matches — which destroys every confirmation a person
+-- gave, leaving their own transfers reading as income and expense again. The
+-- transactions themselves are untouched. Restore from backup.
 
 CREATE TABLE public.transfer_matches (
   id                        uuid        PRIMARY KEY,
@@ -289,8 +302,11 @@ COMMENT ON TABLE public.transfer_matches IS
   'and a rate this platform chose would be a fabricated loss on a person''s '
   'own money. The two sides must be different transactions on different '
   'accounts, and a transaction may participate in at most ONE live '
-  '(non-REJECTED) match — two partial unique indexes plus '
-  'transfer_matches_guard (SQLSTATE KAR42) for the cross-side case. REJECTED '
+  '(non-REJECTED) match — two partial unique indexes, plus '
+  'transfer_matches_guard (SQLSTATE KAR42) for the cross-side case no index '
+  'can express, plus transfer_matches_lock_transaction_pair, which is what '
+  'makes that guard right under concurrency instead of only when nobody else '
+  'is writing. REJECTED '
   'rows are kept, not deleted: without them the same wrong suggestion '
   'returns on every import. THERE IS NO AMOUNT, NO TOTAL, NO NET AND NO '
   'CATEGORY COLUMN, and nothing in the owning module computes one. RLS '
@@ -440,6 +456,13 @@ BEGIN
   -- case and settle races; this arm covers the crossing. REJECTED rows are
   -- excluded on both sides: a refusal is history, and a person may reject one
   -- pairing and later accept a different one involving the same transaction.
+  --
+  -- This SELECT is CORRECT ONLY AGAINST COMMITTED ROWS, which is a property of
+  -- every SELECT and not a defect in this one. What makes it enough is
+  -- transfer_matches_lock_transaction_pair below: a writer that has claimed
+  -- both transactions cannot be running at the same time as another writer
+  -- that claimed either of them, so by the time this query runs the competing
+  -- row is either committed and visible here, or rolled back and gone.
   IF NEW.match_state <> 'REJECTED' THEN
     SELECT existing.id
       INTO conflicting_match
@@ -468,6 +491,94 @@ CREATE TRIGGER transfer_matches_guard
   BEFORE INSERT OR UPDATE ON public.transfer_matches
   FOR EACH ROW
   EXECUTE FUNCTION public.transfer_matches_guard();
+
+-- THE CROSSED-SIDE RACE, CLOSED.
+--
+-- The guard above answers with a SELECT, and no SELECT sees a row another
+-- session has written and not yet committed. So two writers proposing A→B and
+-- B→A at the same instant both find nothing and both commit, and one
+-- transaction ends up explained away twice — the exact outcome the whole rule
+-- exists to prevent. No index catches it either: the two rows collide on no
+-- single index entry, which is why the crossing needed a trigger in the first
+-- place.
+--
+-- A writer therefore CLAIMS both transactions before it inserts, with
+-- pg_advisory_xact_lock. Transaction-scoped is the load-bearing half:
+-- PostgreSQL releases the claim when the transaction ends, on a COMMIT, a
+-- ROLLBACK, a statement timeout, a lost connection or a killed backend alike.
+-- Nothing is written to hold it, so there is no lock row to clean up, no lease
+-- to expire, and no way to leave one behind.
+--
+-- WHY THE ORDER IS THE KEY ORDER AND NOT THE ID ORDER. Two sessions that take
+-- the same two locks in opposite orders deadlock, so the order has to be a
+-- total order every session computes identically. Sorting the two transaction
+-- ids would look like that and would not be: the lock is over a HASH of the
+-- id, the hash is not monotonic in the id, and an order over the ids is
+-- therefore not an order over the LOCKS. Three sessions holding {A,B}, {B,C}
+-- and {C,A} can still form a waiting cycle under it. The sort is over the lock
+-- keys themselves, because the keys are what is being taken.
+--
+-- The PL/pgSQL loop is what makes that ordering real rather than incidental. A
+-- single SELECT calling pg_advisory_xact_lock in its target list evaluates it
+-- once per row in an order the planner chooses, and an ORDER BY sorts the
+-- RESULT rather than the calls; a FOR loop over a sorted query acquires them
+-- one at a time, in the order the query returned.
+--
+-- The key is namespaced with the table name because advisory locks share one
+-- cluster-wide bigint space with every other caller (bootstrap.ts takes one
+-- over 'karar.bootstrap_roles'). A hash collision between two unrelated
+-- transactions costs a moment of contention and nothing else: the ROW rules
+-- decide who may exist, never the lock, so the worst a collision does is make
+-- two writers take turns. DISTINCT collapses a collision — and the impossible
+-- same-id pair — to one acquisition rather than two.
+--
+-- The claim reveals NOTHING. It is granted unconditionally, to whoever asks
+-- and over whatever they name, so a caller learns nothing from taking it or
+-- from waiting on it: not whether a match exists, not whether the transaction
+-- does, not whose it is. That is why it may be keyed on the transaction alone,
+-- with no principal in the key, without becoming an oracle. NULL is REFUSED
+-- rather than ignored, because pg_advisory_xact_lock(NULL) returns without
+-- locking anything and would reopen the race in silence.
+CREATE FUNCTION public.transfer_matches_lock_transaction_pair(
+  first_transaction_id  uuid,
+  second_transaction_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  lock_key bigint;
+BEGIN
+  IF first_transaction_id IS NULL OR second_transaction_id IS NULL THEN
+    RAISE EXCEPTION 'claiming a transfer-match pair needs BOTH transaction ids: pg_advisory_xact_lock(NULL) returns without taking anything, so a NULL here would silently reopen the crossed-side race this function exists to close'
+      USING ERRCODE = '22004';
+  END IF;
+
+  -- Which id is the outflow and which is the inflow is deliberately not a
+  -- parameter of this ordering: the two writers this protects against disagree
+  -- about exactly that, and a claim that depended on it would let both proceed.
+  FOR lock_key IN
+    SELECT DISTINCT hashtextextended('public.transfer_matches:' || claimed::text, 0)
+      FROM unnest(ARRAY[first_transaction_id, second_transaction_id]) AS claimed
+     ORDER BY 1
+  LOOP
+    PERFORM pg_advisory_xact_lock(lock_key);
+  END LOOP;
+END;
+$$;
+
+COMMENT ON FUNCTION public.transfer_matches_lock_transaction_pair(uuid, uuid) IS
+  'Claims BOTH transactions of a proposed match for the rest of the calling '
+  'transaction, so that transfer_matches_guard''s SELECT is right under '
+  'concurrency and not only when nobody else is writing: without it, two '
+  'inserts crossing sides (A→B and B→A) both pass the guard and both commit, '
+  'and one movement is explained away twice. Transaction-scoped, so the claim '
+  'is released by COMMIT, ROLLBACK, timeout or a lost backend with nothing to '
+  'clean up. The two locks are taken in ascending LOCK KEY order — not '
+  'ascending id order, which is not an order over the locks because the hash '
+  'is not monotonic — so two sessions naming the same pair cannot deadlock. '
+  'Symmetric in its arguments on purpose. Grants unconditionally and so '
+  'reveals nothing about any row. See migration 0099 and '
+  'modules/transfer-matching/MODULE.md.';
 
 -- DELETE is granted for the same reason as 0088, 0090, 0096, 0097 and 0098:
 -- the declared erasure strategy is CASCADE_DELETE, and erasing a transaction
