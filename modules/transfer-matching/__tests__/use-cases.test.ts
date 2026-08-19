@@ -27,13 +27,15 @@ import type {
 } from '../application/ports/transfer-match-retention-decision.js';
 import type {
   TransferMatchCreateOutcome,
+  TransferMatchPage,
+  TransferMatchPageQuery,
   TransferMatchRepository,
   TransferMatchUpdateOutcome,
 } from '../application/ports/transfer-match-repository.js';
 import type { IdSource } from '../application/ports/id-source.js';
 import type { MatchingPrincipal } from '../application/principal.js';
 import type { MatchedAccountRef, TransactionRef, TransferMatchId } from '../domain/refs.js';
-import type { MatchState, TransferMatch } from '../domain/transfer-match.js';
+import type { TransferMatch } from '../domain/transfer-match.js';
 import { ConfirmTransferMatch } from '../application/use-cases/confirm-transfer-match.js';
 import { EraseTransferMatches } from '../application/use-cases/erase-transfer-matches.js';
 import { ListOwnTransferMatches } from '../application/use-cases/list-own-transfer-matches.js';
@@ -54,18 +56,36 @@ const TX_OUT = 'd0000000-0000-4000-8000-000000000001';
 const TX_IN = 'e0000000-0000-4000-8000-000000000001';
 const clock = new Clock.Fixed(new Date('2026-08-19T12:00:00.000Z'));
 
+/**
+ * One page, no narrowing, big enough for every fixture in this file.
+ *
+ * The listing use case takes a WINDOW now, because the repository offers no
+ * unbounded read. This suite is about what the use case returns rather than
+ * about paging, so it asks for a page that comfortably holds the handful of
+ * matches each test seeds.
+ */
+const EVERY_MATCH_PAGE = { offset: 0, limit: 50 } as const;
+
 class InMemoryMatches implements TransferMatchRepository {
   readonly rows = new Map<string, TransferMatch>();
 
-  listOwn(): Promise<readonly TransferMatch[]> {
-    return Promise.resolve([...this.rows.values()]);
-  }
-
-  listOwnByState(
-    _actor: MatchingPrincipal,
-    state: MatchState,
-  ): Promise<readonly TransferMatch[]> {
-    return Promise.resolve([...this.rows.values()].filter((match) => match.state === state));
+  pageOwn(_actor: MatchingPrincipal, query: TransferMatchPageQuery): Promise<TransferMatchPage> {
+    // The fake cuts the page the way the real store does — narrow, order
+    // totally, skip, then read ONE more than asked for — so a caller that
+    // mistook the extra row for a result would fail here too.
+    const ordered = [...this.rows.values()]
+      .filter((match) => query.state === null || match.state === query.state)
+      .sort(
+        (left, right) =>
+          right.createdAt.getTime() - left.createdAt.getTime() ||
+          right.id.localeCompare(left.id),
+      );
+    const read = ordered.slice(query.offset, query.offset + query.limit + 1);
+    const hasMore = read.length > query.limit;
+    return Promise.resolve({
+      matches: hasMore ? read.slice(0, query.limit) : read,
+      hasMore,
+    });
   }
 
   findOwnById(
@@ -529,15 +549,15 @@ describe('the other use cases', () => {
   it('listing narrows by state and returns a list, never a figure', async () => {
     const { matches, match } = await seedOne();
     const list = new ListOwnTransferMatches(matches);
-    const suggested = await list.execute({ state: 'SUGGESTED' }, ACTOR);
+    const suggested = await list.execute({ state: 'SUGGESTED', ...EVERY_MATCH_PAGE }, ACTOR);
     expect(suggested.ok).toBe(true);
     if (suggested.ok) {
-      expect(suggested.value).toHaveLength(1);
-      expect(Array.isArray(suggested.value)).toBe(true);
+      expect(suggested.value.matches).toHaveLength(1);
+      expect(Array.isArray(suggested.value.matches)).toBe(true);
     }
-    const confirmed = await list.execute({ state: 'CONFIRMED' }, ACTOR);
+    const confirmed = await list.execute({ state: 'CONFIRMED', ...EVERY_MATCH_PAGE }, ACTOR);
     expect(confirmed.ok).toBe(true);
-    if (confirmed.ok) expect(confirmed.value).toHaveLength(0);
+    if (confirmed.ok) expect(confirmed.value.matches).toHaveLength(0);
     expect(match.state).toBe('SUGGESTED');
   });
 

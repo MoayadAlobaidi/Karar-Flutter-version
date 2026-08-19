@@ -38,12 +38,12 @@ import {
 } from '@karar/financial-accounts';
 import type {
   AccountNature,
+  AccountOrigin,
   AccountStatus,
   AccountType,
   CreateManualAccountInput,
-  FinancialAccount,
-  Institution,
   InstitutionRef,
+  ListOwnAccountsInput,
   UpdateOwnAccountInput,
   WalletKind,
 } from '@karar/financial-accounts';
@@ -241,10 +241,19 @@ export function readUpdateInput(accountId: string, body: unknown): Read<UpdateOw
   };
 }
 
-/** A predicate over the caller's OWN accounts. It narrows; it never widens. */
-export interface AccountFilters {
-  matches(account: FinancialAccount, institution: Institution | null): boolean;
-}
+/**
+ * The narrowing a caller asked for, as VALUES the module's page query takes.
+ *
+ * It used to be a predicate this file closed over and the controller ran on
+ * every account the caller owned. That read every row before discarding most
+ * of them, and it made the offset a cursor carries count rows in the
+ * unfiltered set — a different set from the one the caller is walking. So the
+ * narrowing is data now, and the store applies it.
+ *
+ * `null` means "do not narrow on this", and every field is present so a
+ * caller of this function cannot forget one.
+ */
+export type AccountFilters = Omit<ListOwnAccountsInput, 'offset' | 'limit'>;
 
 export function readAccountFilters(query: unknown): AccountFilters | InputRefusal {
   const institutionId = queryValue(query, 'institutionId');
@@ -252,6 +261,9 @@ export function readAccountFilters(query: unknown): AccountFilters | InputRefusa
     return refusal('institutionId', 'is not a reference');
   }
   const checks: Array<[string, readonly string[]]> = [
+    // The catalogue's own kinds are NOT checked here, exactly as before: this
+    // filter is answered by the catalogue row an account names, and a kind
+    // nothing in the catalogue has simply matches no account.
     ['institutionKind', []],
     ['accountType', ACCOUNT_TYPES],
     ['walletKind', WALLET_KINDS],
@@ -274,24 +286,13 @@ export function readAccountFilters(query: unknown): AccountFilters | InputRefusa
   }
 
   return {
-    matches(account, institution) {
-      if (institutionId !== undefined && account.institutionRef !== institutionId) return false;
-      const kind = values.get('institutionKind');
-      // A kind filter is a fact about the ISSUER, so an account naming no
-      // catalogue issuer matches no kind rather than matching every one.
-      if (kind !== undefined && (institution === null || institution.kind !== kind)) return false;
-      const type = values.get('accountType');
-      if (type !== undefined && account.accountType !== type) return false;
-      const wallet = values.get('walletKind');
-      if (wallet !== undefined && account.walletKind !== wallet) return false;
-      const nature = values.get('nature');
-      if (nature !== undefined && account.nature !== nature) return false;
-      const status = values.get('status');
-      if (status !== undefined && account.status !== status) return false;
-      const origin = values.get('origin');
-      if (origin !== undefined && account.origin !== origin) return false;
-      if (currency !== undefined && account.currency.code !== currency) return false;
-      return true;
-    },
+    institutionRef: (institutionId ?? null) as InstitutionRef | null,
+    institutionKind: values.get('institutionKind') ?? null,
+    accountType: (values.get('accountType') ?? null) as AccountType | null,
+    walletKind: (values.get('walletKind') ?? null) as WalletKind | null,
+    nature: (values.get('nature') ?? null) as AccountNature | null,
+    status: (values.get('status') ?? null) as AccountStatus | null,
+    origin: (values.get('origin') ?? null) as AccountOrigin | null,
+    currencyCode: currency ?? null,
   };
 }

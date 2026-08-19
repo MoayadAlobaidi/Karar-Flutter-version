@@ -20,6 +20,7 @@
  */
 
 import pg from 'pg';
+import { expect } from 'vitest';
 
 import { TenantId, UserId } from '@karar/shared-kernel';
 import {
@@ -35,10 +36,18 @@ import {
 } from '@karar/platform/dist/db/index.js';
 import { createPrismaClient, type PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
+import type { BalanceSnapshotRepository } from '../application/ports/balance-snapshot-repository.js';
+import type { FinancialAccountRepository } from '../application/ports/financial-account-repository.js';
 import type { FinancialAccountRetentionDecisionPort } from '../application/ports/financial-account-retention-decision.js';
 import type { HsfFieldEncryptionPort } from '../application/ports/hsf-field-encryption.js';
 import type { AccountsPrincipal } from '../application/principal.js';
-import type { InstitutionRef, SourceReference } from '../domain/refs.js';
+import type { BalanceSnapshot } from '../domain/balance-snapshot.js';
+import type { FinancialAccount } from '../domain/financial-account.js';
+import type {
+  FinancialAccountId,
+  InstitutionRef,
+  SourceReference,
+} from '../domain/refs.js';
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
 
@@ -259,4 +268,137 @@ export async function dropDatabase(database: string): Promise<void> {
 
 export function buildHandle(database: string): PrismaHandle {
   return createPrismaClient(appProfile(database));
+}
+
+
+/**
+ * The window an isolation probe reads through, now that neither repository
+ * offers an unbounded list.
+ *
+ * `expectEveryVisible*` deliberately asserts `hasMore` is false before
+ * handing the rows back. Without that assertion a probe would silently become
+ * weaker the day a fixture seeds more rows than the limit: "this principal
+ * sees nothing of that one" would start passing because the page ran out
+ * rather than because the rows did, and an isolation suite that stops
+ * isolating looks exactly like one that never had anything to find.
+ */
+const PROBE_PAGE = { offset: 0, limit: 50 } as const;
+
+/** No narrowing at all — the probe asks for everything the principal can see. */
+const NO_ACCOUNT_NARROWING = {
+  institutionRef: null,
+  institutionKind: null,
+  accountType: null,
+  walletKind: null,
+  nature: null,
+  status: null,
+  origin: null,
+  currencyCode: null,
+} as const;
+
+export async function expectEveryVisibleAccount(
+  repository: FinancialAccountRepository,
+  actor: AccountsPrincipal,
+): Promise<readonly FinancialAccount[]> {
+  const page = await repository.pageOwn(actor, { ...NO_ACCOUNT_NARROWING, ...PROBE_PAGE });
+  expect(page.hasMore).toBe(false);
+  return page.accounts;
+}
+
+export async function expectEveryVisibleSnapshot(
+  repository: BalanceSnapshotRepository,
+  actor: AccountsPrincipal,
+  accountId: FinancialAccountId,
+): Promise<readonly BalanceSnapshot[]> {
+  const page = await repository.pageForOwnAccount(actor, {
+    accountId,
+    balanceKind: null,
+    sourceKind: null,
+    ...PROBE_PAGE,
+  });
+  expect(page.hasMore).toBe(false);
+  return page.snapshots;
+}
+
+/** The listing inputs a suite uses when it is not testing paging itself. */
+export const EVERY_ACCOUNT_PAGE = { ...NO_ACCOUNT_NARROWING, ...PROBE_PAGE } as const;
+
+export function everySnapshotPage(accountId: FinancialAccountId) {
+  return { accountId, balanceKind: null, sourceKind: null, ...PROBE_PAGE } as const;
+}
+
+
+/**
+ * What one `findMany` actually did: the cap the statement carried, and the
+ * number of rows PostgreSQL handed back.
+ */
+export interface ObservedRead {
+  readonly model: string;
+  /** The row cap in the statement, or `undefined` when it carried none. */
+  readonly take: number | undefined;
+  /** How many rows the database actually returned. */
+  readonly rows: number;
+}
+
+/**
+ * A handle that records every `findMany` a repository issues inside its
+ * principal-context transaction.
+ *
+ * THIS IS WHAT MAKES A PAGE-BOUND TEST A CLAIM ABOUT THE DATABASE. Asserting
+ * that a page holds `limit` rows proves only that something trimmed a list —
+ * a repository that read every row a subject owns and sliced afterwards
+ * satisfies it exactly as a bounded one does. What separates the two is how
+ * many rows crossed the wire, so that is what is recorded here, read off the
+ * array PostgreSQL returned rather than off the page built from it.
+ *
+ * `withPrincipalContext` reaches the store through `client.$transaction`, so
+ * this substitutes the transaction client the callback receives and leaves
+ * every other property alone — including the `$queryRaw` that binds the
+ * principal GUCs, so an observed read runs under exactly the RLS context a
+ * real one does.
+ */
+export function observingHandle(handle: PrismaHandle, seen: ObservedRead[]): PrismaHandle {
+  const client = new Proxy(handle.client, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      if (typeof value !== 'function') return value;
+      const bound = value.bind(target) as (...args: unknown[]) => unknown;
+      if (property !== '$transaction') return bound;
+      return (first: unknown, ...rest: unknown[]): unknown =>
+        typeof first === 'function'
+          ? bound(
+              (tx: object) => (first as (tx: unknown) => unknown)(observedTransaction(tx, seen)),
+              ...rest,
+            )
+          : bound(first, ...rest);
+    },
+  });
+  return { client, pool: handle.pool, end: () => handle.end() };
+}
+
+/** The transaction client, with `findMany` on every model delegate observed. */
+function observedTransaction(tx: object, seen: ObservedRead[]): object {
+  return new Proxy(tx, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      // `$`-prefixed members are Prisma's own plumbing and are passed through
+      // untouched; only the model delegates are wrapped.
+      if (typeof property !== 'string' || property.startsWith('$')) {
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      if (typeof value !== 'object' || value === null) return value;
+      return new Proxy(value, {
+        get(model, method) {
+          const inner: unknown = Reflect.get(model, method);
+          if (method !== 'findMany' || typeof inner !== 'function') return inner;
+          const call = inner.bind(model) as (args: unknown) => Promise<unknown[]>;
+          return async (args: { readonly take?: number }): Promise<unknown[]> => {
+            const rows = await call(args);
+            seen.push({ model: property, take: args.take, rows: rows.length });
+            return rows;
+          };
+        },
+      });
+    },
+  });
 }

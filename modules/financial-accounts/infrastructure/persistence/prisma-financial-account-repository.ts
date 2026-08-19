@@ -50,6 +50,8 @@ import type { HsfFieldEncryptionPort } from '../../application/ports/hsf-field-e
 import type {
   AccountDeleteOutcome,
   AccountUpdateOutcome,
+  FinancialAccountPage,
+  FinancialAccountPageQuery,
   FinancialAccountRepository,
 } from '../../application/ports/financial-account-repository.js';
 import type { AccountsPrincipal } from '../../application/principal.js';
@@ -91,24 +93,54 @@ export class PrismaFinancialAccountRepository implements FinancialAccountReposit
     });
   }
 
-  listOwn(actor: AccountsPrincipal): Promise<readonly FinancialAccount[]> {
+  pageOwn(
+    actor: AccountsPrincipal,
+    query: FinancialAccountPageQuery,
+  ): Promise<FinancialAccountPage> {
     return this.inContext(actor, async (tx) => {
       const rows = await tx.financialAccount.findMany({
         where: {
           tenantId: TenantId.toString(actor.tenantId),
           userId: UserId.toString(actor.userId),
+          ...(query.institutionRef === null ? {} : { institutionRef: query.institutionRef }),
+          // The issuer's KIND, asked of the catalogue row this account names.
+          // Expressed as a relation predicate so the store decides it: an
+          // account naming no catalogue issuer matches no kind, which is the
+          // behaviour a filter applied afterwards had, and doing it here is
+          // what lets the page be cut before the rows are read.
+          ...(query.institutionKind === null
+            ? {}
+            : { institution: { is: { kind: query.institutionKind } } }),
+          ...(query.accountType === null ? {} : { accountType: query.accountType }),
+          ...(query.walletKind === null ? {} : { walletKind: query.walletKind }),
+          ...(query.nature === null ? {} : { accountNature: query.nature }),
+          ...(query.status === null ? {} : { status: query.status }),
+          ...(query.origin === null ? {} : { originKind: query.origin }),
+          ...(query.currencyCode === null ? {} : { currencyCode: query.currencyCode }),
         },
-        orderBy: { createdAt: 'asc' },
+        // The row id closes the order. `created_at` alone leaves two accounts
+        // opened in the same instant interchangeable, and an interchangeable
+        // pair straddling a page boundary is a row a caller never sees and
+        // another they see twice.
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        skip: query.offset,
+        // ONE row past the page, which answers "is there another page"
+        // without a second statement — and, more importantly, is what keeps
+        // this read bounded by the caller's limit rather than by how many
+        // accounts the caller happens to hold.
+        take: query.limit + 1,
       });
+      const hasMore = rows.length > query.limit;
       // Sequential rather than concurrent: a key-management provider is a
       // rate-limited external dependency in every environment but this one,
       // and a listing that fans out one call per field per row is how a
-      // page load becomes a throttling incident.
+      // page load becomes a throttling incident. It now runs over ONE page
+      // rather than over everything the caller owns.
       const accounts: FinancialAccount[] = [];
-      for (const row of rows) {
+      for (const row of hasMore ? rows.slice(0, query.limit) : rows) {
         accounts.push(await toFinancialAccount(row, this.encryption, actor));
       }
-      return accounts;
+      return { accounts, hasMore };
     });
   }
 

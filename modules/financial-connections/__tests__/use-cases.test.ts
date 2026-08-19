@@ -35,6 +35,7 @@ import {
 import {
   ACTOR_A1,
   ACTOR_A2,
+  EVERY_SOURCE_LINK_PAGE,
   SYNTHETIC_SOURCE_REF_ONE,
   SYNTHETIC_SOURCE_REF_TWO,
   testFingerprints,
@@ -296,11 +297,14 @@ describe('the exact path — the whole point of the redesign', () => {
     expect(second.value.link.subjectConfirmedAt).toBeNull();
 
     // ONE account, TWO connections feeding it.
-    const forAccount = await list.execute({ accountId: ACCOUNT_ONE }, ACTOR_A1);
+    const forAccount = await list.execute(
+      { accountId: ACCOUNT_ONE, ...EVERY_SOURCE_LINK_PAGE },
+      ACTOR_A1,
+    );
     expect(forAccount.ok).toBe(true);
     if (!forAccount.ok) return;
-    expect(forAccount.value).toHaveLength(2);
-    expect(new Set(forAccount.value.map((link) => link.connectionId)).size).toBe(2);
+    expect(forAccount.value.items).toHaveLength(2);
+    expect(new Set(forAccount.value.items.map((link) => link.connectionId)).size).toBe(2);
   });
 
   it('re-proposing through the same connection is a duplicate, answered with the existing link', async () => {
@@ -327,9 +331,9 @@ describe('the exact path — the whole point of the redesign', () => {
     expect(again.ok).toBe(true);
     if (!again.ok) return;
     expect(again.value.link.id).toBe(first.value.link.id);
-    const all = await list.execute({}, ACTOR_A1);
+    const all = await list.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(all.ok).toBe(true);
-    if (all.ok) expect(all.value).toHaveLength(1);
+    if (all.ok) expect(all.value.items).toHaveLength(1);
   });
 
   it('one connection may feed MANY accounts', async () => {
@@ -348,11 +352,11 @@ describe('the exact path — the whole point of the redesign', () => {
       );
       expect(proposed.ok, `${account} must link`).toBe(true);
     }
-    const all = await list.execute({}, ACTOR_A1);
+    const all = await list.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(all.ok).toBe(true);
     if (!all.ok) return;
-    expect(all.value).toHaveLength(2);
-    expect(new Set(all.value.map((link) => link.accountRef.accountId)).size).toBe(2);
+    expect(all.value.items).toHaveLength(2);
+    expect(new Set(all.value.items.map((link) => link.accountRef.accountId)).size).toBe(2);
   });
 });
 
@@ -555,8 +559,8 @@ describe('erasing an account reaches its source links', () => {
     if (again.ok) expect(again.value.accountSourceLinksDeleted).toBe(0);
 
     // The other account's link survives — erasure is scoped, not a purge.
-    const remaining = await list.execute({}, ACTOR_A1);
+    const remaining = await list.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(remaining.ok).toBe(true);
-    if (remaining.ok) expect(remaining.value).toHaveLength(1);
+    if (remaining.ok) expect(remaining.value.items).toHaveLength(1);
   });
 });

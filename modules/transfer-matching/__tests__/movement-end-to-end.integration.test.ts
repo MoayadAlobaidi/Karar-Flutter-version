@@ -45,6 +45,7 @@ import { SUGGESTION_WINDOW_DAYS, SUGGESTION_WINDOW_VERSION } from '../domain/sug
 import {
   ACTOR_A1,
   BOOKED,
+  EVERY_MATCH_PAGE,
   buildHandle,
   dropDatabase,
   money,
@@ -211,10 +212,10 @@ describe.skipIf(unreachable !== null)('one movement of the person’s own money'
   });
 
   it('the match changes NEITHER transaction — both are exactly as written', async () => {
-    const listed = await list.execute({ state: 'SUGGESTED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'SUGGESTED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const match = listed.value[0];
+    const match = listed.value.matches[0];
     expect(match).toBeDefined();
     if (match === undefined) return;
 
@@ -239,23 +240,23 @@ describe.skipIf(unreachable !== null)('one movement of the person’s own money'
   });
 
   it('a SUGGESTED match carries no decision until the person makes one', async () => {
-    const listed = await list.execute({ state: 'SUGGESTED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'SUGGESTED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const match = listed.value[0];
+    const match = listed.value.matches[0];
     expect(match?.subjectDecidedAt).toBeNull();
 
     // And there is no CONFIRMED match yet at all.
-    const confirmed = await list.execute({ state: 'CONFIRMED' }, ACTOR_A1);
+    const confirmed = await list.execute({ state: 'CONFIRMED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(confirmed.ok).toBe(true);
-    if (confirmed.ok) expect(confirmed.value).toHaveLength(0);
+    if (confirmed.ok) expect(confirmed.value.matches).toHaveLength(0);
   });
 
   it('confirming records the instant and is the only path to authoritative', async () => {
-    const listed = await list.execute({ state: 'SUGGESTED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'SUGGESTED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const match = listed.value[0];
+    const match = listed.value.matches[0];
     if (match === undefined) throw new Error('no suggestion to confirm');
 
     const confirmed = await confirm.execute(
@@ -275,10 +276,10 @@ describe.skipIf(unreachable !== null)('one movement of the person’s own money'
   });
 
   it('a stale confirmation is refused rather than applied', async () => {
-    const listed = await list.execute({ state: 'CONFIRMED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'CONFIRMED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const match = listed.value[0];
+    const match = listed.value.matches[0];
     if (match === undefined) throw new Error('no confirmed match');
     const stale = await confirm.execute({ matchId: match.id, expectedVersion: 1 }, ACTOR_A1);
     expect(stale.ok).toBe(false);
@@ -352,10 +353,10 @@ describe.skipIf(unreachable !== null)('one movement of the person’s own money'
   });
 
   it('a transaction already in a live match cannot join another', async () => {
-    const listed = await list.execute({ state: 'CONFIRMED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'CONFIRMED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const confirmed = listed.value[0];
+    const confirmed = listed.value.matches[0];
     if (confirmed === undefined) throw new Error('no confirmed match');
 
     const other = await seedTransaction(seeder, ACTOR_A1, {
@@ -381,10 +382,10 @@ describe.skipIf(unreachable !== null)('one movement of the person’s own money'
   });
 
   it('rejecting a match frees both transactions for a different pairing', async () => {
-    const listed = await list.execute({ state: 'CONFIRMED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'CONFIRMED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const confirmed = listed.value[0];
+    const confirmed = listed.value.matches[0];
     if (confirmed === undefined) throw new Error('no confirmed match');
 
     const withdrawn = await reject.execute(
@@ -416,10 +417,10 @@ describe.skipIf(unreachable !== null)('one movement of the person’s own money'
   });
 
   it('erasing a TRANSACTION takes every match that names it, on either side', async () => {
-    const listed = await list.execute({ state: 'SUGGESTED' }, ACTOR_A1);
+    const listed = await list.execute({ state: 'SUGGESTED', ...EVERY_MATCH_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const match = listed.value[0];
+    const match = listed.value.matches[0];
     if (match === undefined) throw new Error('no suggestion to erase around');
 
     const erased = await eraser.eraseTransferMatchesForTransaction(

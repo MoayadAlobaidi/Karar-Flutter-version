@@ -46,6 +46,7 @@ import {
   ACTOR_A1,
   ACTOR_A2,
   ACTOR_B1,
+  EVERY_ACCOUNT_PAGE,
   INSTITUTION_ACTIVE,
   INSTITUTION_SECOND_ACTIVE,
   TENANT_A,
@@ -56,6 +57,7 @@ import {
   asApp,
   buildHandle,
   dropDatabase,
+  expectEveryVisibleAccount,
   probePostgres,
   provisionDatabase,
   skipBanner,
@@ -288,24 +290,27 @@ describe.skipIf(unreachable !== null)(
     });
 
     it('one person holds the whole awkward portfolio, and every account is its own row', async () => {
-      const own = await list.execute(ACTOR_A1);
+      const own = await list.execute(EVERY_ACCOUNT_PAGE, ACTOR_A1);
       expect(own.ok).toBe(true);
       if (!own.ok) return;
-      expect(own.value).toHaveLength(PORTFOLIO.length);
+      expect(own.value.accounts).toHaveLength(PORTFOLIO.length);
+      // The whole portfolio fit in one page, so every count below is a count
+      // of ROWS rather than of however many the page happened to hold.
+      expect(own.value.hasMore).toBe(false);
 
       // Identity is the id: thirteen accounts, thirteen distinct ids, and no
       // two of them collapsed into one another by any attribute they share.
-      const ids = new Set(own.value.map((account) => account.id));
+      const ids = new Set(own.value.accounts.map((account) => account.id));
       expect(ids.size).toBe(PORTFOLIO.length);
 
-      const names = own.value.map((account) => account.displayName.reveal()).sort();
+      const names = own.value.accounts.map((account) => account.displayName.reveal()).sort();
       expect(names).toEqual([...PORTFOLIO].map((input) => input.displayName).sort());
     });
 
     it('two CURRENT accounts in one currency at ONE issuer both exist', async () => {
-      const own = await list.execute(ACTOR_A1);
+      const own = await list.execute(EVERY_ACCOUNT_PAGE, ACTOR_A1);
       if (!own.ok) throw new Error('listing failed');
-      const pair = own.value.filter(
+      const pair = own.value.accounts.filter(
         (account) =>
           account.institutionRef === INSTITUTION_ACTIVE &&
           account.accountType === 'CURRENT' &&
@@ -318,9 +323,9 @@ describe.skipIf(unreachable !== null)(
     });
 
     it('two credit cards from one issuer, and a foreign-currency savings account beside them', async () => {
-      const own = await list.execute(ACTOR_A1);
+      const own = await list.execute(EVERY_ACCOUNT_PAGE, ACTOR_A1);
       if (!own.ok) throw new Error('listing failed');
-      const atFirstIssuer = own.value.filter(
+      const atFirstIssuer = own.value.accounts.filter(
         (account) => account.institutionRef === INSTITUTION_ACTIVE,
       );
       expect(
@@ -339,9 +344,9 @@ describe.skipIf(unreachable !== null)(
     });
 
     it('two mobile-money wallets and a payroll wallet at ONE issuer all coexist', async () => {
-      const own = await list.execute(ACTOR_A1);
+      const own = await list.execute(EVERY_ACCOUNT_PAGE, ACTOR_A1);
       if (!own.ok) throw new Error('listing failed');
-      const wallets = own.value.filter(
+      const wallets = own.value.accounts.filter(
         (account) =>
           account.accountType === 'WALLET' && account.institutionRef === INSTITUTION_ACTIVE,
       );
@@ -356,19 +361,19 @@ describe.skipIf(unreachable !== null)(
     });
 
     it('accounts at a second issuer, cash, and an unlisted institution complete the set', async () => {
-      const own = await list.execute(ACTOR_A1);
+      const own = await list.execute(EVERY_ACCOUNT_PAGE, ACTOR_A1);
       if (!own.ok) throw new Error('listing failed');
       expect(
-        own.value.filter((account) => account.institutionRef === INSTITUTION_SECOND_ACTIVE),
+        own.value.accounts.filter((account) => account.institutionRef === INSTITUTION_SECOND_ACTIVE),
       ).toHaveLength(3);
-      const cash = own.value.filter((account) => account.accountType === 'CASH');
+      const cash = own.value.accounts.filter((account) => account.accountType === 'CASH');
       expect(cash).toHaveLength(1);
       expect(cash[0]?.institutionRef).toBeNull();
       expect(cash[0]?.walletKind).toBeNull();
 
       // The unlisted institution stays on the subject's own row as ciphertext
       // and never enters the global catalogue.
-      const unlisted = own.value.filter(
+      const unlisted = own.value.accounts.filter(
         (account) => account.userSuppliedInstitutionLabel !== null,
       );
       expect(unlisted).toHaveLength(1);
@@ -412,11 +417,11 @@ describe.skipIf(unreachable !== null)(
       // The failure a tenant-only predicate would produce: two members of one
       // household tenant reading each other's accounts.
       const neighbour: AccountsPrincipal = ACTOR_A2;
-      const listed = await list.execute(neighbour);
+      const listed = await list.execute(EVERY_ACCOUNT_PAGE, neighbour);
       expect(listed.ok).toBe(true);
-      if (listed.ok) expect(listed.value).toEqual([]);
+      if (listed.ok) expect(listed.value.accounts).toEqual([]);
 
-      expect(await accounts.listOwn(neighbour)).toEqual([]);
+      expect(await expectEveryVisibleAccount(accounts, neighbour)).toEqual([]);
 
       const raw = await asApp(database, gucA2, (tx) =>
         tx.query<{ count: string }>(
@@ -428,11 +433,11 @@ describe.skipIf(unreachable !== null)(
 
     it('a person in another tenant sees none of it either, through every path', async () => {
       const outsider: AccountsPrincipal = ACTOR_B1;
-      const listed = await list.execute(outsider);
+      const listed = await list.execute(EVERY_ACCOUNT_PAGE, outsider);
       expect(listed.ok).toBe(true);
-      if (listed.ok) expect(listed.value).toEqual([]);
+      if (listed.ok) expect(listed.value.accounts).toEqual([]);
 
-      expect(await accounts.listOwn(outsider)).toEqual([]);
+      expect(await expectEveryVisibleAccount(accounts, outsider)).toEqual([]);
 
       const raw = await asApp(database, gucB1, (tx) =>
         tx.query<{ count: string }>(

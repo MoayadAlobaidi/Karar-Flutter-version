@@ -76,15 +76,52 @@ export type TransferMatchUpdateOutcome =
   | { readonly kind: 'stale' }
   | { readonly kind: 'not_found' };
 
-export interface TransferMatchRepository {
-  /** The principal's own matches, newest first. */
-  listOwn(actor: MatchingPrincipal): Promise<readonly TransferMatch[]>;
+/**
+ * What one page of the principal's own matches asks for.
+ *
+ * **The bound travels INTO the query.** A match row is written for every pair
+ * the suggestion rule finds and is kept even once rejected — that is what
+ * stops the same pair being suggested again as though nobody had looked — so
+ * this table grows with a person's transactions and nothing prunes it. A read
+ * of all of it is a read whose size is decided by how long somebody has used
+ * the product.
+ *
+ * The state filter goes down with the bound rather than being applied to the
+ * answer, because an offset counted over every state names a position in a
+ * set the caller is not walking.
+ */
+export interface TransferMatchPageQuery {
+  /** Narrow to one state; `null` reads every state. */
+  readonly state: TransferMatch['state'] | null;
+  /** How many rows the caller's cursor has already consumed. */
+  readonly offset: number;
+  /** How many rows to return. */
+  readonly limit: number;
+}
 
-  /** The principal's own matches in one state, newest first. */
-  listOwnByState(
+/**
+ * One page, and whether another exists.
+ *
+ * `hasMore` is a BOOLEAN, deliberately: it answers "ask again?" and is not a
+ * figure about the caller's matches. A remaining-row number here would be the
+ * first quantity this module ever published about a person's transfers.
+ */
+export interface TransferMatchPage {
+  readonly matches: readonly TransferMatch[];
+  readonly hasMore: boolean;
+}
+
+export interface TransferMatchRepository {
+  /**
+   * One page of the principal's own matches, newest first, `id` breaking ties
+   * so the order is TOTAL. Two matches written in the same instant are
+   * otherwise interchangeable, and a page boundary falling between two
+   * interchangeable rows drops one and repeats the other.
+   */
+  pageOwn(
     actor: MatchingPrincipal,
-    state: TransferMatch['state'],
-  ): Promise<readonly TransferMatch[]>;
+    query: TransferMatchPageQuery,
+  ): Promise<TransferMatchPage>;
 
   /** The principal's own row, or `null` — another subject's id is `null` too. */
   findOwnById(

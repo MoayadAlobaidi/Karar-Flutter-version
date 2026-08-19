@@ -78,6 +78,8 @@ import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
 import type {
   TransferMatchCreateOutcome,
+  TransferMatchPage,
+  TransferMatchPageQuery,
   TransferMatchRepository,
   TransferMatchUpdateOutcome,
 } from '../../application/ports/transfer-match-repository.js';
@@ -149,33 +151,34 @@ export class PrismaTransferMatchRepository implements TransferMatchRepository {
     return rows.map((row) => toTransferMatch(row));
   }
 
-  listOwn(actor: MatchingPrincipal): Promise<readonly TransferMatch[]> {
+  pageOwn(actor: MatchingPrincipal, query: TransferMatchPageQuery): Promise<TransferMatchPage> {
     return this.inContext(actor, async (tx) => {
       const rows = await tx.transferMatch.findMany({
         where: {
           tenantId: TenantId.toString(actor.tenantId),
           userId: UserId.toString(actor.userId),
+          ...(query.state === null ? {} : { matchState: query.state }),
         },
+        // Newest first, with the row id closing the order. Two matches
+        // written in the same instant are otherwise interchangeable, and a
+        // page boundary between two interchangeable rows drops one and
+        // repeats the other for whoever walks the cursor.
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: query.offset,
+        // ONE row past the page: it reports whether another page exists
+        // without a second statement — which matters here, because the second
+        // statement a caller would reach for is the counting one this module
+        // refuses to offer — and it is what keeps this read bounded by the
+        // caller's limit rather than by how many matches they have
+        // accumulated.
+        take: query.limit + 1,
       });
-      return PrismaTransferMatchRepository.map(rows as readonly TransferMatchRow[]);
-    });
-  }
-
-  listOwnByState(
-    actor: MatchingPrincipal,
-    state: TransferMatch['state'],
-  ): Promise<readonly TransferMatch[]> {
-    return this.inContext(actor, async (tx) => {
-      const rows = await tx.transferMatch.findMany({
-        where: {
-          matchState: state,
-          tenantId: TenantId.toString(actor.tenantId),
-          userId: UserId.toString(actor.userId),
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      });
-      return PrismaTransferMatchRepository.map(rows as readonly TransferMatchRow[]);
+      const hasMore = rows.length > query.limit;
+      const page = hasMore ? rows.slice(0, query.limit) : rows;
+      return {
+        matches: PrismaTransferMatchRepository.map(page as readonly TransferMatchRow[]),
+        hasMore,
+      };
     });
   }
 

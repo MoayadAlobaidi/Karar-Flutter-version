@@ -35,6 +35,7 @@
  */
 
 import pg from 'pg';
+import { expect } from 'vitest';
 
 import { CalendarDay, Clock, Money, TenantId, UserId } from '@karar/shared-kernel';
 import type { Currency } from '@karar/shared-kernel';
@@ -73,8 +74,10 @@ import {
   type TransactionsPrincipal,
 } from '@karar/transactions';
 
+import type { TransferMatchRepository } from '../application/ports/transfer-match-repository.js';
 import type { TransferMatchRetentionDecisionPort } from '../application/ports/transfer-match-retention-decision.js';
 import type { MatchingPrincipal } from '../application/principal.js';
+import type { TransferMatch } from '../domain/transfer-match.js';
 import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
 
 export const TENANT_A = TenantId.of('aaaaaaaa-0000-4000-8000-00000000000a');
@@ -417,4 +420,102 @@ export async function seedTransaction(
     throw new Error(`fixture could not create a transaction: ${JSON.stringify(created.error)}`);
   }
   return created.value.id;
+}
+
+
+/**
+ * The window a probe reads through, now that the repository offers no
+ * unbounded list.
+ *
+ * `expectEveryVisibleMatch` asserts `hasMore` is false before handing the
+ * rows back. Without it a probe would silently weaken the day a fixture seeds
+ * more matches than the limit: "this principal sees nothing of that one"
+ * would start passing because the page ran out rather than because the rows
+ * did.
+ */
+export const EVERY_MATCH_PAGE = { offset: 0, limit: 50 } as const;
+
+export async function expectEveryVisibleMatch(
+  repository: TransferMatchRepository,
+  actor: MatchingPrincipal,
+): Promise<readonly TransferMatch[]> {
+  const page = await repository.pageOwn(actor, { state: null, ...EVERY_MATCH_PAGE });
+  expect(page.hasMore).toBe(false);
+  return page.matches;
+}
+
+
+/**
+ * What one `findMany` actually did: the cap the statement carried, and the
+ * number of rows PostgreSQL handed back.
+ */
+export interface ObservedRead {
+  readonly model: string;
+  /** The row cap in the statement, or `undefined` when it carried none. */
+  readonly take: number | undefined;
+  /** How many rows the database actually returned. */
+  readonly rows: number;
+}
+
+/**
+ * A handle that records every `findMany` a repository issues inside its
+ * principal-context transaction.
+ *
+ * THIS IS WHAT MAKES A PAGE-BOUND TEST A CLAIM ABOUT THE DATABASE. Asserting
+ * that a page holds `limit` rows proves only that something trimmed a list —
+ * a repository that read every row a subject owns and sliced afterwards
+ * satisfies it exactly as a bounded one does. What separates the two is how
+ * many rows crossed the wire, so that is what is recorded here, read off the
+ * array PostgreSQL returned rather than off the page built from it.
+ *
+ * `withPrincipalContext` reaches the store through `client.$transaction`, so
+ * this substitutes the transaction client the callback receives and leaves
+ * every other property alone — including the `$queryRaw` that binds the
+ * principal GUCs, so an observed read runs under exactly the RLS context a
+ * real one does.
+ */
+export function observingHandle(handle: PrismaHandle, seen: ObservedRead[]): PrismaHandle {
+  const client = new Proxy(handle.client, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      if (typeof value !== 'function') return value;
+      const bound = value.bind(target) as (...args: unknown[]) => unknown;
+      if (property !== '$transaction') return bound;
+      return (first: unknown, ...rest: unknown[]): unknown =>
+        typeof first === 'function'
+          ? bound(
+              (tx: object) => (first as (tx: unknown) => unknown)(observedTransaction(tx, seen)),
+              ...rest,
+            )
+          : bound(first, ...rest);
+    },
+  });
+  return { client, pool: handle.pool, end: () => handle.end() };
+}
+
+/** The transaction client, with `findMany` on every model delegate observed. */
+function observedTransaction(tx: object, seen: ObservedRead[]): object {
+  return new Proxy(tx, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      // `$`-prefixed members are Prisma's own plumbing and are passed through
+      // untouched; only the model delegates are wrapped.
+      if (typeof property !== 'string' || property.startsWith('$')) {
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      if (typeof value !== 'object' || value === null) return value;
+      return new Proxy(value, {
+        get(model, method) {
+          const inner: unknown = Reflect.get(model, method);
+          if (method !== 'findMany' || typeof inner !== 'function') return inner;
+          const call = inner.bind(model) as (args: unknown) => Promise<unknown[]>;
+          return async (args: { readonly take?: number }): Promise<unknown[]> => {
+            const rows = await call(args);
+            seen.push({ model: property, take: args.take, rows: rows.length });
+            return rows;
+          };
+        },
+      });
+    },
+  });
 }

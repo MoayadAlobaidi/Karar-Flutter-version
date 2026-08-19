@@ -28,6 +28,7 @@
  */
 
 import pg from 'pg';
+import { expect } from 'vitest';
 
 import { Clock, TenantId, UserId } from '@karar/shared-kernel';
 import {
@@ -51,10 +52,14 @@ import {
   Uuidv7IdSource as AccountsIdSource,
 } from '@karar/financial-accounts';
 
+import type { AccountSourceLinkRepository } from '../application/ports/account-source-link-repository.js';
+import type { FinancialConnectionRepository } from '../application/ports/financial-connection-repository.js';
 import type { FinancialConnectionRetentionDecisionPort } from '../application/ports/financial-connection-retention-decision.js';
 import type { HsfFieldEncryptionPort } from '../application/ports/hsf-field-encryption.js';
 import type { SourceAccountFingerprintPort } from '../application/ports/source-account-fingerprint.js';
 import type { ConnectionsPrincipal } from '../application/principal.js';
+import type { AccountSourceLink } from '../domain/account-source-link.js';
+import type { FinancialConnection } from '../domain/financial-connection.js';
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { LocalKeyedSourceAccountFingerprintProvider } from '../infrastructure/providers/local-keyed-source-account-fingerprint-provider.js';
 import { LocalSyntheticRetentionDecisionProvider } from '../infrastructure/providers/local-synthetic-retention-decision-provider.js';
@@ -292,4 +297,127 @@ export async function seedAccount(
     );
   }
   return created.value.id;
+}
+
+
+/**
+ * The window an isolation probe reads through, now that neither repository
+ * offers an unbounded list.
+ *
+ * `expectEveryVisible*` asserts `hasMore` is false before handing the rows
+ * back, deliberately. Without it a probe would silently weaken the day a
+ * fixture seeds more rows than the limit: "this principal sees nothing of
+ * that one" would start passing because the page ran out rather than because
+ * the rows did.
+ */
+const PROBE_PAGE = { offset: 0, limit: 50 } as const;
+
+/** No narrowing at all — every connection the principal can see. */
+export const EVERY_CONNECTION_PAGE = {
+  rail: null,
+  status: null,
+  institutionId: null,
+  ...PROBE_PAGE,
+} as const;
+
+/** No narrowing at all — every source link the principal can see. */
+export const EVERY_SOURCE_LINK_PAGE = { rail: null, status: null, ...PROBE_PAGE } as const;
+
+/** The same window, narrowed to the links feeding one account. */
+export function everySourceLinkPageFor(accountId: string) {
+  return { accountId, ...EVERY_SOURCE_LINK_PAGE } as const;
+}
+
+export async function expectEveryVisibleConnection(
+  repository: FinancialConnectionRepository,
+  actor: ConnectionsPrincipal,
+): Promise<readonly FinancialConnection[]> {
+  const page = await repository.pageOwn(actor, EVERY_CONNECTION_PAGE);
+  expect(page.hasMore).toBe(false);
+  return page.connections;
+}
+
+export async function expectEveryVisibleSourceLink(
+  repository: AccountSourceLinkRepository,
+  actor: ConnectionsPrincipal,
+): Promise<readonly AccountSourceLink[]> {
+  const page = await repository.pageOwn(actor, { accountRef: null, ...EVERY_SOURCE_LINK_PAGE });
+  expect(page.hasMore).toBe(false);
+  return page.links;
+}
+
+
+/**
+ * What one `findMany` actually did: the cap the statement carried, and the
+ * number of rows PostgreSQL handed back.
+ */
+export interface ObservedRead {
+  readonly model: string;
+  /** The row cap in the statement, or `undefined` when it carried none. */
+  readonly take: number | undefined;
+  /** How many rows the database actually returned. */
+  readonly rows: number;
+}
+
+/**
+ * A handle that records every `findMany` a repository issues inside its
+ * principal-context transaction.
+ *
+ * THIS IS WHAT MAKES A PAGE-BOUND TEST A CLAIM ABOUT THE DATABASE. Asserting
+ * that a page holds `limit` rows proves only that something trimmed a list —
+ * a repository that read every row a subject owns and sliced afterwards
+ * satisfies it exactly as a bounded one does. What separates the two is how
+ * many rows crossed the wire, so that is what is recorded here, read off the
+ * array PostgreSQL returned rather than off the page built from it.
+ *
+ * `withPrincipalContext` reaches the store through `client.$transaction`, so
+ * this substitutes the transaction client the callback receives and leaves
+ * every other property alone — including the `$queryRaw` that binds the
+ * principal GUCs, so an observed read runs under exactly the RLS context a
+ * real one does.
+ */
+export function observingHandle(handle: PrismaHandle, seen: ObservedRead[]): PrismaHandle {
+  const client = new Proxy(handle.client, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      if (typeof value !== 'function') return value;
+      const bound = value.bind(target) as (...args: unknown[]) => unknown;
+      if (property !== '$transaction') return bound;
+      return (first: unknown, ...rest: unknown[]): unknown =>
+        typeof first === 'function'
+          ? bound(
+              (tx: object) => (first as (tx: unknown) => unknown)(observedTransaction(tx, seen)),
+              ...rest,
+            )
+          : bound(first, ...rest);
+    },
+  });
+  return { client, pool: handle.pool, end: () => handle.end() };
+}
+
+/** The transaction client, with `findMany` on every model delegate observed. */
+function observedTransaction(tx: object, seen: ObservedRead[]): object {
+  return new Proxy(tx, {
+    get(target, property) {
+      const value: unknown = Reflect.get(target, property);
+      // `$`-prefixed members are Prisma's own plumbing and are passed through
+      // untouched; only the model delegates are wrapped.
+      if (typeof property !== 'string' || property.startsWith('$')) {
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      if (typeof value !== 'object' || value === null) return value;
+      return new Proxy(value, {
+        get(model, method) {
+          const inner: unknown = Reflect.get(model, method);
+          if (method !== 'findMany' || typeof inner !== 'function') return inner;
+          const call = inner.bind(model) as (args: unknown) => Promise<unknown[]>;
+          return async (args: { readonly take?: number }): Promise<unknown[]> => {
+            const rows = await call(args);
+            seen.push({ model: property, take: args.take, rows: rows.length });
+            return rows;
+          };
+        },
+      });
+    },
+  });
 }

@@ -72,11 +72,13 @@ import { SuggestTransferMatch } from '../application/use-cases/suggest-transfer-
 import type { MatchingPrincipal } from '../application/principal.js';
 import type {
   TransferMatchCreateOutcome,
+  TransferMatchPage,
+  TransferMatchPageQuery,
   TransferMatchRepository,
   TransferMatchUpdateOutcome,
 } from '../application/ports/transfer-match-repository.js';
 import type { TransactionRef, TransferMatchId } from '../domain/refs.js';
-import type { MatchState, TransferMatch } from '../domain/transfer-match.js';
+import type { TransferMatch } from '../domain/transfer-match.js';
 import { TransactionsMatchableTransactionAdapter } from '../infrastructure/adapters/transactions-matchable-transaction-access.js';
 import { TransactionsTransferMatchEraser } from '../infrastructure/adapters/transactions-transfer-match-eraser.js';
 import { PrismaTransferMatchRepository } from '../infrastructure/persistence/prisma-transfer-match-repository.js';
@@ -145,12 +147,8 @@ function poisonedOutage(): Error {
 class RefusingTransferMatchRepository implements TransferMatchRepository {
   constructor(private readonly real: TransferMatchRepository) {}
 
-  listOwn(actor: MatchingPrincipal): Promise<readonly TransferMatch[]> {
-    return this.real.listOwn(actor);
-  }
-
-  listOwnByState(actor: MatchingPrincipal, state: MatchState): Promise<readonly TransferMatch[]> {
-    return this.real.listOwnByState(actor, state);
+  pageOwn(actor: MatchingPrincipal, query: TransferMatchPageQuery): Promise<TransferMatchPage> {
+    return this.real.pageOwn(actor, query);
   }
 
   findOwnById(actor: MatchingPrincipal, id: TransferMatchId): Promise<TransferMatch | null> {

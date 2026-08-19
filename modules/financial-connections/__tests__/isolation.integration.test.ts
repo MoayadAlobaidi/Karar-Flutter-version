@@ -43,6 +43,8 @@ import {
   ACTOR_A1,
   ACTOR_A2,
   ACTOR_B1,
+  EVERY_CONNECTION_PAGE,
+  EVERY_SOURCE_LINK_PAGE,
   SYNTHETIC_SOURCE_REF_ONE,
   TENANT_A,
   TENANT_B,
@@ -53,6 +55,8 @@ import {
   asApp,
   buildHandle,
   dropDatabase,
+  expectEveryVisibleConnection,
+  expectEveryVisibleSourceLink,
   probePostgres,
   provisionDatabase,
   seedAccount,
@@ -157,18 +161,18 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('the legitimate read is non-empty — without which nothing below proves anything', async () => {
-    const own = await listConnections.execute(ACTOR_A1);
+    const own = await listConnections.execute(EVERY_CONNECTION_PAGE, ACTOR_A1);
     expect(own.ok).toBe(true);
-    if (own.ok) expect(own.value).toHaveLength(1);
+    if (own.ok) expect(own.value.connections).toHaveLength(1);
 
-    const ownLinks = await listLinks.execute({}, ACTOR_A1);
+    const ownLinks = await listLinks.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(ownLinks.ok).toBe(true);
-    if (ownLinks.ok) expect(ownLinks.value).toHaveLength(1);
+    if (ownLinks.ok) expect(ownLinks.value.items).toHaveLength(1);
   });
 
   it('one tenant member cannot see another member connections through the repository', async () => {
-    const a1 = await connections.listOwn(ACTOR_A1);
-    const a2 = await connections.listOwn(ACTOR_A2);
+    const a1 = await expectEveryVisibleConnection(connections, ACTOR_A1);
+    const a2 = await expectEveryVisibleConnection(connections, ACTOR_A2);
     expect(a1).toHaveLength(1);
     expect(a2).toHaveLength(1);
     expect(a1[0]?.id).not.toBe(a2[0]?.id);
@@ -179,8 +183,8 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('one tenant member cannot see another member source links', async () => {
-    const a1 = await links.listOwn(ACTOR_A1);
-    const a2 = await links.listOwn(ACTOR_A2);
+    const a1 = await expectEveryVisibleSourceLink(links, ACTOR_A1);
+    const a2 = await expectEveryVisibleSourceLink(links, ACTOR_A2);
     expect(a1).toHaveLength(1);
     expect(a2).toHaveLength(1);
     expect(a1[0]?.id).not.toBe(a2[0]?.id);
@@ -189,8 +193,8 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   it('two members of one tenant fingerprint the same source reference DIFFERENTLY', async () => {
     // The row-level boundary and the cryptographic one, together: even if a
     // reader saw both rows, the column could not correlate them.
-    const a1 = await links.listOwn(ACTOR_A1);
-    const a2 = await links.listOwn(ACTOR_A2);
+    const a1 = await expectEveryVisibleSourceLink(links, ACTOR_A1);
+    const a2 = await expectEveryVisibleSourceLink(links, ACTOR_A2);
     expect(a1[0]?.fingerprint.value).toBeDefined();
     expect(a2[0]?.fingerprint.value).toBeDefined();
     expect(a1[0]?.fingerprint.value).not.toBe(a2[0]?.fingerprint.value);
@@ -199,13 +203,13 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   it('a cross-tenant read sees nothing', async () => {
     expect(await connections.findOwnById(ACTOR_B1, seeded['a1']!.connection)).toBeNull();
     expect(await connections.findOwnById(ACTOR_A1, seeded['b1']!.connection)).toBeNull();
-    const b1 = await links.listOwn(ACTOR_B1);
+    const b1 = await expectEveryVisibleSourceLink(links, ACTOR_B1);
     expect(b1).toHaveLength(1);
-    expect(b1[0]?.id).not.toBe((await links.listOwn(ACTOR_A1))[0]?.id);
+    expect(b1[0]?.id).not.toBe((await expectEveryVisibleSourceLink(links, ACTOR_A1))[0]?.id);
   });
 
   it('a valid user id presented under the wrong tenant sees nothing', async () => {
-    const listed = await connections.listOwn(actorA1inB);
+    const listed = await expectEveryVisibleConnection(connections, actorA1inB);
     expect(listed).toHaveLength(0);
     expect(await connections.findOwnById(actorA1inB, seeded['a1']!.connection)).toBeNull();
   });
@@ -249,14 +253,14 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('a raw DELETE as karar_app against a neighbour source link removes nothing', async () => {
-    const before = await links.listOwn(ACTOR_A1);
+    const before = await expectEveryVisibleSourceLink(links, ACTOR_A1);
     await asApp(
       database,
       { tenantId: TenantId.toString(TENANT_B), userId: UserId.toString(USER_B1) },
       (tx) =>
         tx.query(`DELETE FROM public.account_source_links WHERE id = $1`, [before[0]!.id]),
     );
-    expect(await links.listOwn(ACTOR_A1)).toHaveLength(before.length);
+    expect(await expectEveryVisibleSourceLink(links, ACTOR_A1)).toHaveLength(before.length);
   });
 
   it('an INSERT as karar_app claiming another subject is refused by WITH CHECK', async () => {
@@ -285,15 +289,24 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
 
   it('a repository called with a partial principal refuses rather than reading widely', async () => {
     await expect(
-      connections.listOwn({ tenantId: TENANT_A } as unknown as ConnectionsPrincipal),
+      connections.pageOwn(
+        { tenantId: TENANT_A } as unknown as ConnectionsPrincipal,
+        EVERY_CONNECTION_PAGE,
+      ),
     ).rejects.toBeInstanceOf(PrincipalContextError);
     await expect(
-      links.listOwn({ userId: USER_A1 } as unknown as ConnectionsPrincipal),
+      links.pageOwn({ userId: USER_A1 } as unknown as ConnectionsPrincipal, {
+        accountRef: null,
+        ...EVERY_SOURCE_LINK_PAGE,
+      }),
     ).rejects.toBeInstanceOf(PrincipalContextError);
   });
 
   it('a use case refuses without a principal instead of answering emptily', async () => {
-    const listed = await listConnections.execute(null as unknown as ConnectionsPrincipal);
+    const listed = await listConnections.execute(
+      EVERY_CONNECTION_PAGE,
+      null as unknown as ConnectionsPrincipal,
+    );
     expect(listed.ok).toBe(false);
     if (!listed.ok) expect(listed.error.kind).toBe('missing_principal_context');
   });

@@ -30,7 +30,7 @@ import { FinancialCapabilityGuard } from './capability.guard.js';
 import { balanceSnapshotWire } from './dto/accounts.js';
 import { accountSourceLinkWire, connectionSummaryWire } from './dto/connections.js';
 import { paymentInstrumentWire } from './dto/instruments.js';
-import { pageOf, readPageRequest, type PageRequest } from './paging.js';
+import { offsetPage, readPageRequest, type PageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
 import { problemForAccountsError } from './problems-accounts.js';
 import { problemForConnectionsError, problemForInstrumentsError } from './problems-views.js';
@@ -47,9 +47,9 @@ interface ReplyLike {
 /** Page bounds from the CENTRAL registry; nothing here writes a number. */
 const PAGE_BOUNDS = MANUAL_ENTRY_LIMITS;
 
-/** A filter that compares one string field, or matches everything. */
-function equals(value: string | undefined): (candidate: string) => boolean {
-  return (candidate) => value === undefined || candidate === value;
+/** A query value as the module page queries take it: the word, or nothing. */
+function narrowing(value: string | undefined): string | null {
+  return value ?? null;
 }
 
 @UseGuards(FinancialCapabilityGuard)
@@ -89,15 +89,19 @@ export class FinancialViewsController {
     // account, and the use case answers `account_not_found` for an id that is
     // not the caller's — the same answer an unknown id gets.
     const result = await this.useCases.listOwnBalanceSnapshots.execute(
-      { accountId: id as never },
+      {
+        accountId: id as never,
+        balanceKind: narrowing(balanceKind),
+        sourceKind: narrowing(sourceKind),
+        offset: page.offset,
+        limit: page.limit,
+      },
       principal,
     );
     if (!result.ok) refuse(problemForAccountsError(result.error));
 
-    const rows = result.value
-      .map(balanceSnapshotWire)
-      .filter((row) => equals(balanceKind)(row.balanceKind) && equals(sourceKind)(row.sourceKind));
-    const cut = pageOf(rows, page);
+    const items = result.value.snapshots.map(balanceSnapshotWire);
+    const cut = offsetPage(items, page, result.value.hasMore);
     reply.status(200).send({ items: cut.items, page: cut.page });
   }
 
@@ -115,15 +119,19 @@ export class FinancialViewsController {
     const status = queryValue(query, 'status');
 
     const result = await this.useCases.listOwnAccountSourceLinks.execute(
-      { accountId: id },
+      {
+        accountId: id,
+        rail: narrowing(rail),
+        status: narrowing(status),
+        offset: page.offset,
+        limit: page.limit,
+      },
       principal,
     );
     if (!result.ok) refuse(problemForConnectionsError(result.error));
 
-    const rows = result.value
-      .map(accountSourceLinkWire)
-      .filter((row) => equals(rail)(row.rail) && equals(status)(row.status));
-    const cut = pageOf(rows, page);
+    const items = result.value.items.map(accountSourceLinkWire);
+    const cut = offsetPage(items, page, result.value.hasMore);
     reply.status(200).send({ items: cut.items, page: cut.page });
   }
 
@@ -145,20 +153,22 @@ export class FinancialViewsController {
     }
 
     const result = await this.useCases.listOwnPaymentInstruments.execute(
-      { accountId: id },
+      {
+        accountId: id,
+        instrumentType: narrowing(instrumentType),
+        status: narrowing(status),
+        // Answered by the module's own spendability predicate, not by a
+        // status list this file would have to keep in step with it.
+        spendable: spendable === undefined ? null : spendable === 'true',
+        offset: page.offset,
+        limit: page.limit,
+      },
       principal,
     );
     if (!result.ok) refuse(problemForInstrumentsError(result.error));
 
-    const rows = result.value
-      .map(paymentInstrumentWire)
-      .filter(
-        (row) =>
-          equals(instrumentType)(row.instrumentType) &&
-          equals(status)(row.status) &&
-          (spendable === undefined || row.spendable === (spendable === 'true')),
-      );
-    const cut = pageOf(rows, page);
+    const items = result.value.instruments.map(paymentInstrumentWire);
+    const cut = offsetPage(items, page, result.value.hasMore);
     reply.status(200).send({ items: cut.items, page: cut.page });
   }
 
@@ -176,18 +186,20 @@ export class FinancialViewsController {
     if (institutionId !== undefined && !isUuid(institutionId)) {
       refuse(invalidRequestProblem('institutionId', 'is not a reference'));
     }
-    const result = await this.useCases.listOwnConnections.execute(principal);
+    const result = await this.useCases.listOwnConnections.execute(
+      {
+        rail: narrowing(rail),
+        status: narrowing(status),
+        institutionId: narrowing(institutionId),
+        offset: page.offset,
+        limit: page.limit,
+      },
+      principal,
+    );
     if (!result.ok) refuse(problemForConnectionsError(result.error));
 
-    const rows = result.value
-      .map(connectionSummaryWire)
-      .filter(
-        (row) =>
-          equals(rail)(row.rail) &&
-          equals(status)(row.status) &&
-          (institutionId === undefined || row.institutionId === institutionId),
-      );
-    const cut = pageOf(rows, page);
+    const items = result.value.connections.map(connectionSummaryWire);
+    const cut = offsetPage(items, page, result.value.hasMore);
     reply.status(200).send({ items: cut.items, page: cut.page });
   }
 }

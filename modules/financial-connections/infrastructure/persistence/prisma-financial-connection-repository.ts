@@ -35,6 +35,8 @@ import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 import type {
   ConnectionDeleteOutcome,
   ConnectionUpdateOutcome,
+  FinancialConnectionPage,
+  FinancialConnectionPageQuery,
   FinancialConnectionRepository,
 } from '../../application/ports/financial-connection-repository.js';
 import type { HsfFieldEncryptionPort } from '../../application/ports/hsf-field-encryption.js';
@@ -68,24 +70,41 @@ export class PrismaFinancialConnectionRepository implements FinancialConnectionR
     );
   }
 
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly FinancialConnection[]> {
+  pageOwn(
+    actor: ConnectionsPrincipal,
+    query: FinancialConnectionPageQuery,
+  ): Promise<FinancialConnectionPage> {
     return this.inContext(actor, async (tx) => {
       const rows = await tx.financialConnection.findMany({
         where: {
           tenantId: TenantId.toString(actor.tenantId),
           userId: UserId.toString(actor.userId),
+          ...(query.rail === null ? {} : { rail: query.rail }),
+          ...(query.status === null ? {} : { status: query.status }),
+          ...(query.institutionId === null ? {} : { institutionRef: query.institutionId }),
         },
-        orderBy: { createdAt: 'asc' },
+        // The row id closes the order: `created_at` alone leaves two
+        // connections created in the same instant interchangeable, and an
+        // interchangeable pair straddling a page boundary is a row the caller
+        // never sees and another they see twice.
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        skip: query.offset,
+        // ONE row past the page, which is both how another page is detected
+        // without a second statement and what keeps this read bounded by the
+        // caller's limit rather than by how many connections they hold.
+        take: query.limit + 1,
       });
+      const hasMore = rows.length > query.limit;
       // Sequential rather than concurrent: a key-management provider is a
       // rate-limited external dependency in every environment but local, and
       // a listing that fans out one call per row is how a page load becomes a
-      // throttling incident.
+      // throttling incident. It now runs over ONE page rather than over every
+      // connection the caller holds.
       const connections: FinancialConnection[] = [];
-      for (const row of rows) {
+      for (const row of hasMore ? rows.slice(0, query.limit) : rows) {
         connections.push(await toFinancialConnection(row, this.encryption, actor));
       }
-      return connections;
+      return { connections, hasMore };
     });
   }
 

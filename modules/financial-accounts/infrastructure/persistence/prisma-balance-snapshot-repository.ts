@@ -15,11 +15,19 @@
  * from a balance a source reported, and conflating them is the failure this
  * module is built to prevent.
  *
- * `listForOwnAccount` returns EVERY kind of reported balance in one ordered
- * list and converts none of them. Selecting which kind answers a question is
- * the domain's `latestReported`, which requires the caller to name the kind:
- * a repository that quietly filtered, or that returned "the latest" across
- * kinds, would answer a question about spendable money with a settled figure.
+ * `pageForOwnAccount` returns every kind of reported balance a caller did not
+ * exclude, in one ordered page, and converts none of them. It filters ONLY on
+ * the values the caller named: selecting which kind answers a question is the
+ * domain's `latestReported`, which requires the caller to name the kind, and
+ * a repository that quietly filtered on its own, or that returned "the
+ * latest" across kinds, would answer a question about spendable money with a
+ * settled figure.
+ *
+ * **The page bound is enforced by the STATEMENT, not by the caller.** This
+ * table is append-only and nothing prunes it, so an unbounded `findMany` here
+ * would be a read whose size is decided by how long a person has held an
+ * account. `skip`/`take` put the bound in the query plan, and the one extra
+ * row is what reports whether another page exists without counting the rest.
  */
 
 import { Money, TenantId, UserId } from '@karar/shared-kernel';
@@ -29,7 +37,11 @@ import {
 } from '@karar/platform/dist/db/principal-context.js';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
-import type { BalanceSnapshotRepository } from '../../application/ports/balance-snapshot-repository.js';
+import type {
+  BalanceSnapshotPage,
+  BalanceSnapshotPageQuery,
+  BalanceSnapshotRepository,
+} from '../../application/ports/balance-snapshot-repository.js';
 import type { AccountsPrincipal } from '../../application/principal.js';
 import type { BalanceSnapshot } from '../../domain/balance-snapshot.js';
 import type { FinancialAccountId } from '../../domain/refs.js';
@@ -55,23 +67,42 @@ export class PrismaBalanceSnapshotRepository implements BalanceSnapshotRepositor
     );
   }
 
-  listForOwnAccount(
+  pageForOwnAccount(
     actor: AccountsPrincipal,
-    accountId: FinancialAccountId,
-  ): Promise<readonly BalanceSnapshot[]> {
+    query: BalanceSnapshotPageQuery,
+  ): Promise<BalanceSnapshotPage> {
     return this.inContext(actor, async (tx) => {
       const rows = await tx.financialAccountBalanceSnapshot.findMany({
         where: {
-          accountId,
+          accountId: query.accountId,
           tenantId: TenantId.toString(actor.tenantId),
           userId: UserId.toString(actor.userId),
+          // The two kinds a caller named, compared against what was stored
+          // and nothing else. A value no source ever reported matches no row,
+          // which is the honest answer — the alternative, treating an
+          // unrecognised kind as "no filter", would answer a question about
+          // one kind with every kind's rows.
+          ...(query.balanceKind === null ? {} : { balanceKind: query.balanceKind }),
+          ...(query.sourceKind === null ? {} : { sourceKind: query.sourceKind }),
         },
         // Most recently TRUE first, capture instant breaking ties — the same
         // order the domain's comparator defines, so the two cannot disagree
-        // about which report is the current one.
-        orderBy: [{ asOf: 'desc' }, { capturedAt: 'desc' }],
+        // about which report is the current one. The row id closes the order:
+        // two reports true at the same instant and captured at the same
+        // instant are otherwise interchangeable, and a page boundary that
+        // falls between two interchangeable rows drops one and repeats the
+        // other for whoever walks the cursor.
+        orderBy: [{ asOf: 'desc' }, { capturedAt: 'desc' }, { id: 'desc' }],
+        skip: query.offset,
+        // ONE row past the page. It is what answers "is there another page"
+        // without a second statement over a table nothing prunes, and it is
+        // the reason this read is bounded no matter how many balances an
+        // account has accumulated.
+        take: query.limit + 1,
       });
-      return rows.map(toBalanceSnapshot);
+      const hasMore = rows.length > query.limit;
+      const page = hasMore ? rows.slice(0, query.limit) : rows;
+      return { snapshots: page.map(toBalanceSnapshot), hasMore };
     });
   }
 

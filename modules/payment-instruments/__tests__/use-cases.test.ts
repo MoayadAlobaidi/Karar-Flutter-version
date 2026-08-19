@@ -17,6 +17,8 @@ import { Clock, TenantId, UserId } from '@karar/shared-kernel';
 import type {
   InstrumentCreateOutcome,
   InstrumentUpdateOutcome,
+  PaymentInstrumentPage,
+  PaymentInstrumentPageQuery,
   PaymentInstrumentRepository,
 } from '../application/ports/payment-instrument-repository.js';
 import type {
@@ -30,7 +32,7 @@ import type {
 } from '../application/ports/payment-instrument-retention-decision.js';
 import type { IdSource } from '../application/ports/id-source.js';
 import type { InstrumentsPrincipal } from '../application/principal.js';
-import type { PaymentInstrument } from '../domain/payment-instrument.js';
+import { isSpendableStatus, type PaymentInstrument } from '../domain/payment-instrument.js';
 import type { BalanceBearingAccountRef, PaymentInstrumentId } from '../domain/refs.js';
 import { DeleteOwnPaymentInstrument } from '../application/use-cases/delete-own-payment-instrument.js';
 import { ErasePaymentInstruments } from '../application/use-cases/erase-payment-instruments.js';
@@ -49,20 +51,52 @@ const ACTOR: InstrumentsPrincipal = { tenantId: TENANT, userId: USER };
 const WALLET = 'dddddddd-0000-4000-8000-00000000000d';
 const clock = new Clock.Fixed(new Date('2026-08-19T12:00:00.000Z'));
 
+/**
+ * One page, no narrowing, big enough for every fixture in this file.
+ *
+ * The listing use case takes a WINDOW now, because the repository offers no
+ * unbounded read. This suite is about what the use case returns rather than
+ * about paging, so it asks for a page that comfortably holds the two or three
+ * instruments each test records.
+ */
+const EVERY_INSTRUMENT_PAGE = {
+  instrumentType: null,
+  status: null,
+  spendable: null,
+  offset: 0,
+  limit: 50,
+} as const;
+
 class InMemoryInstruments implements PaymentInstrumentRepository {
   readonly rows = new Map<string, PaymentInstrument>();
 
-  listOwn(): Promise<readonly PaymentInstrument[]> {
-    return Promise.resolve([...this.rows.values()]);
-  }
-
-  listOwnForAccount(
+  pageOwn(
     _actor: InstrumentsPrincipal,
-    accountRef: BalanceBearingAccountRef,
-  ): Promise<readonly PaymentInstrument[]> {
-    return Promise.resolve(
-      [...this.rows.values()].filter((i) => i.accountRef.accountId === accountRef.accountId),
-    );
+    query: PaymentInstrumentPageQuery,
+  ): Promise<PaymentInstrumentPage> {
+    // The fake cuts the page the way the real store does — narrow, order
+    // totally, skip, then read ONE more than asked for — so a caller that
+    // mistook the extra row for a result would fail here too.
+    const ordered = [...this.rows.values()]
+      .filter(
+        (row) =>
+          (query.accountRef === null ||
+            row.accountRef.accountId === query.accountRef.accountId) &&
+          (query.instrumentType === null || row.instrumentType === query.instrumentType) &&
+          (query.status === null || row.status === query.status) &&
+          (query.spendable === null || isSpendableStatus(row.status) === query.spendable),
+      )
+      .sort(
+        (left, right) =>
+          left.createdAt.getTime() - right.createdAt.getTime() ||
+          left.id.localeCompare(right.id),
+      );
+    const read = ordered.slice(query.offset, query.offset + query.limit + 1);
+    const hasMore = read.length > query.limit;
+    return Promise.resolve({
+      instruments: hasMore ? read.slice(0, query.limit) : read,
+      hasMore,
+    });
   }
 
   findOwnById(
@@ -469,14 +503,14 @@ describe('the other use cases', () => {
       ACTOR,
     );
     const list = new ListOwnPaymentInstruments(instruments);
-    const forWallet = await list.execute({ accountId: WALLET }, ACTOR);
+    const forWallet = await list.execute({ accountId: WALLET, ...EVERY_INSTRUMENT_PAGE }, ACTOR);
     expect(forWallet.ok).toBe(true);
     if (forWallet.ok) {
-      expect(forWallet.value).toHaveLength(1);
-      expect(Array.isArray(forWallet.value)).toBe(true);
+      expect(forWallet.value.instruments).toHaveLength(1);
+      expect(Array.isArray(forWallet.value.instruments)).toBe(true);
     }
-    const all = await list.execute({}, ACTOR);
+    const all = await list.execute(EVERY_INSTRUMENT_PAGE, ACTOR);
     expect(all.ok).toBe(true);
-    if (all.ok) expect(all.value).toHaveLength(2);
+    if (all.ok) expect(all.value.instruments).toHaveLength(2);
   });
 });

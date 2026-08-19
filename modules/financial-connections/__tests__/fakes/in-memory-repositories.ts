@@ -12,6 +12,8 @@
  */
 
 import type {
+  AccountSourceLinkPage,
+  AccountSourceLinkPageQuery,
   AccountSourceLinkRepository,
   SourceLinkCreateOutcome,
   SourceLinkUpdateOutcome,
@@ -24,6 +26,8 @@ import type {
 import type {
   ConnectionDeleteOutcome,
   ConnectionUpdateOutcome,
+  FinancialConnectionPage,
+  FinancialConnectionPageQuery,
   FinancialConnectionRepository,
 } from '../../application/ports/financial-connection-repository.js';
 import type { IdSource } from '../../application/ports/id-source.js';
@@ -46,8 +50,33 @@ function owns(actor: ConnectionsPrincipal, row: { tenantId: string; userId: stri
 export class InMemoryConnectionRepository implements FinancialConnectionRepository {
   readonly rows = new Map<string, FinancialConnection>();
 
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly FinancialConnection[]> {
-    return Promise.resolve([...this.rows.values()].filter((row) => owns(actor, row)));
+  pageOwn(
+    actor: ConnectionsPrincipal,
+    query: FinancialConnectionPageQuery,
+  ): Promise<FinancialConnectionPage> {
+    // The fake cuts the page the way the real store does — narrow, order
+    // totally, skip, then read ONE more than asked for — so a caller that
+    // mistook the extra row for a result would fail here too.
+    const ordered = [...this.rows.values()]
+      .filter(
+        (row) =>
+          owns(actor, row) &&
+          (query.rail === null || row.rail === query.rail) &&
+          (query.status === null || row.status === query.status) &&
+          (query.institutionId === null ||
+            row.institutionRef?.institutionId === query.institutionId),
+      )
+      .sort(
+        (left, right) =>
+          left.createdAt.getTime() - right.createdAt.getTime() ||
+          left.id.localeCompare(right.id),
+      );
+    const read = ordered.slice(query.offset, query.offset + query.limit + 1);
+    const hasMore = read.length > query.limit;
+    return Promise.resolve({
+      connections: hasMore ? read.slice(0, query.limit) : read,
+      hasMore,
+    });
   }
 
   findOwnById(
@@ -102,17 +131,31 @@ export class InMemorySourceLinkRepository implements AccountSourceLinkRepository
     return [...this.rows.values()].filter((row) => owns(actor, row));
   }
 
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly AccountSourceLink[]> {
-    return Promise.resolve(this.mine(actor));
-  }
-
-  listOwnForAccount(
+  pageOwn(
     actor: ConnectionsPrincipal,
-    accountRef: CanonicalAccountRef,
-  ): Promise<readonly AccountSourceLink[]> {
-    return Promise.resolve(
-      this.mine(actor).filter((row) => row.accountRef.accountId === accountRef.accountId),
-    );
+    query: AccountSourceLinkPageQuery,
+  ): Promise<AccountSourceLinkPage> {
+    const ordered = this.mine(actor)
+      .filter(
+        (row) =>
+          (query.accountRef === null ||
+            row.accountRef.accountId === query.accountRef.accountId) &&
+          (query.rail === null || row.connectionRail === query.rail) &&
+          (query.status === null || row.status === query.status),
+      )
+      .sort(
+        (left, right) =>
+          left.sourcePriority - right.sourcePriority ||
+          left.createdAt.getTime() - right.createdAt.getTime() ||
+          left.id.localeCompare(right.id),
+      );
+    // One row past the page, exactly as the real store reads it.
+    const read = ordered.slice(query.offset, query.offset + query.limit + 1);
+    const hasMore = read.length > query.limit;
+    return Promise.resolve({
+      links: hasMore ? read.slice(0, query.limit) : read,
+      hasMore,
+    });
   }
 
   listOwnForConnection(

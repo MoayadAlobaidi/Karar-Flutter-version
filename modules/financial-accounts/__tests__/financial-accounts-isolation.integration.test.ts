@@ -31,6 +31,7 @@ import {
   ACTOR_A2,
   ACTOR_B1,
   BIND_GUCS,
+  EVERY_ACCOUNT_PAGE,
   INSTITUTION_ACTIVE,
   TENANT_A,
   TENANT_B,
@@ -40,6 +41,8 @@ import {
   asApp,
   buildHandle,
   dropDatabase,
+  everySnapshotPage,
+  expectEveryVisibleAccount,
   probePostgres,
   provisionDatabase,
   skipBanner,
@@ -259,15 +262,15 @@ describe.skipIf(unreachable !== null)(
       }
 
       // Repository and use case agree, and the content is the caller's own.
-      const own = await accounts.listOwn(ACTOR_A1);
+      const own = await expectEveryVisibleAccount(accounts, ACTOR_A1);
       expect(own).toHaveLength(1);
       expect(own[0]?.displayName.reveal()).toBe('Synthetic Test Account A1');
 
-      const listed = await listAccounts.execute(ACTOR_A2);
+      const listed = await listAccounts.execute(EVERY_ACCOUNT_PAGE, ACTOR_A2);
       expect(listed.ok).toBe(true);
       if (listed.ok) {
-        expect(listed.value).toHaveLength(1);
-        expect(listed.value[0]?.displayName.reveal()).toBe('Synthetic Test Account A2');
+        expect(listed.value.accounts).toHaveLength(1);
+        expect(listed.value.accounts[0]?.displayName.reveal()).toBe('Synthetic Test Account A2');
       }
     });
 
@@ -311,7 +314,7 @@ describe.skipIf(unreachable !== null)(
 
     it('cross-tenant: a tenant-B session sees nothing of tenant A, and A stays non-empty', async () => {
       expect(await accounts.findOwnById(actorA1inB, accountA1)).toBeNull();
-      expect(await accounts.listOwn(ACTOR_B1)).toHaveLength(1);
+      expect(await expectEveryVisibleAccount(accounts, ACTOR_B1)).toHaveLength(1);
 
       await asApp(
         database,
@@ -425,20 +428,20 @@ describe.skipIf(unreachable !== null)(
           );
         expect(failure).toBe(marker);
       });
-      expect(await accounts.listOwn(ACTOR_A1)).toHaveLength(1); // no residue
+      expect(await expectEveryVisibleAccount(accounts, ACTOR_A1)).toHaveLength(1); // no residue
     });
 
     it('snapshots: each owner sees only their own, and cross-principal writes are refused', async () => {
       // NON-EMPTY FIRST at the use-case layer.
-      const ownA1 = await listSnapshots.execute({ accountId: accountA1 }, ACTOR_A1);
+      const ownA1 = await listSnapshots.execute(everySnapshotPage(accountA1), ACTOR_A1);
       expect(ownA1.ok).toBe(true);
       if (ownA1.ok) {
-        expect(ownA1.value).toHaveLength(1);
-        expect(ownA1.value[0]?.amount.minorUnits).toBe(100_00n);
+        expect(ownA1.value.snapshots).toHaveLength(1);
+        expect(ownA1.value.snapshots[0]?.amount.minorUnits).toBe(100_00n);
       }
 
       // A neighbour asking about A1's account is answered not-found, not empty.
-      const neighbour = await listSnapshots.execute({ accountId: accountA1 }, ACTOR_A2);
+      const neighbour = await listSnapshots.execute(everySnapshotPage(accountA1), ACTOR_A2);
       expect(neighbour.ok).toBe(false);
       if (!neighbour.ok) expect(neighbour.error.kind).toBe('account_not_found');
 
@@ -550,7 +553,7 @@ describe.skipIf(unreachable !== null)(
       expect(await accounts.findOwnById(ACTOR_A1, accountA1)).toBeNull();
       expect(await snapshots.countForAccount(ACTOR_A1, accountA1)).toBe(0);
       // And the OTHER principals' data is untouched — erasure is scoped.
-      expect(await accounts.listOwn(ACTOR_A2)).toHaveLength(1);
+      expect(await expectEveryVisibleAccount(accounts, ACTOR_A2)).toHaveLength(1);
       expect(await snapshots.countForAccount(ACTOR_B1, accountB1)).toBe(1);
     });
 
@@ -582,7 +585,7 @@ describe.skipIf(unreachable !== null)(
 
     it('repositories fail closed BEFORE any query on an incomplete principal', async () => {
       const failure = await accounts
-        .listOwn({ tenantId: TENANT_A } as unknown as AccountsPrincipal)
+        .pageOwn({ tenantId: TENANT_A } as unknown as AccountsPrincipal, EVERY_ACCOUNT_PAGE)
         .then(
           () => null,
           (error: unknown) => error,
@@ -591,7 +594,7 @@ describe.skipIf(unreachable !== null)(
     });
 
     it('pooled-connection hygiene: after repository work the session carries no GUC and sees nothing', async () => {
-      await accounts.listOwn(ACTOR_B1);
+      await expectEveryVisibleAccount(accounts, ACTOR_B1);
       const probe = await handle.client.$queryRawUnsafe<
         { tenant_guc: string | null; accounts: bigint; snapshots: bigint }[]
       >(

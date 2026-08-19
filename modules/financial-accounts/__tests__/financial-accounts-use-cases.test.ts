@@ -22,10 +22,16 @@ import { describe, expect, it } from 'vitest';
 
 import { Clock, Currency, Money, TenantId, UserId } from '@karar/shared-kernel';
 
-import type { BalanceSnapshotRepository } from '../application/ports/balance-snapshot-repository.js';
+import type {
+  BalanceSnapshotPage,
+  BalanceSnapshotPageQuery,
+  BalanceSnapshotRepository,
+} from '../application/ports/balance-snapshot-repository.js';
 import type {
   AccountDeleteOutcome,
   AccountUpdateOutcome,
+  FinancialAccountPage,
+  FinancialAccountPageQuery,
   FinancialAccountRepository,
 } from '../application/ports/financial-account-repository.js';
 import type {
@@ -96,6 +102,32 @@ const actorB1: AccountsPrincipal = { tenantId: TENANT_B, userId: USER_B1 };
 
 const clock = new Clock.Fixed(NOW);
 
+/**
+ * One page, no narrowing, big enough to hold every fixture in this file.
+ *
+ * Both listing use cases take a WINDOW now, because neither store offers an
+ * unbounded read. These suites are about ownership rather than about paging,
+ * so they ask for a page that comfortably holds the handful of rows each test
+ * seeds — and the counting assertions below stay exact because of it.
+ */
+const EVERY_ACCOUNT_PAGE = {
+  institutionRef: null,
+  institutionKind: null,
+  accountType: null,
+  walletKind: null,
+  nature: null,
+  status: null,
+  origin: null,
+  currencyCode: null,
+  offset: 0,
+  limit: 50,
+} as const;
+
+/** The same window over one account's reported balances. */
+function everySnapshotPage(accountId: FinancialAccountId) {
+  return { accountId, balanceKind: null, sourceKind: null, offset: 0, limit: 50 } as const;
+}
+
 function ownerKey(actor: AccountsPrincipal): string {
   return `${actor.tenantId}:${actor.userId}`;
 }
@@ -116,12 +148,36 @@ class FakeAccountRepository implements FinancialAccountRepository {
     return account !== undefined && ownerKey(actor) === `${account.tenantId}:${account.userId}`;
   }
 
-  listOwn(actor: AccountsPrincipal): Promise<readonly FinancialAccount[]> {
-    return Promise.resolve(
-      [...this.rows.values()]
-        .filter((row) => this.visible(actor, row))
-        .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime()),
-    );
+  pageOwn(
+    actor: AccountsPrincipal,
+    query: FinancialAccountPageQuery,
+  ): Promise<FinancialAccountPage> {
+    // The fake cuts the page the way the real store does — filter, order
+    // totally, skip, then take ONE more than asked for — so a use case that
+    // mistook the extra row for a result would fail here too.
+    const ordered = [...this.rows.values()]
+      .filter((row) => this.visible(actor, row))
+      .filter(
+        (row) =>
+          (query.institutionRef === null || row.institutionRef === query.institutionRef) &&
+          (query.accountType === null || row.accountType === query.accountType) &&
+          (query.walletKind === null || row.walletKind === query.walletKind) &&
+          (query.nature === null || row.nature === query.nature) &&
+          (query.status === null || row.status === query.status) &&
+          (query.origin === null || row.origin === query.origin) &&
+          (query.currencyCode === null || row.currency.code === query.currencyCode),
+      )
+      .sort(
+        (left, right) =>
+          left.createdAt.getTime() - right.createdAt.getTime() ||
+          left.id.localeCompare(right.id),
+      );
+    const read = ordered.slice(query.offset, query.offset + query.limit + 1);
+    const hasMore = read.length > query.limit;
+    return Promise.resolve({
+      accounts: hasMore ? read.slice(0, query.limit) : read,
+      hasMore,
+    });
   }
 
   findOwnById(
@@ -199,13 +255,24 @@ class FakeSnapshotRepository implements BalanceSnapshotRepository {
     return snapshot;
   }
 
-  listForOwnAccount(
+  pageForOwnAccount(
     actor: AccountsPrincipal,
-    accountId: FinancialAccountId,
-  ): Promise<readonly BalanceSnapshot[]> {
-    return Promise.resolve(
-      this.rows.filter((row) => this.visible(actor, row) && row.accountId === accountId),
+    query: BalanceSnapshotPageQuery,
+  ): Promise<BalanceSnapshotPage> {
+    const matching = this.rows.filter(
+      (row) =>
+        this.visible(actor, row) &&
+        row.accountId === query.accountId &&
+        (query.balanceKind === null || row.balanceKind === query.balanceKind) &&
+        (query.sourceKind === null || row.sourceKind === query.sourceKind),
     );
+    // One row past the page, exactly as the real store reads it.
+    const read = matching.slice(query.offset, query.offset + query.limit + 1);
+    const hasMore = read.length > query.limit;
+    return Promise.resolve({
+      snapshots: hasMore ? read.slice(0, query.limit) : read,
+      hasMore,
+    });
   }
 
   countForAccount(actor: AccountsPrincipal, accountId: FinancialAccountId): Promise<number> {
@@ -593,12 +660,12 @@ describe('financial-accounts use cases: the principal is context, never input', 
     const id = 'fa000000-0000-4000-8000-000000000001' as FinancialAccountId;
 
     const outcomes = await Promise.all([
-      list.execute(broken),
+      list.execute(EVERY_ACCOUNT_PAGE, broken),
       read.execute({ accountId: id }, broken),
       create.execute(manualInput, broken),
       update.execute({ accountId: id, expectedVersion: 1, displayName: 'x' }, broken),
       remove.execute({ accountId: id, expectedVersion: 1 }, broken),
-      listSnapshots.execute({ accountId: id }, broken),
+      listSnapshots.execute(everySnapshotPage(id), broken),
       recordBalance.execute(
         {
           accountId: id,
@@ -672,18 +739,23 @@ describe('financial-accounts use cases: create, read, list', () => {
     await create.execute(manualInput, actorA1);
     await create.execute({ ...manualInput, displayName: 'Synthetic Test Account Two' }, actorA1);
 
-    const own = await list.execute(actorA1);
+    const own = await list.execute(EVERY_ACCOUNT_PAGE, actorA1);
     expect(own.ok).toBe(true);
-    if (own.ok) expect(own.value).toHaveLength(2);
+    if (own.ok) {
+      expect(own.value.accounts).toHaveLength(2);
+      // Both rows fit, so the count above is a count of rows rather than of
+      // however many the page happened to hold.
+      expect(own.value.hasMore).toBe(false);
+    }
 
     // Same tenant, different person: tenant scoping alone would show these.
-    const neighbour = await list.execute(actorA2);
+    const neighbour = await list.execute(EVERY_ACCOUNT_PAGE, actorA2);
     expect(neighbour.ok).toBe(true);
-    if (neighbour.ok) expect(neighbour.value).toHaveLength(0);
+    if (neighbour.ok) expect(neighbour.value.accounts).toHaveLength(0);
 
-    const otherTenant = await list.execute(actorB1);
+    const otherTenant = await list.execute(EVERY_ACCOUNT_PAGE, actorB1);
     expect(otherTenant.ok).toBe(true);
-    if (otherTenant.ok) expect(otherTenant.value).toHaveLength(0);
+    if (otherTenant.ok) expect(otherTenant.value.accounts).toHaveLength(0);
   });
 
   it('a guessed id, a neighbour account, and another tenant all answer the SAME not-found', async () => {
@@ -1016,8 +1088,8 @@ describe('financial-accounts use cases: delete is first class and cannot cross a
       expect(deleted.value.snapshotsDeleted).toBe(2);
       expect(deleted.value.recordsDeleted).toEqual(NO_RECORDS_ERASED);
     }
-    const remaining = await list.execute(actorA1);
-    if (remaining.ok) expect(remaining.value).toHaveLength(0);
+    const remaining = await list.execute(EVERY_ACCOUNT_PAGE, actorA1);
+    if (remaining.ok) expect(remaining.value.accounts).toHaveLength(0);
     expect(snapshotStore.rows).toHaveLength(0);
   });
 
@@ -1076,11 +1148,11 @@ describe('financial-accounts use cases: balance snapshots', () => {
       createdAt: NOW,
     });
 
-    const listed = await listSnapshots.execute({ accountId: created.value.id }, actorA1);
+    const listed = await listSnapshots.execute(everySnapshotPage(created.value.id), actorA1);
     expect(listed.ok).toBe(true);
     if (listed.ok) {
-      expect(listed.value).toHaveLength(1);
-      expect(listed.value[0]?.amount.minorUnits).toBe(-123_456n);
+      expect(listed.value.snapshots).toHaveLength(1);
+      expect(listed.value.snapshots[0]?.amount.minorUnits).toBe(-123_456n);
     }
   });
 
@@ -1091,9 +1163,9 @@ describe('financial-accounts use cases: balance snapshots', () => {
     const created = await create.execute(manualInput, actorA1);
     if (!created.ok) return expect.unreachable('fixture create failed');
 
-    const listed = await listSnapshots.execute({ accountId: created.value.id }, actorA1);
+    const listed = await listSnapshots.execute(everySnapshotPage(created.value.id), actorA1);
     expect(listed.ok).toBe(true);
-    if (listed.ok) expect(listed.value).toHaveLength(0);
+    if (listed.ok) expect(listed.value.snapshots).toHaveLength(0);
   });
 
   it('a neighbour asking for the same account gets not-found, not an empty list', async () => {
@@ -1101,7 +1173,7 @@ describe('financial-accounts use cases: balance snapshots', () => {
     const created = await create.execute(manualInput, actorA1);
     if (!created.ok) return expect.unreachable('fixture create failed');
 
-    const listed = await listSnapshots.execute({ accountId: created.value.id }, actorA2);
+    const listed = await listSnapshots.execute(everySnapshotPage(created.value.id), actorA2);
     expect(listed.ok).toBe(false);
     if (!listed.ok) expect(listed.error.kind).toBe('account_not_found');
   });
@@ -1180,8 +1252,8 @@ describe('financial-accounts use cases: durable creation fails closed on retenti
       // snapshot store, and no identifier was even minted.
       expect(accountStore.rows.size).toBe(0);
       expect(snapshotStore.rows).toHaveLength(0);
-      const listed = await list.execute(actorA1);
-      expect(listed.ok && listed.value).toHaveLength(0);
+      const listed = await list.execute(EVERY_ACCOUNT_PAGE, actorA1);
+      expect(listed.ok && listed.value.accounts).toHaveLength(0);
     });
   }
 
@@ -1664,8 +1736,8 @@ describe('financial-accounts use cases: recording a reported balance', () => {
       expect(recorded.value.sourceKind).toBe('MANUAL');
     }
 
-    const listed = await listSnapshots.execute({ accountId: created.value.id }, actorA1);
-    expect(listed.ok && listed.value).toHaveLength(1);
+    const listed = await listSnapshots.execute(everySnapshotPage(created.value.id), actorA1);
+    expect(listed.ok && listed.value.snapshots).toHaveLength(1);
   });
 
   it('refuses a source reference that could carry narrative, before any write', async () => {

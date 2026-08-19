@@ -236,6 +236,56 @@ Six classes: `PUBLIC` · `INTERNAL` · `CONFIDENTIAL` · `HIGHLY_SENSITIVE_FINAN
 
 `HIGHLY_SENSITIVE_FINANCIAL` may carry payload in an event only with a declared `payloadExemption` naming owner, reason, and reviewer — CI fails without it. **`SEALED` has no exemption mechanism at all.** See [`event-governance.md`](event-governance.md).
 
+## 7.1 Content trust — a second axis, and not a second classification
+
+Classification answers **how sensitive is this**. It does not answer **who wrote it, and may it direct behaviour** — and those are different questions with different consequences. A merchant narrative and a system prompt can both be `HIGHLY_SENSITIVE_FINANCIAL`; only one of them may tell the platform what to do.
+
+`ContentTrustClass` (ADR-0029) is that second axis. Four members, no more:
+
+| Class | Means | May direct behaviour |
+|---|---|---|
+| `TRUSTED_PLATFORM_INSTRUCTION` | platform-owned code or configuration | **yes — the only one** |
+| `TRUSTED_STRUCTURED_PLATFORM_FACT` | a value this platform derived under a named, versioned ruleset | no |
+| `UNTRUSTED_USER_CONTENT` | the subject typed it into Karar | no |
+| `UNTRUSTED_EXTERNAL_CONTENT` | it arrived in a file or a feed | no |
+
+**External content is DATA. External content is never INSTRUCTION.** That covers uploaded CSV cells, column headers, merchant descriptions, bank narratives, source references, imported account labels, and — in later phases — PDF text, OCR output, email bodies, aggregator payloads and device signals.
+
+### The trusted arm is unconstructible from data, structurally
+
+Three mechanisms, none of which is a convention: the mint accepts a member of a closed source-declared registry rather than a `string`, so a cell cannot be passed without a compile error; the origin is nominally branded, so an object literal is not a classification either; and the mint re-checks membership against a frozen registry at runtime, so a cast past the first two throws. **There is no function that reads text and returns a trust class** — such a function is a keyword blacklist wearing a type.
+
+**Trust is not confidence.** There is no score, no threshold and no numeric field on any arm, and a compile-time assertion fails the build if one appears. A threshold is a number at which an attacker becomes believable.
+
+### There is no trust column, and that is the decision
+
+**No table stores a content trust class.** A stored narrative's class is a total function of provenance that is already persisted: `transaction_provenance.source_kind` is `NOT NULL` and `CHECK`ed to `MANUAL` or `CSV` on every revision of every transaction, so `CSV` is `UNTRUSTED_EXTERNAL_CONTENT` and `MANUAL` is `UNTRUSTED_USER_CONTENT`. A column beside it would give one fact two homes and a way to disagree.
+
+The general rule this instance illustrates: **persist trust metadata only where its absence would create real later ambiguity.** A denormalised constant is not a control; it is a second thing to keep true. Prefer typed wrappers at the boundary where raw text enters, and explicit projection contracts at the boundary where it leaves.
+
+### A derived figure is a fact; the text it came from is not
+
+Reading `1.234` as `123400` minor units under `statement-csv/normalization/v1` produces a `TRUSTED_STRUCTURED_PLATFORM_FACT` whose derivation, ruleset version and untrusted origin are all recorded. **The narrative stays untrusted**, and the fact carries no authority either — trusted-as-a-value and may-direct-behaviour are separate properties, and collapsing them is the mistake the four-member vocabulary exists to prevent.
+
+### Storage never sanitises for a destination it does not have
+
+A record is never rejected or rewritten because a text field contains instruction-shaped, markup-shaped or JSON-shaped content. Escaping is a property of a **destination**, and a value escaped for one destination is wrong in every other — applied at storage it corrupts the fact for the API, the client, the subject's own export and the deduplication fingerprint at once, inside a ciphertext column where the corruption is undiscoverable.
+
+**The export-boundary rule:** spreadsheet formula syntax (a leading `=`, `+`, `-` or `@`) is ordinary text here, and any future CSV or XLSX export must neutralise untrusted text for its target format **as it writes**. No export exists in Phase 5, and none was built to satisfy this rule in advance.
+
+### The flow, and the direction it does not run
+
+```
+uploaded source  ->  parser  ->  normalisation  ->  structured facts + provenance
+UNTRUSTED_EXTERNAL   bounded,     deterministic,     TRUSTED_STRUCTURED_PLATFORM_FACT
+                     byte-        versioned,         (narrative stays UNTRUSTED)
+                     verified     refuses rather
+                                  than guesses
+        ->  Phase 6 verified facts  ->  Phase 7 AI context, as DATA
+```
+
+Every arrow is one-way. Nothing downstream writes back to a source fact, and no future AI layer reaches past the minimised projection it is given — **no raw artifact is ever automatically placed in a prompt, a retrieval index, a vector store or an agent memory.** See [ADR-0029](../adr/0029-untrusted-external-financial-content.md) for the full contract, and [`../security/threat-model.md`](../security/threat-model.md) for the threats it answers.
+
 ## 8. Sealed storage — the split that makes it work
 
 ```

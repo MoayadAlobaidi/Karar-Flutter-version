@@ -257,9 +257,13 @@ export {
 export type {
   ConnectionDeleteOutcome,
   ConnectionUpdateOutcome,
+  FinancialConnectionPage,
+  FinancialConnectionPageQuery,
   FinancialConnectionRepository,
 } from './application/ports/financial-connection-repository.js';
 export type {
+  AccountSourceLinkPage,
+  AccountSourceLinkPageQuery,
   AccountSourceLinkRepository,
   SourceLinkCreateOutcome,
   SourceLinkUpdateOutcome,
@@ -275,7 +279,10 @@ export {
   CreateManualConnection,
   type CreateManualConnectionInput,
 } from './application/use-cases/create-manual-connection.js';
-export { ListOwnConnections } from './application/use-cases/list-own-connections.js';
+export {
+  ListOwnConnections,
+  type ListOwnConnectionsInput,
+} from './application/use-cases/list-own-connections.js';
 export {
   DeleteOwnConnection,
   type ConnectionDeleted,
@@ -297,6 +304,7 @@ export {
 export {
   ListOwnAccountSourceLinks,
   type ListOwnAccountSourceLinksInput,
+  type ListOwnAccountSourceLinksPage,
 } from './application/use-cases/list-own-account-source-links.js';
 export {
   RecordSourceObservation,

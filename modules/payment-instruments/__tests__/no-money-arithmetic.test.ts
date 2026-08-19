@@ -164,9 +164,9 @@ describe('no money arithmetic exists anywhere in payment-instruments', () => {
         present: false,
       });
     }
-    // Word-boundaried: `listOwnForAccount(` ends in the letters of `count(`
-    // and is not a counting method, so a substring check would fail on the
-    // very method that returns the list instead of a number.
+    // Word-boundaried rather than a substring check: a method whose name
+    // merely ENDS in the letters of `count(` is not a counting method, and a
+    // substring check would fail on a method that returns rows.
     const port = readCode(path.join('application', 'ports', 'payment-instrument-repository.ts'));
     expect(/\bcount\s*\(/.test(port)).toBe(false);
     expect(/\btotal/i.test(port)).toBe(false);

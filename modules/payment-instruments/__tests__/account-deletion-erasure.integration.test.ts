@@ -58,9 +58,13 @@ import { ErasePaymentInstruments } from '../application/use-cases/erase-payment-
 import { ListOwnPaymentInstruments } from '../application/use-cases/list-own-payment-instruments.js';
 import { RecordPaymentInstrument } from '../application/use-cases/record-payment-instrument.js';
 import type { InstrumentsPrincipal } from '../application/principal.js';
-import type { PaymentInstrumentRepository } from '../application/ports/payment-instrument-repository.js';
+import type {
+  PaymentInstrumentPage,
+  PaymentInstrumentPageQuery,
+  PaymentInstrumentRepository,
+} from '../application/ports/payment-instrument-repository.js';
 import type { PaymentInstrument } from '../domain/payment-instrument.js';
-import type { BalanceBearingAccountRef, PaymentInstrumentId } from '../domain/refs.js';
+import type { PaymentInstrumentId } from '../domain/refs.js';
 import { FinancialAccountsBalanceBearingAccountAdapter } from '../infrastructure/adapters/financial-accounts-balance-bearing-account-access.js';
 import { FinancialAccountsPaymentInstrumentEraser } from '../infrastructure/adapters/financial-accounts-payment-instrument-eraser.js';
 import { PrismaPaymentInstrumentRepository } from '../infrastructure/persistence/prisma-payment-instrument-repository.js';
@@ -68,6 +72,7 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import {
   ACTOR_A1,
   ACTOR_A2,
+  EVERY_INSTRUMENT_PAGE,
   SYNTHETIC_MASK_ONE,
   SYNTHETIC_MASK_TWO,
   accountsRepository,
@@ -119,15 +124,11 @@ const POISONED_SQL = 'DELETE FROM public.payment_instruments WHERE account_id = 
 class RefusingInstrumentRepository implements PaymentInstrumentRepository {
   constructor(private readonly real: PaymentInstrumentRepository) {}
 
-  listOwn(actor: InstrumentsPrincipal): Promise<readonly PaymentInstrument[]> {
-    return this.real.listOwn(actor);
-  }
-
-  listOwnForAccount(
+  pageOwn(
     actor: InstrumentsPrincipal,
-    accountRef: BalanceBearingAccountRef,
-  ): Promise<readonly PaymentInstrument[]> {
-    return this.real.listOwnForAccount(actor, accountRef);
+    query: PaymentInstrumentPageQuery,
+  ): Promise<PaymentInstrumentPage> {
+    return this.real.pageOwn(actor, query);
   }
 
   findOwnById(
@@ -418,9 +419,12 @@ describe.skipIf(unreachable !== null)(
 
       // And the neighbour can still read their own two, through the real
       // list path — proof the rows are usable and not merely present.
-      const listed = await list.execute({ accountId: theirs }, ACTOR_A2);
+      const listed = await list.execute(
+        { accountId: theirs, ...EVERY_INSTRUMENT_PAGE },
+        ACTOR_A2,
+      );
       expect(listed.ok).toBe(true);
-      if (listed.ok) expect(listed.value).toHaveLength(2);
+      if (listed.ok) expect(listed.value.instruments).toHaveLength(2);
     });
   },
 );

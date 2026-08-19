@@ -59,6 +59,8 @@ import { CreateManualConnection } from '../application/use-cases/create-manual-c
 import { EraseAccountSourceLinks } from '../application/use-cases/erase-account-source-links.js';
 import { ProposeAccountSourceLink } from '../application/use-cases/propose-account-source-link.js';
 import type {
+  AccountSourceLinkPage,
+  AccountSourceLinkPageQuery,
   AccountSourceLinkRepository,
   SourceLinkCreateOutcome,
   SourceLinkUpdateOutcome,
@@ -68,11 +70,7 @@ import type {
   AccountSourceLink,
   SourceAccountFingerprint,
 } from '../domain/account-source-link.js';
-import type {
-  AccountSourceLinkId,
-  CanonicalAccountRef,
-  FinancialConnectionId,
-} from '../domain/refs.js';
+import type { AccountSourceLinkId, FinancialConnectionId } from '../domain/refs.js';
 import { FinancialAccountsCanonicalAccountAdapter } from '../infrastructure/adapters/financial-accounts-canonical-account-access.js';
 import { FinancialAccountsSourceLinkEraser } from '../infrastructure/adapters/financial-accounts-source-link-eraser.js';
 import { PrismaAccountSourceLinkRepository } from '../infrastructure/persistence/prisma-account-source-link-repository.js';
@@ -134,15 +132,11 @@ const POISONED_SQL = 'DELETE FROM public.account_source_links WHERE account_id =
 class RefusingSourceLinkRepository implements AccountSourceLinkRepository {
   constructor(private readonly real: AccountSourceLinkRepository) {}
 
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly AccountSourceLink[]> {
-    return this.real.listOwn(actor);
-  }
-
-  listOwnForAccount(
+  pageOwn(
     actor: ConnectionsPrincipal,
-    accountRef: CanonicalAccountRef,
-  ): Promise<readonly AccountSourceLink[]> {
-    return this.real.listOwnForAccount(actor, accountRef);
+    query: AccountSourceLinkPageQuery,
+  ): Promise<AccountSourceLinkPage> {
+    return this.real.pageOwn(actor, query);
   }
 
   listOwnForConnection(

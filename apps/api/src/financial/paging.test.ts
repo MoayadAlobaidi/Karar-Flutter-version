@@ -7,7 +7,14 @@
 // reset looks perfectly well-formed.
 import { describe, expect, it } from 'vitest';
 
-import { keysetPage, pageOf, readCursor, readLimit, readPageRequest } from './paging.js';
+import {
+  keysetPage,
+  offsetPage,
+  pageOf,
+  readCursor,
+  readLimit,
+  readPageRequest,
+} from './paging.js';
 import { CSV_STATEMENT_LIMITS, MANUAL_ENTRY_LIMITS } from './use-cases.js';
 
 const BOUNDS = MANUAL_ENTRY_LIMITS;
@@ -86,5 +93,86 @@ describe('a keyset page reports the STORE’s cursor, not the item count', () =>
     expect(page.page.hasMore).toBe(false);
     expect(page.page.nextCursor).toBeNull();
     expect(page.page.returned).toBe(1);
+  });
+});
+
+describe('a page the STORE cut carries the same envelope as one cut here', () => {
+  const all = Array.from({ length: 7 }, (_, index) => index);
+
+  /**
+   * What a bounded repository does: read one row past the page, hand back at
+   * most `limit`, and say whether the extra row existed.
+   *
+   * The fake reads `limit + 1` deliberately. A test store that read the whole
+   * array and sliced would still produce the right envelope, and would
+   * therefore not be exercising the thing `offsetPage` exists to wrap.
+   */
+  function storePage(request: { limit: number; offset: number }): {
+    items: number[];
+    hasMore: boolean;
+  } {
+    const read = all.slice(request.offset, request.offset + request.limit + 1);
+    const hasMore = read.length > request.limit;
+    return { items: hasMore ? read.slice(0, request.limit) : read, hasMore };
+  }
+
+  it('is BYTE-IDENTICAL to the in-memory cut, so a client cannot tell them apart', () => {
+    // The wire contract is one contract. A caller holding a cursor from
+    // before the store started cutting the page must still be able to use it,
+    // and a generated client must not need to know which read produced a
+    // page.
+    for (const offset of [0, 3, 6]) {
+      const request = { limit: 3, offset };
+      const store = storePage(request);
+      expect(offsetPage(store.items, request, store.hasMore)).toEqual(pageOf(all, request));
+    }
+  });
+
+  it('walks every row exactly once, follows only the CURSOR, and terminates', () => {
+    // The failure this catches is the one a person experiences as a
+    // transaction that is simply missing: a boundary that drops one row and
+    // repeats another. Nothing here computes an offset — each page is reached
+    // only through the opaque cursor the previous one returned.
+    const walked: number[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    for (;;) {
+      const request = readPageRequest(
+        cursor === null ? { limit: '3' } : { limit: '3', cursor },
+        BOUNDS,
+      );
+      if (typeof request === 'string') throw new Error(`the walk was refused: ${request}`);
+      const store = storePage(request);
+      const page = offsetPage(store.items, request, store.hasMore);
+      walked.push(...page.items);
+      pages += 1;
+      expect(page.page.returned).toBe(page.items.length);
+      expect(page.page.limit).toBe(3);
+      if (!page.page.hasMore) {
+        // The end is STATED: no cursor, so a client stops rather than guessing.
+        expect(page.page.nextCursor).toBeNull();
+        break;
+      }
+      expect(page.page.nextCursor).not.toBeNull();
+      // Termination, asserted rather than assumed: a page that claimed
+      // `hasMore` while returning nothing would otherwise spin here forever.
+      expect(page.items.length).toBeGreaterThan(0);
+      expect(pages).toBeLessThanOrEqual(all.length);
+      cursor = page.page.nextCursor;
+    }
+    expect(walked).toEqual(all);
+    expect(new Set(walked).size).toBe(all.length);
+    expect(pages).toBe(3);
+  });
+
+  it('reports the end from the STORE, not from a full page', () => {
+    // A page that happens to fill exactly is not the last page. Inferring
+    // otherwise would silently drop whatever came after it.
+    const exact = offsetPage([0, 1, 2], { limit: 3, offset: 0 }, true);
+    expect(exact.page.hasMore).toBe(true);
+    expect(exact.page.nextCursor).not.toBeNull();
+    const last = offsetPage([0, 1, 2], { limit: 3, offset: 0 }, false);
+    expect(last.page.hasMore).toBe(false);
+    expect(last.page.nextCursor).toBeNull();
   });
 });

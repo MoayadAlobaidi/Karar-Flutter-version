@@ -45,6 +45,8 @@ import {
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
 import type {
+  AccountSourceLinkPage,
+  AccountSourceLinkPageQuery,
   AccountSourceLinkRepository,
   SourceLinkCreateOutcome,
   SourceLinkUpdateOutcome,
@@ -145,34 +147,41 @@ export class PrismaAccountSourceLinkRepository implements AccountSourceLinkRepos
     return links;
   }
 
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly AccountSourceLink[]> {
-    return this.inContext(actor, async (tx) => {
-      const rows = await tx.accountSourceLink.findMany({
-        where: {
-          tenantId: TenantId.toString(actor.tenantId),
-          userId: UserId.toString(actor.userId),
-        },
-        orderBy: [{ sourcePriority: 'asc' }, { createdAt: 'asc' }],
-      });
-      return this.mapAll(rows as readonly AccountSourceLinkRow[], actor);
-    });
-  }
-
-  listOwnForAccount(
+  pageOwn(
     actor: ConnectionsPrincipal,
-    accountRef: CanonicalAccountRef,
-  ): Promise<readonly AccountSourceLink[]> {
+    query: AccountSourceLinkPageQuery,
+  ): Promise<AccountSourceLinkPage> {
     return this.inContext(actor, async (tx) => {
       const rows = await tx.accountSourceLink.findMany({
         where: {
-          accountId: accountRef.accountId,
-          accountReferenceType: accountRef.referenceType,
           tenantId: TenantId.toString(actor.tenantId),
           userId: UserId.toString(actor.userId),
+          ...(query.accountRef === null
+            ? {}
+            : {
+                accountId: query.accountRef.accountId,
+                accountReferenceType: query.accountRef.referenceType,
+              }),
+          ...(query.rail === null ? {} : { connectionRail: query.rail }),
+          ...(query.status === null ? {} : { sourceStatus: query.status }),
         },
-        orderBy: [{ sourcePriority: 'asc' }, { createdAt: 'asc' }],
+        // Strongest priority first, oldest first within a priority, and the
+        // row id last so the order is TOTAL. Without the id two links written
+        // in the same instant at the same priority are interchangeable, and a
+        // page boundary between them loses one row and repeats another.
+        orderBy: [{ sourcePriority: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+        skip: query.offset,
+        // ONE row past the page: it reports whether another page exists
+        // without a second statement, and it is what makes this read cost the
+        // caller's limit rather than the number of links they hold.
+        take: query.limit + 1,
       });
-      return this.mapAll(rows as readonly AccountSourceLinkRow[], actor);
+      const hasMore = rows.length > query.limit;
+      const page = hasMore ? rows.slice(0, query.limit) : rows;
+      return {
+        links: await this.mapAll(page as readonly AccountSourceLinkRow[], actor),
+        hasMore,
+      };
     });
   }
 

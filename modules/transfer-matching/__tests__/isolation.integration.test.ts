@@ -52,9 +52,11 @@ import {
   USER_A1,
   USER_A2,
   USER_B1,
+  EVERY_MATCH_PAGE,
   asApp,
   buildHandle,
   dropDatabase,
+  expectEveryVisibleMatch,
   money,
   probePostgres,
   provisionDatabase,
@@ -183,17 +185,17 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('the legitimate read is non-empty — without which nothing below proves anything', async () => {
-    const own = await list.execute({}, ACTOR_A1);
+    const own = await list.execute(EVERY_MATCH_PAGE, ACTOR_A1);
     expect(own.ok).toBe(true);
     if (own.ok) {
-      expect(own.value).toHaveLength(1);
-      expect(own.value[0]?.state).toBe('SUGGESTED');
+      expect(own.value.matches).toHaveLength(1);
+      expect(own.value.matches[0]?.state).toBe('SUGGESTED');
     }
   });
 
   it('one tenant member cannot see another member matches through the repository', async () => {
-    const a1 = await matches.listOwn(ACTOR_A1);
-    const a2 = await matches.listOwn(ACTOR_A2);
+    const a1 = await expectEveryVisibleMatch(matches, ACTOR_A1);
+    const a2 = await expectEveryVisibleMatch(matches, ACTOR_A2);
     expect(a1).toHaveLength(1);
     expect(a2).toHaveLength(1);
     expect(a1[0]?.id).not.toBe(a2[0]?.id);
@@ -205,13 +207,13 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   it('a cross-tenant read sees nothing', async () => {
     expect(await matches.findOwnById(ACTOR_B1, TransferMatchId.of(seeded['a1']!.matchId))).toBeNull();
     expect(await matches.findOwnById(ACTOR_A1, TransferMatchId.of(seeded['b1']!.matchId))).toBeNull();
-    const b1 = await matches.listOwn(ACTOR_B1);
+    const b1 = await expectEveryVisibleMatch(matches, ACTOR_B1);
     expect(b1).toHaveLength(1);
-    expect(b1[0]?.id).not.toBe((await matches.listOwn(ACTOR_A1))[0]?.id);
+    expect(b1[0]?.id).not.toBe((await expectEveryVisibleMatch(matches, ACTOR_A1))[0]?.id);
   });
 
   it('a valid user id presented under the wrong tenant sees nothing', async () => {
-    expect(await matches.listOwn(actorA1inB)).toHaveLength(0);
+    expect(await expectEveryVisibleMatch(matches, actorA1inB)).toHaveLength(0);
     expect(
       await matches.findOwnById(actorA1inB, TransferMatchId.of(seeded['a1']!.matchId)),
     ).toBeNull();
@@ -266,13 +268,13 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('a raw DELETE as karar_app against a neighbour row removes nothing', async () => {
-    const before = await matches.listOwn(ACTOR_A1);
+    const before = await expectEveryVisibleMatch(matches, ACTOR_A1);
     await asApp(
       database,
       { tenantId: TenantId.toString(TENANT_B), userId: UserId.toString(USER_B1) },
       (tx) => tx.query(`DELETE FROM public.transfer_matches WHERE id = $1`, [before[0]!.id]),
     );
-    expect(await matches.listOwn(ACTOR_A1)).toHaveLength(before.length);
+    expect(await expectEveryVisibleMatch(matches, ACTOR_A1)).toHaveLength(before.length);
   });
 
   it('an INSERT as karar_app claiming another subject is refused by WITH CHECK', async () => {
@@ -304,15 +306,24 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
 
   it('the repository refuses a partial principal rather than reading widely', async () => {
     await expect(
-      matches.listOwn({ tenantId: TENANT_A } as unknown as MatchingPrincipal),
+      matches.pageOwn({ tenantId: TENANT_A } as unknown as MatchingPrincipal, {
+        state: null,
+        ...EVERY_MATCH_PAGE,
+      }),
     ).rejects.toBeInstanceOf(PrincipalContextError);
     await expect(
-      matches.listOwn({ userId: USER_A1 } as unknown as MatchingPrincipal),
+      matches.pageOwn({ userId: USER_A1 } as unknown as MatchingPrincipal, {
+        state: null,
+        ...EVERY_MATCH_PAGE,
+      }),
     ).rejects.toBeInstanceOf(PrincipalContextError);
   });
 
   it('a use case refuses without a principal instead of answering emptily', async () => {
-    const listed = await list.execute({}, null as unknown as MatchingPrincipal);
+    const listed = await list.execute(
+      EVERY_MATCH_PAGE,
+      null as unknown as MatchingPrincipal,
+    );
     expect(listed.ok).toBe(false);
     if (!listed.ok) expect(listed.error.kind).toBe('missing_principal_context');
   });

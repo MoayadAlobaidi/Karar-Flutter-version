@@ -166,9 +166,15 @@ export {
 export type {
   AccountDeleteOutcome,
   AccountUpdateOutcome,
+  FinancialAccountPage,
+  FinancialAccountPageQuery,
   FinancialAccountRepository,
 } from './application/ports/financial-account-repository.js';
-export type { BalanceSnapshotRepository } from './application/ports/balance-snapshot-repository.js';
+export type {
+  BalanceSnapshotPage,
+  BalanceSnapshotPageQuery,
+  BalanceSnapshotRepository,
+} from './application/ports/balance-snapshot-repository.js';
 export type { InstitutionCatalogueReader } from './application/ports/institution-catalogue-reader.js';
 export type { IdSource } from './application/ports/id-source.js';
 export {
@@ -213,7 +219,10 @@ export type {
 } from './application/ports/payment-instrument-eraser.js';
 
 // application — use cases
-export { ListOwnAccounts } from './application/use-cases/list-own-accounts.js';
+export {
+  ListOwnAccounts,
+  type ListOwnAccountsInput,
+} from './application/use-cases/list-own-accounts.js';
 export {
   ReadOwnAccount,
   type ReadOwnAccountInput,

@@ -44,21 +44,65 @@ export type InstrumentUpdateOutcome =
   | { readonly kind: 'stale' }
   | { readonly kind: 'not_found' };
 
-export interface PaymentInstrumentRepository {
-  /** The principal's own instruments, oldest first. */
-  listOwn(actor: InstrumentsPrincipal): Promise<readonly PaymentInstrument[]>;
+/**
+ * What one page of the principal's own instruments asks for.
+ *
+ * **The bound and the narrowing travel together into the store.** Nothing in
+ * the schema limits how many instruments an account may have — that absence
+ * is deliberate, because "two virtual cards on one wallet" is the ordinary
+ * case and no constraint may forbid a second card — so a read of all of them
+ * has no ceiling, and each row costs a key-management call to decrypt its
+ * mask and label. Narrowing after the read would bound the response and leave
+ * both costs unbounded, and it would make the offset a cursor carries count
+ * rows in a set the caller is not walking.
+ *
+ * `spendable` is the MODULE'S OWN predicate asked of the store: an
+ * implementation answers it from `SPENDABLE_INSTRUMENT_STATUSES` rather than
+ * from a status list restated in a query, so a vocabulary change moves both
+ * at once.
+ *
+ * `null` on any filter means "do not narrow on this".
+ */
+export interface PaymentInstrumentPageQuery {
+  /** Narrow to what spends from one account; `null` reads every instrument. */
+  readonly accountRef: BalanceBearingAccountRef | null;
+  /** Narrow to one instrument type; `null` reads every type. */
+  readonly instrumentType: string | null;
+  /** Narrow to one status; `null` reads every status. */
+  readonly status: string | null;
+  /** Narrow to what may (or may not) still be used to spend; `null` reads both. */
+  readonly spendable: boolean | null;
+  /** How many rows the caller's cursor has already consumed. */
+  readonly offset: number;
+  /** How many rows to return. */
+  readonly limit: number;
+}
 
+/**
+ * One page, and whether another exists.
+ *
+ * `hasMore` is a BOOLEAN and never a remaining-row figure, which keeps this
+ * type on the right side of the module's rule: it answers "ask again?" and
+ * cannot be mistaken for a per-account quantity.
+ */
+export interface PaymentInstrumentPage {
+  readonly instruments: readonly PaymentInstrument[];
+  readonly hasMore: boolean;
+}
+
+export interface PaymentInstrumentRepository {
   /**
-   * The principal's own instruments that spend from one account.
+   * One page of the principal's own instruments, oldest first, `id` breaking
+   * ties so the order is TOTAL.
    *
-   * This is the method that makes "two virtual cards on one wallet" readable
-   * as what it is: two rows against one account. It returns a LIST, never a
-   * count and never a total.
+   * With `accountRef` set this is the method that makes "two virtual cards on
+   * one wallet" readable as what it is: two rows against one account. It
+   * returns ROWS, never a figure about them.
    */
-  listOwnForAccount(
+  pageOwn(
     actor: InstrumentsPrincipal,
-    accountRef: BalanceBearingAccountRef,
-  ): Promise<readonly PaymentInstrument[]>;
+    query: PaymentInstrumentPageQuery,
+  ): Promise<PaymentInstrumentPage>;
 
   /** The principal's own row, or `null` — another subject's id is `null` too. */
   findOwnById(

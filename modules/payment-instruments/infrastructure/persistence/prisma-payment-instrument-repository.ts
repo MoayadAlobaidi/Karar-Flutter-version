@@ -47,10 +47,15 @@ import type { HsfFieldEncryptionPort } from '../../application/ports/hsf-field-e
 import type {
   InstrumentCreateOutcome,
   InstrumentUpdateOutcome,
+  PaymentInstrumentPage,
+  PaymentInstrumentPageQuery,
   PaymentInstrumentRepository,
 } from '../../application/ports/payment-instrument-repository.js';
 import type { InstrumentsPrincipal } from '../../application/principal.js';
-import type { PaymentInstrument } from '../../domain/payment-instrument.js';
+import {
+  SPENDABLE_INSTRUMENT_STATUSES,
+  type PaymentInstrument,
+} from '../../domain/payment-instrument.js';
 import type { BalanceBearingAccountRef, PaymentInstrumentId } from '../../domain/refs.js';
 import {
   encryptInstrumentFields,
@@ -95,37 +100,57 @@ export class PrismaPaymentInstrumentRepository implements PaymentInstrumentRepos
     return instruments;
   }
 
-  listOwn(actor: InstrumentsPrincipal): Promise<readonly PaymentInstrument[]> {
-    return this.inContext(actor, async (tx) => {
-      const rows = await tx.paymentInstrument.findMany({
-        where: {
-          tenantId: TenantId.toString(actor.tenantId),
-          userId: UserId.toString(actor.userId),
-        },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      });
-      return this.mapAll(rows as readonly PaymentInstrumentRow[], actor);
-    });
-  }
-
-  listOwnForAccount(
+  pageOwn(
     actor: InstrumentsPrincipal,
-    accountRef: BalanceBearingAccountRef,
-  ): Promise<readonly PaymentInstrument[]> {
+    query: PaymentInstrumentPageQuery,
+  ): Promise<PaymentInstrumentPage> {
     return this.inContext(actor, async (tx) => {
-      // A LIST, deliberately. The question "what spends from this account?"
-      // has a list for an answer; the question a count would suggest — "how
-      // much is on it" — belongs to the account and not to the cards.
+      // ROWS, deliberately. The question "what spends from this account?" has
+      // a list for an answer; the question a figure would suggest — "how much
+      // is on it" — belongs to the account and not to the cards, and the page
+      // bound below is a number of ROWS rather than of anything else.
       const rows = await tx.paymentInstrument.findMany({
         where: {
-          accountId: accountRef.accountId,
-          accountReferenceType: accountRef.referenceType,
           tenantId: TenantId.toString(actor.tenantId),
           userId: UserId.toString(actor.userId),
+          ...(query.accountRef === null
+            ? {}
+            : {
+                accountId: query.accountRef.accountId,
+                accountReferenceType: query.accountRef.referenceType,
+              }),
+          ...(query.instrumentType === null ? {} : { instrumentType: query.instrumentType }),
+          ...(query.status === null ? {} : { status: query.status }),
+          // Spendability asked of the store as the DOMAIN'S set of statuses,
+          // not as a list of names copied into a query — a status that leaves
+          // or joins that set moves this predicate with it. It sits under
+          // `AND` so it composes with an explicit status filter instead of
+          // silently replacing it.
+          ...(query.spendable === null
+            ? {}
+            : {
+                AND: [
+                  query.spendable
+                    ? { status: { in: [...SPENDABLE_INSTRUMENT_STATUSES] } }
+                    : { status: { notIn: [...SPENDABLE_INSTRUMENT_STATUSES] } },
+                ],
+              }),
         },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        skip: query.offset,
+        // ONE row past the page. It reports whether another page exists
+        // without a second statement — which matters here, because the second
+        // statement a caller would reach for is the one this module refuses
+        // to offer — and it is what keeps the read bounded by the caller's
+        // limit rather than by how many cards they hold.
+        take: query.limit + 1,
       });
-      return this.mapAll(rows as readonly PaymentInstrumentRow[], actor);
+      const hasMore = rows.length > query.limit;
+      const page = hasMore ? rows.slice(0, query.limit) : rows;
+      return {
+        instruments: await this.mapAll(page as readonly PaymentInstrumentRow[], actor),
+        hasMore,
+      };
     });
   }
 

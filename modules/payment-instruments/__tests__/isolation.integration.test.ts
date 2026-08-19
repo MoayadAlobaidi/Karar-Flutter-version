@@ -40,6 +40,7 @@ import {
   ACTOR_A1,
   ACTOR_A2,
   ACTOR_B1,
+  EVERY_INSTRUMENT_PAGE,
   SYNTHETIC_MASK_ONE,
   TENANT_A,
   TENANT_B,
@@ -50,6 +51,7 @@ import {
   asApp,
   buildHandle,
   dropDatabase,
+  expectEveryVisibleInstrument,
   probePostgres,
   provisionDatabase,
   seedWallet,
@@ -132,17 +134,17 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('the legitimate read is non-empty — without which nothing below proves anything', async () => {
-    const own = await list.execute({}, ACTOR_A1);
+    const own = await list.execute(EVERY_INSTRUMENT_PAGE, ACTOR_A1);
     expect(own.ok).toBe(true);
     if (own.ok) {
-      expect(own.value).toHaveLength(1);
-      expect(own.value[0]?.mask.reveal()).toBe(SYNTHETIC_MASK_ONE);
+      expect(own.value.instruments).toHaveLength(1);
+      expect(own.value.instruments[0]?.mask.reveal()).toBe(SYNTHETIC_MASK_ONE);
     }
   });
 
   it('one tenant member cannot see another member instruments through the repository', async () => {
-    const a1 = await instruments.listOwn(ACTOR_A1);
-    const a2 = await instruments.listOwn(ACTOR_A2);
+    const a1 = await expectEveryVisibleInstrument(instruments, ACTOR_A1);
+    const a2 = await expectEveryVisibleInstrument(instruments, ACTOR_A2);
     expect(a1).toHaveLength(1);
     expect(a2).toHaveLength(1);
     expect(a1[0]?.id).not.toBe(a2[0]?.id);
@@ -160,9 +162,12 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
     // The account filter is the one path that takes an identifier the caller
     // could have guessed. It must answer nothing rather than another
     // subject's instruments.
-    const listed = await list.execute({ accountId: seeded['a2']!.account }, ACTOR_A1);
+    const listed = await list.execute(
+      { accountId: seeded['a2']!.account, ...EVERY_INSTRUMENT_PAGE },
+      ACTOR_A1,
+    );
     expect(listed.ok).toBe(true);
-    if (listed.ok) expect(listed.value).toHaveLength(0);
+    if (listed.ok) expect(listed.value.instruments).toHaveLength(0);
   });
 
   it('a cross-tenant read sees nothing', async () => {
@@ -172,13 +177,15 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
     expect(
       await instruments.findOwnById(ACTOR_A1, PaymentInstrumentId.of(seeded['b1']!.instrument)),
     ).toBeNull();
-    const b1 = await instruments.listOwn(ACTOR_B1);
+    const b1 = await expectEveryVisibleInstrument(instruments, ACTOR_B1);
     expect(b1).toHaveLength(1);
-    expect(b1[0]?.id).not.toBe((await instruments.listOwn(ACTOR_A1))[0]?.id);
+    expect(b1[0]?.id).not.toBe(
+      (await expectEveryVisibleInstrument(instruments, ACTOR_A1))[0]?.id,
+    );
   });
 
   it('a valid user id presented under the wrong tenant sees nothing', async () => {
-    expect(await instruments.listOwn(actorA1inB)).toHaveLength(0);
+    expect(await expectEveryVisibleInstrument(instruments, actorA1inB)).toHaveLength(0);
     expect(
       await instruments.findOwnById(actorA1inB, PaymentInstrumentId.of(seeded['a1']!.instrument)),
     ).toBeNull();
@@ -222,13 +229,15 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
   });
 
   it('a raw DELETE as karar_app against a neighbour row removes nothing', async () => {
-    const before = await instruments.listOwn(ACTOR_A1);
+    const before = await expectEveryVisibleInstrument(instruments, ACTOR_A1);
     await asApp(
       database,
       { tenantId: TenantId.toString(TENANT_B), userId: UserId.toString(USER_B1) },
       (tx) => tx.query(`DELETE FROM public.payment_instruments WHERE id = $1`, [before[0]!.id]),
     );
-    expect(await instruments.listOwn(ACTOR_A1)).toHaveLength(before.length);
+    expect(await expectEveryVisibleInstrument(instruments, ACTOR_A1)).toHaveLength(
+      before.length,
+    );
   });
 
   it('an INSERT as karar_app claiming another subject is refused by WITH CHECK', async () => {
@@ -264,15 +273,24 @@ describe.skipIf(unreachable !== null)('cross-subject and cross-tenant invisibili
 
   it('the repository refuses a partial principal rather than reading widely', async () => {
     await expect(
-      instruments.listOwn({ tenantId: TENANT_A } as unknown as InstrumentsPrincipal),
+      instruments.pageOwn({ tenantId: TENANT_A } as unknown as InstrumentsPrincipal, {
+        accountRef: null,
+        ...EVERY_INSTRUMENT_PAGE,
+      }),
     ).rejects.toBeInstanceOf(PrincipalContextError);
     await expect(
-      instruments.listOwn({ userId: USER_A1 } as unknown as InstrumentsPrincipal),
+      instruments.pageOwn({ userId: USER_A1 } as unknown as InstrumentsPrincipal, {
+        accountRef: null,
+        ...EVERY_INSTRUMENT_PAGE,
+      }),
     ).rejects.toBeInstanceOf(PrincipalContextError);
   });
 
   it('a use case refuses without a principal instead of answering emptily', async () => {
-    const listed = await list.execute({}, null as unknown as InstrumentsPrincipal);
+    const listed = await list.execute(
+      EVERY_INSTRUMENT_PAGE,
+      null as unknown as InstrumentsPrincipal,
+    );
     expect(listed.ok).toBe(false);
     if (!listed.ok) expect(listed.error.kind).toBe('missing_principal_context');
   });

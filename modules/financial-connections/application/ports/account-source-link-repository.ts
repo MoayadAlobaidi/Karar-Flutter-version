@@ -63,15 +63,56 @@ export type SourceLinkCreateOutcome =
   | { readonly kind: 'duplicate' }
   | { readonly kind: 'conflicting_account'; readonly linkedAccountId: string };
 
-export interface AccountSourceLinkRepository {
-  /** Every link the principal owns, strongest priority first. */
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly AccountSourceLink[]>;
+/**
+ * What one page of the principal's own source links asks for.
+ *
+ * **The bound and the narrowing travel together into the store.** This table
+ * grows with every connection a person adds and every account each connection
+ * reports, so "every link the principal owns" is a read whose size nothing in
+ * the schema limits. Filtering after the read would leave that read unbounded
+ * and would make the offset a cursor carries count rows in the unfiltered set
+ * — a different set from the one the caller is walking.
+ *
+ * `null` on any filter means "do not narrow on this". A rail or a status
+ * outside the vocabulary matches nothing rather than widening the answer.
+ */
+export interface AccountSourceLinkPageQuery {
+  /** Narrow to the links feeding one account; `null` reads every link. */
+  readonly accountRef: CanonicalAccountRef | null;
+  /** Narrow to one rail; `null` reads every rail. */
+  readonly rail: string | null;
+  /** Narrow to one source status; `null` reads every status. */
+  readonly status: string | null;
+  /** How many rows the caller's cursor has already consumed. */
+  readonly offset: number;
+  /** How many rows to return. */
+  readonly limit: number;
+}
 
-  /** The links feeding one of the principal's own accounts. */
-  listOwnForAccount(
+/**
+ * One page, and whether another exists.
+ *
+ * `hasMore` comes from one extra row rather than from a COUNT: the caller's
+ * only question is whether to ask again, and a count is a second pass over
+ * the rows the page bound exists to avoid reading.
+ */
+export interface AccountSourceLinkPage {
+  readonly links: readonly AccountSourceLink[];
+  readonly hasMore: boolean;
+}
+
+export interface AccountSourceLinkRepository {
+  /**
+   * One page of the principal's own links, strongest priority first, `id`
+   * breaking ties so the order is TOTAL. Two links written at the same
+   * instant at the same priority are otherwise interchangeable, and a page
+   * boundary falling between two interchangeable rows drops one and repeats
+   * the other for whoever walks the cursor.
+   */
+  pageOwn(
     actor: ConnectionsPrincipal,
-    accountRef: CanonicalAccountRef,
-  ): Promise<readonly AccountSourceLink[]>;
+    query: AccountSourceLinkPageQuery,
+  ): Promise<AccountSourceLinkPage>;
 
   /** The links one of the principal's own connections feeds. */
   listOwnForConnection(

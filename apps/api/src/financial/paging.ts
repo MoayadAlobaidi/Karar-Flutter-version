@@ -17,16 +17,25 @@
  *     surface untouched: re-encoding it here would put a second decoder in
  *     the system, and the two would eventually disagree about where a page
  *     ends.
- *   * Every other read on this surface is a use case that answers with the
- *     caller's complete, stably ordered set — the module declares no page
- *     query and inventing one at the edge would be a lie about what the store
- *     did. Those pages are cut HERE, from an offset the cursor carries.
+ *   * Every other read on this surface carries an OFFSET the cursor encodes.
+ *     The offset is not applied here: it is handed to a module's page query,
+ *     the store cuts the page, and `offsetPage` only puts the envelope round
+ *     what came back.
  *
- * An offset cursor is honest for a subject's own bounded collections (their
- * accounts, their connections, one account's instruments) and dishonest for
- * an unbounded one, which is why the unbounded collection — transactions —
- * is the one that has a keyset cursor in its module rather than an offset
- * here.
+ * WHERE THE PAGE IS CUT MATTERS MORE THAN WHICH CURSOR CARRIES IT. This file
+ * used to expose `pageOf`, which slices a COMPLETE result set the use case
+ * had already materialised. That is a bounded RESPONSE over an unbounded
+ * READ: the process still held every balance an account had ever reported,
+ * every match a person had accumulated, every link and every card, and the
+ * page bound hid it. So the modules grew page queries, `offsetPage` replaced
+ * `pageOf` on those paths, and the only reads still cut in memory are the
+ * ones with a stated ceiling — see `pageOf` below for which, and for the
+ * bound that makes each safe.
+ *
+ * The FILTERS travel down with the offset for the same reason, and for a
+ * second one: an offset counted over an unfiltered set names a position in a
+ * set the caller is not walking, so filtering after the cut would return the
+ * wrong rows as well as reading too many.
  *
  * A MALFORMED CURSOR IS REFUSED, NEVER RESET. Silently restarting at page one
  * shows a person the wrong rows and tells them nothing; it is also how a
@@ -120,11 +129,58 @@ export function readPageRequest(query: unknown, bounds: PageBounds): PageRequest
   return { limit, offset: 0 };
 }
 
-/** Cuts one page out of a complete, stably ordered result set. */
+/**
+ * Cuts one page out of a complete, stably ordered result set.
+ *
+ * ONLY FOR A COLLECTION WITH A STATED CEILING, and the four that remain each
+ * have one:
+ *
+ *   * the reviewed institution catalogue and the financial-category
+ *     catalogue — reference data that changes by reviewed migration, so its
+ *     size is a review decision rather than a function of usage;
+ *   * one transaction's provenance — one row per revision of one
+ *     transaction, bounded by that transaction's own history; and
+ *   * a statement import's row errors — bounded by `maxReportedErrors` in the
+ *     central ingestion limit policy, which the import path enforces on the
+ *     way in.
+ *
+ * Anything whose size grows with how long a person has used the product does
+ * NOT belong here. It takes a page query into its module and comes back
+ * through `offsetPage`.
+ */
 export function pageOf<T>(all: readonly T[], request: PageRequest): Page<T> {
   const items = all.slice(request.offset, request.offset + request.limit);
   const consumed = request.offset + items.length;
   const hasMore = consumed < all.length;
+  return {
+    items,
+    page: {
+      limit: request.limit,
+      returned: items.length,
+      hasMore,
+      nextCursor: hasMore ? encodeOffsetCursor(consumed) : null,
+    },
+  };
+}
+
+/**
+ * The envelope for a page the STORE already cut, from an offset cursor.
+ *
+ * `hasMore` is the store's answer — it read one row past the page and says
+ * whether it found one — rather than something inferred from the item count.
+ * A page that happens to fill exactly is not the last page, and inferring
+ * otherwise would silently drop a caller's remaining rows.
+ *
+ * The cursor is encoded HERE, by the same function `pageOf` uses, so a client
+ * cannot tell which of the two produced a page: the wire contract is one
+ * contract, and a caller's saved cursor keeps meaning what it meant.
+ */
+export function offsetPage<T>(
+  items: readonly T[],
+  request: PageRequest,
+  hasMore: boolean,
+): Page<T> {
+  const consumed = request.offset + items.length;
   return {
     items,
     page: {

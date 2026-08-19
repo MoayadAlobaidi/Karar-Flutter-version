@@ -42,7 +42,7 @@ import type { MatchState } from '@karar/transfer-matching';
 
 import { FinancialCapabilityGuard } from './capability.guard.js';
 import { transferMatchWire } from './dto/matches.js';
-import { pageOf, readPageRequest } from './paging.js';
+import { offsetPage, readPageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
 import { problemForMatchingError } from './problems-matching.js';
 import { FINANCIAL_PRINCIPAL_SOURCE, type FinancialPrincipalSource } from './principal.js';
@@ -100,12 +100,17 @@ export class TransferMatchesController {
     }
 
     const result = await this.useCases.listOwnTransferMatches.execute(
-      { state: (state ?? null) as MatchState | null },
+      {
+        state: (state ?? null) as MatchState | null,
+        offset: page.offset,
+        limit: page.limit,
+      },
       principal,
     );
     if (!result.ok) refuse(problemForMatchingError(result.error));
 
-    const cut = pageOf(result.value.map(transferMatchWire), page);
+    const items = result.value.matches.map(transferMatchWire);
+    const cut = offsetPage(items, page, result.value.hasMore);
     reply.status(200).send({ items: cut.items, page: cut.page });
   }
 

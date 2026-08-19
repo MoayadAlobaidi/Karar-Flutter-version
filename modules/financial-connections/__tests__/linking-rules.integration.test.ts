@@ -30,12 +30,15 @@ import { PrismaFinancialConnectionRepository } from '../infrastructure/persisten
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import {
   ACTOR_A1,
+  EVERY_CONNECTION_PAGE,
+  EVERY_SOURCE_LINK_PAGE,
   SYNTHETIC_SOURCE_REF_ONE,
   SYNTHETIC_SOURCE_REF_TWO,
   accountsRepository,
   asApp,
   buildHandle,
   dropDatabase,
+  everySourceLinkPageFor,
   probePostgres,
   provisionDatabase,
   seedAccount,
@@ -178,11 +181,11 @@ describe.skipIf(unreachable !== null)('linking rules against live PostgreSQL', (
 
     // ONE account, TWO connections. No second account was created here and
     // none could be: this module creates no account at all.
-    const forAccount = await listLinks.execute({ accountId: accountOne }, ACTOR_A1);
+    const forAccount = await listLinks.execute(everySourceLinkPageFor(accountOne), ACTOR_A1);
     expect(forAccount.ok).toBe(true);
     if (!forAccount.ok) return;
-    expect(forAccount.value).toHaveLength(2);
-    expect(new Set(forAccount.value.map((link) => link.connectionId)).size).toBe(2);
+    expect(forAccount.value.items).toHaveLength(2);
+    expect(new Set(forAccount.value.items.map((link) => link.connectionId)).size).toBe(2);
   });
 
   it('refuses to point one source account at a second canonical account', async () => {
@@ -224,21 +227,21 @@ describe.skipIf(unreachable !== null)('linking rules against live PostgreSQL', (
     if (!toTwo.ok) return;
     expect(toTwo.value.link.accountRef.accountId).toBe(accountTwo);
 
-    const all = await listLinks.execute({}, ACTOR_A1);
+    const all = await listLinks.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(all.ok).toBe(true);
     if (!all.ok) return;
-    expect(new Set(all.value.map((link) => link.accountRef.accountId)).size).toBe(2);
+    expect(new Set(all.value.items.map((link) => link.accountRef.accountId)).size).toBe(2);
   });
 
   it('never returns the external reference or the fingerprint from a read path', async () => {
-    const all = await listLinks.execute({}, ACTOR_A1);
+    const all = await listLinks.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(all.ok).toBe(true);
     if (!all.ok) return;
-    expect(all.value.length).toBeGreaterThan(0);
-    const serialized = JSON.stringify(all.value);
+    expect(all.value.items.length).toBeGreaterThan(0);
+    const serialized = JSON.stringify(all.value.items);
     expect(serialized).not.toContain(SYNTHETIC_SOURCE_REF_ONE);
     expect(serialized).not.toContain(SYNTHETIC_SOURCE_REF_TWO);
-    for (const view of all.value) {
+    for (const view of all.value.items) {
       expect(Object.keys(view)).not.toContain('sourceAccountReference');
       expect(Object.keys(view)).not.toContain('fingerprint');
     }
@@ -324,10 +327,10 @@ describe.skipIf(unreachable !== null)('linking rules against live PostgreSQL', (
     );
     expect(proposed.ok).toBe(true);
 
-    const listed = await listConnections.execute(ACTOR_A1);
+    const listed = await listConnections.execute(EVERY_CONNECTION_PAGE, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    const row = listed.value.find((connection) => connection.id === doomed);
+    const row = listed.value.connections.find((connection) => connection.id === doomed);
     expect(row).toBeDefined();
     if (row === undefined) return;
 
@@ -339,18 +342,18 @@ describe.skipIf(unreachable !== null)('linking rules against live PostgreSQL', (
     if (!deleted.ok) return;
     expect(deleted.value.sourceLinksDeleted).toBe(1);
 
-    const remaining = await listLinks.execute({}, ACTOR_A1);
+    const remaining = await listLinks.execute(EVERY_SOURCE_LINK_PAGE, ACTOR_A1);
     expect(remaining.ok).toBe(true);
     if (remaining.ok) {
-      expect(remaining.value.some((link) => link.connectionId === doomed)).toBe(false);
+      expect(remaining.value.items.some((link) => link.connectionId === doomed)).toBe(false);
     }
   });
 
   it('erasing an account removes its links and is idempotent', async () => {
-    const before = await listLinks.execute({ accountId: accountTwo }, ACTOR_A1);
+    const before = await listLinks.execute(everySourceLinkPageFor(accountTwo), ACTOR_A1);
     expect(before.ok).toBe(true);
     if (!before.ok) return;
-    const count = before.value.length;
+    const count = before.value.items.length;
     expect(count).toBeGreaterThan(0);
 
     const erased = await erase.execute({ accountId: accountTwo }, ACTOR_A1);
@@ -363,9 +366,9 @@ describe.skipIf(unreachable !== null)('linking rules against live PostgreSQL', (
     if (again.ok) expect(again.value.accountSourceLinksDeleted).toBe(0);
 
     // Account one's links are untouched — erasure is scoped, not a purge.
-    const other = await listLinks.execute({ accountId: accountOne }, ACTOR_A1);
+    const other = await listLinks.execute(everySourceLinkPageFor(accountOne), ACTOR_A1);
     expect(other.ok).toBe(true);
-    if (other.ok) expect(other.value.length).toBeGreaterThan(0);
+    if (other.ok) expect(other.value.items.length).toBeGreaterThan(0);
   });
 
   it('refuses an account belonging to someone else, through the real accounts adapter', async () => {

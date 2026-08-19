@@ -183,6 +183,8 @@ export {
 export type {
   InstrumentCreateOutcome,
   InstrumentUpdateOutcome,
+  PaymentInstrumentPage,
+  PaymentInstrumentPageQuery,
   PaymentInstrumentRepository,
 } from './application/ports/payment-instrument-repository.js';
 // An ALIAS of the port @karar/financial-accounts declares and this module

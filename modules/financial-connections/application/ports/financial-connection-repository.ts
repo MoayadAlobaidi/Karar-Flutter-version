@@ -36,9 +36,55 @@ export type ConnectionDeleteOutcome =
   | { readonly kind: 'stale' }
   | { readonly kind: 'not_found' };
 
+/**
+ * What one page of the principal's own connections asks for.
+ *
+ * **The bound and the narrowing travel together into the store**, because a
+ * page cut out of a filtered set is only the caller's page if the store did
+ * the filtering: narrowing afterwards leaves the read unbounded and makes the
+ * offset a cursor carries count rows in a set the caller is not walking.
+ * Nothing in the schema limits how many connections a person may hold — there
+ * is deliberately no uniqueness over user and institution or user and rail,
+ * because several connections to one institution on one rail is the ordinary
+ * case — so "every connection" is a read with no ceiling.
+ *
+ * `null` on any filter means "do not narrow on this"; a value outside a
+ * vocabulary matches nothing rather than widening the answer.
+ */
+export interface FinancialConnectionPageQuery {
+  /** Narrow to one rail; `null` reads every rail. */
+  readonly rail: string | null;
+  /** Narrow to one status; `null` reads every status. */
+  readonly status: string | null;
+  /** Narrow to the connections naming one catalogue issuer; `null` reads all. */
+  readonly institutionId: string | null;
+  /** How many rows the caller's cursor has already consumed. */
+  readonly offset: number;
+  /** How many rows to return. */
+  readonly limit: number;
+}
+
+/**
+ * One page, and whether another exists. `hasMore` comes from one extra row
+ * rather than from a COUNT — the caller's only question is whether to ask
+ * again.
+ */
+export interface FinancialConnectionPage {
+  readonly connections: readonly FinancialConnection[];
+  readonly hasMore: boolean;
+}
+
 export interface FinancialConnectionRepository {
-  /** The principal's own connections, oldest first. */
-  listOwn(actor: ConnectionsPrincipal): Promise<readonly FinancialConnection[]>;
+  /**
+   * One page of the principal's own connections, oldest first, `id` breaking
+   * ties so the order is TOTAL. Two connections created in the same instant
+   * are otherwise interchangeable, and a page boundary falling between two
+   * interchangeable rows drops one and repeats the other.
+   */
+  pageOwn(
+    actor: ConnectionsPrincipal,
+    query: FinancialConnectionPageQuery,
+  ): Promise<FinancialConnectionPage>;
 
   /** One of the principal's own connections, or `null` — see the errors file. */
   findOwnById(

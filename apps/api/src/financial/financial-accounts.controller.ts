@@ -44,7 +44,7 @@ import type { FinancialAccount } from '@karar/financial-accounts';
 import { FinancialCapabilityGuard } from './capability.guard.js';
 import { financialAccountWire } from './dto/accounts.js';
 import { InstitutionLookup } from './institution-lookup.js';
-import { pageOf, readPageRequest } from './paging.js';
+import { offsetPage, readPageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
 import { problemForAccountsError } from './problems-accounts.js';
 import { FINANCIAL_PRINCIPAL_SOURCE, type FinancialPrincipalSource } from './principal.js';
@@ -98,21 +98,19 @@ export class FinancialAccountsController {
     const filters = readAccountFilters(query);
     if ('field' in filters) refuse(invalidRequestProblem(filters.field, filters.why));
 
-    const result = await this.useCases.listOwnAccounts.execute(principal);
+    // The narrowing and the page go DOWN to the store together. The store
+    // answers with at most one page, so the issuer catalogue below is
+    // resolved for a page rather than for every account the caller owns —
+    // and the offset the cursor carries counts rows in the filtered set,
+    // which is the set the caller is actually walking.
+    const result = await this.useCases.listOwnAccounts.execute(
+      { ...filters, offset: page.offset, limit: page.limit },
+      principal,
+    );
     if (!result.ok) refuse(problemForAccountsError(result.error));
 
-    // Filters narrow the caller's OWN set; they never widen it, and the
-    // issuer-kind filter is applied after the catalogue is resolved because
-    // kind is a fact about the issuer rather than about the account.
-    const lookup = new InstitutionLookup(this.useCases.institutions);
-    await lookup.resolve(result.value.map((account) => account.institutionRef));
-    const matching = result.value.filter((account) =>
-      filters.matches(account, lookup.get(account.institutionRef)),
-    );
-    const cut = pageOf(matching, page);
-    const items = cut.items.map((account) =>
-      financialAccountWire(account, lookup.get(account.institutionRef)),
-    );
+    const cut = offsetPage(result.value.accounts, page, result.value.hasMore);
+    const items = await this.serialize(cut.items);
     reply.status(200).send({ items, page: cut.page });
   }
 

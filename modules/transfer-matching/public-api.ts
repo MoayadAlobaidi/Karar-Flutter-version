@@ -168,6 +168,8 @@ export {
 } from './application/ports/transfer-match-retention-decision.js';
 export type {
   TransferMatchCreateOutcome,
+  TransferMatchPage,
+  TransferMatchPageQuery,
   TransferMatchRepository,
   TransferMatchUpdateOutcome,
 } from './application/ports/transfer-match-repository.js';

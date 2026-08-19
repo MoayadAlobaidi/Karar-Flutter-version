@@ -18,8 +18,15 @@
  * what the use cases turn into the single, oracle-free `account_not_found`.
  */
 
-import type { FinancialAccount } from '../../domain/financial-account.js';
-import type { FinancialAccountId } from '../../domain/refs.js';
+import type {
+  AccountNature,
+  AccountOrigin,
+  AccountStatus,
+  AccountType,
+  FinancialAccount,
+  WalletKind,
+} from '../../domain/financial-account.js';
+import type { FinancialAccountId, InstitutionRef } from '../../domain/refs.js';
 import type { AccountsPrincipal } from '../principal.js';
 
 /** What an optimistic update did. `stale` means someone else moved first. */
@@ -34,9 +41,66 @@ export type AccountDeleteOutcome =
   | { readonly kind: 'stale' }
   | { readonly kind: 'not_found' };
 
+/**
+ * What one page of the principal's own accounts asks for.
+ *
+ * **Every filter is part of the QUERY rather than a predicate applied to the
+ * answer, and the difference is not stylistic.** A page cut out of a filtered
+ * set is only the page the caller asked for if the store did the filtering:
+ * narrowing afterwards means the store read — and the process held — every
+ * account the caller owns before discarding most of them, and the offset a
+ * cursor carries would count rows in the wrong set. Nothing bounds this table
+ * either; a person may hold as many accounts as they open.
+ *
+ * `institutionKind` is deliberately here beside the rest, even though it is a
+ * fact about the ISSUER rather than about the account. An implementation
+ * answers it from the catalogue row the account names, so an account naming
+ * no catalogue issuer matches no kind — the same answer the predicate this
+ * replaced gave, now decided where the rows are.
+ *
+ * `null` means "do not narrow on this". A value outside a vocabulary is not
+ * this port's to refuse — it simply matches nothing, which is the honest
+ * answer to a question about a value nothing has.
+ */
+export interface FinancialAccountPageQuery {
+  readonly institutionRef: InstitutionRef | null;
+  readonly institutionKind: string | null;
+  readonly accountType: AccountType | null;
+  readonly walletKind: WalletKind | null;
+  readonly nature: AccountNature | null;
+  readonly status: AccountStatus | null;
+  readonly origin: AccountOrigin | null;
+  readonly currencyCode: string | null;
+  /** How many rows the caller's cursor has already consumed. */
+  readonly offset: number;
+  /** How many rows to return. */
+  readonly limit: number;
+}
+
+/**
+ * One page, and whether another exists.
+ *
+ * `hasMore` comes from one extra row rather than from a COUNT: the caller's
+ * only question is whether to ask again, and a count is a second pass over
+ * rows the page bound exists to avoid reading.
+ */
+export interface FinancialAccountPage {
+  readonly accounts: readonly FinancialAccount[];
+  readonly hasMore: boolean;
+}
+
 export interface FinancialAccountRepository {
-  /** The acting principal's own accounts, oldest first. */
-  listOwn(actor: AccountsPrincipal): Promise<readonly FinancialAccount[]>;
+  /**
+   * One page of the acting principal's own accounts, oldest first, `id`
+   * breaking ties so the order is TOTAL. Two accounts created in the same
+   * instant are otherwise interchangeable, and a page boundary that falls
+   * between two interchangeable rows drops one and repeats the other for
+   * whoever walks the cursor.
+   */
+  pageOwn(
+    actor: AccountsPrincipal,
+    query: FinancialAccountPageQuery,
+  ): Promise<FinancialAccountPage>;
 
   /** One of the acting principal's own accounts, or null when not visible. */
   findOwnById(

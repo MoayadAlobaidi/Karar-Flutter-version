@@ -38,6 +38,7 @@ import { PrismaPaymentInstrumentRepository } from '../infrastructure/persistence
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import {
   ACTOR_A1,
+  EVERY_INSTRUMENT_PAGE,
   SYNTHETIC_MASK_ONE,
   SYNTHETIC_MASK_TWO,
   accountsRepository,
@@ -116,25 +117,25 @@ describe.skipIf(unreachable !== null)('two virtual cards, one wallet, one balanc
       expect(created.ok).toBe(true);
     }
 
-    const listed = await list.execute({ accountId: walletId }, ACTOR_A1);
+    const listed = await list.execute({ accountId: walletId, ...EVERY_INSTRUMENT_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
     // TWO instruments. ONE account.
-    expect(listed.value).toHaveLength(2);
-    expect(new Set(listed.value.map((i) => i.accountRef.accountId))).toEqual(
+    expect(listed.value.instruments).toHaveLength(2);
+    expect(new Set(listed.value.instruments.map((i) => i.accountRef.accountId))).toEqual(
       new Set([walletId]),
     );
-    expect(new Set(listed.value.map((i) => i.id)).size).toBe(2);
-    expect(listed.value.map((i) => i.mask.reveal()).sort()).toEqual(
+    expect(new Set(listed.value.instruments.map((i) => i.id)).size).toBe(2);
+    expect(listed.value.instruments.map((i) => i.mask.reveal()).sort()).toEqual(
       [SYNTHETIC_MASK_ONE, SYNTHETIC_MASK_TWO].sort(),
     );
   });
 
   it('neither instrument carries a figure, so two cards cannot be two balances', async () => {
-    const listed = await list.execute({ accountId: walletId }, ACTOR_A1);
+    const listed = await list.execute({ accountId: walletId, ...EVERY_INSTRUMENT_PAGE }, ACTOR_A1);
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
-    for (const instrument of listed.value) {
+    for (const instrument of listed.value.instruments) {
       const numericFields = Object.entries(instrument)
         .filter(([, value]) => typeof value === 'number')
         .map(([key]) => key);
@@ -252,9 +253,8 @@ describe.skipIf(unreachable !== null)('two virtual cards, one wallet, one balanc
       'eraseForAccount',
       'findOwnById',
       'inContext',
-      'listOwn',
-      'listOwnForAccount',
       'mapAll',
+      'pageOwn',
       'update',
     ]);
   });
