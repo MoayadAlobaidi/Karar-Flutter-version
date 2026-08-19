@@ -31,7 +31,6 @@ import 'package:karar_mobile/features/financial_accounts/domain/account_source_l
 import 'package:karar_mobile/features/financial_accounts/domain/balance_snapshot.dart';
 import 'package:karar_mobile/features/financial_accounts/domain/financial_account.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/accounts_providers.dart';
-import 'package:karar_mobile/features/financial_accounts/presentation/financial_feature_registration.dart';
 import 'package:karar_mobile/features/payment_instruments/domain/payment_instrument.dart';
 import 'package:karar_mobile/features/payment_instruments/presentation/instruments_providers.dart';
 import 'package:karar_mobile/features/transaction_categories/presentation/categories_providers.dart';
