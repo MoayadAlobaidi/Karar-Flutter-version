@@ -93,12 +93,9 @@ _None._ This module has no publish call site and the event catalogue (`packages/
 
 ## Permissions
 
-| Permission | Role(s) |
-|---|---|
-| `accounts.account.read` | `USER` |
-| `accounts.account.write` | `USER` |
+_None._ Every operation here is owner self-service: a principal reads and writes their OWN accounts and no other principal's. What denies is the principal resolved exclusively from the session's server-side tenant binding, the subject-scoped repository binding that principal's RLS context per transaction, and a foreign account id answering 404 identically to an unknown one — so the surface is not an existence oracle. `USER` holds nothing in the permission catalogue and that is the design, not an omission (`modules/authorization/domain/catalogue.ts`: "Own-data authority comes from identity + RLS, never from an RBAC grant"). A permission granted to `USER` and to no other role would therefore be a check that its only possible holder always passes — ceremony rather than a boundary. access-control.md §2 records the two authorisation models and which one governs here.
 
-**Permissions deliberately absent:** No staff endpoint returns one customer's accounts.
+**Permissions deliberately absent:** No staff endpoint returns one customer's accounts, and none may be added.
 
 ## Dependencies
 

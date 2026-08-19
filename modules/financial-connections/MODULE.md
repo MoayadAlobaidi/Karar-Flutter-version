@@ -208,10 +208,7 @@ None. This module publishes no event this phase. When it does, the payload rule 
 
 ## Permissions
 
-| Permission | Role(s) |
-|---|---|
-| `accounts.connection.read` | `USER` |
-| `accounts.connection.write` | `USER` |
+_None._ Every operation here is owner self-service: a principal reads and writes their OWN connections and source links and no other principal's. What denies is the principal resolved exclusively from the session's server-side tenant binding, `CanonicalAccountAccessPort` (`application/ports/canonical-account-access.ts`) resolving the account a source link is attached to as one the caller owns, and RLS bound per transaction. `USER` holds nothing in the permission catalogue and that is the design, not an omission (`modules/authorization/domain/catalogue.ts`: "Own-data authority comes from identity + RLS, never from an RBAC grant"). A permission granted to `USER` and to no other role would therefore be a check that its only possible holder always passes — ceremony rather than a boundary. access-control.md §2 records the two authorisation models and which one governs here.
 
 **Permissions deliberately absent:** no staff endpoint returns one customer's connections or source links, and none may be added — a source link says which institutions a person deals with and, through the fingerprint, which of their accounts are the same account.
 

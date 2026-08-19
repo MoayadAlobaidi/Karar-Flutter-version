@@ -18,7 +18,7 @@ graph TB
         N1[modules/x/<br/>domain · application ·<br/>infrastructure · presentation]
         N2[descriptor entry in the<br/>capability-registry package]
         N3[MODULE.md ownership doc]
-        N4[permissions declared in MODULE.md,<br/>seeded by migration]
+        N4[permissions RBAC decides —<br/>in MODULE.md, seeded by migration]
         N5[events in catalogue]
         N6[Flutter feature folder]
         N7[OpenAPI paths]
@@ -67,7 +67,7 @@ This is a stop-work condition, not a preference. The whole design rests on it, a
 
 1. **Write `MODULE.md` first**, answering all seventeen points below. Before any code.
 2. **Get the checklist reviewed.** Points 4, 5, 6, 7, 16, and 17 are governance decisions, not engineering ones — several need a legal answer.
-3. Create the module skeleton (§5), with the permissions — including the ones that deliberately do not exist — declared in `MODULE.md`.
+3. Create the module skeleton (§5), with the permissions — including the ones that deliberately do not exist, and including **none at all** where every operation is owner self-service — declared in `MODULE.md`.
 4. Domain first, framework-free. Then use cases and ports. Then adapters. Then presentation.
 5. Register the append-only seams (§3.1).
 6. Flutter feature folder + route.
@@ -104,7 +104,7 @@ Every capability answers all seventeen in its `MODULE.md` **before implementatio
 |---|---|---|
 | 1 | **Bounded context** | A named module directory. Not a folder inside an existing one |
 | 2 | **Domain ownership** | Its own vocabulary, declared in `MODULE.md`. Borrowed vocabulary means a borrowed boundary |
-| 3 | **Permissions** | Named `<capability>.<resource>.<action>`. **State which permissions deliberately do not exist** |
+| 3 | **Permissions** | Named `<capability>.<resource>.<action>`, and declared only for what RBAC actually decides — staff, cross-subject, and platform operations. A capability whose every operation is owner self-service declares **none**, and says so. **State which permissions deliberately do not exist** |
 | 4 | **Capability registration** | `CAPABILITY_IDS` member and a descriptor; `declaredJurisdictions` — **`[]` until legal clearance**; `implementation` and `deployment` state the truth, never the intent |
 | 5 | **Country availability** | Per-jurisdiction, per-environment rows. **Nothing enabled by default** — a missing row is `DISABLED`, and so is a missing entitlement |
 | 6 | **Country policy** | Which PolicyPack clauses it needs: clearance, a named resolution strategy, an `ApprovalPolicy` if disclosure-bearing (the pack fails validation without one), and a processing basis for every purpose it declares |
@@ -141,7 +141,15 @@ modules/<name>/
 └── __tests__/
 ```
 
-Two declarations a reader might expect inside the module live elsewhere, deliberately. The **descriptor** is an entry in `packages/capability-registry`, not a per-module file: the registry is a closed compile-time union whose validator must see every descriptor at once, and scattering them would make "what exists" a build step rather than a readable constant. **Permissions** are declared in `MODULE.md` — including the ones that deliberately do not exist — and seeded by reviewed migration against the closed catalogue in `modules/authorization/domain/catalogue.ts`; a permission exists because a migration created it, never because a module file mentioned it.
+Two declarations a reader might expect inside the module live elsewhere, deliberately. The **descriptor** is an entry in `packages/capability-registry`, not a per-module file: the registry is a closed compile-time union whose validator must see every descriptor at once, and scattering them would make "what exists" a build step rather than a readable constant. **Permissions** are declared in `MODULE.md` — including the ones that deliberately do not exist — and seeded by reviewed migration against the closed catalogue in `modules/authorization/domain/catalogue.ts`; a permission exists because a migration created it, never because a module file mentioned it. A supplementary architecture check enforces that last clause: `module-permissions-in-catalogue` fails a `MODULE.md` permission table naming an identifier the catalogue does not define, unless the row itself says the permission is planned or unseeded.
+
+### Where a permission is checked — the convention, and the divergence
+
+The convention this tree follows is a **use-case check**: the module declares its own `PolicyService` port and calls `authorize(...)` before acting, because HTTP is not the only caller — worker jobs and AI tools invoke use cases directly. `tenancy`, `authorization`, `operating-entity`, `consent`, `jurisdiction`, `capability` and `control-plane` all enforce that way.
+
+**The route-level half is an aspiration, and is named here as one rather than restated as a rule.** `modules/authorization/presentation/http/` exports a `requirePermission('x.y.z')` guard for controllers, and it has **no production call site anywhere in the repository**; the only code that mints one is the authorization module's own guard test. Text describing "the guard on the route AND `authorize()` in the use case" describes an intended second layer, not the current state. A new capability that enforces in the use case alone is following the tree, not departing from it — and adding the route-level half is a deliberate repository-wide change with its own review, not something one capability does on the side.
+
+**A capability may also correctly declare no permission at all.** Where every operation is owner self-service — a principal acting on their own records — authority comes from the session-bound principal, the module's ownership ports and RLS, and RBAC has nothing to decide: the catalogue grants `USER` nothing, so a permission held by `USER` and by no other role would be a check its only possible holder always passes. The six Phase 5 financial modules are the worked example, and the two models are set out in [`../security/access-control.md`](../security/access-control.md) §2. Declaring none does not weaken the "deliberately absent" statement — that statement is about the **staff** permissions that may never exist, and it stays.
 
 ## 6. What a capability consumes
 

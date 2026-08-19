@@ -223,10 +223,7 @@ None, yet. `StatementCommitPort` enqueues an **identifier-only** notice — the 
 
 ## Permissions
 
-| Permission | Role(s) |
-|---|---|
-| `transactions.import.read` | `USER` |
-| `transactions.import.write` | `USER` |
+_None._ Every operation here is owner self-service: a principal imports into, reads, and commits their OWN statements and no other principal's. What denies is the principal resolved exclusively from the session's server-side tenant binding, `CanonicalAccountAccessPort` (`application/ports/canonical-account-access.ts`) resolving the destination account as one the caller owns at start, again at parse, and again at commit, and RLS bound per transaction. `USER` holds nothing in the permission catalogue and that is the design, not an omission (`modules/authorization/domain/catalogue.ts`: "Own-data authority comes from identity + RLS, never from an RBAC grant"). A permission granted to `USER` and to no other role would therefore be a check that its only possible holder always passes — ceremony rather than a boundary. access-control.md §2 records the two authorisation models and which one governs here.
 
 **Permissions deliberately absent:** no staff endpoint returns one customer's statement, staged rows, or row errors, and none may be added. A staged row is a line of somebody's bank statement, and a row error names which line of it could not be read.
 

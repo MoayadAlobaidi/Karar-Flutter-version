@@ -41,8 +41,13 @@ _None. This module consumes events and publishes none._
 
 | Permission | Role(s) |
 |---|---|
-| `audit.record.read` | `SECURITY` |
-| `audit.security_event.read` | `SECURITY` |
+| `audit.record.read` | _none — declared, deliberately unseeded_ |
+| `audit.security_event.read` | _none — declared, deliberately unseeded_ |
+
+Neither is seeded, and `SECURITY` holds nothing in the catalogue. That is deliberate rather than
+pending: no surface reads an audit record yet, and a right that exists before the surface that
+invokes it is a right nobody reviewed against a real call site. `SECURITY` is where they would
+land when a reader exists.
 
 **Permissions deliberately absent:** No role may update or delete an audit record. Enforced by revoked grants and by trigger.
 

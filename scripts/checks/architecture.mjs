@@ -2793,6 +2793,194 @@ export function checkIngestionNotMountedBeforePhase5(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Supplementary — a MODULE.md permission table may not name a right the
+// authorization catalogue does not hold
+// ---------------------------------------------------------------------------
+//
+// The drift this exists to catch is documentation asserting authority the
+// system never had. Six Phase 5 financial modules declared twelve permissions
+// between them — `accounts.account.read`, `transactions.import.write` and the
+// rest — in `MODULE.md` permission tables that named `USER` as the holder.
+// None was in `modules/authorization/domain/catalogue.ts`, none was seeded by
+// any migration, and no route or use case ever consulted one. The tables read
+// exactly like the tables of modules whose permissions are real, so the claim
+// survived four phases of review: a permission table is the one place a reader
+// looks to answer "what rights exist here", and nothing checked that its rows
+// corresponded to anything.
+//
+// The catalogue is the closed universe (access-control.md §2): a permission
+// exists because a reviewed migration seeded it AND the compile-time catalogue
+// lists it, and an integration test holds those two equal. So the catalogue is
+// the right thing to check a table against — a name absent from it is a name
+// that grants nothing and denies nothing.
+//
+// TWO NARROWINGS, both deliberate, both stated so a reader can see the edge.
+//
+//   * Only modules that have shipped code are in scope. A `MODULE.md` for a
+//     module with no implementation is a forward design document, and its
+//     permission table is a plan for a later phase (`ai`, `goals`, `budgets`,
+//     `zakat` and the rest are in that state). The moment such a module gains
+//     its first source file, its table stops being a plan and becomes a claim
+//     about running software — and this check starts holding it to one.
+//
+//   * A row that SAYS the permission is not granted yet is honest and passes.
+//     `capability` and `jurisdiction` write `_none — declared, deliberately
+//     unseeded_` in the role column; `control-plane` writes "(planned, Phase 8
+//     — not in the seeded catalogue)" in the permission cell; `tenancy` marks
+//     its Phase 8 row "(planned …)". Each of those tells the reader the right
+//     does not exist, which is the opposite of the failure above. The marker
+//     has to be IN THE ROW: a caveat further down the page is not attached to
+//     the row a reader is looking at.
+// ---------------------------------------------------------------------------
+const CATALOGUE_REL = path.join('modules', 'authorization', 'domain', 'catalogue.ts');
+/** `name: 'x.y.z'` entries of PERMISSION_CATALOGUE — the closed universe. */
+const CATALOGUE_PERMISSION = /\bname:\s*'([a-z][a-z_]*\.[a-z][a-z_]*\.[a-z][a-z_]*)'/g;
+/** A backticked permission identifier inside a table cell. */
+const CELL_PERMISSION = /`([a-z][a-z_]*\.[a-z][a-z_]*\.[a-z][a-z_]*)`/g;
+/** The row's own statement that the right is not granted yet. */
+const NOT_YET_GRANTED = /unseeded|planned|not (?:yet )?(?:in|seeded in) the (?:seeded )?catalogue/i;
+
+// Declarations that predate this check, in modules outside the change that
+// added it. Each is real drift and each is listed here rather than silently
+// scoped out, so it appears in the check's own output on every run. An entry
+// that stops describing the tree FAILS (below): the exemption cannot outlive
+// the drift it was written for.
+const UNRECONCILED_MODULE_PERMISSIONS = [
+  // Empty, and that is the point.
+  //
+  // It held four entries when this check was written: two in audit and two in
+  // identity, each a MODULE.md table claiming a right the catalogue never
+  // defined — the same drift as the twelve financial permissions that prompted
+  // the check. All four were reconciled by marking the rows as declared and
+  // deliberately unseeded, which is what they always were: deny-by-default
+  // means a right nobody holds denies, and these arrive by forward migration
+  // with the surface that invokes them.
+  //
+  // A STALE entry here FAILS this check, so an exemption cannot outlive the
+  // drift it excuses. That is why the list emptied itself the moment the
+  // tables were corrected, rather than sitting here as a permanent apology.
+];
+
+/** The permission names the closed catalogue actually defines. */
+function readCataloguePermissions(root) {
+  const file = path.join(root, CATALOGUE_REL);
+  if (!fs.existsSync(file)) return null;
+  const names = new Set();
+  for (const m of loadStripped(file).matchAll(CATALOGUE_PERMISSION)) names.add(m[1]);
+  return names;
+}
+
+export function checkModulePermissionsInCatalogue(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  let scanned = 0;
+
+  const catalogued = readCataloguePermissions(root);
+  // A check that cannot read the closed universe must not pass by scanning
+  // nothing — that is the vacuous pass this suite exists to refuse.
+  if (catalogued === null || catalogued.size === 0) {
+    violations.push({
+      file: CATALOGUE_REL,
+      detail:
+        catalogued === null
+          ? 'is missing — the permission catalogue is what MODULE.md tables are checked against, so its absence cannot be a pass'
+          : 'defines no permissions — PERMISSION_CATALOGUE parsed empty, which would make every declaration look like drift and every drift look checked',
+    });
+    return violationsResult(violations, 0);
+  }
+
+  const exempted = new Set();
+  // Injectable so the self-test can seed a STALE exemption. The production
+  // list is empty — correctly, the drift it excused is fixed — and a self-test
+  // that read it directly would silently stop exercising the arm that makes
+  // these exemptions self-cleaning. A test whose coverage disappears when the
+  // code gets healthier is a test that will not notice when it gets sick.
+  const exemptions = new Map(
+    (ctx.unreconciledPermissions ?? UNRECONCILED_MODULE_PERMISSIONS).map((e) => [
+      `${e.module}/${e.permission}`,
+      e,
+    ]),
+  );
+  let markedNotYetGranted = 0;
+  let modulesInScope = 0;
+
+  for (const mod of moduleNames(root)) {
+    const moduleDir = path.join(root, 'modules', mod);
+    const docPath = path.join(moduleDir, 'MODULE.md');
+    if (!fs.existsSync(docPath)) continue;
+    // Specification-only modules are out of scope — see the header.
+    if (codeFiles([moduleDir]).length === 0) continue;
+    const section = extractSection(readText(docPath), 'Permissions');
+    if (section === null) continue;
+    const table = parseMdTable(section);
+    // A module that states its permissions in prose ('_None._', 'None this
+    // phase.') declares no row for anything to be wrong about.
+    if (table === null) continue;
+    modulesInScope += 1;
+
+    const column = Math.max(
+      0,
+      table.headers.findIndex((h) => /permission/i.test(h)),
+    );
+    const relPath = `modules/${mod}/MODULE.md`;
+    for (const row of table.rows) {
+      const cell = row[column] ?? '';
+      const rowText = row.join(' | ');
+      for (const match of cell.matchAll(CELL_PERMISSION)) {
+        const permission = match[1];
+        scanned += 1;
+        if (catalogued.has(permission)) continue;
+        if (NOT_YET_GRANTED.test(rowText)) {
+          markedNotYetGranted += 1;
+          continue;
+        }
+        const key = `${mod}/${permission}`;
+        if (exemptions.has(key)) {
+          exempted.add(key);
+          continue;
+        }
+        violations.push({
+          file: relPath,
+          detail:
+            `declares permission '${permission}', which ${CATALOGUE_REL} does not define and no ` +
+            `migration seeds — so no role holds it, no code can check it, and the row documents ` +
+            `authority the system does not have. Either add it to the catalogue in a reviewed ` +
+            `migration AND the compile-time catalogue together, or mark the row as planned/unseeded ` +
+            `if it is a future right, or delete the row if the operation is owner self-service and ` +
+            `RBAC decides nothing (access-control.md §2)`,
+        });
+      }
+    }
+  }
+
+  for (const [key, entry] of exemptions) {
+    if (exempted.has(key)) continue;
+    violations.push({
+      file: `modules/${entry.module}/MODULE.md`,
+      detail:
+        `the unreconciled-declaration exemption for '${entry.permission}' no longer describes this ` +
+        `tree — the row is gone, the module lost its code, or the permission is now catalogued. It was ` +
+        `exempted because: ${entry.reason}. Delete the entry from UNRECONCILED_MODULE_PERMISSIONS in ` +
+        `scripts/checks/architecture.mjs — an exemption that outlives its drift is a hole nobody is watching`,
+    });
+  }
+
+  const live = [...exemptions.values()].filter((e) => exempted.has(`${e.module}/${e.permission}`));
+  const named = live.map((e) => `${e.module}/${e.permission}`).join(', ');
+  return {
+    ...violationsResult(
+      violations,
+      scanned,
+      `module tables checked: ${modulesInScope}; marked planned/unseeded: ${markedNotYetGranted}; ` +
+        `pre-existing unreconciled declarations: ${live.length}${named === '' ? '' : ` (${named})`}`,
+    ),
+    // Carried into the report so each exemption's REASON travels with the run
+    // that relied on it, rather than living only in this file.
+    exemptions: live,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Check registry (function map)
 // ---------------------------------------------------------------------------
 const CHECKS = {
@@ -2819,6 +3007,17 @@ const CHECKS = {
   checkLifecycleDeclarations,
   checkAssuranceClaims,
   checkResourceLimits,
+};
+
+// The supplementary checks are not among the canonical 26 and so are not in
+// the registry, which left them resolvable only by name in the self-test. They
+// resolve through this map instead: one place that main() and the self-test
+// both read, so a supplementary check cannot be wired into the run and quietly
+// left out of the proof that it is not vacuous.
+const SUPPLEMENTARY_CHECKS = {
+  checkAdminNoDbDriver,
+  checkIngestionNotMountedBeforePhase5,
+  checkModulePermissionsInCatalogue,
 };
 
 // ---------------------------------------------------------------------------
@@ -3189,6 +3388,62 @@ function buildSelfTestFixture() {
     JSON.stringify({ name: '@karar/admin', dependencies: { pg: '^8.0.0' } }),
   );
 
+  // module-permissions-in-catalogue fixture: one closed catalogue, and three
+  // MODULE.md tables standing in the three relations to it that matter — a
+  // right the catalogue never held, a right the row itself says is unseeded,
+  // and a right declared by a module that has shipped no code at all.
+  write(
+    'modules/authorization/domain/catalogue.ts',
+    [
+      'export const PERMISSION_CATALOGUE = [',
+      "  { name: 'fixture.thing.read', capability: 'fixture', description: 'seeded' },",
+      '];',
+      '',
+    ].join('\n'),
+  );
+  write('modules/gamma/application/list-things.ts', 'export const listThings = () => [];\n');
+  write(
+    'modules/gamma/MODULE.md',
+    [
+      '# Module: gamma',
+      '',
+      '## Permissions',
+      '',
+      '| Permission | Role(s) |',
+      '|---|---|',
+      '| `fixture.thing.read` | `SUPPORT` |',
+      '| `fixture.ghost.write` | `SUPPORT` |',
+      '',
+    ].join('\n'),
+  );
+  write('modules/delta/application/plan-things.ts', 'export const planThings = () => [];\n');
+  write(
+    'modules/delta/MODULE.md',
+    [
+      '# Module: delta',
+      '',
+      '## Permissions',
+      '',
+      '| Permission | Role(s) |',
+      '|---|---|',
+      '| `fixture.later.manage` | _none — declared, deliberately unseeded_ |',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'modules/epsilon/MODULE.md',
+    [
+      '# Module: epsilon',
+      '',
+      '## Permissions',
+      '',
+      '| Permission | Role(s) |',
+      '|---|---|',
+      '| `fixture.future.read` | `USER` |',
+      '',
+    ].join('\n'),
+  );
+
   // Tests 9/21/22 seeds: a fixture schema carrying every failure shape.
   write(
     'packages/platform/db/migrations/9900_fixture_tables.sql',
@@ -3489,6 +3744,24 @@ const SELF_TEST_CASES = [
   // …and a malformed evidence id.
   { fn: 'checkAssuranceClaims', expect: /AC-004: evidence id 'EV-4' is malformed/ },
   { fn: 'checkAdminNoDbDriver', expect: /'pg'/ },
+  // A MODULE.md table naming a right the authorization catalogue never held —
+  // the drift that let six Phase 5 modules document twelve permissions nothing
+  // granted, nothing seeded, and no code consulted.
+  { fn: 'checkModulePermissionsInCatalogue', expect: /fixture\.ghost\.write/ },
+  // …and the other arm: an exemption that has stopped describing the tree must
+  // fail, or an allowance outlives the drift it was written for. The fixture
+  // carries none of the exempted modules, so every entry is stale there.
+  {
+    fn: 'checkModulePermissionsInCatalogue',
+    // A stale exemption: the fixture's `delta` marks its right unseeded, so an
+    // entry excusing it describes drift that is gone.
+    ctx: {
+      unreconciledPermissions: [
+        { module: 'delta', permission: 'fixture.later.manage', reason: 'seeded staleness' },
+      ],
+    },
+    expect: /exemption for '[a-z_.]+' no longer/,
+  },
 ];
 
 // Negative cases: seeded shapes a checker must NOT flag — the proof an
@@ -3511,6 +3784,15 @@ const NEGATIVE_SELF_TEST_CASES = [
   // that arms the rule — the check is not "every pack fails".
   { fn: 'checkApprovalPolicy', forbid: /fx\/correct/ },
   { fn: 'checkApprovalPolicy', forbid: /[/\\]armed-activation/ },
+  // A catalogued permission is never drift…
+  { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.thing\.read/ },
+  // …a row that SAYS the right is not granted yet is an honest declaration,
+  // not a claim (the shape capability, jurisdiction, tenancy and control-plane
+  // already use)…
+  { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.later\.manage/ },
+  // …and a specification-only module's table is a plan for a later phase, so
+  // it is out of scope until that module ships its first source file.
+  { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.future\.read/ },
 ];
 
 function runSelfTest() {
@@ -3518,23 +3800,19 @@ function runSelfTest() {
   const failures = [];
   try {
     const results = new Map();
-    const resultFor = (fn) => {
-      if (!results.has(fn)) {
-        results.set(
-          fn,
-          CHECKS[fn]
-            ? CHECKS[fn]({ root: fixtureRoot })
-            : fn === 'checkAdminNoDbDriver'
-              ? checkAdminNoDbDriver({ root: fixtureRoot })
-              : fn === 'checkIngestionNotMountedBeforePhase5'
-                ? checkIngestionNotMountedBeforePhase5({ root: fixtureRoot })
-                : null,
-        );
+    // Keyed by function AND by any extra context a case supplies, so a case
+    // that seeds different inputs gets its own run rather than a cached one
+    // from a different set of inputs.
+    const resultFor = (fn, extra) => {
+      const key = `${fn}|${extra === undefined ? '' : JSON.stringify(extra)}`;
+      if (!results.has(key)) {
+        const check = CHECKS[fn] ?? SUPPLEMENTARY_CHECKS[fn] ?? null;
+        results.set(key, check === null ? null : check({ root: fixtureRoot, ...(extra ?? {}) }));
       }
-      return results.get(fn);
+      return results.get(key);
     };
-    for (const { fn, expect } of SELF_TEST_CASES) {
-      const result = resultFor(fn);
+    for (const { fn, expect, ctx } of SELF_TEST_CASES) {
+      const result = resultFor(fn, ctx);
       if (!result) {
         failures.push(`${fn}: unknown check`);
         continue;
@@ -3552,8 +3830,8 @@ function runSelfTest() {
         );
       }
     }
-    for (const { fn, forbid } of NEGATIVE_SELF_TEST_CASES) {
-      const result = resultFor(fn);
+    for (const { fn, forbid, ctx } of NEGATIVE_SELF_TEST_CASES) {
+      const result = resultFor(fn, ctx);
       if (!result) {
         failures.push(`${fn}: unknown check (negative case)`);
         continue;
@@ -3684,6 +3962,18 @@ function main() {
   );
   for (const v of preActivation.violations) console.log(`          ${v.file} — ${v.detail}`);
 
+  const declaredPermissions = checkModulePermissionsInCatalogue({ root: REPO_ROOT });
+  const declaredPermissionsStatus = declaredPermissions.violations.length === 0 ? 'PASS' : 'FAIL';
+  // Counted on both arms, for the reason given above.
+  if (declaredPermissionsStatus === 'FAIL') failCount += 1;
+  else passCount += 1;
+  console.log(
+    `${declaredPermissionsStatus.padEnd(7)} supplementary     module-permissions-in-catalogue (declarations checked: ${declaredPermissions.scanned}; ${declaredPermissions.note})`,
+  );
+  for (const v of declaredPermissions.violations) {
+    console.log(`          ${v.file} — ${v.detail}`);
+  }
+
   // Self-test at the end of every normal run: prove the passes above are not
   // vacuous by asserting each checker fails on seeded violations.
   console.log('');
@@ -3719,6 +4009,14 @@ function main() {
         status: preActivationStatus,
         violations: preActivation.violations,
         scanned: preActivation.scanned,
+      },
+      {
+        name: 'module-permissions-in-catalogue',
+        status: declaredPermissionsStatus,
+        violations: declaredPermissions.violations,
+        scanned: declaredPermissions.scanned,
+        note: declaredPermissions.note,
+        exemptions: declaredPermissions.exemptions,
       },
     ],
   };

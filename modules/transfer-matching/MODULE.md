@@ -223,10 +223,7 @@ None. This module publishes no event this phase. When it does, the payload rule 
 
 ## Permissions
 
-| Permission | Role(s) |
-|---|---|
-| `accounts.transfer.read` | `USER` |
-| `accounts.transfer.write` | `USER` |
+_None._ Every operation here is owner self-service: a principal reads and writes their OWN matches and no other principal's. What denies is the principal resolved exclusively from the session's server-side tenant binding, `MatchableTransactionAccessPort` (`application/ports/matchable-transaction-access.ts`) resolving both legs as transactions the caller owns, and RLS bound per transaction. `USER` holds nothing in the permission catalogue and that is the design, not an omission (`modules/authorization/domain/catalogue.ts`: "Own-data authority comes from identity + RLS, never from an RBAC grant"). A permission granted to `USER` and to no other role would therefore be a check that its only possible holder always passes — ceremony rather than a boundary. access-control.md §2 records the two authorisation models and which one governs here.
 
 **Permissions deliberately absent:** no staff endpoint returns one customer's transfer matches, and none may be added — the set says which of a person's accounts feed which, and how often.
 
