@@ -139,13 +139,6 @@ class RefusingSourceLinkRepository implements AccountSourceLinkRepository {
     return this.real.pageOwn(actor, query);
   }
 
-  listOwnForConnection(
-    actor: ConnectionsPrincipal,
-    connectionId: FinancialConnectionId,
-  ): Promise<readonly AccountSourceLink[]> {
-    return this.real.listOwnForConnection(actor, connectionId);
-  }
-
   findOwnById(
     actor: ConnectionsPrincipal,
     id: AccountSourceLinkId,

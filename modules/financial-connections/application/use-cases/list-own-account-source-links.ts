@@ -28,7 +28,7 @@ import {
   toAccountSourceLinkView,
   type AccountSourceLinkView,
 } from '../../domain/account-source-link.js';
-import { CanonicalAccountRef } from '../../domain/refs.js';
+import { CanonicalAccountRef, FinancialConnectionId } from '../../domain/refs.js';
 import { storeFailure, type ListOwnAccountSourceLinksError } from '../errors.js';
 import type { AccountSourceLinkRepository } from '../ports/account-source-link-repository.js';
 import { requirePrincipal, type ConnectionsPrincipal } from '../principal.js';
@@ -36,6 +36,8 @@ import { requirePrincipal, type ConnectionsPrincipal } from '../principal.js';
 export interface ListOwnAccountSourceLinksInput {
   /** Absent means every link the subject owns. */
   readonly accountId?: string;
+  /** Narrow to the links one connection feeds; `null` reads every connection. */
+  readonly connectionId: string | null;
   /** Narrow to one rail; `null` reads every rail. */
   readonly rail: string | null;
   /** Narrow to one source status; `null` reads every status. */
@@ -65,6 +67,8 @@ export class ListOwnAccountSourceLinks {
       const page = await this.links.pageOwn(principal.value, {
         accountRef:
           input.accountId === undefined ? null : CanonicalAccountRef.of(input.accountId),
+        connectionId:
+          input.connectionId === null ? null : FinancialConnectionId.of(input.connectionId),
         rail: input.rail,
         status: input.status,
         offset: input.offset,

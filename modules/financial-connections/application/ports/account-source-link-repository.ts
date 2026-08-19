@@ -79,6 +79,8 @@ export type SourceLinkCreateOutcome =
 export interface AccountSourceLinkPageQuery {
   /** Narrow to the links feeding one account; `null` reads every link. */
   readonly accountRef: CanonicalAccountRef | null;
+  /** Narrow to the links one connection feeds; `null` reads every connection. */
+  readonly connectionId: FinancialConnectionId | null;
   /** Narrow to one rail; `null` reads every rail. */
   readonly rail: string | null;
   /** Narrow to one source status; `null` reads every status. */
@@ -113,12 +115,6 @@ export interface AccountSourceLinkRepository {
     actor: ConnectionsPrincipal,
     query: AccountSourceLinkPageQuery,
   ): Promise<AccountSourceLinkPage>;
-
-  /** The links one of the principal's own connections feeds. */
-  listOwnForConnection(
-    actor: ConnectionsPrincipal,
-    connectionId: FinancialConnectionId,
-  ): Promise<readonly AccountSourceLink[]>;
 
   findOwnById(
     actor: ConnectionsPrincipal,

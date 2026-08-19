@@ -140,6 +140,7 @@ export class InMemorySourceLinkRepository implements AccountSourceLinkRepository
         (row) =>
           (query.accountRef === null ||
             row.accountRef.accountId === query.accountRef.accountId) &&
+          (query.connectionId === null || row.connectionId === query.connectionId) &&
           (query.rail === null || row.connectionRail === query.rail) &&
           (query.status === null || row.status === query.status),
       )
@@ -158,12 +159,6 @@ export class InMemorySourceLinkRepository implements AccountSourceLinkRepository
     });
   }
 
-  listOwnForConnection(
-    actor: ConnectionsPrincipal,
-    connectionId: FinancialConnectionId,
-  ): Promise<readonly AccountSourceLink[]> {
-    return Promise.resolve(this.mine(actor).filter((row) => row.connectionId === connectionId));
-  }
 
   findOwnById(
     actor: ConnectionsPrincipal,

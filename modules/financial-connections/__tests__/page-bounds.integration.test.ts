@@ -74,7 +74,7 @@ const clock = new Clock.Fixed(new Date('2026-08-18T12:00:00.000Z'));
 const SEEDED = 9;
 const PAGE = 4;
 
-const EVERY_LINK = { accountRef: null, rail: null, status: null } as const;
+const EVERY_LINK = { accountRef: null, connectionId: null, rail: null, status: null } as const;
 const EVERY_CONNECTION = { rail: null, status: null, institutionId: null } as const;
 
 let handle: PrismaHandle;
@@ -82,6 +82,8 @@ let handle: PrismaHandle;
 let links: PrismaAccountSourceLinkRepository;
 let connections: PrismaFinancialConnectionRepository;
 const seen: ObservedRead[] = [];
+/** The seeded connection ids, in seeding order — one link hangs off each. */
+const seededConnectionIds: string[] = [];
 
 function measured(model: string): readonly ObservedRead[] {
   return seen.filter((read) => read.model === model);
@@ -132,6 +134,7 @@ describe.skipIf(unreachable !== null)(
           ACTOR_A1,
         );
         if (!created.ok) throw new Error(`connection fixture refused: ${created.error.kind}`);
+        seededConnectionIds.push(created.value.id);
         // One link per connection, all against ONE account: same default
         // source priority, and one fixed clock instant, so every pair ties on
         // both of the columns the ordering used to rest on.
@@ -233,6 +236,42 @@ describe.skipIf(unreachable !== null)(
       expect(walked).toHaveLength(SEEDED);
       expect(new Set(walked).size).toBe(SEEDED);
       expect(pages).toBeGreaterThan(1);
+    });
+
+    it('narrowing links to ONE connection is done by the database', async () => {
+      // The unbounded `listOwnForConnection` was the only way to read the
+      // links one connection feeds, and it read all of them. It is gone, and
+      // this is what replaced it: the same question asked of the paged read.
+      // A filter applied after the read would have pulled a whole page and
+      // then thrown most of it away, which is the shape the removal existed
+      // to prevent.
+      seen.length = 0;
+      const page = await links.pageOwn(ACTOR_A1, {
+        ...EVERY_LINK,
+        connectionId: seededConnectionIds[0] as never,
+        offset: 0,
+        limit: PAGE,
+      });
+
+      expect(page.links).toHaveLength(1);
+      expect(page.hasMore).toBe(false);
+      // ONE row read, not a page of them, and not every link the subject owns.
+      expect(measured('accountSourceLink').map((read) => read.rows)).toEqual([1]);
+    });
+
+    it('narrowing to a connection that feeds no link reads nothing at all', async () => {
+      seen.length = 0;
+      const page = await links.pageOwn(ACTOR_A1, {
+        ...EVERY_LINK,
+        // A well-formed id belonging to no seeded connection.
+        connectionId: '00000000-0000-4000-8000-000000000000' as never,
+        offset: 0,
+        limit: PAGE,
+      });
+
+      expect(page.links).toEqual([]);
+      expect(page.hasMore).toBe(false);
+      expect(measured('accountSourceLink').map((read) => read.rows)).toEqual([0]);
     });
 
     it('a narrowed listing is narrowed BY THE DATABASE, not after the read', async () => {

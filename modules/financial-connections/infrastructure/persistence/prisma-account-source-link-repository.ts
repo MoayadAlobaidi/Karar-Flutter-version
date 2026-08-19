@@ -162,6 +162,7 @@ export class PrismaAccountSourceLinkRepository implements AccountSourceLinkRepos
                 accountId: query.accountRef.accountId,
                 accountReferenceType: query.accountRef.referenceType,
               }),
+          ...(query.connectionId === null ? {} : { connectionId: query.connectionId }),
           ...(query.rail === null ? {} : { connectionRail: query.rail }),
           ...(query.status === null ? {} : { sourceStatus: query.status }),
         },
@@ -185,22 +186,6 @@ export class PrismaAccountSourceLinkRepository implements AccountSourceLinkRepos
     });
   }
 
-  listOwnForConnection(
-    actor: ConnectionsPrincipal,
-    connectionId: FinancialConnectionId,
-  ): Promise<readonly AccountSourceLink[]> {
-    return this.inContext(actor, async (tx) => {
-      const rows = await tx.accountSourceLink.findMany({
-        where: {
-          connectionId,
-          tenantId: TenantId.toString(actor.tenantId),
-          userId: UserId.toString(actor.userId),
-        },
-        orderBy: { createdAt: 'asc' },
-      });
-      return this.mapAll(rows as readonly AccountSourceLinkRow[], actor);
-    });
-  }
 
   findOwnById(
     actor: ConnectionsPrincipal,

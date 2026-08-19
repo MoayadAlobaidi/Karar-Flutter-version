@@ -321,7 +321,12 @@ export const EVERY_CONNECTION_PAGE = {
 } as const;
 
 /** No narrowing at all — every source link the principal can see. */
-export const EVERY_SOURCE_LINK_PAGE = { rail: null, status: null, ...PROBE_PAGE } as const;
+export const EVERY_SOURCE_LINK_PAGE = {
+  connectionId: null,
+  rail: null,
+  status: null,
+  ...PROBE_PAGE,
+} as const;
 
 /** The same window, narrowed to the links feeding one account. */
 export function everySourceLinkPageFor(accountId: string) {

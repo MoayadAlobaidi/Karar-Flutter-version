@@ -121,6 +121,11 @@ export class FinancialViewsController {
     const result = await this.useCases.listOwnAccountSourceLinks.execute(
       {
         accountId: id,
+        // This endpoint answers "which sources feed THIS account", so it never
+        // narrows by connection. The filter exists on the use case because the
+        // paged read replaced an unbounded `listOwnForConnection`; exposing it
+        // over HTTP is a contract change, and the contract does not declare it.
+        connectionId: null,
         rail: narrowing(rail),
         status: narrowing(status),
         offset: page.offset,
