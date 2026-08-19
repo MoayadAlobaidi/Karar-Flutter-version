@@ -64,6 +64,27 @@ describe('instrument mask bound', () => {
     expect(outcome.ok).toBe(true);
   });
 
+  it('accepts a mask of exactly the bound, and one byte under it', () => {
+    // THE BOUND IS INCLUSIVE, because the column's is: the SQL CHECK is
+    // `octet_length(...) <= 32`, so a 32-byte mask is storable and refusing it
+    // would reject a legitimate value the database would have taken.
+    //
+    // Only the over-limit case was asserted before this. Changing the domain
+    // comparison from `>` to `>=` — the single most likely edit anyone makes
+    // here — passed every test in this file while silently refusing every
+    // mask of exactly the permitted length.
+    for (const length of [INSTRUMENT_MASK_MAX_BYTES - 1, INSTRUMENT_MASK_MAX_BYTES]) {
+      const mask = '*'.repeat(length);
+      expect(utf8Bytes(mask)).toBe(length);
+
+      const outcome = rowWithMask(mask);
+
+      expect(outcome.ok, `${String(length)} bytes must be accepted`).toBe(true);
+      if (!outcome.ok) continue;
+      expect(outcome.row.instrumentMask?.reveal()).toBe(mask);
+    }
+  });
+
   it('refuses an over-long mask as a typed row error, not a failed import', () => {
     const tooLong = '*'.repeat(INSTRUMENT_MASK_MAX_BYTES + 1);
     const outcome = rowWithMask(tooLong);
