@@ -3122,4 +3122,210 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statementImportHeaderRowNo => 'No, the first row is a transaction';
+
+  @override
+  String get transferMatchesScreenTitle =>
+      'Transfers between your own accounts';
+
+  @override
+  String get transferMatchesIntro =>
+      'Moving money between two accounts you own is one movement recorded twice — once leaving, once arriving. Karar proposes the pairs it found. Nothing changes until you answer.';
+
+  @override
+  String get transferMatchesFilterLabel => 'Show';
+
+  @override
+  String get transferMatchesFilterAwaiting => 'Waiting for you';
+
+  @override
+  String get transferMatchesFilterConfirmed => 'You confirmed';
+
+  @override
+  String get transferMatchesFilterRejected => 'You kept separate';
+
+  @override
+  String get transferMatchStateSuggested => 'Proposed';
+
+  @override
+  String get transferMatchStateConfirmed => 'Confirmed by you';
+
+  @override
+  String get transferMatchStateRejected => 'Kept separate';
+
+  @override
+  String get transferMatchStateUnrecognised =>
+      'A state this version does not know';
+
+  @override
+  String get transferMatchNothingChangedNote =>
+      'Nothing has changed. This is a question, not a decision.';
+
+  @override
+  String get transferMatchConfirmedNote =>
+      'You confirmed this pair, so Karar counts the two entries as one movement.';
+
+  @override
+  String get transferMatchRejectedNote =>
+      'The two entries keep counting separately, and this pair will not be proposed again.';
+
+  @override
+  String get transferMatchUnrecognisedNote =>
+      'This version of Karar cannot act on this pair. Update the app to answer it.';
+
+  @override
+  String get transferMatchBasisHeading => 'Why this pair was proposed';
+
+  @override
+  String get transferMatchBasisEqualAndOpposite =>
+      'The two amounts are exactly equal and opposite, they are in the same currency, and they were booked within the window of the rule below.';
+
+  @override
+  String get transferMatchBasisUnrecognised =>
+      'This version of Karar does not know the rule that proposed this pair.';
+
+  @override
+  String get transferMatchRuleLabel => 'Rule that proposed it';
+
+  @override
+  String get transferMatchNoScoreNote =>
+      'Karar does not score a pair. It either meets the rule or it is not proposed at all.';
+
+  @override
+  String get transferMatchOutflowHeading => 'Money left this account';
+
+  @override
+  String get transferMatchInflowHeading => 'Money arrived in this account';
+
+  @override
+  String get transferMatchAccountLabel => 'Account';
+
+  @override
+  String get transferMatchCurrencyLabel => 'Currency';
+
+  @override
+  String get transferMatchAmountLabel => 'Amount';
+
+  @override
+  String get transferMatchBookedLabel => 'Booked';
+
+  @override
+  String get transferMatchDescriptionLabel => 'Description';
+
+  @override
+  String get transferMatchProposedAtLabel => 'Proposed on';
+
+  @override
+  String get transferMatchDecidedAtLabel => 'You answered on';
+
+  @override
+  String get transferMatchAccountNotNamed => 'Account name unavailable';
+
+  @override
+  String get transferMatchActionOpenMovements => 'Show both movements';
+
+  @override
+  String get transferMatchActionHideMovements => 'Hide both movements';
+
+  @override
+  String get transferMatchActionConfirm => 'Yes, one movement';
+
+  @override
+  String get transferMatchActionReject => 'No, two separate movements';
+
+  @override
+  String get transferMatchActionWithdraw => 'Withdraw my confirmation';
+
+  @override
+  String get transferMatchConfirmingStatus => 'Recording your confirmation';
+
+  @override
+  String get transferMatchRejectingStatus => 'Recording your answer';
+
+  @override
+  String get transferMatchOpenToAnswerNote => 'Open both movements to answer.';
+
+  @override
+  String get transferMatchRejectDialogTitle => 'Keep these two separate?';
+
+  @override
+  String get transferMatchRejectDialogMessage =>
+      'Both entries stay exactly as they are and keep counting separately. Karar will not propose this pair again.';
+
+  @override
+  String get transferMatchWithdrawDialogTitle => 'Withdraw your confirmation?';
+
+  @override
+  String get transferMatchWithdrawDialogMessage =>
+      'The two entries go back to counting separately. Karar will not propose this pair again, and you cannot confirm it later.';
+
+  @override
+  String get transferMatchCrossCurrencyTitle => 'Two different currencies';
+
+  @override
+  String get transferMatchCrossCurrencyDetail =>
+      'These two movements are held in different currencies. Karar holds no exchange rate and never relates an amount in one currency to an amount in another, so this pair cannot be confirmed here.';
+
+  @override
+  String get transferMatchesEmptyAwaitingTitle => 'Nothing waiting for you';
+
+  @override
+  String get transferMatchesEmptyAwaitingDescription =>
+      'Karar has not proposed any transfers between your own accounts.';
+
+  @override
+  String get transferMatchesEmptyConfirmedTitle =>
+      'You have not confirmed a pair yet';
+
+  @override
+  String get transferMatchesEmptyConfirmedDescription =>
+      'Pairs you confirm are kept here.';
+
+  @override
+  String get transferMatchesEmptyRejectedTitle =>
+      'You have not kept a pair separate yet';
+
+  @override
+  String get transferMatchesEmptyRejectedDescription =>
+      'Pairs you keep separate are remembered here, so Karar does not ask about them again.';
+
+  @override
+  String get transferMatchesUnavailableTitle =>
+      'Proposed transfers cannot be shown';
+
+  @override
+  String get transferMatchesUnavailableDescription =>
+      'Karar could not reach the platform. Nothing was changed.';
+
+  @override
+  String get transferMatchRefusalConflict =>
+      'This pair changed while it was on your screen. Reload it and answer again.';
+
+  @override
+  String get transferMatchRefusalGone =>
+      'This pair is no longer here. Nothing was changed.';
+
+  @override
+  String get transferMatchRefusalNotAvailable =>
+      'That answer is no longer available for this pair.';
+
+  @override
+  String get transferMatchRefusalCrossCurrency =>
+      'Karar cannot pair two movements in different currencies.';
+
+  @override
+  String get transferMatchRefusalGeneric =>
+      'Your answer was not recorded. Nothing was changed.';
+
+  @override
+  String get transferMatchMovementUnavailable =>
+      'This movement could not be loaded. Answer only when you can see both.';
+
+  @override
+  String get transferMatchMovementsLoading => 'Loading both movements';
+
+  @override
+  String get transferMatchesLoadMore => 'Show more pairs';
+
+  @override
+  String get transferMatchesLoadingMore => 'Loading more pairs';
 }

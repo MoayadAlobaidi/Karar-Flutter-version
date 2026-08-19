@@ -3093,4 +3093,204 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get statementImportHeaderRowNo => 'لا، الصف الأول معاملة';
+
+  @override
+  String get transferMatchesScreenTitle => 'التحويلات بين حساباتك';
+
+  @override
+  String get transferMatchesIntro =>
+      'نقل المال بين حسابين تملكهما هو حركة واحدة مسجّلة مرتين: مرة عند الخروج ومرة عند الوصول. يقترح كرار الأزواج التي وجدها، ولا يتغير شيء حتى تجيب.';
+
+  @override
+  String get transferMatchesFilterLabel => 'اعرض';
+
+  @override
+  String get transferMatchesFilterAwaiting => 'بانتظار إجابتك';
+
+  @override
+  String get transferMatchesFilterConfirmed => 'أكدتها';
+
+  @override
+  String get transferMatchesFilterRejected => 'أبقيتها منفصلة';
+
+  @override
+  String get transferMatchStateSuggested => 'مقترح';
+
+  @override
+  String get transferMatchStateConfirmed => 'مؤكد منك';
+
+  @override
+  String get transferMatchStateRejected => 'تبقى منفصلة';
+
+  @override
+  String get transferMatchStateUnrecognised => 'حالة لا تعرفها هذه النسخة';
+
+  @override
+  String get transferMatchNothingChangedNote =>
+      'لم يتغير شيء. هذا سؤال وليس حكمًا.';
+
+  @override
+  String get transferMatchConfirmedNote =>
+      'أكدت هذا الزوج، لذا يحسب كرار القيدين حركة واحدة.';
+
+  @override
+  String get transferMatchRejectedNote =>
+      'يظل القيدان محسوبين بشكل منفصل، ولن يُقترح هذا الزوج مرة أخرى.';
+
+  @override
+  String get transferMatchUnrecognisedNote =>
+      'لا تستطيع هذه النسخة من كرار التعامل مع هذا الزوج. حدّث التطبيق للإجابة عليه.';
+
+  @override
+  String get transferMatchBasisHeading => 'لماذا اقتُرح هذا الزوج';
+
+  @override
+  String get transferMatchBasisEqualAndOpposite =>
+      'المبلغان متساويان تمامًا ومتعاكسان، وبالعملة نفسها، وقُيّدا ضمن نافذة القاعدة أدناه.';
+
+  @override
+  String get transferMatchBasisUnrecognised =>
+      'لا تعرف هذه النسخة من كرار القاعدة التي اقترحت هذا الزوج.';
+
+  @override
+  String get transferMatchRuleLabel => 'القاعدة التي اقترحته';
+
+  @override
+  String get transferMatchNoScoreNote =>
+      'لا يمنح كرار الزوج درجة. إما أن يحقق القاعدة أو لا يُقترح أصلًا.';
+
+  @override
+  String get transferMatchOutflowHeading => 'خرج المال من هذا الحساب';
+
+  @override
+  String get transferMatchInflowHeading => 'وصل المال إلى هذا الحساب';
+
+  @override
+  String get transferMatchAccountLabel => 'الحساب';
+
+  @override
+  String get transferMatchCurrencyLabel => 'العملة';
+
+  @override
+  String get transferMatchAmountLabel => 'المبلغ';
+
+  @override
+  String get transferMatchBookedLabel => 'تاريخ القيد';
+
+  @override
+  String get transferMatchDescriptionLabel => 'الوصف';
+
+  @override
+  String get transferMatchProposedAtLabel => 'تاريخ الاقتراح';
+
+  @override
+  String get transferMatchDecidedAtLabel => 'تاريخ إجابتك';
+
+  @override
+  String get transferMatchAccountNotNamed => 'اسم الحساب غير متاح';
+
+  @override
+  String get transferMatchActionOpenMovements => 'أظهر الحركتين';
+
+  @override
+  String get transferMatchActionHideMovements => 'أخفِ الحركتين';
+
+  @override
+  String get transferMatchActionConfirm => 'نعم، حركة واحدة';
+
+  @override
+  String get transferMatchActionReject => 'لا، حركتان منفصلتان';
+
+  @override
+  String get transferMatchActionWithdraw => 'اسحب تأكيدي';
+
+  @override
+  String get transferMatchConfirmingStatus => 'يجري تسجيل تأكيدك';
+
+  @override
+  String get transferMatchRejectingStatus => 'يجري تسجيل إجابتك';
+
+  @override
+  String get transferMatchOpenToAnswerNote => 'افتح الحركتين للإجابة.';
+
+  @override
+  String get transferMatchRejectDialogTitle => 'هل تبقيهما منفصلتين؟';
+
+  @override
+  String get transferMatchRejectDialogMessage =>
+      'يبقى القيدان كما هما تمامًا ويظلان محسوبين بشكل منفصل. ولن يقترح كرار هذا الزوج مرة أخرى.';
+
+  @override
+  String get transferMatchWithdrawDialogTitle => 'هل تسحب تأكيدك؟';
+
+  @override
+  String get transferMatchWithdrawDialogMessage =>
+      'يعود القيدان إلى الحساب بشكل منفصل. ولن يقترح كرار هذا الزوج مرة أخرى، ولن تستطيع تأكيده لاحقًا.';
+
+  @override
+  String get transferMatchCrossCurrencyTitle => 'عملتان مختلفتان';
+
+  @override
+  String get transferMatchCrossCurrencyDetail =>
+      'الحركتان بعملتين مختلفتين. لا يحتفظ كرار بأي سعر صرف ولا يربط مبلغًا بعملة بمبلغ بعملة أخرى، لذا لا يمكن تأكيد هذا الزوج هنا.';
+
+  @override
+  String get transferMatchesEmptyAwaitingTitle => 'لا شيء بانتظارك';
+
+  @override
+  String get transferMatchesEmptyAwaitingDescription =>
+      'لم يقترح كرار أي تحويلات بين حساباتك.';
+
+  @override
+  String get transferMatchesEmptyConfirmedTitle => 'لم تؤكد أي زوج بعد';
+
+  @override
+  String get transferMatchesEmptyConfirmedDescription =>
+      'تُحفظ هنا الأزواج التي تؤكدها.';
+
+  @override
+  String get transferMatchesEmptyRejectedTitle => 'لم تُبقِ أي زوج منفصلًا بعد';
+
+  @override
+  String get transferMatchesEmptyRejectedDescription =>
+      'تُحفظ هنا الأزواج التي تبقيها منفصلة، حتى لا يسأل كرار عنها مرة أخرى.';
+
+  @override
+  String get transferMatchesUnavailableTitle => 'تعذّر عرض التحويلات المقترحة';
+
+  @override
+  String get transferMatchesUnavailableDescription =>
+      'تعذّر على كرار الوصول إلى المنصة. لم يتغير شيء.';
+
+  @override
+  String get transferMatchRefusalConflict =>
+      'تغيّر هذا الزوج بينما كان على شاشتك. أعد تحميله ثم أجب مرة أخرى.';
+
+  @override
+  String get transferMatchRefusalGone =>
+      'لم يعد هذا الزوج موجودًا. لم يتغير شيء.';
+
+  @override
+  String get transferMatchRefusalNotAvailable =>
+      'لم تعد هذه الإجابة متاحة لهذا الزوج.';
+
+  @override
+  String get transferMatchRefusalCrossCurrency =>
+      'لا يستطيع كرار ربط حركتين بعملتين مختلفتين.';
+
+  @override
+  String get transferMatchRefusalGeneric => 'لم تُسجَّل إجابتك. لم يتغير شيء.';
+
+  @override
+  String get transferMatchMovementUnavailable =>
+      'تعذّر تحميل هذه الحركة. لا تجب إلا عندما ترى الحركتين.';
+
+  @override
+  String get transferMatchMovementsLoading => 'يجري تحميل الحركتين';
+
+  @override
+  String get transferMatchesLoadMore => 'أظهر أزواجًا أخرى';
+
+  @override
+  String get transferMatchesLoadingMore => 'يجري تحميل أزواج أخرى';
 }

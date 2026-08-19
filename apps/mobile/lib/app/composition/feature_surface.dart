@@ -34,6 +34,7 @@ import '../../features/financial_accounts/presentation/financial_home_shell.dart
 import '../../features/platform_bootstrap/presentation/platform_feature_registration.dart';
 import '../../features/session_management/presentation/security_state_screens.dart';
 import '../../features/statement_imports/presentation/statement_import_feature_registration.dart';
+import '../../features/transfer_matching/presentation/transfer_matching_feature_registration.dart';
 import '../../shared/design_system/theme/karar_theme.dart';
 import '../dependency_injection/providers.dart';
 import '../lifecycle/startup_state.dart';
@@ -63,6 +64,7 @@ List<Override> featureSurfaceOverrides() => <Override>[
         // to spell `/financial…`, and a second exemption would be a second
         // place a contract path could hide.
         ...statementImportRoutes(),
+        ...transferMatchingRoutes(),
       ]),
       startupScreenOverridesProvider.overrideWithValue(
         <StartupStage, StartupScreenBuilder>{
@@ -79,6 +81,7 @@ List<Override> featureSurfaceOverrides() => <Override>[
         ...platformTenantScopedProviders(),
         ...financialTenantScopedProviders(),
         ...statementImportFeatureTenantScopedProviders(),
+        ...transferMatchingTenantScopedProviders(),
       ]),
       ...themeOverrides(),
     ];

@@ -33,6 +33,7 @@ import 'package:karar_mobile/features/financial_accounts/presentation/financial_
 import 'package:karar_mobile/features/statement_imports/presentation/statement_import_feature_registration.dart';
 import 'package:karar_mobile/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:karar_mobile/features/transactions/presentation/transactions_screen.dart';
+import 'package:karar_mobile/features/transfer_matching/presentation/transfer_matching_feature_registration.dart';
 
 import '../features/financial_accounts/support/financial_fixtures.dart';
 import 'support/deep_link_launch.dart';
@@ -60,7 +61,11 @@ List<String> everyFinancialPath() {
   // live under their own location prefix rather than `/financial…`, and a
   // derivation that read only one of the two functions would have declared the
   // surface covered while leaving half of it unvisited.
-  for (final route in <RouteBase>[...financialFeatureRoutes(), ...statementImportRoutes()]) {
+  for (final route in <RouteBase>[
+    ...financialFeatureRoutes(),
+    ...statementImportRoutes(),
+    ...transferMatchingRoutes(),
+  ]) {
     if (route is! GoRoute) {
       continue;
     }
@@ -105,11 +110,13 @@ Result<BootstrapSnapshot> bindingPending() {
 
 void main() {
   group('the derived route set', () {
-    test('covers every financial route BOTH workstreams contribute', () {
+    test('covers every financial route EVERY workstream contributes', () {
       final derived = everyFinancialPath();
-      final declared = <RouteBase>[...financialFeatureRoutes(), ...statementImportRoutes()]
-          .whereType<GoRoute>()
-          .length;
+      final declared = <RouteBase>[
+        ...financialFeatureRoutes(),
+        ...statementImportRoutes(),
+        ...transferMatchingRoutes(),
+      ].whereType<GoRoute>().length;
 
       expect(derived, hasLength(declared));
       expect(

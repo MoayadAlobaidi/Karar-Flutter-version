@@ -5374,6 +5374,366 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No, the first row is a transaction'**
   String get statementImportHeaderRowNo;
+
+  /// Title of the screen that lists proposed and decided transfer matches.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers between your own accounts'**
+  String get transferMatchesScreenTitle;
+
+  /// Explains what a transfer match is and that a proposal on its own changes nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Moving money between two accounts you own is one movement recorded twice — once leaving, once arriving. Karar proposes the pairs it found. Nothing changes until you answer.'**
+  String get transferMatchesIntro;
+
+  /// Label above the control that chooses which decisions the list shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get transferMatchesFilterLabel;
+
+  /// Filter that shows only the pairs the person has not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for you'**
+  String get transferMatchesFilterAwaiting;
+
+  /// Filter that shows only the pairs the person confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirmed'**
+  String get transferMatchesFilterConfirmed;
+
+  /// Filter that shows only the pairs the person turned down or withdrew.
+  ///
+  /// In en, this message translates to:
+  /// **'You kept separate'**
+  String get transferMatchesFilterRejected;
+
+  /// Badge for a pair the platform proposed and nobody has answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed'**
+  String get transferMatchStateSuggested;
+
+  /// Badge for a pair the person confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed by you'**
+  String get transferMatchStateConfirmed;
+
+  /// Badge for a pair the person turned down, or a confirmation they withdrew.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept separate'**
+  String get transferMatchStateRejected;
+
+  /// Badge for a match state the shipped build does not recognise.
+  ///
+  /// In en, this message translates to:
+  /// **'A state this version does not know'**
+  String get transferMatchStateUnrecognised;
+
+  /// Stated on every proposed pair so a suggestion is never read as something already applied.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed. This is a question, not a decision.'**
+  String get transferMatchNothingChangedNote;
+
+  /// Stated on a confirmed pair, naming the person as the one who decided.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirmed this pair, so Karar counts the two entries as one movement.'**
+  String get transferMatchConfirmedNote;
+
+  /// Stated on a pair the person kept separate, including a withdrawn confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The two entries keep counting separately, and this pair will not be proposed again.'**
+  String get transferMatchRejectedNote;
+
+  /// Stated on a pair whose state the shipped build does not recognise.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Karar cannot act on this pair. Update the app to answer it.'**
+  String get transferMatchUnrecognisedNote;
+
+  /// Heading above the rule the platform matched on.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this pair was proposed'**
+  String get transferMatchBasisHeading;
+
+  /// The one suggestion rule the platform declares, written out for a person.
+  ///
+  /// In en, this message translates to:
+  /// **'The two amounts are exactly equal and opposite, they are in the same currency, and they were booked within the window of the rule below.'**
+  String get transferMatchBasisEqualAndOpposite;
+
+  /// Shown when the suggestion basis is a value the shipped build does not recognise.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Karar does not know the rule that proposed this pair.'**
+  String get transferMatchBasisUnrecognised;
+
+  /// Label for the version label of the suggestion rule, shown verbatim.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule that proposed it'**
+  String get transferMatchRuleLabel;
+
+  /// States that no confidence figure exists, so nobody looks for one.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not score a pair. It either meets the rule or it is not proposed at all.'**
+  String get transferMatchNoScoreNote;
+
+  /// Heading for the outflow side of a proposed pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Money left this account'**
+  String get transferMatchOutflowHeading;
+
+  /// Heading for the inflow side of a proposed pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Money arrived in this account'**
+  String get transferMatchInflowHeading;
+
+  /// Label for the account one side of a pair sits on.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get transferMatchAccountLabel;
+
+  /// Label for the currency one side of a pair is held in.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get transferMatchCurrencyLabel;
+
+  /// Label for the amount of one side of a pair, as the platform reported it.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get transferMatchAmountLabel;
+
+  /// Label for the calendar day the institution booked one side of a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked'**
+  String get transferMatchBookedLabel;
+
+  /// Label for the description the source supplied for one side of a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get transferMatchDescriptionLabel;
+
+  /// Label for when the platform first proposed a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed on'**
+  String get transferMatchProposedAtLabel;
+
+  /// Label for when the person answered a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'You answered on'**
+  String get transferMatchDecidedAtLabel;
+
+  /// Shown in place of an account name when the portfolio could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Account name unavailable'**
+  String get transferMatchAccountNotNamed;
+
+  /// Action that opens the two movements a pair relates.
+  ///
+  /// In en, this message translates to:
+  /// **'Show both movements'**
+  String get transferMatchActionOpenMovements;
+
+  /// Action that closes the two movements a pair relates.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide both movements'**
+  String get transferMatchActionHideMovements;
+
+  /// Action recording the person's confirmation that two entries are one movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, one movement'**
+  String get transferMatchActionConfirm;
+
+  /// Action recording that the person considers the two entries separate.
+  ///
+  /// In en, this message translates to:
+  /// **'No, two separate movements'**
+  String get transferMatchActionReject;
+
+  /// Action withdrawing a confirmation the person previously made.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw my confirmation'**
+  String get transferMatchActionWithdraw;
+
+  /// Screen-reader and visible status while a confirmation is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording your confirmation'**
+  String get transferMatchConfirmingStatus;
+
+  /// Screen-reader and visible status while a refusal or withdrawal is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording your answer'**
+  String get transferMatchRejectingStatus;
+
+  /// Tells the person that the answer controls appear once both movements are shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Open both movements to answer.'**
+  String get transferMatchOpenToAnswerNote;
+
+  /// Title of the dialog confirming that a pair is not a transfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep these two separate?'**
+  String get transferMatchRejectDialogTitle;
+
+  /// States the consequence of keeping a pair separate, including that it is remembered.
+  ///
+  /// In en, this message translates to:
+  /// **'Both entries stay exactly as they are and keep counting separately. Karar will not propose this pair again.'**
+  String get transferMatchRejectDialogMessage;
+
+  /// Title of the dialog confirming that a confirmation is being withdrawn.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw your confirmation?'**
+  String get transferMatchWithdrawDialogTitle;
+
+  /// States that withdrawing a confirmation is final: the pair cannot be confirmed again.
+  ///
+  /// In en, this message translates to:
+  /// **'The two entries go back to counting separately. Karar will not propose this pair again, and you cannot confirm it later.'**
+  String get transferMatchWithdrawDialogMessage;
+
+  /// Heading shown when the two sides of a pair name different currencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Two different currencies'**
+  String get transferMatchCrossCurrencyTitle;
+
+  /// Explains why a cross-currency pair is shown as two amounts and cannot be confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'These two movements are held in different currencies. Karar holds no exchange rate and never relates an amount in one currency to an amount in another, so this pair cannot be confirmed here.'**
+  String get transferMatchCrossCurrencyDetail;
+
+  /// Empty state when no pair is waiting to be answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing waiting for you'**
+  String get transferMatchesEmptyAwaitingTitle;
+
+  /// Body of the empty state when nothing is waiting to be answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar has not proposed any transfers between your own accounts.'**
+  String get transferMatchesEmptyAwaitingDescription;
+
+  /// Empty state when the person has confirmed nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not confirmed a pair yet'**
+  String get transferMatchesEmptyConfirmedTitle;
+
+  /// Body of the empty state for confirmed pairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairs you confirm are kept here.'**
+  String get transferMatchesEmptyConfirmedDescription;
+
+  /// Empty state when the person has turned nothing down.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not kept a pair separate yet'**
+  String get transferMatchesEmptyRejectedTitle;
+
+  /// Body of the empty state for pairs the person kept separate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairs you keep separate are remembered here, so Karar does not ask about them again.'**
+  String get transferMatchesEmptyRejectedDescription;
+
+  /// Title shown when the transfer-matching listing could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed transfers cannot be shown'**
+  String get transferMatchesUnavailableTitle;
+
+  /// Body shown when the listing failed, stating that nothing was written.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not reach the platform. Nothing was changed.'**
+  String get transferMatchesUnavailableDescription;
+
+  /// Refusal shown when the platform reported a version conflict on a decision.
+  ///
+  /// In en, this message translates to:
+  /// **'This pair changed while it was on your screen. Reload it and answer again.'**
+  String get transferMatchRefusalConflict;
+
+  /// Refusal shown when the platform no longer has the pair the person answered.
+  ///
+  /// In en, this message translates to:
+  /// **'This pair is no longer here. Nothing was changed.'**
+  String get transferMatchRefusalGone;
+
+  /// Refusal shown when the transition the person asked for is not legal from the pair's state.
+  ///
+  /// In en, this message translates to:
+  /// **'That answer is no longer available for this pair.'**
+  String get transferMatchRefusalNotAvailable;
+
+  /// Refusal shown when a confirmation was asked for across two currencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar cannot pair two movements in different currencies.'**
+  String get transferMatchRefusalCrossCurrency;
+
+  /// Refusal shown for any other reason a decision was not recorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer was not recorded. Nothing was changed.'**
+  String get transferMatchRefusalGeneric;
+
+  /// Shown in place of one side of a pair when the transaction behind it could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'This movement could not be loaded. Answer only when you can see both.'**
+  String get transferMatchMovementUnavailable;
+
+  /// Screen-reader and visible status while the two movements of a pair are read.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading both movements'**
+  String get transferMatchMovementsLoading;
+
+  /// Action that follows the platform's cursor to the next page of pairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more pairs'**
+  String get transferMatchesLoadMore;
+
+  /// Screen-reader and visible status while the next page of pairs is read.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more pairs'**
+  String get transferMatchesLoadingMore;
 }
 
 class _AppLocalizationsDelegate

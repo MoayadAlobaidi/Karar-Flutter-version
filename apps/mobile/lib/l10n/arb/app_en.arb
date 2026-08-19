@@ -4168,5 +4168,246 @@
   "statementImportHeaderRowNo": "No, the first row is a transaction",
   "@statementImportHeaderRowNo": {
     "description": "Answer meaning the first row of the file is data rather than a heading."
+  },
+
+  "transferMatchesScreenTitle": "Transfers between your own accounts",
+  "@transferMatchesScreenTitle": {
+    "description": "Title of the screen that lists proposed and decided transfer matches."
+  },
+  "transferMatchesIntro": "Moving money between two accounts you own is one movement recorded twice — once leaving, once arriving. Karar proposes the pairs it found. Nothing changes until you answer.",
+  "@transferMatchesIntro": {
+    "description": "Explains what a transfer match is and that a proposal on its own changes nothing."
+  },
+  "transferMatchesFilterLabel": "Show",
+  "@transferMatchesFilterLabel": {
+    "description": "Label above the control that chooses which decisions the list shows."
+  },
+  "transferMatchesFilterAwaiting": "Waiting for you",
+  "@transferMatchesFilterAwaiting": {
+    "description": "Filter that shows only the pairs the person has not answered."
+  },
+  "transferMatchesFilterConfirmed": "You confirmed",
+  "@transferMatchesFilterConfirmed": {
+    "description": "Filter that shows only the pairs the person confirmed."
+  },
+  "transferMatchesFilterRejected": "You kept separate",
+  "@transferMatchesFilterRejected": {
+    "description": "Filter that shows only the pairs the person turned down or withdrew."
+  },
+  "transferMatchStateSuggested": "Proposed",
+  "@transferMatchStateSuggested": {
+    "description": "Badge for a pair the platform proposed and nobody has answered."
+  },
+  "transferMatchStateConfirmed": "Confirmed by you",
+  "@transferMatchStateConfirmed": {
+    "description": "Badge for a pair the person confirmed."
+  },
+  "transferMatchStateRejected": "Kept separate",
+  "@transferMatchStateRejected": {
+    "description": "Badge for a pair the person turned down, or a confirmation they withdrew."
+  },
+  "transferMatchStateUnrecognised": "A state this version does not know",
+  "@transferMatchStateUnrecognised": {
+    "description": "Badge for a match state the shipped build does not recognise."
+  },
+  "transferMatchNothingChangedNote": "Nothing has changed. This is a question, not a decision.",
+  "@transferMatchNothingChangedNote": {
+    "description": "Stated on every proposed pair so a suggestion is never read as something already applied."
+  },
+  "transferMatchConfirmedNote": "You confirmed this pair, so Karar counts the two entries as one movement.",
+  "@transferMatchConfirmedNote": {
+    "description": "Stated on a confirmed pair, naming the person as the one who decided."
+  },
+  "transferMatchRejectedNote": "The two entries keep counting separately, and this pair will not be proposed again.",
+  "@transferMatchRejectedNote": {
+    "description": "Stated on a pair the person kept separate, including a withdrawn confirmation."
+  },
+  "transferMatchUnrecognisedNote": "This version of Karar cannot act on this pair. Update the app to answer it.",
+  "@transferMatchUnrecognisedNote": {
+    "description": "Stated on a pair whose state the shipped build does not recognise."
+  },
+  "transferMatchBasisHeading": "Why this pair was proposed",
+  "@transferMatchBasisHeading": {
+    "description": "Heading above the rule the platform matched on."
+  },
+  "transferMatchBasisEqualAndOpposite": "The two amounts are exactly equal and opposite, they are in the same currency, and they were booked within the window of the rule below.",
+  "@transferMatchBasisEqualAndOpposite": {
+    "description": "The one suggestion rule the platform declares, written out for a person."
+  },
+  "transferMatchBasisUnrecognised": "This version of Karar does not know the rule that proposed this pair.",
+  "@transferMatchBasisUnrecognised": {
+    "description": "Shown when the suggestion basis is a value the shipped build does not recognise."
+  },
+  "transferMatchRuleLabel": "Rule that proposed it",
+  "@transferMatchRuleLabel": {
+    "description": "Label for the version label of the suggestion rule, shown verbatim."
+  },
+  "transferMatchNoScoreNote": "Karar does not score a pair. It either meets the rule or it is not proposed at all.",
+  "@transferMatchNoScoreNote": {
+    "description": "States that no confidence figure exists, so nobody looks for one."
+  },
+  "transferMatchOutflowHeading": "Money left this account",
+  "@transferMatchOutflowHeading": {
+    "description": "Heading for the outflow side of a proposed pair."
+  },
+  "transferMatchInflowHeading": "Money arrived in this account",
+  "@transferMatchInflowHeading": {
+    "description": "Heading for the inflow side of a proposed pair."
+  },
+  "transferMatchAccountLabel": "Account",
+  "@transferMatchAccountLabel": {
+    "description": "Label for the account one side of a pair sits on."
+  },
+  "transferMatchCurrencyLabel": "Currency",
+  "@transferMatchCurrencyLabel": {
+    "description": "Label for the currency one side of a pair is held in."
+  },
+  "transferMatchAmountLabel": "Amount",
+  "@transferMatchAmountLabel": {
+    "description": "Label for the amount of one side of a pair, as the platform reported it."
+  },
+  "transferMatchBookedLabel": "Booked",
+  "@transferMatchBookedLabel": {
+    "description": "Label for the calendar day the institution booked one side of a pair."
+  },
+  "transferMatchDescriptionLabel": "Description",
+  "@transferMatchDescriptionLabel": {
+    "description": "Label for the description the source supplied for one side of a pair."
+  },
+  "transferMatchProposedAtLabel": "Proposed on",
+  "@transferMatchProposedAtLabel": {
+    "description": "Label for when the platform first proposed a pair."
+  },
+  "transferMatchDecidedAtLabel": "You answered on",
+  "@transferMatchDecidedAtLabel": {
+    "description": "Label for when the person answered a pair."
+  },
+  "transferMatchAccountNotNamed": "Account name unavailable",
+  "@transferMatchAccountNotNamed": {
+    "description": "Shown in place of an account name when the portfolio could not be read."
+  },
+  "transferMatchActionOpenMovements": "Show both movements",
+  "@transferMatchActionOpenMovements": {
+    "description": "Action that opens the two movements a pair relates."
+  },
+  "transferMatchActionHideMovements": "Hide both movements",
+  "@transferMatchActionHideMovements": {
+    "description": "Action that closes the two movements a pair relates."
+  },
+  "transferMatchActionConfirm": "Yes, one movement",
+  "@transferMatchActionConfirm": {
+    "description": "Action recording the person's confirmation that two entries are one movement."
+  },
+  "transferMatchActionReject": "No, two separate movements",
+  "@transferMatchActionReject": {
+    "description": "Action recording that the person considers the two entries separate."
+  },
+  "transferMatchActionWithdraw": "Withdraw my confirmation",
+  "@transferMatchActionWithdraw": {
+    "description": "Action withdrawing a confirmation the person previously made."
+  },
+  "transferMatchConfirmingStatus": "Recording your confirmation",
+  "@transferMatchConfirmingStatus": {
+    "description": "Screen-reader and visible status while a confirmation is being sent."
+  },
+  "transferMatchRejectingStatus": "Recording your answer",
+  "@transferMatchRejectingStatus": {
+    "description": "Screen-reader and visible status while a refusal or withdrawal is being sent."
+  },
+  "transferMatchOpenToAnswerNote": "Open both movements to answer.",
+  "@transferMatchOpenToAnswerNote": {
+    "description": "Tells the person that the answer controls appear once both movements are shown."
+  },
+  "transferMatchRejectDialogTitle": "Keep these two separate?",
+  "@transferMatchRejectDialogTitle": {
+    "description": "Title of the dialog confirming that a pair is not a transfer."
+  },
+  "transferMatchRejectDialogMessage": "Both entries stay exactly as they are and keep counting separately. Karar will not propose this pair again.",
+  "@transferMatchRejectDialogMessage": {
+    "description": "States the consequence of keeping a pair separate, including that it is remembered."
+  },
+  "transferMatchWithdrawDialogTitle": "Withdraw your confirmation?",
+  "@transferMatchWithdrawDialogTitle": {
+    "description": "Title of the dialog confirming that a confirmation is being withdrawn."
+  },
+  "transferMatchWithdrawDialogMessage": "The two entries go back to counting separately. Karar will not propose this pair again, and you cannot confirm it later.",
+  "@transferMatchWithdrawDialogMessage": {
+    "description": "States that withdrawing a confirmation is final: the pair cannot be confirmed again."
+  },
+  "transferMatchCrossCurrencyTitle": "Two different currencies",
+  "@transferMatchCrossCurrencyTitle": {
+    "description": "Heading shown when the two sides of a pair name different currencies."
+  },
+  "transferMatchCrossCurrencyDetail": "These two movements are held in different currencies. Karar holds no exchange rate and never relates an amount in one currency to an amount in another, so this pair cannot be confirmed here.",
+  "@transferMatchCrossCurrencyDetail": {
+    "description": "Explains why a cross-currency pair is shown as two amounts and cannot be confirmed."
+  },
+  "transferMatchesEmptyAwaitingTitle": "Nothing waiting for you",
+  "@transferMatchesEmptyAwaitingTitle": {
+    "description": "Empty state when no pair is waiting to be answered."
+  },
+  "transferMatchesEmptyAwaitingDescription": "Karar has not proposed any transfers between your own accounts.",
+  "@transferMatchesEmptyAwaitingDescription": {
+    "description": "Body of the empty state when nothing is waiting to be answered."
+  },
+  "transferMatchesEmptyConfirmedTitle": "You have not confirmed a pair yet",
+  "@transferMatchesEmptyConfirmedTitle": {
+    "description": "Empty state when the person has confirmed nothing."
+  },
+  "transferMatchesEmptyConfirmedDescription": "Pairs you confirm are kept here.",
+  "@transferMatchesEmptyConfirmedDescription": {
+    "description": "Body of the empty state for confirmed pairs."
+  },
+  "transferMatchesEmptyRejectedTitle": "You have not kept a pair separate yet",
+  "@transferMatchesEmptyRejectedTitle": {
+    "description": "Empty state when the person has turned nothing down."
+  },
+  "transferMatchesEmptyRejectedDescription": "Pairs you keep separate are remembered here, so Karar does not ask about them again.",
+  "@transferMatchesEmptyRejectedDescription": {
+    "description": "Body of the empty state for pairs the person kept separate."
+  },
+  "transferMatchesUnavailableTitle": "Proposed transfers cannot be shown",
+  "@transferMatchesUnavailableTitle": {
+    "description": "Title shown when the transfer-matching listing could not be read."
+  },
+  "transferMatchesUnavailableDescription": "Karar could not reach the platform. Nothing was changed.",
+  "@transferMatchesUnavailableDescription": {
+    "description": "Body shown when the listing failed, stating that nothing was written."
+  },
+  "transferMatchRefusalConflict": "This pair changed while it was on your screen. Reload it and answer again.",
+  "@transferMatchRefusalConflict": {
+    "description": "Refusal shown when the platform reported a version conflict on a decision."
+  },
+  "transferMatchRefusalGone": "This pair is no longer here. Nothing was changed.",
+  "@transferMatchRefusalGone": {
+    "description": "Refusal shown when the platform no longer has the pair the person answered."
+  },
+  "transferMatchRefusalNotAvailable": "That answer is no longer available for this pair.",
+  "@transferMatchRefusalNotAvailable": {
+    "description": "Refusal shown when the transition the person asked for is not legal from the pair's state."
+  },
+  "transferMatchRefusalCrossCurrency": "Karar cannot pair two movements in different currencies.",
+  "@transferMatchRefusalCrossCurrency": {
+    "description": "Refusal shown when a confirmation was asked for across two currencies."
+  },
+  "transferMatchRefusalGeneric": "Your answer was not recorded. Nothing was changed.",
+  "@transferMatchRefusalGeneric": {
+    "description": "Refusal shown for any other reason a decision was not recorded."
+  },
+  "transferMatchMovementUnavailable": "This movement could not be loaded. Answer only when you can see both.",
+  "@transferMatchMovementUnavailable": {
+    "description": "Shown in place of one side of a pair when the transaction behind it could not be read."
+  },
+  "transferMatchMovementsLoading": "Loading both movements",
+  "@transferMatchMovementsLoading": {
+    "description": "Screen-reader and visible status while the two movements of a pair are read."
+  },
+  "transferMatchesLoadMore": "Show more pairs",
+  "@transferMatchesLoadMore": {
+    "description": "Action that follows the platform's cursor to the next page of pairs."
+  },
+  "transferMatchesLoadingMore": "Loading more pairs",
+  "@transferMatchesLoadingMore": {
+    "description": "Screen-reader and visible status while the next page of pairs is read."
   }
 }
