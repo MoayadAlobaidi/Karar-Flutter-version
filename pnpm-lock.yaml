@@ -584,6 +584,56 @@ importers:
         specifier: ^8.16.0
         version: 8.23.0
 
+  modules/provider-capabilities:
+    dependencies:
+      '@karar/financial-accounts':
+        specifier: workspace:*
+        version: link:../financial-accounts
+      '@karar/financial-connections':
+        specifier: workspace:*
+        version: link:../financial-connections
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+
+  modules/statement-imports:
+    dependencies:
+      '@karar/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
+      '@karar/financial-accounts':
+        specifier: workspace:*
+        version: link:../financial-accounts
+      '@karar/financial-connections':
+        specifier: workspace:*
+        version: link:../financial-connections
+      '@karar/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@karar/shared-kernel':
+        specifier: workspace:*
+        version: link:../../packages/shared-kernel
+      '@karar/transactions':
+        specifier: workspace:*
+        version: link:../transactions
+    devDependencies:
+      '@karar/financial-retention-local-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/financial-retention-local-fixtures
+      '@types/node':
+        specifier: ^25.9.5
+        version: 25.9.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.21.0
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.0
+
   modules/subject-policy:
     dependencies:
       '@karar/audit':

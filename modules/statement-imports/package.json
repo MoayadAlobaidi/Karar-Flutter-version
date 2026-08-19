@@ -1,0 +1,28 @@
+{
+  "name": "@karar/statement-imports",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CSV statement ingestion: source, parse, normalize, stage, preview, subject review, commit. Parsing never writes a financial record — only a reviewed commit does, atomically and idempotently. The retention decision is resolved before the first durable source byte exists, the raw file lives only as authenticated ciphertext outside PostgreSQL, and deduplication reuses the transactions module's canonical fingerprint rather than inventing a second one.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/api-contracts": "workspace:*",
+    "@karar/financial-accounts": "workspace:*",
+    "@karar/financial-connections": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*",
+    "@karar/transactions": "workspace:*"
+  },
+  "devDependencies": {
+    "@karar/financial-retention-local-fixtures": "workspace:*",
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}
