@@ -3,7 +3,7 @@
 **Branch:** `claude/karar-v2-phase-5-financial-foundation` · **Started:** 18 August 2026 · **Status:** IN PROGRESS
 **Base:** Phase 4 post-merge record commit `2b0dfca` on `main`.
 
-**This phase is part-built, and the part that is built now answers requests.** The financial data platform spans **six modules** — accounts and wallets, transactions, connections and source links, payment instruments, transfer matching, and statement imports — plus `provider-capabilities`, which owns no table and executes nothing. **27 operations over 21 `/financial/*` paths** are mounted from the composition root, manual transaction entry and CSV statement import both write real rows, and `currentPhase` has moved to **5** with architecture test 24 ACTIVE. No field below is a completion claim: **there is no Flutter financial surface, no provider connector, and nothing is deployed anywhere**; the retention question this data depends on is NOT resolved; and account deletion is deliberately not exposed over HTTP.
+**This phase is part-built, and the part that is built now answers requests.** The financial data platform spans **six modules** — accounts and wallets, transactions, connections and source links, payment instruments, transfer matching, and statement imports — plus `provider-capabilities`, which owns no table and executes nothing. **27 operations over 21 `/financial/*` paths** are mounted from the composition root, manual transaction entry and CSV statement import both write real rows, and `currentPhase` has moved to **5** with architecture test 24 ACTIVE. No field below is a completion claim: **the Flutter financial surface now exists but a statement cannot be chosen on a device — no file picker adapter ships — there is no provider connector, and nothing is deployed anywhere**; the retention question this data depends on is NOT resolved; and account deletion is deliberately not exposed over HTTP.
 
 **Figures in this report are derived from the committed tree at `ef1d155`**, the activation commit, and were re-confirmed unchanged at `4e6f13b`, which regenerated the Dart client and edited the contract fragments without moving an operation count. Where a figure is unstable because concurrent workstreams are mid-edit, it says so instead of being rounded into confidence, and where a figure was measured at an earlier commit it names that commit rather than being restated as current.
 
@@ -112,7 +112,7 @@ In `packages/platform`, `src/ingestion/limits.ts` is the single registry of inge
 
 `scripts/checks/architecture.mjs` still carries the supplementary check that FAILS a tree mounting an ingestion controller or use case while `currentPhase < 5`. It now scans zero files and passes trivially, because the marker has moved — it is retained as the other half of a lock whose first half, test 24, has taken over the enforcement.
 
-**The application wiring is real, and it is ordinary.** `main.ts` builds every use case over its real ports in `apps/api/src/composition/phase5-modules.ts` and imports `FinancialApiModule.register(...)`; eight controllers are listed there, nothing is discovered by convention, and no controller constructs a repository, a provider or an encryption port. `apps/mobile` is still untouched — no feature folder, no generated client method, no route, no fixture, no screen.
+**The application wiring is real, and it is ordinary.** `main.ts` builds every use case over its real ports in `apps/api/src/composition/phase5-modules.ts` and imports `FinancialApiModule.register(...)`; eight controllers are listed there, nothing is discovered by convention, and no controller constructs a repository, a provider or an encryption port. `apps/mobile` was untouched when this paragraph was written and is not any more: seven financial feature folders read those controllers through the generated client, each route gated inside its builder on the capability the platform reports.
 
 ## Database migrations
 
@@ -158,7 +158,7 @@ Four contract rules hold across all of them, and each is a test rather than a co
 
 The CSV upload is the only operation with a non-JSON request body. Every success body is `application/json`; every failure is `application/problem+json` from the single writer.
 
-**The generated Dart client did change, and it is the one place a reader could over-read.** It is generated from the whole contract and never hand-edited, so it now carries **27 financial methods** among its 62 — and **nothing in `apps/mobile/lib/` calls a single one of them.** There is no financial feature folder, route, provider, fixture or screen. A method existing in a generated file is not a surface; it is the drift check doing its job.
+**The generated Dart client did change, and it is the one place a reader could over-read.** It is generated from the whole contract and never hand-edited, so it carries **27 financial methods** among its 62. When this paragraph was first written nothing called them, and the point it made — that a method in a generated file is the drift check working, not a capability arriving — still stands even though the callers now exist. What replaced it is a stricter line: seven feature folders call those methods, `navigableCapabilityIds` is still empty, and `TRANSACTIONS` is still `NOT_IMPLEMENTED`.
 
 ## Security controls
 
@@ -294,7 +294,7 @@ Four items deferred at the previous checkpoint have since landed: CSV statement 
 
 Still deferred **by this checkpoint**, deliberately and in this order:
 
-1. **Any Flutter surface** for financial data. It does not begin until the capability is exposable, and exposable is a stricter claim than "a route answers".
+1. **A file picker adapter.** The Flutter surface itself is no longer deferred — it was built later in this phase — but the statement-import flow sits above a picker port with no implementation, so nobody can choose a file. A plugin would add a platform permission and a test pins a real build's permissions to the reviewed set; the intended implementation is a first-party channel over `ACTION_OPEN_DOCUMENT` and `UIDocumentPickerViewController`, which needs no permission and which nothing here has exercised on a device.
 2. **The categorization pipeline.** Merchant rules are schema and domain; nothing applies them.
 3. **Account deletion over HTTP**, which waits on a chosen contract for a non-atomic partial outcome rather than on more code.
 4. **`SuggestTransferMatch`, `RecordReportedBalance`, `CreateManualConnection` and every payment-instrument write.** Their routes are not in the contract, so their use cases are deliberately absent from the bundle the controllers can call — a bundle carrying a use case nothing calls invites the route to appear later without the contract review that should precede it.

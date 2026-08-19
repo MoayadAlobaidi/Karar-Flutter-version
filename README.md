@@ -17,7 +17,7 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **5 — IN PROGRESS** — the financial data platform, on `claude/karar-v2-phase-5-financial-foundation` ([report](docs/phases/phase-05.md)). The marker moved to 5 with the **first real mounted ingestion path** — CSV statement upload and parse — because architecture test 24 (resource limits) activates at phase 5 and a limits test with no path to scan proves nothing. **Not complete, not deployed**: no Flutter financial surface, no provider connector, and no capability is available |
+| Current phase | **5 — IN PROGRESS** — the financial data platform, on `claude/karar-v2-phase-5-financial-foundation` ([report](docs/phases/phase-05.md)). The marker moved to 5 with the **first real mounted ingestion path** — CSV statement upload and parse — because architecture test 24 (resource limits) activates at phase 5 and a limits test with no path to scan proves nothing. **Not complete, not deployed**: the financial screens exist but a statement cannot be chosen on a device (no file picker adapter), there is no provider connector, and no capability is available |
 | Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — merged 18 August 2026 |
 | Branch model | `main` + phase branches (current: `claude/karar-v2-phase-5-financial-foundation`) |
 | Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, a Flutter client covering account, identity and platform state, and the Phase 5 financial data platform: six financial modules plus `provider-capabilities`, behind **27 HTTP operations over 21 `/financial/*` paths** with CSV statement ingestion mounted. **Nothing is deployed and no capability is available anywhere** — the registry entry for `TRANSACTIONS` is still `NOT_IMPLEMENTED`, no PolicyPack clears it, and no client renders it |
@@ -87,7 +87,7 @@ graph TB
 
 | Container | What it is |
 |---|---|
-| `apps/mobile` | Flutter client (consumer; white-label flavors are Phase 11). Renders values; computes nothing authoritative. Ten feature folders, all of them account, identity or platform state; a generated Dart API client with contract drift detection; Android and iOS build guards that refuse a deployed-environment package with no usable endpoint — see [`flutter.md`](docs/architecture/flutter.md) |
+| `apps/mobile` | Flutter client (consumer; white-label flavors are Phase 11). Renders values; computes nothing authoritative. Seventeen feature folders — ten of account, identity and platform state, seven financial (accounts and wallets, transactions, categories, payment instruments, statement imports, transfer matching, connections and sources), every financial route gated on the platform's own capability answer and re-evaluated on every build; a generated Dart API client with contract drift detection; Android and iOS build guards that refuse a deployed-environment package with no usable endpoint — see [`flutter.md`](docs/architecture/flutter.md) |
 | `apps/api` | NestJS modular monolith — the only public API surface |
 | `apps/worker` | Second entrypoint over the same modules: outbox relay, projections, scheduled jobs |
 | `apps/admin` | Super Admin SPA; talks to the control plane only, carries no database driver |
@@ -214,14 +214,14 @@ graph TD
   T --> TM[TransferMatch<br/>own-account movement, no amount]
   ING[Manual entry · CSV import<br/>BUILT AND MOUNTED] --writes--> T
   HTTP[HTTP surface<br/>27 operations, 21 paths] --reads--> A
-  FLU[Flutter screen<br/>NOT BUILT] -.would read.-> HTTP
+  FLU[Flutter screens<br/>BUILT, CAPABILITY-GATED] -.reads.-> HTTP
   EXT[External provider rails<br/>NOT BUILT, refused by CHECK] -.feeds.-> C
 
   style FLU stroke-dasharray: 5 5
   style EXT stroke-dasharray: 5 5
 ```
 
-**Dashed elements are not built, and the convention has moved twice because the tree has.** Payment instruments and transfer matching were the dashed pair while they were modelled in the ADR with no migration and no code; ingestion and the HTTP surface replaced them once those tables landed. Both of those are now solid too: manual transaction entry and CSV statement import write real rows, and 27 operations over 21 `/financial/*` paths read them back. What remains dashed is what a person actually touches and what a bank actually is: **no Flutter feature folder, route, fixture or screen refers to any of this** — the generated Dart client carries the 27 methods, because it is generated from the whole contract, and nothing in the app calls one — and **every acquisition rail beyond `MANUAL` and `USER_FILE_UPLOAD` is refused by a database CHECK.** Every solid box is schema that exists, code tested against live PostgreSQL, and a route the runtime-conformance suite drives for real — and **none of it is deployed anywhere.**
+**Dashed elements are not built, and the convention has moved twice because the tree has.** Payment instruments and transfer matching were the dashed pair while they were modelled in the ADR with no migration and no code; ingestion and the HTTP surface replaced them once those tables landed. Both of those are now solid too: manual transaction entry and CSV statement import write real rows, and 27 operations over 21 `/financial/*` paths read them back. What remains dashed is what a bank actually is: **every acquisition rail beyond `MANUAL` and `USER_FILE_UPLOAD` is refused by a database CHECK.** The screens are no longer dashed — seven financial feature folders read those 27 operations through the generated client — but nothing is deployed and no capability is AVAILABLE, so a mounted, gated route in a local build is not a capability anyone has been granted. Every solid box is schema that exists, code tested against live PostgreSQL, and a route the runtime-conformance suite drives for real — and **none of it is deployed anywhere.**
 
 Why each separation earns its cost:
 
@@ -319,7 +319,7 @@ Completed: 0, 0.5, 1, 2, 3, 3.5, 4. **Phase 5 is IN PROGRESS; Phase 6 has NOT ST
 
 Phase 5, in progress, has built the **financial data platform** across six modules — the issuer catalogue with per-country markets, accounts and wallets, source-reported balance snapshots, transactions with revisions and provenance, connections and account source links, payment instruments, transfer matching, and CSV statement imports — behind migrations 0087-0101, together with [ADR-0027](docs/adr/0027-calendar-day-and-instant.md) (calendar days are not instants) and [ADR-0028](docs/adr/0028-multi-rail-financial-sources.md) (seven separated concepts across thirteen named acquisition rails), both **ACCEPTED**. A seventh module, `provider-capabilities`, describes in types what a provider could do; it owns no table and executes nothing. The data is now reachable: **27 operations over 21 `/financial/*` paths** are mounted from the composition root, and CSV statement ingestion runs the full draft → upload → parse → preview → commit sequence with parsing writing no financial record and only a reviewed commit doing so. `currentPhase` moved to **5** and architecture test 24 became **ACTIVE** in that same commit, because a resource-limit test with no path to scan proves nothing.
 
-What Phase 5 has **not** done is equally load-bearing: there is **no Flutter financial surface** of any kind, **no provider connector** and no real provider capability VERIFIED, **nothing deployed** and no capability AVAILABLE, the retention decision is **unresolved** and fails closed outside LOCAL, and **account deletion is not exposed over HTTP** because its cross-module cascade is not atomic and the contract for reporting a partial outcome has not been chosen. Phase 5 is IN PROGRESS, not complete.
+What Phase 5 has **not** done is equally load-bearing: the Flutter financial surface exists but **cannot be used to import a statement — no file picker adapter ships**, there is **no provider connector** and no real provider capability VERIFIED, **nothing deployed** and no capability AVAILABLE, the retention decision is **unresolved** and fails closed outside LOCAL, and **account deletion is not exposed over HTTP** because its cross-module cascade is not atomic and the contract for reporting a partial outcome has not been chosen. Phase 5 is IN PROGRESS, not complete.
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 

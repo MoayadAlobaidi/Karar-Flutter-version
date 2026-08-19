@@ -96,7 +96,7 @@ Nineteen of the twenty-nine module directories have implementations; each `MODUL
 | `subject-policy` | Immutable, version-pinned records of a subject's pack-permitted elections; option content stays capability-owned; no events, no HTTP surface (3.5) |
 | `bootstrap` | `GET /platform/bootstrap` and `POST /platform/tenant-binding`; composes client-safe views and owns no data (3.5). Since Phase 4 every enrichment port returns a **tagged outcome**, so a store fault and a legitimately empty answer are different values rather than the same one (4) |
 
-The seven Phase 5 contexts. Six of them are reached by **27 operations over 21 `/financial/*` paths**, composed in `apps/api/src/composition/phase5-modules.ts` and served by eight controllers; the seventh owns no table and serves nothing. The generated Dart client carries the matching 27 methods because it is generated from the whole contract — **and nothing in `apps/mobile/lib/` calls one**, so there is still no financial surface on the client:
+The seven Phase 5 contexts. Six of them are reached by **27 operations over 21 `/financial/*` paths**, composed in `apps/api/src/composition/phase5-modules.ts` and served by eight controllers; the seventh owns no table and serves nothing. The generated Dart client carries the matching 27 methods because it is generated from the whole contract, and seven Flutter feature folders now call them — each route gated on the platform's own capability answer, none of it deployed:
 
 | Module | Landed mechanics (Phase) |
 |---|---|
