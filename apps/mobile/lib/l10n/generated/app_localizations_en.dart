@@ -2461,4 +2461,665 @@ class AppLocalizationsEn extends AppLocalizations {
   String a11yInstrumentSummary(String label, String status, String type) {
     return '$label, $type, $status';
   }
+
+  @override
+  String get statementImportTitle => 'Import a statement';
+
+  @override
+  String get statementImportStartTitle => 'Choose an account and a file';
+
+  @override
+  String get statementImportMappingTitle => 'Match the columns';
+
+  @override
+  String get statementImportReviewTitle => 'Review before importing';
+
+  @override
+  String get statementImportRailExplanation =>
+      'Karar imports statements you upload yourself. It does not connect to your bank, and it never asks for a banking password, PIN or one-time code.';
+
+  @override
+  String get statementImportAccountLabel => 'Account to import into';
+
+  @override
+  String get statementImportAccountHelper =>
+      'You choose the account before the file is read. Nothing in the file can change where its rows land.';
+
+  @override
+  String get statementImportNoAccounts =>
+      'You need an account before you can import a statement.';
+
+  @override
+  String get statementImportChooseFile => 'Choose a CSV file';
+
+  @override
+  String get statementImportChooseFileSemantics =>
+      'Choose a CSV statement file from your device';
+
+  @override
+  String statementImportFileRules(int megabytes) {
+    final intl.NumberFormat megabytesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String megabytesString = megabytesNumberFormat.format(megabytes);
+
+    return 'CSV only, up to $megabytesString MB.';
+  }
+
+  @override
+  String get statementImportFileChosen => 'File ready to upload';
+
+  @override
+  String get statementImportActionUpload => 'Upload and continue';
+
+  @override
+  String get statementImportPickerUnavailableTitle =>
+      'This build cannot open a file picker';
+
+  @override
+  String get statementImportPickerUnavailableDetail =>
+      'The rest of the import is ready. When file selection is added it will ask only for the one file you pick, never for access to your storage.';
+
+  @override
+  String get statementImportPickerUnreadable =>
+      'That file could not be read from your device.';
+
+  @override
+  String get statementImportSourceEmpty => 'That file is empty.';
+
+  @override
+  String statementImportSourceTooLarge(int megabytes) {
+    final intl.NumberFormat megabytesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String megabytesString = megabytesNumberFormat.format(megabytes);
+
+    return 'That file is larger than the $megabytesString MB this import accepts.';
+  }
+
+  @override
+  String get statementImportSampleInvalidEncoding =>
+      'That file is not valid UTF-8 text. Karar refuses it rather than replacing the damaged characters, which would alter what your bank wrote.';
+
+  @override
+  String get statementImportSampleMalformedQuoting =>
+      'A quoted value in that file is never closed, so its columns cannot be counted reliably.';
+
+  @override
+  String get statementImportSampleTooManyColumns =>
+      'A line in that file has more columns than this import accepts.';
+
+  @override
+  String get statementImportMappingIntro =>
+      'Tell Karar what each column holds. Nothing is guessed, because a wrong guess moves money.';
+
+  @override
+  String get statementImportHeaderRowLabel => 'The first row is a heading row';
+
+  @override
+  String get statementImportHeaderRowHelper =>
+      'Stated, never detected. A heading row treated as data becomes a refused transaction.';
+
+  @override
+  String statementImportColumnNumber(int number) {
+    final intl.NumberFormat numberNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String numberString = numberNumberFormat.format(number);
+
+    return 'Column $numberString';
+  }
+
+  @override
+  String get statementImportColumnNotMapped => 'Not mapped';
+
+  @override
+  String get statementImportPreviewCaption =>
+      'The first rows of your file, shown as plain text.';
+
+  @override
+  String get statementImportPreviewInertNote =>
+      'Values appear exactly as your file contains them. Karar never treats them as instructions.';
+
+  @override
+  String get statementImportFieldBookingDate => 'Booking date';
+
+  @override
+  String get statementImportFieldValueDate => 'Value date';
+
+  @override
+  String get statementImportFieldEventOccurredAt => 'Exact time';
+
+  @override
+  String get statementImportFieldSourceTimezone => 'Time zone';
+
+  @override
+  String get statementImportFieldAmount => 'Amount';
+
+  @override
+  String get statementImportFieldDebitAmount => 'Debit';
+
+  @override
+  String get statementImportFieldCreditAmount => 'Credit';
+
+  @override
+  String get statementImportFieldCurrency => 'Currency';
+
+  @override
+  String get statementImportFieldDescription => 'Description';
+
+  @override
+  String get statementImportFieldMerchant => 'Merchant';
+
+  @override
+  String get statementImportFieldSourceBalance => 'Balance';
+
+  @override
+  String get statementImportFieldSourceReference => 'Reference';
+
+  @override
+  String get statementImportFieldInstrumentMask => 'Card or account tail';
+
+  @override
+  String get statementImportFieldAccountIdentifier => 'Account identifier';
+
+  @override
+  String get statementImportFieldRow => 'Whole row';
+
+  @override
+  String get statementImportFieldUnrecognised =>
+      'A field this version does not recognise';
+
+  @override
+  String get statementImportAccountIdentifierHelper =>
+      'Used only to notice that a file covers more than one account, so the import can refuse instead of mixing them.';
+
+  @override
+  String get statementImportAmountShapeLabel => 'How is the amount written?';
+
+  @override
+  String get statementImportAmountShapeSigned => 'One column, with a sign';
+
+  @override
+  String get statementImportAmountShapeDebitCredit =>
+      'Separate debit and credit columns';
+
+  @override
+  String get statementImportSignFrameLabel =>
+      'Whose point of view do the signs use?';
+
+  @override
+  String get statementImportSignFrameAccountHolder =>
+      'Mine, so money I spend is negative';
+
+  @override
+  String get statementImportSignFrameBankLedger =>
+      'The bank ledger, so a deposit is a credit';
+
+  @override
+  String get statementImportSignFrameHelper =>
+      'There is no default. Reading the signs the wrong way turns every payment in the file into income.';
+
+  @override
+  String get statementImportDateOrderLabel =>
+      'How are ambiguous dates written?';
+
+  @override
+  String get statementImportDateOrderNotStated => 'Not stated';
+
+  @override
+  String get statementImportDateOrderIso => 'Year first, as in 2026-04-03';
+
+  @override
+  String get statementImportDateOrderDayFirst =>
+      'Day first, so 03/04 is 3 April';
+
+  @override
+  String get statementImportDateOrderMonthFirst =>
+      'Month first, so 03/04 is 4 March';
+
+  @override
+  String get statementImportDateOrderHelper =>
+      'If you do not state one, Karar refuses the rows it cannot read without guessing rather than picking a reading for you.';
+
+  @override
+  String get statementImportCurrencySourceLabel =>
+      'Where does the currency come from?';
+
+  @override
+  String get statementImportCurrencyFromColumn => 'A column in the file';
+
+  @override
+  String get statementImportCurrencyStatedForFile =>
+      'The whole file is in one currency';
+
+  @override
+  String get statementImportStatedCurrencyLabel => 'Currency of the file';
+
+  @override
+  String get statementImportCurrencyHelper =>
+      'One or the other, never both. Two sources for one currency can disagree, and resolving that would mean choosing on your behalf.';
+
+  @override
+  String get statementImportBalanceKindLabel =>
+      'What does the balance column hold?';
+
+  @override
+  String get statementImportBalanceKindRunning => 'Running balance';
+
+  @override
+  String get statementImportBalanceKindLedger => 'Ledger balance';
+
+  @override
+  String get statementImportBalanceKindAvailable => 'Available balance';
+
+  @override
+  String get statementImportBalanceKindClosing => 'Closing balance';
+
+  @override
+  String get statementImportStatedBalanceLabel =>
+      'Balance the statement states';
+
+  @override
+  String get statementImportStatedBalanceHelper =>
+      'Optional. Used only to check that the rows add up. It is never saved as a balance of your account.';
+
+  @override
+  String get statementImportStatedBalanceKindLabel => 'Which balance is it?';
+
+  @override
+  String get statementImportStatedBalanceOpening => 'Opening';
+
+  @override
+  String get statementImportStatedBalanceClosing => 'Closing';
+
+  @override
+  String get statementImportStatedBalanceLedger => 'Ledger';
+
+  @override
+  String get statementImportStatedBalanceAvailable => 'Available';
+
+  @override
+  String get statementImportStatedBalanceInvalid =>
+      'Enter the balance as digits, with at most the decimal places this currency uses.';
+
+  @override
+  String get statementImportMappingColumnIndexInvalid =>
+      'A chosen column is not in this file.';
+
+  @override
+  String get statementImportMappingColumnUsedTwice =>
+      'One column is matched to two fields. A column cannot be two facts at once.';
+
+  @override
+  String get statementImportMappingCurrencyNotDetermined =>
+      'No currency column and no stated currency. The currency of your account is not an answer, because it would put a currency nobody chose on every row.';
+
+  @override
+  String get statementImportMappingCurrencyDoublyDetermined =>
+      'Both a currency column and a stated currency. The two can disagree.';
+
+  @override
+  String get statementImportMappingBalanceKindNotStated =>
+      'A balance column needs its kind stated. Running, ledger and available are three different numbers.';
+
+  @override
+  String get statementImportMappingTimezoneWithoutInstant =>
+      'A time zone column needs an exact-time column to interpret.';
+
+  @override
+  String get statementImportActionParse => 'Read the file';
+
+  @override
+  String get statementImportCountsTitle => 'What the file contained';
+
+  @override
+  String get statementImportCountRows => 'Rows';
+
+  @override
+  String get statementImportCountValid => 'Ready to import';
+
+  @override
+  String get statementImportCountInvalid => 'Refused';
+
+  @override
+  String get statementImportCountExactDuplicates => 'Already imported';
+
+  @override
+  String get statementImportCountProbableDuplicates => 'Possible duplicates';
+
+  @override
+  String get statementImportProbableDuplicatesNote =>
+      'Karar does not look for possible duplicates, so this is always zero.';
+
+  @override
+  String get statementImportReconciliationTitle => 'Does the statement add up?';
+
+  @override
+  String get statementImportReconciliationMatched =>
+      'The rows match the balance the statement states.';
+
+  @override
+  String get statementImportReconciliationMismatched =>
+      'The rows do not match the balance the statement states.';
+
+  @override
+  String get statementImportReconciliationNotAvailable =>
+      'The statement stated no balance, so nothing was compared.';
+
+  @override
+  String get statementImportReconciliationUnrecognised =>
+      'This version does not recognise the reconciliation result.';
+
+  @override
+  String get statementImportReconciliationBlocksCommit =>
+      'Importing is blocked while they disagree. Importing a statement that does not add up would write records nobody can trust.';
+
+  @override
+  String get statementImportRowIssuesTitle => 'Refused rows';
+
+  @override
+  String get statementImportRowIssuesNone => 'No row was refused.';
+
+  @override
+  String statementImportRowNumber(int number) {
+    final intl.NumberFormat numberNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String numberString = numberNumberFormat.format(number);
+
+    return 'Row $numberString';
+  }
+
+  @override
+  String statementImportIssuesTruncated(int shown, int total) {
+    final intl.NumberFormat shownNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String shownString = shownNumberFormat.format(shown);
+    final intl.NumberFormat totalNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String totalString = totalNumberFormat.format(total);
+
+    return 'Showing $shownString of $totalString refused rows.';
+  }
+
+  @override
+  String get statementImportNoValuesShown =>
+      'Karar does not show values from your file here. Open your own file at these row numbers to see them.';
+
+  @override
+  String get statementImportRemedyStateAConvention =>
+      'State the convention and read the file again.';
+
+  @override
+  String get statementImportRemedyCorrectTheMapping =>
+      'Correct which column holds what.';
+
+  @override
+  String get statementImportRemedyCorrectTheFile =>
+      'Export the statement from your bank again.';
+
+  @override
+  String get statementImportRemedyRespectABound =>
+      'This line is past a limit this import enforces.';
+
+  @override
+  String get statementImportRemedyUnknown =>
+      'This version does not know what to suggest here.';
+
+  @override
+  String get statementImportReasonRequiredFieldMissing =>
+      'A required field was empty.';
+
+  @override
+  String get statementImportReasonUnreadableAmount =>
+      'The amount is not a number Karar can read.';
+
+  @override
+  String get statementImportReasonAmbiguousDecimalSeparator =>
+      'The decimal separator could be read two ways, and neither was stated.';
+
+  @override
+  String get statementImportReasonAmbiguousDateOrder =>
+      'The date could be read two ways, and neither was stated.';
+
+  @override
+  String get statementImportReasonUnreadableDate =>
+      'The date is not in a shape Karar accepts.';
+
+  @override
+  String get statementImportReasonUnreadableInstant =>
+      'The exact time is not a time Karar can read.';
+
+  @override
+  String get statementImportReasonUnknownTimezone =>
+      'The time zone is not one this platform knows.';
+
+  @override
+  String get statementImportReasonUnknownCurrency =>
+      'The currency is not one this platform supports.';
+
+  @override
+  String get statementImportReasonCurrencyMismatch =>
+      'The currency of this row is not the currency of the account, and nothing here converts between them.';
+
+  @override
+  String get statementImportReasonAmbiguousDirection =>
+      'Karar could not tell whether this row is money in or money out.';
+
+  @override
+  String get statementImportReasonDebitAndCreditBothPresent =>
+      'The debit and credit columns both carried a value.';
+
+  @override
+  String get statementImportReasonDebitAndCreditBothAbsent =>
+      'The debit and credit columns were both empty.';
+
+  @override
+  String get statementImportReasonFieldTooLarge =>
+      'A field is larger than this import accepts.';
+
+  @override
+  String get statementImportReasonTooManyColumns =>
+      'This row has more columns than this import accepts.';
+
+  @override
+  String get statementImportReasonColumnCountMismatch =>
+      'This row has a different number of columns from the heading row.';
+
+  @override
+  String get statementImportReasonInvalidEncoding =>
+      'This row is not valid UTF-8 text.';
+
+  @override
+  String get statementImportReasonMalformedQuoting =>
+      'A quoted value in this row is never closed.';
+
+  @override
+  String get statementImportReasonAmountExceedsRange =>
+      'The amount is too large to hold exactly.';
+
+  @override
+  String get statementImportReasonDecimalPlacesExceedCurrency =>
+      'The amount has more decimal places than its currency uses.';
+
+  @override
+  String get statementImportReasonUnrecognised =>
+      'This version does not recognise the reason this row was refused.';
+
+  @override
+  String get statementImportRefusalSourceTooLarge =>
+      'The file is larger than this import accepts.';
+
+  @override
+  String get statementImportRefusalTooManyRows =>
+      'The file has more rows than this import accepts.';
+
+  @override
+  String get statementImportRefusalTooManyColumns =>
+      'The file has more columns than this import accepts.';
+
+  @override
+  String get statementImportRefusalFieldTooLarge =>
+      'One field in the file is larger than this import accepts.';
+
+  @override
+  String get statementImportRefusalBufferedRowsExceeded =>
+      'The file needed more rows held at once than this import allows.';
+
+  @override
+  String get statementImportRefusalBufferedBytesExceeded =>
+      'The file needed more memory held at once than this import allows.';
+
+  @override
+  String get statementImportRefusalDeadlineExceeded =>
+      'Reading the file took longer than this import allows.';
+
+  @override
+  String get statementImportRefusalCancelled =>
+      'Reading the file was cancelled.';
+
+  @override
+  String get statementImportRefusalTooManyErrors =>
+      'Too many rows were refused for the file to be read any further.';
+
+  @override
+  String get statementImportRefusalUnsupportedMediaType =>
+      'The file was not sent as CSV.';
+
+  @override
+  String get statementImportRefusalInvalidEncoding =>
+      'The file is not valid UTF-8 text.';
+
+  @override
+  String get statementImportRefusalBinaryContent => 'The file is not text.';
+
+  @override
+  String get statementImportRefusalSpreadsheetContent =>
+      'The file is a spreadsheet. Export it as CSV and try again.';
+
+  @override
+  String get statementImportRefusalCompressedContent =>
+      'The file is compressed. Extract it and upload the CSV inside.';
+
+  @override
+  String get statementImportRefusalMalformedQuoting =>
+      'A quoted value in the file is never closed.';
+
+  @override
+  String get statementImportRefusalEmptySource => 'The file is empty.';
+
+  @override
+  String get statementImportRefusalNoHeaderRow =>
+      'The file was read as having a heading row, and it has none.';
+
+  @override
+  String get statementImportRefusalMappingAmbiguous =>
+      'The columns as matched leave too much unstated to read the file.';
+
+  @override
+  String get statementImportRefusalMultipleAccountsInSource =>
+      'The file covers more than one account. Karar refuses it rather than mixing them into the account you chose.';
+
+  @override
+  String get statementImportRefusalCurrencyMismatch =>
+      'The currency of the file is not the currency of the account, and nothing here converts between them.';
+
+  @override
+  String get statementImportRefusalReconciliationMismatch =>
+      'The rows do not add up to the balance the statement states.';
+
+  @override
+  String get statementImportRefusalSourceAlreadyImported =>
+      'You have already imported this exact file.';
+
+  @override
+  String get statementImportRefusalSourceIntegrityFailed =>
+      'The stored file no longer matches what was uploaded, so it was not read.';
+
+  @override
+  String get statementImportRefusalSourceUnreadable =>
+      'The stored file could not be read.';
+
+  @override
+  String get statementImportRefusalUnrecognised =>
+      'This version does not recognise the reason this import was refused.';
+
+  @override
+  String get statementImportStateDraft => 'Not started';
+
+  @override
+  String get statementImportStateSourceStored => 'File uploaded';
+
+  @override
+  String get statementImportStateParsing => 'Reading the file';
+
+  @override
+  String get statementImportStateReviewRequired => 'Waiting for your decision';
+
+  @override
+  String get statementImportStateCommitting => 'Importing';
+
+  @override
+  String get statementImportStateCommitted => 'Imported';
+
+  @override
+  String get statementImportStateRejected => 'Discarded';
+
+  @override
+  String get statementImportStateFailed => 'Refused';
+
+  @override
+  String get statementImportStateDuplicate => 'Already imported';
+
+  @override
+  String get statementImportStateErased => 'Erased';
+
+  @override
+  String get statementImportStateUnrecognised =>
+      'A state this version does not recognise';
+
+  @override
+  String get statementImportActionCommit => 'Import these transactions';
+
+  @override
+  String get statementImportActionDiscard => 'Discard this import';
+
+  @override
+  String get statementImportUploadingStatus => 'Uploading your file';
+
+  @override
+  String get statementImportParsingStatus => 'Reading your file';
+
+  @override
+  String get statementImportCommittingStatus => 'Importing your transactions';
+
+  @override
+  String get statementImportCommittedTitle => 'Statement imported';
+
+  @override
+  String get statementImportCommittedCount => 'Transactions added';
+
+  @override
+  String get statementImportAlreadyCommitted =>
+      'This statement was already imported. Nothing was added a second time.';
+
+  @override
+  String get statementImportDiscardedTitle => 'Import discarded';
+
+  @override
+  String get statementImportDiscardedDetail =>
+      'The file and the rows it staged are gone. Transactions already imported from it are not affected.';
+
+  @override
+  String get statementImportUnavailableTitle => 'This import cannot be shown';
+
+  @override
+  String get statementImportUnavailableDescription =>
+      'Karar could not reach the platform. Nothing was changed.';
+
+  @override
+  String get statementImportRefusedTitle => 'This file was refused';
+
+  @override
+  String get statementImportHeaderRowYes => 'Yes, the first row is a heading';
+
+  @override
+  String get statementImportHeaderRowNo => 'No, the first row is a transaction';
 }

@@ -2440,4 +2440,657 @@ class AppLocalizationsAr extends AppLocalizations {
   String a11yInstrumentSummary(String label, String status, String type) {
     return '$label، $type، $status';
   }
+
+  @override
+  String get statementImportTitle => 'استيراد كشف حساب';
+
+  @override
+  String get statementImportStartTitle => 'اختر حساباً وملفاً';
+
+  @override
+  String get statementImportMappingTitle => 'طابق الأعمدة';
+
+  @override
+  String get statementImportReviewTitle => 'راجع قبل الاستيراد';
+
+  @override
+  String get statementImportRailExplanation =>
+      'يستورد كرار كشوف الحساب التي ترفعها بنفسك. لا يتصل بمصرفك، ولا يطلب أبداً كلمة مرور مصرفية أو رمزاً سرياً أو رمزاً لمرة واحدة.';
+
+  @override
+  String get statementImportAccountLabel => 'الحساب الذي سيُستورد إليه';
+
+  @override
+  String get statementImportAccountHelper =>
+      'تختار الحساب قبل قراءة الملف. لا شيء في الملف يمكنه تغيير وجهة صفوفه.';
+
+  @override
+  String get statementImportNoAccounts =>
+      'تحتاج إلى حساب قبل أن تتمكن من استيراد كشف.';
+
+  @override
+  String get statementImportChooseFile => 'اختر ملف CSV';
+
+  @override
+  String get statementImportChooseFileSemantics =>
+      'اختر ملف كشف حساب بصيغة CSV من جهازك';
+
+  @override
+  String statementImportFileRules(int megabytes) {
+    final intl.NumberFormat megabytesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String megabytesString = megabytesNumberFormat.format(megabytes);
+
+    return 'ملفات CSV فقط، حتى $megabytesString ميغابايت.';
+  }
+
+  @override
+  String get statementImportFileChosen => 'الملف جاهز للرفع';
+
+  @override
+  String get statementImportActionUpload => 'ارفع وتابع';
+
+  @override
+  String get statementImportPickerUnavailableTitle =>
+      'هذه النسخة لا تستطيع فتح منتقي الملفات';
+
+  @override
+  String get statementImportPickerUnavailableDetail =>
+      'بقية الاستيراد جاهزة. عند إضافة اختيار الملفات سيطلب الملف الذي تختاره وحده، ولن يطلب الوصول إلى مساحة التخزين.';
+
+  @override
+  String get statementImportPickerUnreadable =>
+      'تعذّرت قراءة هذا الملف من جهازك.';
+
+  @override
+  String get statementImportSourceEmpty => 'هذا الملف فارغ.';
+
+  @override
+  String statementImportSourceTooLarge(int megabytes) {
+    final intl.NumberFormat megabytesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String megabytesString = megabytesNumberFormat.format(megabytes);
+
+    return 'هذا الملف أكبر من $megabytesString ميغابايت التي يقبلها هذا الاستيراد.';
+  }
+
+  @override
+  String get statementImportSampleInvalidEncoding =>
+      'هذا الملف ليس نصاً صالحاً بترميز UTF-8. يرفضه كرار بدلاً من استبدال المحارف التالفة، لأن ذلك يغيّر ما كتبه مصرفك.';
+
+  @override
+  String get statementImportSampleMalformedQuoting =>
+      'توجد قيمة بين علامتي اقتباس لم تُغلق في هذا الملف، لذا لا يمكن عدّ أعمدته بشكل موثوق.';
+
+  @override
+  String get statementImportSampleTooManyColumns =>
+      'أحد السطور في هذا الملف يحتوي أعمدة أكثر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportMappingIntro =>
+      'أخبر كرار بما يحتويه كل عمود. لا شيء يُخمَّن، لأن التخمين الخاطئ يحرّك أموالاً.';
+
+  @override
+  String get statementImportHeaderRowLabel => 'الصف الأول هو صف عناوين';
+
+  @override
+  String get statementImportHeaderRowHelper =>
+      'يُذكر ولا يُكتشف. صف العناوين الذي يُعامل كبيانات يصبح معاملة مرفوضة.';
+
+  @override
+  String statementImportColumnNumber(int number) {
+    final intl.NumberFormat numberNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String numberString = numberNumberFormat.format(number);
+
+    return 'العمود $numberString';
+  }
+
+  @override
+  String get statementImportColumnNotMapped => 'غير مرتبط';
+
+  @override
+  String get statementImportPreviewCaption =>
+      'الصفوف الأولى من ملفك، معروضة كنص عادي.';
+
+  @override
+  String get statementImportPreviewInertNote =>
+      'تُعرض القيم كما وردت في ملفك تماماً. ولا يعاملها كرار أبداً كتعليمات.';
+
+  @override
+  String get statementImportFieldBookingDate => 'تاريخ القيد';
+
+  @override
+  String get statementImportFieldValueDate => 'تاريخ الاستحقاق';
+
+  @override
+  String get statementImportFieldEventOccurredAt => 'الوقت الدقيق';
+
+  @override
+  String get statementImportFieldSourceTimezone => 'المنطقة الزمنية';
+
+  @override
+  String get statementImportFieldAmount => 'المبلغ';
+
+  @override
+  String get statementImportFieldDebitAmount => 'مدين';
+
+  @override
+  String get statementImportFieldCreditAmount => 'دائن';
+
+  @override
+  String get statementImportFieldCurrency => 'العملة';
+
+  @override
+  String get statementImportFieldDescription => 'الوصف';
+
+  @override
+  String get statementImportFieldMerchant => 'التاجر';
+
+  @override
+  String get statementImportFieldSourceBalance => 'الرصيد';
+
+  @override
+  String get statementImportFieldSourceReference => 'المرجع';
+
+  @override
+  String get statementImportFieldInstrumentMask =>
+      'آخر أرقام البطاقة أو الحساب';
+
+  @override
+  String get statementImportFieldAccountIdentifier => 'معرّف الحساب';
+
+  @override
+  String get statementImportFieldRow => 'الصف بأكمله';
+
+  @override
+  String get statementImportFieldUnrecognised => 'حقل لا تعرفه هذه النسخة';
+
+  @override
+  String get statementImportAccountIdentifierHelper =>
+      'يُستخدم فقط لملاحظة أن الملف يغطي أكثر من حساب، كي يرفض الاستيراد بدلاً من خلطها.';
+
+  @override
+  String get statementImportAmountShapeLabel => 'كيف يُكتب المبلغ؟';
+
+  @override
+  String get statementImportAmountShapeSigned => 'عمود واحد بإشارة';
+
+  @override
+  String get statementImportAmountShapeDebitCredit =>
+      'عمودان منفصلان للمدين والدائن';
+
+  @override
+  String get statementImportSignFrameLabel => 'من وجهة نظر مَن كُتبت الإشارات؟';
+
+  @override
+  String get statementImportSignFrameAccountHolder =>
+      'وجهة نظري، فما أنفقه يظهر بالسالب';
+
+  @override
+  String get statementImportSignFrameBankLedger =>
+      'دفتر المصرف، فالإيداع قيد دائن';
+
+  @override
+  String get statementImportSignFrameHelper =>
+      'لا يوجد خيار افتراضي. قراءة الإشارات بالمقلوب تحوّل كل دفعة في الملف إلى دخل.';
+
+  @override
+  String get statementImportDateOrderLabel => 'كيف تُكتب التواريخ الملتبسة؟';
+
+  @override
+  String get statementImportDateOrderNotStated => 'غير محدد';
+
+  @override
+  String get statementImportDateOrderIso => 'السنة أولاً، مثل 2026-04-03';
+
+  @override
+  String get statementImportDateOrderDayFirst =>
+      'اليوم أولاً، فتعني 03/04 الثالث من أبريل';
+
+  @override
+  String get statementImportDateOrderMonthFirst =>
+      'الشهر أولاً، فتعني 03/04 الرابع من مارس';
+
+  @override
+  String get statementImportDateOrderHelper =>
+      'إذا لم تحدد واحداً، يرفض كرار الصفوف التي لا يستطيع قراءتها دون تخمين بدلاً من اختيار قراءة نيابةً عنك.';
+
+  @override
+  String get statementImportCurrencySourceLabel => 'من أين تأتي العملة؟';
+
+  @override
+  String get statementImportCurrencyFromColumn => 'عمود في الملف';
+
+  @override
+  String get statementImportCurrencyStatedForFile => 'الملف كله بعملة واحدة';
+
+  @override
+  String get statementImportStatedCurrencyLabel => 'عملة الملف';
+
+  @override
+  String get statementImportCurrencyHelper =>
+      'أحدهما لا كلاهما. مصدران لعملة واحدة قد يتعارضان، وحلّ التعارض يعني الاختيار نيابةً عنك.';
+
+  @override
+  String get statementImportBalanceKindLabel => 'ماذا يحتوي عمود الرصيد؟';
+
+  @override
+  String get statementImportBalanceKindRunning => 'الرصيد الجاري';
+
+  @override
+  String get statementImportBalanceKindLedger => 'رصيد الدفتر';
+
+  @override
+  String get statementImportBalanceKindAvailable => 'الرصيد المتاح';
+
+  @override
+  String get statementImportBalanceKindClosing => 'الرصيد الختامي';
+
+  @override
+  String get statementImportStatedBalanceLabel => 'الرصيد الذي يذكره الكشف';
+
+  @override
+  String get statementImportStatedBalanceHelper =>
+      'اختياري. يُستخدم فقط للتحقق من أن الصفوف متسقة. ولا يُحفظ أبداً كرصيد لحسابك.';
+
+  @override
+  String get statementImportStatedBalanceKindLabel => 'أي رصيد هو؟';
+
+  @override
+  String get statementImportStatedBalanceOpening => 'افتتاحي';
+
+  @override
+  String get statementImportStatedBalanceClosing => 'ختامي';
+
+  @override
+  String get statementImportStatedBalanceLedger => 'دفتري';
+
+  @override
+  String get statementImportStatedBalanceAvailable => 'متاح';
+
+  @override
+  String get statementImportStatedBalanceInvalid =>
+      'أدخل الرصيد بالأرقام، وبعدد المنازل العشرية التي تستخدمها هذه العملة على الأكثر.';
+
+  @override
+  String get statementImportMappingColumnIndexInvalid =>
+      'أحد الأعمدة المختارة غير موجود في هذا الملف.';
+
+  @override
+  String get statementImportMappingColumnUsedTwice =>
+      'عمود واحد مرتبط بحقلين. لا يمكن للعمود أن يكون حقيقتين في آن واحد.';
+
+  @override
+  String get statementImportMappingCurrencyNotDetermined =>
+      'لا يوجد عمود عملة ولا عملة محددة. عملة حسابك ليست جواباً، لأن ذلك يضع على كل صف عملة لم يخترها أحد.';
+
+  @override
+  String get statementImportMappingCurrencyDoublyDetermined =>
+      'يوجد عمود عملة وعملة محددة معاً. وقد يتعارضان.';
+
+  @override
+  String get statementImportMappingBalanceKindNotStated =>
+      'عمود الرصيد يحتاج إلى تحديد نوعه. الجاري والدفتري والمتاح ثلاثة أرقام مختلفة.';
+
+  @override
+  String get statementImportMappingTimezoneWithoutInstant =>
+      'عمود المنطقة الزمنية يحتاج إلى عمود وقت دقيق ليفسّره.';
+
+  @override
+  String get statementImportActionParse => 'اقرأ الملف';
+
+  @override
+  String get statementImportCountsTitle => 'ما احتواه الملف';
+
+  @override
+  String get statementImportCountRows => 'الصفوف';
+
+  @override
+  String get statementImportCountValid => 'جاهزة للاستيراد';
+
+  @override
+  String get statementImportCountInvalid => 'مرفوضة';
+
+  @override
+  String get statementImportCountExactDuplicates => 'مستوردة سابقاً';
+
+  @override
+  String get statementImportCountProbableDuplicates => 'تكرارات محتملة';
+
+  @override
+  String get statementImportProbableDuplicatesNote =>
+      'لا يبحث كرار عن التكرارات المحتملة، لذا تبقى هذه القيمة صفراً دائماً.';
+
+  @override
+  String get statementImportReconciliationTitle => 'هل الكشف متسق؟';
+
+  @override
+  String get statementImportReconciliationMatched =>
+      'الصفوف تطابق الرصيد الذي يذكره الكشف.';
+
+  @override
+  String get statementImportReconciliationMismatched =>
+      'الصفوف لا تطابق الرصيد الذي يذكره الكشف.';
+
+  @override
+  String get statementImportReconciliationNotAvailable =>
+      'لم يذكر الكشف رصيداً، لذا لم تتم أي مقارنة.';
+
+  @override
+  String get statementImportReconciliationUnrecognised =>
+      'لا تعرف هذه النسخة نتيجة المطابقة.';
+
+  @override
+  String get statementImportReconciliationBlocksCommit =>
+      'الاستيراد متوقف ما دام هناك اختلاف. استيراد كشف غير متسق يكتب سجلات لا يمكن الوثوق بها.';
+
+  @override
+  String get statementImportRowIssuesTitle => 'الصفوف المرفوضة';
+
+  @override
+  String get statementImportRowIssuesNone => 'لم يُرفض أي صف.';
+
+  @override
+  String statementImportRowNumber(int number) {
+    final intl.NumberFormat numberNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String numberString = numberNumberFormat.format(number);
+
+    return 'الصف $numberString';
+  }
+
+  @override
+  String statementImportIssuesTruncated(int shown, int total) {
+    final intl.NumberFormat shownNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String shownString = shownNumberFormat.format(shown);
+    final intl.NumberFormat totalNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String totalString = totalNumberFormat.format(total);
+
+    return 'يُعرض $shownString من $totalString صفاً مرفوضاً.';
+  }
+
+  @override
+  String get statementImportNoValuesShown =>
+      'لا يعرض كرار هنا أي قيم من ملفك. افتح ملفك عند أرقام الصفوف هذه لرؤيتها.';
+
+  @override
+  String get statementImportRemedyStateAConvention =>
+      'حدّد العُرف ثم اقرأ الملف من جديد.';
+
+  @override
+  String get statementImportRemedyCorrectTheMapping =>
+      'صحّح أي عمود يحتوي ماذا.';
+
+  @override
+  String get statementImportRemedyCorrectTheFile =>
+      'صدّر الكشف من مصرفك مرة أخرى.';
+
+  @override
+  String get statementImportRemedyRespectABound =>
+      'هذا السطر يتجاوز حداً يفرضه هذا الاستيراد.';
+
+  @override
+  String get statementImportRemedyUnknown =>
+      'لا تعرف هذه النسخة ما تقترحه هنا.';
+
+  @override
+  String get statementImportReasonRequiredFieldMissing =>
+      'حقل مطلوب كان فارغاً.';
+
+  @override
+  String get statementImportReasonUnreadableAmount =>
+      'المبلغ ليس رقماً يستطيع كرار قراءته.';
+
+  @override
+  String get statementImportReasonAmbiguousDecimalSeparator =>
+      'يمكن قراءة الفاصل العشري بطريقتين، ولم تُحدَّد أي منهما.';
+
+  @override
+  String get statementImportReasonAmbiguousDateOrder =>
+      'يمكن قراءة التاريخ بطريقتين، ولم تُحدَّد أي منهما.';
+
+  @override
+  String get statementImportReasonUnreadableDate =>
+      'التاريخ ليس بصيغة يقبلها كرار.';
+
+  @override
+  String get statementImportReasonUnreadableInstant =>
+      'الوقت الدقيق ليس وقتاً يستطيع كرار قراءته.';
+
+  @override
+  String get statementImportReasonUnknownTimezone =>
+      'المنطقة الزمنية ليست من المناطق التي تعرفها هذه المنصة.';
+
+  @override
+  String get statementImportReasonUnknownCurrency =>
+      'العملة ليست من العملات التي تدعمها هذه المنصة.';
+
+  @override
+  String get statementImportReasonCurrencyMismatch =>
+      'عملة هذا الصف ليست عملة الحساب، ولا شيء هنا يحوّل بينهما.';
+
+  @override
+  String get statementImportReasonAmbiguousDirection =>
+      'لم يستطع كرار تحديد ما إذا كان هذا الصف دخلاً أم إنفاقاً.';
+
+  @override
+  String get statementImportReasonDebitAndCreditBothPresent =>
+      'عمودا المدين والدائن حملا قيمة معاً.';
+
+  @override
+  String get statementImportReasonDebitAndCreditBothAbsent =>
+      'عمودا المدين والدائن كانا فارغين معاً.';
+
+  @override
+  String get statementImportReasonFieldTooLarge =>
+      'أحد الحقول أكبر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportReasonTooManyColumns =>
+      'هذا الصف يحتوي أعمدة أكثر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportReasonColumnCountMismatch =>
+      'عدد أعمدة هذا الصف يختلف عن صف العناوين.';
+
+  @override
+  String get statementImportReasonInvalidEncoding =>
+      'هذا الصف ليس نصاً صالحاً بترميز UTF-8.';
+
+  @override
+  String get statementImportReasonMalformedQuoting =>
+      'قيمة بين علامتي اقتباس في هذا الصف لم تُغلق.';
+
+  @override
+  String get statementImportReasonAmountExceedsRange =>
+      'المبلغ أكبر من أن يُحفظ بدقة.';
+
+  @override
+  String get statementImportReasonDecimalPlacesExceedCurrency =>
+      'المبلغ يحتوي منازل عشرية أكثر مما تستخدمه عملته.';
+
+  @override
+  String get statementImportReasonUnrecognised =>
+      'لا تعرف هذه النسخة سبب رفض هذا الصف.';
+
+  @override
+  String get statementImportRefusalSourceTooLarge =>
+      'الملف أكبر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportRefusalTooManyRows =>
+      'الملف يحتوي صفوفاً أكثر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportRefusalTooManyColumns =>
+      'الملف يحتوي أعمدة أكثر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportRefusalFieldTooLarge =>
+      'أحد الحقول في الملف أكبر مما يقبله هذا الاستيراد.';
+
+  @override
+  String get statementImportRefusalBufferedRowsExceeded =>
+      'احتاج الملف إلى الاحتفاظ بصفوف أكثر مما يسمح به هذا الاستيراد دفعة واحدة.';
+
+  @override
+  String get statementImportRefusalBufferedBytesExceeded =>
+      'احتاج الملف إلى ذاكرة أكبر مما يسمح به هذا الاستيراد دفعة واحدة.';
+
+  @override
+  String get statementImportRefusalDeadlineExceeded =>
+      'استغرقت قراءة الملف وقتاً أطول مما يسمح به هذا الاستيراد.';
+
+  @override
+  String get statementImportRefusalCancelled => 'أُلغيت قراءة الملف.';
+
+  @override
+  String get statementImportRefusalTooManyErrors =>
+      'رُفض عدد كبير من الصفوف بحيث تعذّر متابعة قراءة الملف.';
+
+  @override
+  String get statementImportRefusalUnsupportedMediaType =>
+      'لم يُرسل الملف بصيغة CSV.';
+
+  @override
+  String get statementImportRefusalInvalidEncoding =>
+      'الملف ليس نصاً صالحاً بترميز UTF-8.';
+
+  @override
+  String get statementImportRefusalBinaryContent => 'الملف ليس نصاً.';
+
+  @override
+  String get statementImportRefusalSpreadsheetContent =>
+      'الملف جدول بيانات. صدّره بصيغة CSV وحاول مجدداً.';
+
+  @override
+  String get statementImportRefusalCompressedContent =>
+      'الملف مضغوط. فُكّ ضغطه وارفع ملف CSV الذي بداخله.';
+
+  @override
+  String get statementImportRefusalMalformedQuoting =>
+      'قيمة بين علامتي اقتباس في الملف لم تُغلق.';
+
+  @override
+  String get statementImportRefusalEmptySource => 'الملف فارغ.';
+
+  @override
+  String get statementImportRefusalNoHeaderRow =>
+      'قُرئ الملف على أن له صف عناوين، وهو لا يحتوي عليه.';
+
+  @override
+  String get statementImportRefusalMappingAmbiguous =>
+      'الأعمدة كما رُبطت تترك أموراً كثيرة غير محددة لقراءة الملف.';
+
+  @override
+  String get statementImportRefusalMultipleAccountsInSource =>
+      'الملف يغطي أكثر من حساب. يرفضه كرار بدلاً من خلطها في الحساب الذي اخترته.';
+
+  @override
+  String get statementImportRefusalCurrencyMismatch =>
+      'عملة الملف ليست عملة الحساب، ولا شيء هنا يحوّل بينهما.';
+
+  @override
+  String get statementImportRefusalReconciliationMismatch =>
+      'الصفوف لا تتفق مع الرصيد الذي يذكره الكشف.';
+
+  @override
+  String get statementImportRefusalSourceAlreadyImported =>
+      'سبق أن استوردت هذا الملف نفسه.';
+
+  @override
+  String get statementImportRefusalSourceIntegrityFailed =>
+      'الملف المخزّن لم يعد مطابقاً لما رُفع، لذا لم تتم قراءته.';
+
+  @override
+  String get statementImportRefusalSourceUnreadable =>
+      'تعذّرت قراءة الملف المخزّن.';
+
+  @override
+  String get statementImportRefusalUnrecognised =>
+      'لا تعرف هذه النسخة سبب رفض هذا الاستيراد.';
+
+  @override
+  String get statementImportStateDraft => 'لم يبدأ';
+
+  @override
+  String get statementImportStateSourceStored => 'تم رفع الملف';
+
+  @override
+  String get statementImportStateParsing => 'جارٍ قراءة الملف';
+
+  @override
+  String get statementImportStateReviewRequired => 'بانتظار أن تقرر';
+
+  @override
+  String get statementImportStateCommitting => 'جارٍ الاستيراد';
+
+  @override
+  String get statementImportStateCommitted => 'تم الاستيراد';
+
+  @override
+  String get statementImportStateRejected => 'مُلغى';
+
+  @override
+  String get statementImportStateFailed => 'مرفوض';
+
+  @override
+  String get statementImportStateDuplicate => 'مستورد سابقاً';
+
+  @override
+  String get statementImportStateErased => 'مُمحى';
+
+  @override
+  String get statementImportStateUnrecognised => 'حالة لا تعرفها هذه النسخة';
+
+  @override
+  String get statementImportActionCommit => 'استورد هذه المعاملات';
+
+  @override
+  String get statementImportActionDiscard => 'ألغِ هذا الاستيراد';
+
+  @override
+  String get statementImportUploadingStatus => 'جارٍ رفع ملفك';
+
+  @override
+  String get statementImportParsingStatus => 'جارٍ قراءة ملفك';
+
+  @override
+  String get statementImportCommittingStatus => 'جارٍ استيراد معاملاتك';
+
+  @override
+  String get statementImportCommittedTitle => 'تم استيراد الكشف';
+
+  @override
+  String get statementImportCommittedCount => 'المعاملات المضافة';
+
+  @override
+  String get statementImportAlreadyCommitted =>
+      'سبق استيراد هذا الكشف. لم يُضف شيء مرة ثانية.';
+
+  @override
+  String get statementImportDiscardedTitle => 'أُلغي الاستيراد';
+
+  @override
+  String get statementImportDiscardedDetail =>
+      'الملف والصفوف التي هيّأها اختفت. المعاملات المستوردة منه سابقاً لا تتأثر.';
+
+  @override
+  String get statementImportUnavailableTitle => 'تعذّر عرض هذا الاستيراد';
+
+  @override
+  String get statementImportUnavailableDescription =>
+      'تعذّر على كرار الوصول إلى المنصة. لم يتغير شيء.';
+
+  @override
+  String get statementImportRefusedTitle => 'رُفض هذا الملف';
+
+  @override
+  String get statementImportHeaderRowYes => 'نعم، الصف الأول عناوين';
+
+  @override
+  String get statementImportHeaderRowNo => 'لا، الصف الأول معاملة';
 }

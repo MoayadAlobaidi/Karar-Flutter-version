@@ -4312,6 +4312,1068 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{label}, {type}, {status}'**
   String a11yInstrumentSummary(String label, String status, String type);
+
+  /// Title of the statement-import surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a statement'**
+  String get statementImportTitle;
+
+  /// Title of the first step, where the person picks the target account and the CSV.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an account and a file'**
+  String get statementImportStartTitle;
+
+  /// Title of the step where the person says which column holds which field.
+  ///
+  /// In en, this message translates to:
+  /// **'Match the columns'**
+  String get statementImportMappingTitle;
+
+  /// Title of the step where the person sees what the parse found and decides.
+  ///
+  /// In en, this message translates to:
+  /// **'Review before importing'**
+  String get statementImportReviewTitle;
+
+  /// Says plainly that file upload is the only rail and that no banking credential is ever requested.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar imports statements you upload yourself. It does not connect to your bank, and it never asks for a banking password, PIN or one-time code.'**
+  String get statementImportRailExplanation;
+
+  /// Label for the account picker on the first step.
+  ///
+  /// In en, this message translates to:
+  /// **'Account to import into'**
+  String get statementImportAccountLabel;
+
+  /// Explains that the target account is chosen by the person and cannot be redirected by file content.
+  ///
+  /// In en, this message translates to:
+  /// **'You choose the account before the file is read. Nothing in the file can change where its rows land.'**
+  String get statementImportAccountHelper;
+
+  /// Shown when the person holds no account to import into.
+  ///
+  /// In en, this message translates to:
+  /// **'You need an account before you can import a statement.'**
+  String get statementImportNoAccounts;
+
+  /// Action that opens the device document picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a CSV file'**
+  String get statementImportChooseFile;
+
+  /// Screen-reader label for the control that opens the document picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a CSV statement file from your device'**
+  String get statementImportChooseFileSemantics;
+
+  /// States the accepted media type and the byte bound the platform enforces.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV only, up to {megabytes} MB.'**
+  String statementImportFileRules(int megabytes);
+
+  /// Confirms a file has been chosen, without naming it.
+  ///
+  /// In en, this message translates to:
+  /// **'File ready to upload'**
+  String get statementImportFileChosen;
+
+  /// Action that sends the chosen file to the platform.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload and continue'**
+  String get statementImportActionUpload;
+
+  /// Title shown when the build ships no document-picker adapter.
+  ///
+  /// In en, this message translates to:
+  /// **'This build cannot open a file picker'**
+  String get statementImportPickerUnavailableTitle;
+
+  /// Explains that the missing piece is only file selection, and that it will be least-privilege when added.
+  ///
+  /// In en, this message translates to:
+  /// **'The rest of the import is ready. When file selection is added it will ask only for the one file you pick, never for access to your storage.'**
+  String get statementImportPickerUnavailableDetail;
+
+  /// Shown when the device could not read the chosen document. Names no path and no filename.
+  ///
+  /// In en, this message translates to:
+  /// **'That file could not be read from your device.'**
+  String get statementImportPickerUnreadable;
+
+  /// Shown when the chosen file has no bytes.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is empty.'**
+  String get statementImportSourceEmpty;
+
+  /// Shown when the chosen file is past the byte bound, before any upload is attempted.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is larger than the {megabytes} MB this import accepts.'**
+  String statementImportSourceTooLarge(int megabytes);
+
+  /// Shown when the chosen file cannot be decoded strictly as UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is not valid UTF-8 text. Karar refuses it rather than replacing the damaged characters, which would alter what your bank wrote.'**
+  String get statementImportSampleInvalidEncoding;
+
+  /// Shown when the local sample reader finds an unterminated quoted field.
+  ///
+  /// In en, this message translates to:
+  /// **'A quoted value in that file is never closed, so its columns cannot be counted reliably.'**
+  String get statementImportSampleMalformedQuoting;
+
+  /// Shown when a sampled line is wider than the platform column bound.
+  ///
+  /// In en, this message translates to:
+  /// **'A line in that file has more columns than this import accepts.'**
+  String get statementImportSampleTooManyColumns;
+
+  /// Introduces the mapping step and says why nothing is auto-detected.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell Karar what each column holds. Nothing is guessed, because a wrong guess moves money.'**
+  String get statementImportMappingIntro;
+
+  /// Toggle for whether the file starts with a header row.
+  ///
+  /// In en, this message translates to:
+  /// **'The first row is a heading row'**
+  String get statementImportHeaderRowLabel;
+
+  /// Explains why the header row is declared rather than sniffed.
+  ///
+  /// In en, this message translates to:
+  /// **'Stated, never detected. A heading row treated as data becomes a refused transaction.'**
+  String get statementImportHeaderRowHelper;
+
+  /// Names a CSV column by its 1-based position, for a file with no heading row.
+  ///
+  /// In en, this message translates to:
+  /// **'Column {number}'**
+  String statementImportColumnNumber(int number);
+
+  /// The choice meaning a field is left without a column.
+  ///
+  /// In en, this message translates to:
+  /// **'Not mapped'**
+  String get statementImportColumnNotMapped;
+
+  /// Caption above the local sample grid on the mapping step.
+  ///
+  /// In en, this message translates to:
+  /// **'The first rows of your file, shown as plain text.'**
+  String get statementImportPreviewCaption;
+
+  /// States the untrusted-content posture: file text is data, rendered inertly, never acted on.
+  ///
+  /// In en, this message translates to:
+  /// **'Values appear exactly as your file contains them. Karar never treats them as instructions.'**
+  String get statementImportPreviewInertNote;
+
+  /// The day the institution booked the movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking date'**
+  String get statementImportFieldBookingDate;
+
+  /// The day the movement takes value.
+  ///
+  /// In en, this message translates to:
+  /// **'Value date'**
+  String get statementImportFieldValueDate;
+
+  /// An instant the source genuinely supplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact time'**
+  String get statementImportFieldEventOccurredAt;
+
+  /// A time zone the source itself states.
+  ///
+  /// In en, this message translates to:
+  /// **'Time zone'**
+  String get statementImportFieldSourceTimezone;
+
+  /// The single signed amount column.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get statementImportFieldAmount;
+
+  /// The column carrying money out.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit'**
+  String get statementImportFieldDebitAmount;
+
+  /// The column carrying money in.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get statementImportFieldCreditAmount;
+
+  /// The per-row currency column.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get statementImportFieldCurrency;
+
+  /// The statement narrative.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get statementImportFieldDescription;
+
+  /// The merchant column, when the source separates one.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant'**
+  String get statementImportFieldMerchant;
+
+  /// A balance the source prints on each row.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get statementImportFieldSourceBalance;
+
+  /// The transaction reference the source prints.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get statementImportFieldSourceReference;
+
+  /// The masked tail digits the source prints.
+  ///
+  /// In en, this message translates to:
+  /// **'Card or account tail'**
+  String get statementImportFieldInstrumentMask;
+
+  /// The column used only to detect that a file covers more than one account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account identifier'**
+  String get statementImportFieldAccountIdentifier;
+
+  /// Names the whole line, used when it could not be split into fields at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole row'**
+  String get statementImportFieldRow;
+
+  /// Fallback for a safe-field name a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'A field this version does not recognise'**
+  String get statementImportFieldUnrecognised;
+
+  /// Explains that the account identifier column detects rather than selects.
+  ///
+  /// In en, this message translates to:
+  /// **'Used only to notice that a file covers more than one account, so the import can refuse instead of mixing them.'**
+  String get statementImportAccountIdentifierHelper;
+
+  /// Asks whether the file uses one signed column or a debit and credit pair.
+  ///
+  /// In en, this message translates to:
+  /// **'How is the amount written?'**
+  String get statementImportAmountShapeLabel;
+
+  /// The single signed amount column shape.
+  ///
+  /// In en, this message translates to:
+  /// **'One column, with a sign'**
+  String get statementImportAmountShapeSigned;
+
+  /// The two-column debit and credit shape.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate debit and credit columns'**
+  String get statementImportAmountShapeDebitCredit;
+
+  /// Asks which frame a signed amount column is written in.
+  ///
+  /// In en, this message translates to:
+  /// **'Whose point of view do the signs use?'**
+  String get statementImportSignFrameLabel;
+
+  /// The account-holder sign frame.
+  ///
+  /// In en, this message translates to:
+  /// **'Mine, so money I spend is negative'**
+  String get statementImportSignFrameAccountHolder;
+
+  /// The bank-ledger sign frame, in which the signs invert.
+  ///
+  /// In en, this message translates to:
+  /// **'The bank ledger, so a deposit is a credit'**
+  String get statementImportSignFrameBankLedger;
+
+  /// Explains why the sign frame must be stated rather than assumed.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no default. Reading the signs the wrong way turns every payment in the file into income.'**
+  String get statementImportSignFrameHelper;
+
+  /// Asks the date order to apply to dates that could be read two ways.
+  ///
+  /// In en, this message translates to:
+  /// **'How are ambiguous dates written?'**
+  String get statementImportDateOrderLabel;
+
+  /// The choice meaning no date order has been declared.
+  ///
+  /// In en, this message translates to:
+  /// **'Not stated'**
+  String get statementImportDateOrderNotStated;
+
+  /// The ISO date order.
+  ///
+  /// In en, this message translates to:
+  /// **'Year first, as in 2026-04-03'**
+  String get statementImportDateOrderIso;
+
+  /// The day-first date order, with a worked example.
+  ///
+  /// In en, this message translates to:
+  /// **'Day first, so 03/04 is 3 April'**
+  String get statementImportDateOrderDayFirst;
+
+  /// The month-first date order, with a worked example.
+  ///
+  /// In en, this message translates to:
+  /// **'Month first, so 03/04 is 4 March'**
+  String get statementImportDateOrderMonthFirst;
+
+  /// Explains that leaving the date order unstated produces typed refusals, not a silent default.
+  ///
+  /// In en, this message translates to:
+  /// **'If you do not state one, Karar refuses the rows it cannot read without guessing rather than picking a reading for you.'**
+  String get statementImportDateOrderHelper;
+
+  /// Asks whether the currency is a column or one code for the whole file.
+  ///
+  /// In en, this message translates to:
+  /// **'Where does the currency come from?'**
+  String get statementImportCurrencySourceLabel;
+
+  /// The choice meaning each row carries its own currency.
+  ///
+  /// In en, this message translates to:
+  /// **'A column in the file'**
+  String get statementImportCurrencyFromColumn;
+
+  /// The choice meaning one currency code covers the file.
+  ///
+  /// In en, this message translates to:
+  /// **'The whole file is in one currency'**
+  String get statementImportCurrencyStatedForFile;
+
+  /// Field for the single currency code covering the whole file.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency of the file'**
+  String get statementImportStatedCurrencyLabel;
+
+  /// Explains why exactly one currency source is accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'One or the other, never both. Two sources for one currency can disagree, and resolving that would mean choosing on your behalf.'**
+  String get statementImportCurrencyHelper;
+
+  /// Asks which kind of balance a mapped balance column carries.
+  ///
+  /// In en, this message translates to:
+  /// **'What does the balance column hold?'**
+  String get statementImportBalanceKindLabel;
+
+  /// The balance after each movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Running balance'**
+  String get statementImportBalanceKindRunning;
+
+  /// The booked balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Ledger balance'**
+  String get statementImportBalanceKindLedger;
+
+  /// The balance available to spend.
+  ///
+  /// In en, this message translates to:
+  /// **'Available balance'**
+  String get statementImportBalanceKindAvailable;
+
+  /// The balance at the end of the statement period.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing balance'**
+  String get statementImportBalanceKindClosing;
+
+  /// Optional field for the balance the statement claims, used for reconciliation.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance the statement states'**
+  String get statementImportStatedBalanceLabel;
+
+  /// Explains that the stated balance is for reconciliation only and is never stored as an account balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional. Used only to check that the rows add up. It is never saved as a balance of your account.'**
+  String get statementImportStatedBalanceHelper;
+
+  /// Asks which balance of the statement the stated figure is.
+  ///
+  /// In en, this message translates to:
+  /// **'Which balance is it?'**
+  String get statementImportStatedBalanceKindLabel;
+
+  /// The balance at the start of the statement period.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get statementImportStatedBalanceOpening;
+
+  /// The balance at the end of the statement period.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing'**
+  String get statementImportStatedBalanceClosing;
+
+  /// The booked balance of the statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Ledger'**
+  String get statementImportStatedBalanceLedger;
+
+  /// The available balance of the statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get statementImportStatedBalanceAvailable;
+
+  /// Validation message when the typed statement balance is not an exact amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the balance as digits, with at most the decimal places this currency uses.'**
+  String get statementImportStatedBalanceInvalid;
+
+  /// Mapping refused because a column index is negative or past the end of the rows.
+  ///
+  /// In en, this message translates to:
+  /// **'A chosen column is not in this file.'**
+  String get statementImportMappingColumnIndexInvalid;
+
+  /// Mapping refused because one column index is used for more than one field.
+  ///
+  /// In en, this message translates to:
+  /// **'One column is matched to two fields. A column cannot be two facts at once.'**
+  String get statementImportMappingColumnUsedTwice;
+
+  /// Mapping refused because the currency of the file is not determined.
+  ///
+  /// In en, this message translates to:
+  /// **'No currency column and no stated currency. The currency of your account is not an answer, because it would put a currency nobody chose on every row.'**
+  String get statementImportMappingCurrencyNotDetermined;
+
+  /// Mapping refused because two sources determine one currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Both a currency column and a stated currency. The two can disagree.'**
+  String get statementImportMappingCurrencyDoublyDetermined;
+
+  /// Mapping refused because a balance column was given without saying what kind of balance it holds.
+  ///
+  /// In en, this message translates to:
+  /// **'A balance column needs its kind stated. Running, ledger and available are three different numbers.'**
+  String get statementImportMappingBalanceKindNotStated;
+
+  /// Mapping refused because a time zone was mapped with no instant to apply it to.
+  ///
+  /// In en, this message translates to:
+  /// **'A time zone column needs an exact-time column to interpret.'**
+  String get statementImportMappingTimezoneWithoutInstant;
+
+  /// Action that parses the stored source under the stated mapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the file'**
+  String get statementImportActionParse;
+
+  /// Heading above the parse counts.
+  ///
+  /// In en, this message translates to:
+  /// **'What the file contained'**
+  String get statementImportCountsTitle;
+
+  /// Total data rows the parse read.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get statementImportCountRows;
+
+  /// Rows that parsed cleanly and would become transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to import'**
+  String get statementImportCountValid;
+
+  /// Rows the parse refused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get statementImportCountInvalid;
+
+  /// Rows identical to transactions this person already holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Already imported'**
+  String get statementImportCountExactDuplicates;
+
+  /// Rows that resemble existing transactions. Always zero; see the accompanying note.
+  ///
+  /// In en, this message translates to:
+  /// **'Possible duplicates'**
+  String get statementImportCountProbableDuplicates;
+
+  /// States that probable-duplicate detection is not implemented, so a zero reads as not looked for rather than none found.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not look for possible duplicates, so this is always zero.'**
+  String get statementImportProbableDuplicatesNote;
+
+  /// Heading above the reconciliation verdict.
+  ///
+  /// In en, this message translates to:
+  /// **'Does the statement add up?'**
+  String get statementImportReconciliationTitle;
+
+  /// Reconciliation verdict: the rows and the stated balance agree.
+  ///
+  /// In en, this message translates to:
+  /// **'The rows match the balance the statement states.'**
+  String get statementImportReconciliationMatched;
+
+  /// Reconciliation verdict: the rows and the stated balance disagree.
+  ///
+  /// In en, this message translates to:
+  /// **'The rows do not match the balance the statement states.'**
+  String get statementImportReconciliationMismatched;
+
+  /// Reconciliation verdict: nothing to compare. Deliberately not the same as matched.
+  ///
+  /// In en, this message translates to:
+  /// **'The statement stated no balance, so nothing was compared.'**
+  String get statementImportReconciliationNotAvailable;
+
+  /// Fallback for a reconciliation verdict a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not recognise the reconciliation result.'**
+  String get statementImportReconciliationUnrecognised;
+
+  /// Explains why a reconciliation mismatch prevents the commit.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing is blocked while they disagree. Importing a statement that does not add up would write records nobody can trust.'**
+  String get statementImportReconciliationBlocksCommit;
+
+  /// Heading above the list of refused rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused rows'**
+  String get statementImportRowIssuesTitle;
+
+  /// Shown when the parse refused nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No row was refused.'**
+  String get statementImportRowIssuesNone;
+
+  /// Names a refused row by its 1-based position among the data rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {number}'**
+  String statementImportRowNumber(int number);
+
+  /// Says that the refused-row report is truncated, so a partial list cannot read as a complete one.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total} refused rows.'**
+  String statementImportIssuesTruncated(int shown, int total);
+
+  /// Explains that the review surface deliberately carries no cell values.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not show values from your file here. Open your own file at these row numbers to see them.'**
+  String get statementImportNoValuesShown;
+
+  /// Remedy for a row refused because a convention was never stated.
+  ///
+  /// In en, this message translates to:
+  /// **'State the convention and read the file again.'**
+  String get statementImportRemedyStateAConvention;
+
+  /// Remedy for a row refused because the column matching is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct which column holds what.'**
+  String get statementImportRemedyCorrectTheMapping;
+
+  /// Remedy for a row refused because the file itself carries something unreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Export the statement from your bank again.'**
+  String get statementImportRemedyCorrectTheFile;
+
+  /// Remedy for a row refused by a declared bound.
+  ///
+  /// In en, this message translates to:
+  /// **'This line is past a limit this import enforces.'**
+  String get statementImportRemedyRespectABound;
+
+  /// Fallback remedy for a reason code this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not know what to suggest here.'**
+  String get statementImportRemedyUnknown;
+
+  /// Row refusal: a required field was absent or blank.
+  ///
+  /// In en, this message translates to:
+  /// **'A required field was empty.'**
+  String get statementImportReasonRequiredFieldMissing;
+
+  /// Row refusal: the amount characters are not a number.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount is not a number Karar can read.'**
+  String get statementImportReasonUnreadableAmount;
+
+  /// Row refusal: both a dot and a comma reading are defensible and neither convention was stated.
+  ///
+  /// In en, this message translates to:
+  /// **'The decimal separator could be read two ways, and neither was stated.'**
+  String get statementImportReasonAmbiguousDecimalSeparator;
+
+  /// Row refusal: day-first and month-first both produce a real date and neither was stated.
+  ///
+  /// In en, this message translates to:
+  /// **'The date could be read two ways, and neither was stated.'**
+  String get statementImportReasonAmbiguousDateOrder;
+
+  /// Row refusal: the value is not a date in any accepted shape.
+  ///
+  /// In en, this message translates to:
+  /// **'The date is not in a shape Karar accepts.'**
+  String get statementImportReasonUnreadableDate;
+
+  /// Row refusal: a stated instant is not parseable.
+  ///
+  /// In en, this message translates to:
+  /// **'The exact time is not a time Karar can read.'**
+  String get statementImportReasonUnreadableInstant;
+
+  /// Row refusal: a stated zone is not an IANA zone the platform knows.
+  ///
+  /// In en, this message translates to:
+  /// **'The time zone is not one this platform knows.'**
+  String get statementImportReasonUnknownTimezone;
+
+  /// Row refusal: the currency code is not supported.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency is not one this platform supports.'**
+  String get statementImportReasonUnknownCurrency;
+
+  /// Row refusal: the row currency differs from the account currency and no conversion is performed.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency of this row is not the currency of the account, and nothing here converts between them.'**
+  String get statementImportReasonCurrencyMismatch;
+
+  /// Row refusal: a direction word that is neither debit nor credit in any recognised form.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not tell whether this row is money in or money out.'**
+  String get statementImportReasonAmbiguousDirection;
+
+  /// Row refusal: separate debit and credit columns both held a value on one line.
+  ///
+  /// In en, this message translates to:
+  /// **'The debit and credit columns both carried a value.'**
+  String get statementImportReasonDebitAndCreditBothPresent;
+
+  /// Row refusal: separate debit and credit columns were both empty on one line.
+  ///
+  /// In en, this message translates to:
+  /// **'The debit and credit columns were both empty.'**
+  String get statementImportReasonDebitAndCreditBothAbsent;
+
+  /// Row refusal: one field exceeded the per-field byte ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'A field is larger than this import accepts.'**
+  String get statementImportReasonFieldTooLarge;
+
+  /// Row refusal: the line had more columns than the declared ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'This row has more columns than this import accepts.'**
+  String get statementImportReasonTooManyColumns;
+
+  /// Row refusal: the line had a different number of columns than the header.
+  ///
+  /// In en, this message translates to:
+  /// **'This row has a different number of columns from the heading row.'**
+  String get statementImportReasonColumnCountMismatch;
+
+  /// Row refusal: the bytes are not valid UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'This row is not valid UTF-8 text.'**
+  String get statementImportReasonInvalidEncoding;
+
+  /// Row refusal: quoting that cannot be resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'A quoted value in this row is never closed.'**
+  String get statementImportReasonMalformedQuoting;
+
+  /// Row refusal: a number too large to be exact minor units.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount is too large to hold exactly.'**
+  String get statementImportReasonAmountExceedsRange;
+
+  /// Row refusal: more decimal places than the currency exponent allows.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount has more decimal places than its currency uses.'**
+  String get statementImportReasonDecimalPlacesExceedCurrency;
+
+  /// Fallback for a row reason code a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not recognise the reason this row was refused.'**
+  String get statementImportReasonUnrecognised;
+
+  /// Import refused: past the byte bound.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is larger than this import accepts.'**
+  String get statementImportRefusalSourceTooLarge;
+
+  /// Import refused: past the row bound.
+  ///
+  /// In en, this message translates to:
+  /// **'The file has more rows than this import accepts.'**
+  String get statementImportRefusalTooManyRows;
+
+  /// Import refused: past the column bound.
+  ///
+  /// In en, this message translates to:
+  /// **'The file has more columns than this import accepts.'**
+  String get statementImportRefusalTooManyColumns;
+
+  /// Import refused: one field exceeded the per-field byte ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'One field in the file is larger than this import accepts.'**
+  String get statementImportRefusalFieldTooLarge;
+
+  /// Import refused: the buffered-row bound was crossed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file needed more rows held at once than this import allows.'**
+  String get statementImportRefusalBufferedRowsExceeded;
+
+  /// Import refused: the buffered-byte bound was crossed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file needed more memory held at once than this import allows.'**
+  String get statementImportRefusalBufferedBytesExceeded;
+
+  /// Import refused: the wall-clock deadline was crossed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file took longer than this import allows.'**
+  String get statementImportRefusalDeadlineExceeded;
+
+  /// Import refused: the read was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file was cancelled.'**
+  String get statementImportRefusalCancelled;
+
+  /// Import refused: the error ceiling was reached.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many rows were refused for the file to be read any further.'**
+  String get statementImportRefusalTooManyErrors;
+
+  /// Import refused: the body was not the accepted media type.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was not sent as CSV.'**
+  String get statementImportRefusalUnsupportedMediaType;
+
+  /// Import refused: the bytes are not valid UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not valid UTF-8 text.'**
+  String get statementImportRefusalInvalidEncoding;
+
+  /// Import refused: the content is binary.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not text.'**
+  String get statementImportRefusalBinaryContent;
+
+  /// Import refused: the content is a spreadsheet workbook rather than CSV.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is a spreadsheet. Export it as CSV and try again.'**
+  String get statementImportRefusalSpreadsheetContent;
+
+  /// Import refused: the content is a compressed archive.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is compressed. Extract it and upload the CSV inside.'**
+  String get statementImportRefusalCompressedContent;
+
+  /// Import refused: quoting that cannot be resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'A quoted value in the file is never closed.'**
+  String get statementImportRefusalMalformedQuoting;
+
+  /// Import refused: the source carried no content.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is empty.'**
+  String get statementImportRefusalEmptySource;
+
+  /// Import refused: a header row was declared but the file has none.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was read as having a heading row, and it has none.'**
+  String get statementImportRefusalNoHeaderRow;
+
+  /// Import refused: the mapping is too ambiguous to parse under.
+  ///
+  /// In en, this message translates to:
+  /// **'The columns as matched leave too much unstated to read the file.'**
+  String get statementImportRefusalMappingAmbiguous;
+
+  /// Import refused: the file describes more than one account.
+  ///
+  /// In en, this message translates to:
+  /// **'The file covers more than one account. Karar refuses it rather than mixing them into the account you chose.'**
+  String get statementImportRefusalMultipleAccountsInSource;
+
+  /// Import refused: the file currency differs from the account currency.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency of the file is not the currency of the account, and nothing here converts between them.'**
+  String get statementImportRefusalCurrencyMismatch;
+
+  /// Import refused: reconciliation against the stated balance failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The rows do not add up to the balance the statement states.'**
+  String get statementImportRefusalReconciliationMismatch;
+
+  /// Import refused: this subject already committed the same file.
+  ///
+  /// In en, this message translates to:
+  /// **'You have already imported this exact file.'**
+  String get statementImportRefusalSourceAlreadyImported;
+
+  /// Import refused: the stored source failed its integrity check.
+  ///
+  /// In en, this message translates to:
+  /// **'The stored file no longer matches what was uploaded, so it was not read.'**
+  String get statementImportRefusalSourceIntegrityFailed;
+
+  /// Import refused: the stored source could not be read back.
+  ///
+  /// In en, this message translates to:
+  /// **'The stored file could not be read.'**
+  String get statementImportRefusalSourceUnreadable;
+
+  /// Fallback for an import refusal code a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not recognise the reason this import was refused.'**
+  String get statementImportRefusalUnrecognised;
+
+  /// Import state: draft.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get statementImportStateDraft;
+
+  /// Import state: the encrypted source is stored.
+  ///
+  /// In en, this message translates to:
+  /// **'File uploaded'**
+  String get statementImportStateSourceStored;
+
+  /// Import state: the parser is running.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file'**
+  String get statementImportStateParsing;
+
+  /// Import state: parsed and staged, awaiting the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your decision'**
+  String get statementImportStateReviewRequired;
+
+  /// Import state: the atomic write is in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing'**
+  String get statementImportStateCommitting;
+
+  /// Import state: the rows became transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get statementImportStateCommitted;
+
+  /// Import state: the person said no.
+  ///
+  /// In en, this message translates to:
+  /// **'Discarded'**
+  String get statementImportStateRejected;
+
+  /// Import state: something refused the import.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get statementImportStateFailed;
+
+  /// Import state: this exact file was already imported.
+  ///
+  /// In en, this message translates to:
+  /// **'Already imported'**
+  String get statementImportStateDuplicate;
+
+  /// Import state: the staged statement has been removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Erased'**
+  String get statementImportStateErased;
+
+  /// Fallback for an import state a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'A state this version does not recognise'**
+  String get statementImportStateUnrecognised;
+
+  /// Action that commits the reviewed import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import these transactions'**
+  String get statementImportActionCommit;
+
+  /// Action that erases the staged statement without importing it.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this import'**
+  String get statementImportActionDiscard;
+
+  /// Screen-reader and visible status while the file is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading your file'**
+  String get statementImportUploadingStatus;
+
+  /// Screen-reader and visible status while the platform parses the file.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading your file'**
+  String get statementImportParsingStatus;
+
+  /// Screen-reader and visible status while the commit is in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing your transactions'**
+  String get statementImportCommittingStatus;
+
+  /// Title shown after a successful commit.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement imported'**
+  String get statementImportCommittedTitle;
+
+  /// Label for how many transactions the commit wrote.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions added'**
+  String get statementImportCommittedCount;
+
+  /// Shown when a commit was an idempotent retry, so a person is told it succeeded rather than failed.
+  ///
+  /// In en, this message translates to:
+  /// **'This statement was already imported. Nothing was added a second time.'**
+  String get statementImportAlreadyCommitted;
+
+  /// Title shown after the staged statement is erased.
+  ///
+  /// In en, this message translates to:
+  /// **'Import discarded'**
+  String get statementImportDiscardedTitle;
+
+  /// Explains that erasing an import does not delete transactions it already produced.
+  ///
+  /// In en, this message translates to:
+  /// **'The file and the rows it staged are gone. Transactions already imported from it are not affected.'**
+  String get statementImportDiscardedDetail;
+
+  /// Title shown when the import surface could not be reached.
+  ///
+  /// In en, this message translates to:
+  /// **'This import cannot be shown'**
+  String get statementImportUnavailableTitle;
+
+  /// Body shown when a statement-import request failed, stating that nothing was written.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not reach the platform. Nothing was changed.'**
+  String get statementImportUnavailableDescription;
+
+  /// Title above a typed import refusal code.
+  ///
+  /// In en, this message translates to:
+  /// **'This file was refused'**
+  String get statementImportRefusedTitle;
+
+  /// Answer meaning the file starts with a header row.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, the first row is a heading'**
+  String get statementImportHeaderRowYes;
+
+  /// Answer meaning the first row of the file is data rather than a heading.
+  ///
+  /// In en, this message translates to:
+  /// **'No, the first row is a transaction'**
+  String get statementImportHeaderRowNo;
 }
 
 class _AppLocalizationsDelegate

@@ -31,6 +31,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/authentication/presentation/routes/identity_module.dart';
 import '../../features/financial_accounts/presentation/financial_feature_registration.dart';
 import '../../features/financial_accounts/presentation/financial_home_shell.dart';
+import '../../features/statement_imports/presentation/statement_import_feature_registration.dart';
 import '../../features/platform_bootstrap/presentation/platform_feature_registration.dart';
 import '../../features/session_management/presentation/security_state_screens.dart';
 import '../../shared/design_system/theme/karar_theme.dart';
@@ -56,6 +57,12 @@ List<Override> featureSurfaceOverrides() => <Override>[
         // reset navigation — the moment bootstrap resolved. The gate decides
         // per build instead, before any financial screen is constructed.
         ...financialFeatureRoutes(),
+        // Mounted beside the financial routes and gated the same way, but
+        // under its own location prefix: the architecture rule that keeps
+        // contract paths out of the application tree allows exactly one file
+        // to spell `/financial…`, and a second exemption would be a second
+        // place a contract path could hide.
+        ...statementImportRoutes(),
       ]),
       startupScreenOverridesProvider.overrideWithValue(
         <StartupStage, StartupScreenBuilder>{
@@ -71,6 +78,7 @@ List<Override> featureSurfaceOverrides() => <Override>[
       tenantScopedDataProvider.overrideWithValue(<TenantScopedProvider>[
         ...platformTenantScopedProviders(),
         ...financialTenantScopedProviders(),
+        ...statementImportFeatureTenantScopedProviders(),
       ]),
       ...themeOverrides(),
     ];

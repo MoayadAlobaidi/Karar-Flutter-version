@@ -28,6 +28,7 @@ import 'package:karar_mobile/core/security/token_store.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/account_detail_screen.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/accounts_and_wallets_screen.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_feature_registration.dart';
+import 'package:karar_mobile/features/statement_imports/presentation/statement_import_feature_registration.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_routes.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_unavailable_screen.dart';
 import 'package:karar_mobile/features/transactions/presentation/transaction_detail_screen.dart';
@@ -40,6 +41,11 @@ import 'support/refusing_repositories.dart';
 /// An identifier a link could name. It belongs to nobody in these fixtures,
 /// which is the point of the last group.
 const String foreignAccountId = 'account-belonging-to-another-tenant';
+
+/// An import identifier belonging to another organisation. A statement import
+/// is a file someone uploaded; naming another organisation's must be as inert
+/// as naming one that does not exist.
+const String foreignImportId = 'import-belonging-to-another-tenant';
 const String foreignTransactionId = 'transaction-belonging-to-another-tenant';
 
 /// Every financial path a deep link could name, derived from the route table
@@ -50,14 +56,19 @@ const String foreignTransactionId = 'transaction-belonging-to-another-tenant';
 /// `financialFeatureRoutes()` appears here without anyone editing this file.
 List<String> everyFinancialPath() {
   final paths = <String>[];
-  for (final route in financialFeatureRoutes()) {
+  // BOTH contributions, because both are mounted. The statement-import routes
+  // live under their own location prefix rather than `/financial…`, and a
+  // derivation that read only one of the two functions would have declared the
+  // surface covered while leaving half of it unvisited.
+  for (final route in <RouteBase>[...financialFeatureRoutes(), ...statementImportRoutes()]) {
     if (route is! GoRoute) {
       continue;
     }
     paths.add(
       route.path
           .replaceAll(':accountId', foreignAccountId)
-          .replaceAll(':transactionId', foreignTransactionId),
+          .replaceAll(':transactionId', foreignTransactionId)
+          .replaceAll(':importId', foreignImportId),
     );
   }
   return paths;
@@ -94,9 +105,11 @@ Result<BootstrapSnapshot> bindingPending() {
 
 void main() {
   group('the derived route set', () {
-    test('covers every financial route the workstream contributes', () {
+    test('covers every financial route BOTH workstreams contribute', () {
       final derived = everyFinancialPath();
-      final declared = financialFeatureRoutes().whereType<GoRoute>().length;
+      final declared = <RouteBase>[...financialFeatureRoutes(), ...statementImportRoutes()]
+          .whereType<GoRoute>()
+          .length;
 
       expect(derived, hasLength(declared));
       expect(

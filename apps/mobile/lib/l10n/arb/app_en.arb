@@ -3425,5 +3425,748 @@
         "type": "String"
       }
     }
+  },
+
+  "statementImportTitle": "Import a statement",
+  "@statementImportTitle": {
+    "description": "Title of the statement-import surface."
+  },
+  "statementImportStartTitle": "Choose an account and a file",
+  "@statementImportStartTitle": {
+    "description": "Title of the first step, where the person picks the target account and the CSV."
+  },
+  "statementImportMappingTitle": "Match the columns",
+  "@statementImportMappingTitle": {
+    "description": "Title of the step where the person says which column holds which field."
+  },
+  "statementImportReviewTitle": "Review before importing",
+  "@statementImportReviewTitle": {
+    "description": "Title of the step where the person sees what the parse found and decides."
+  },
+  "statementImportRailExplanation": "Karar imports statements you upload yourself. It does not connect to your bank, and it never asks for a banking password, PIN or one-time code.",
+  "@statementImportRailExplanation": {
+    "description": "Says plainly that file upload is the only rail and that no banking credential is ever requested."
+  },
+  "statementImportAccountLabel": "Account to import into",
+  "@statementImportAccountLabel": {
+    "description": "Label for the account picker on the first step."
+  },
+  "statementImportAccountHelper": "You choose the account before the file is read. Nothing in the file can change where its rows land.",
+  "@statementImportAccountHelper": {
+    "description": "Explains that the target account is chosen by the person and cannot be redirected by file content."
+  },
+  "statementImportNoAccounts": "You need an account before you can import a statement.",
+  "@statementImportNoAccounts": {
+    "description": "Shown when the person holds no account to import into."
+  },
+  "statementImportChooseFile": "Choose a CSV file",
+  "@statementImportChooseFile": {
+    "description": "Action that opens the device document picker."
+  },
+  "statementImportChooseFileSemantics": "Choose a CSV statement file from your device",
+  "@statementImportChooseFileSemantics": {
+    "description": "Screen-reader label for the control that opens the document picker."
+  },
+  "statementImportFileRules": "CSV only, up to {megabytes} MB.",
+  "@statementImportFileRules": {
+    "description": "States the accepted media type and the byte bound the platform enforces.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportFileChosen": "File ready to upload",
+  "@statementImportFileChosen": {
+    "description": "Confirms a file has been chosen, without naming it."
+  },
+  "statementImportActionUpload": "Upload and continue",
+  "@statementImportActionUpload": {
+    "description": "Action that sends the chosen file to the platform."
+  },
+  "statementImportPickerUnavailableTitle": "This build cannot open a file picker",
+  "@statementImportPickerUnavailableTitle": {
+    "description": "Title shown when the build ships no document-picker adapter."
+  },
+  "statementImportPickerUnavailableDetail": "The rest of the import is ready. When file selection is added it will ask only for the one file you pick, never for access to your storage.",
+  "@statementImportPickerUnavailableDetail": {
+    "description": "Explains that the missing piece is only file selection, and that it will be least-privilege when added."
+  },
+  "statementImportPickerUnreadable": "That file could not be read from your device.",
+  "@statementImportPickerUnreadable": {
+    "description": "Shown when the device could not read the chosen document. Names no path and no filename."
+  },
+  "statementImportSourceEmpty": "That file is empty.",
+  "@statementImportSourceEmpty": {
+    "description": "Shown when the chosen file has no bytes."
+  },
+  "statementImportSourceTooLarge": "That file is larger than the {megabytes} MB this import accepts.",
+  "@statementImportSourceTooLarge": {
+    "description": "Shown when the chosen file is past the byte bound, before any upload is attempted.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportSampleInvalidEncoding": "That file is not valid UTF-8 text. Karar refuses it rather than replacing the damaged characters, which would alter what your bank wrote.",
+  "@statementImportSampleInvalidEncoding": {
+    "description": "Shown when the chosen file cannot be decoded strictly as UTF-8."
+  },
+  "statementImportSampleMalformedQuoting": "A quoted value in that file is never closed, so its columns cannot be counted reliably.",
+  "@statementImportSampleMalformedQuoting": {
+    "description": "Shown when the local sample reader finds an unterminated quoted field."
+  },
+  "statementImportSampleTooManyColumns": "A line in that file has more columns than this import accepts.",
+  "@statementImportSampleTooManyColumns": {
+    "description": "Shown when a sampled line is wider than the platform column bound."
+  },
+  "statementImportMappingIntro": "Tell Karar what each column holds. Nothing is guessed, because a wrong guess moves money.",
+  "@statementImportMappingIntro": {
+    "description": "Introduces the mapping step and says why nothing is auto-detected."
+  },
+  "statementImportHeaderRowLabel": "The first row is a heading row",
+  "@statementImportHeaderRowLabel": {
+    "description": "Toggle for whether the file starts with a header row."
+  },
+  "statementImportHeaderRowHelper": "Stated, never detected. A heading row treated as data becomes a refused transaction.",
+  "@statementImportHeaderRowHelper": {
+    "description": "Explains why the header row is declared rather than sniffed."
+  },
+  "statementImportColumnNumber": "Column {number}",
+  "@statementImportColumnNumber": {
+    "description": "Names a CSV column by its 1-based position, for a file with no heading row.",
+    "placeholders": {
+      "number": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportColumnNotMapped": "Not mapped",
+  "@statementImportColumnNotMapped": {
+    "description": "The choice meaning a field is left without a column."
+  },
+  "statementImportPreviewCaption": "The first rows of your file, shown as plain text.",
+  "@statementImportPreviewCaption": {
+    "description": "Caption above the local sample grid on the mapping step."
+  },
+  "statementImportPreviewInertNote": "Values appear exactly as your file contains them. Karar never treats them as instructions.",
+  "@statementImportPreviewInertNote": {
+    "description": "States the untrusted-content posture: file text is data, rendered inertly, never acted on."
+  },
+  "statementImportFieldBookingDate": "Booking date",
+  "@statementImportFieldBookingDate": {
+    "description": "The day the institution booked the movement."
+  },
+  "statementImportFieldValueDate": "Value date",
+  "@statementImportFieldValueDate": {
+    "description": "The day the movement takes value."
+  },
+  "statementImportFieldEventOccurredAt": "Exact time",
+  "@statementImportFieldEventOccurredAt": {
+    "description": "An instant the source genuinely supplies."
+  },
+  "statementImportFieldSourceTimezone": "Time zone",
+  "@statementImportFieldSourceTimezone": {
+    "description": "A time zone the source itself states."
+  },
+  "statementImportFieldAmount": "Amount",
+  "@statementImportFieldAmount": {
+    "description": "The single signed amount column."
+  },
+  "statementImportFieldDebitAmount": "Debit",
+  "@statementImportFieldDebitAmount": {
+    "description": "The column carrying money out."
+  },
+  "statementImportFieldCreditAmount": "Credit",
+  "@statementImportFieldCreditAmount": {
+    "description": "The column carrying money in."
+  },
+  "statementImportFieldCurrency": "Currency",
+  "@statementImportFieldCurrency": {
+    "description": "The per-row currency column."
+  },
+  "statementImportFieldDescription": "Description",
+  "@statementImportFieldDescription": {
+    "description": "The statement narrative."
+  },
+  "statementImportFieldMerchant": "Merchant",
+  "@statementImportFieldMerchant": {
+    "description": "The merchant column, when the source separates one."
+  },
+  "statementImportFieldSourceBalance": "Balance",
+  "@statementImportFieldSourceBalance": {
+    "description": "A balance the source prints on each row."
+  },
+  "statementImportFieldSourceReference": "Reference",
+  "@statementImportFieldSourceReference": {
+    "description": "The transaction reference the source prints."
+  },
+  "statementImportFieldInstrumentMask": "Card or account tail",
+  "@statementImportFieldInstrumentMask": {
+    "description": "The masked tail digits the source prints."
+  },
+  "statementImportFieldAccountIdentifier": "Account identifier",
+  "@statementImportFieldAccountIdentifier": {
+    "description": "The column used only to detect that a file covers more than one account."
+  },
+  "statementImportFieldRow": "Whole row",
+  "@statementImportFieldRow": {
+    "description": "Names the whole line, used when it could not be split into fields at all."
+  },
+  "statementImportFieldUnrecognised": "A field this version does not recognise",
+  "@statementImportFieldUnrecognised": {
+    "description": "Fallback for a safe-field name a newer platform sent that this build does not ship."
+  },
+  "statementImportAccountIdentifierHelper": "Used only to notice that a file covers more than one account, so the import can refuse instead of mixing them.",
+  "@statementImportAccountIdentifierHelper": {
+    "description": "Explains that the account identifier column detects rather than selects."
+  },
+  "statementImportAmountShapeLabel": "How is the amount written?",
+  "@statementImportAmountShapeLabel": {
+    "description": "Asks whether the file uses one signed column or a debit and credit pair."
+  },
+  "statementImportAmountShapeSigned": "One column, with a sign",
+  "@statementImportAmountShapeSigned": {
+    "description": "The single signed amount column shape."
+  },
+  "statementImportAmountShapeDebitCredit": "Separate debit and credit columns",
+  "@statementImportAmountShapeDebitCredit": {
+    "description": "The two-column debit and credit shape."
+  },
+  "statementImportSignFrameLabel": "Whose point of view do the signs use?",
+  "@statementImportSignFrameLabel": {
+    "description": "Asks which frame a signed amount column is written in."
+  },
+  "statementImportSignFrameAccountHolder": "Mine, so money I spend is negative",
+  "@statementImportSignFrameAccountHolder": {
+    "description": "The account-holder sign frame."
+  },
+  "statementImportSignFrameBankLedger": "The bank ledger, so a deposit is a credit",
+  "@statementImportSignFrameBankLedger": {
+    "description": "The bank-ledger sign frame, in which the signs invert."
+  },
+  "statementImportSignFrameHelper": "There is no default. Reading the signs the wrong way turns every payment in the file into income.",
+  "@statementImportSignFrameHelper": {
+    "description": "Explains why the sign frame must be stated rather than assumed."
+  },
+  "statementImportDateOrderLabel": "How are ambiguous dates written?",
+  "@statementImportDateOrderLabel": {
+    "description": "Asks the date order to apply to dates that could be read two ways."
+  },
+  "statementImportDateOrderNotStated": "Not stated",
+  "@statementImportDateOrderNotStated": {
+    "description": "The choice meaning no date order has been declared."
+  },
+  "statementImportDateOrderIso": "Year first, as in 2026-04-03",
+  "@statementImportDateOrderIso": {
+    "description": "The ISO date order."
+  },
+  "statementImportDateOrderDayFirst": "Day first, so 03/04 is 3 April",
+  "@statementImportDateOrderDayFirst": {
+    "description": "The day-first date order, with a worked example."
+  },
+  "statementImportDateOrderMonthFirst": "Month first, so 03/04 is 4 March",
+  "@statementImportDateOrderMonthFirst": {
+    "description": "The month-first date order, with a worked example."
+  },
+  "statementImportDateOrderHelper": "If you do not state one, Karar refuses the rows it cannot read without guessing rather than picking a reading for you.",
+  "@statementImportDateOrderHelper": {
+    "description": "Explains that leaving the date order unstated produces typed refusals, not a silent default."
+  },
+  "statementImportCurrencySourceLabel": "Where does the currency come from?",
+  "@statementImportCurrencySourceLabel": {
+    "description": "Asks whether the currency is a column or one code for the whole file."
+  },
+  "statementImportCurrencyFromColumn": "A column in the file",
+  "@statementImportCurrencyFromColumn": {
+    "description": "The choice meaning each row carries its own currency."
+  },
+  "statementImportCurrencyStatedForFile": "The whole file is in one currency",
+  "@statementImportCurrencyStatedForFile": {
+    "description": "The choice meaning one currency code covers the file."
+  },
+  "statementImportStatedCurrencyLabel": "Currency of the file",
+  "@statementImportStatedCurrencyLabel": {
+    "description": "Field for the single currency code covering the whole file."
+  },
+  "statementImportCurrencyHelper": "One or the other, never both. Two sources for one currency can disagree, and resolving that would mean choosing on your behalf.",
+  "@statementImportCurrencyHelper": {
+    "description": "Explains why exactly one currency source is accepted."
+  },
+  "statementImportBalanceKindLabel": "What does the balance column hold?",
+  "@statementImportBalanceKindLabel": {
+    "description": "Asks which kind of balance a mapped balance column carries."
+  },
+  "statementImportBalanceKindRunning": "Running balance",
+  "@statementImportBalanceKindRunning": {
+    "description": "The balance after each movement."
+  },
+  "statementImportBalanceKindLedger": "Ledger balance",
+  "@statementImportBalanceKindLedger": {
+    "description": "The booked balance."
+  },
+  "statementImportBalanceKindAvailable": "Available balance",
+  "@statementImportBalanceKindAvailable": {
+    "description": "The balance available to spend."
+  },
+  "statementImportBalanceKindClosing": "Closing balance",
+  "@statementImportBalanceKindClosing": {
+    "description": "The balance at the end of the statement period."
+  },
+  "statementImportStatedBalanceLabel": "Balance the statement states",
+  "@statementImportStatedBalanceLabel": {
+    "description": "Optional field for the balance the statement claims, used for reconciliation."
+  },
+  "statementImportStatedBalanceHelper": "Optional. Used only to check that the rows add up. It is never saved as a balance of your account.",
+  "@statementImportStatedBalanceHelper": {
+    "description": "Explains that the stated balance is for reconciliation only and is never stored as an account balance."
+  },
+  "statementImportStatedBalanceKindLabel": "Which balance is it?",
+  "@statementImportStatedBalanceKindLabel": {
+    "description": "Asks which balance of the statement the stated figure is."
+  },
+  "statementImportStatedBalanceOpening": "Opening",
+  "@statementImportStatedBalanceOpening": {
+    "description": "The balance at the start of the statement period."
+  },
+  "statementImportStatedBalanceClosing": "Closing",
+  "@statementImportStatedBalanceClosing": {
+    "description": "The balance at the end of the statement period."
+  },
+  "statementImportStatedBalanceLedger": "Ledger",
+  "@statementImportStatedBalanceLedger": {
+    "description": "The booked balance of the statement."
+  },
+  "statementImportStatedBalanceAvailable": "Available",
+  "@statementImportStatedBalanceAvailable": {
+    "description": "The available balance of the statement."
+  },
+  "statementImportStatedBalanceInvalid": "Enter the balance as digits, with at most the decimal places this currency uses.",
+  "@statementImportStatedBalanceInvalid": {
+    "description": "Validation message when the typed statement balance is not an exact amount."
+  },
+  "statementImportMappingColumnIndexInvalid": "A chosen column is not in this file.",
+  "@statementImportMappingColumnIndexInvalid": {
+    "description": "Mapping refused because a column index is negative or past the end of the rows."
+  },
+  "statementImportMappingColumnUsedTwice": "One column is matched to two fields. A column cannot be two facts at once.",
+  "@statementImportMappingColumnUsedTwice": {
+    "description": "Mapping refused because one column index is used for more than one field."
+  },
+  "statementImportMappingCurrencyNotDetermined": "No currency column and no stated currency. The currency of your account is not an answer, because it would put a currency nobody chose on every row.",
+  "@statementImportMappingCurrencyNotDetermined": {
+    "description": "Mapping refused because the currency of the file is not determined."
+  },
+  "statementImportMappingCurrencyDoublyDetermined": "Both a currency column and a stated currency. The two can disagree.",
+  "@statementImportMappingCurrencyDoublyDetermined": {
+    "description": "Mapping refused because two sources determine one currency."
+  },
+  "statementImportMappingBalanceKindNotStated": "A balance column needs its kind stated. Running, ledger and available are three different numbers.",
+  "@statementImportMappingBalanceKindNotStated": {
+    "description": "Mapping refused because a balance column was given without saying what kind of balance it holds."
+  },
+  "statementImportMappingTimezoneWithoutInstant": "A time zone column needs an exact-time column to interpret.",
+  "@statementImportMappingTimezoneWithoutInstant": {
+    "description": "Mapping refused because a time zone was mapped with no instant to apply it to."
+  },
+  "statementImportActionParse": "Read the file",
+  "@statementImportActionParse": {
+    "description": "Action that parses the stored source under the stated mapping."
+  },
+  "statementImportCountsTitle": "What the file contained",
+  "@statementImportCountsTitle": {
+    "description": "Heading above the parse counts."
+  },
+  "statementImportCountRows": "Rows",
+  "@statementImportCountRows": {
+    "description": "Total data rows the parse read."
+  },
+  "statementImportCountValid": "Ready to import",
+  "@statementImportCountValid": {
+    "description": "Rows that parsed cleanly and would become transactions."
+  },
+  "statementImportCountInvalid": "Refused",
+  "@statementImportCountInvalid": {
+    "description": "Rows the parse refused."
+  },
+  "statementImportCountExactDuplicates": "Already imported",
+  "@statementImportCountExactDuplicates": {
+    "description": "Rows identical to transactions this person already holds."
+  },
+  "statementImportCountProbableDuplicates": "Possible duplicates",
+  "@statementImportCountProbableDuplicates": {
+    "description": "Rows that resemble existing transactions. Always zero; see the accompanying note."
+  },
+  "statementImportProbableDuplicatesNote": "Karar does not look for possible duplicates, so this is always zero.",
+  "@statementImportProbableDuplicatesNote": {
+    "description": "States that probable-duplicate detection is not implemented, so a zero reads as not looked for rather than none found."
+  },
+  "statementImportReconciliationTitle": "Does the statement add up?",
+  "@statementImportReconciliationTitle": {
+    "description": "Heading above the reconciliation verdict."
+  },
+  "statementImportReconciliationMatched": "The rows match the balance the statement states.",
+  "@statementImportReconciliationMatched": {
+    "description": "Reconciliation verdict: the rows and the stated balance agree."
+  },
+  "statementImportReconciliationMismatched": "The rows do not match the balance the statement states.",
+  "@statementImportReconciliationMismatched": {
+    "description": "Reconciliation verdict: the rows and the stated balance disagree."
+  },
+  "statementImportReconciliationNotAvailable": "The statement stated no balance, so nothing was compared.",
+  "@statementImportReconciliationNotAvailable": {
+    "description": "Reconciliation verdict: nothing to compare. Deliberately not the same as matched."
+  },
+  "statementImportReconciliationUnrecognised": "This version does not recognise the reconciliation result.",
+  "@statementImportReconciliationUnrecognised": {
+    "description": "Fallback for a reconciliation verdict a newer platform sent that this build does not ship."
+  },
+  "statementImportReconciliationBlocksCommit": "Importing is blocked while they disagree. Importing a statement that does not add up would write records nobody can trust.",
+  "@statementImportReconciliationBlocksCommit": {
+    "description": "Explains why a reconciliation mismatch prevents the commit."
+  },
+  "statementImportRowIssuesTitle": "Refused rows",
+  "@statementImportRowIssuesTitle": {
+    "description": "Heading above the list of refused rows."
+  },
+  "statementImportRowIssuesNone": "No row was refused.",
+  "@statementImportRowIssuesNone": {
+    "description": "Shown when the parse refused nothing."
+  },
+  "statementImportRowNumber": "Row {number}",
+  "@statementImportRowNumber": {
+    "description": "Names a refused row by its 1-based position among the data rows.",
+    "placeholders": {
+      "number": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportIssuesTruncated": "Showing {shown} of {total} refused rows.",
+  "@statementImportIssuesTruncated": {
+    "description": "Says that the refused-row report is truncated, so a partial list cannot read as a complete one.",
+    "placeholders": {
+      "shown": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportNoValuesShown": "Karar does not show values from your file here. Open your own file at these row numbers to see them.",
+  "@statementImportNoValuesShown": {
+    "description": "Explains that the review surface deliberately carries no cell values."
+  },
+  "statementImportRemedyStateAConvention": "State the convention and read the file again.",
+  "@statementImportRemedyStateAConvention": {
+    "description": "Remedy for a row refused because a convention was never stated."
+  },
+  "statementImportRemedyCorrectTheMapping": "Correct which column holds what.",
+  "@statementImportRemedyCorrectTheMapping": {
+    "description": "Remedy for a row refused because the column matching is wrong."
+  },
+  "statementImportRemedyCorrectTheFile": "Export the statement from your bank again.",
+  "@statementImportRemedyCorrectTheFile": {
+    "description": "Remedy for a row refused because the file itself carries something unreadable."
+  },
+  "statementImportRemedyRespectABound": "This line is past a limit this import enforces.",
+  "@statementImportRemedyRespectABound": {
+    "description": "Remedy for a row refused by a declared bound."
+  },
+  "statementImportRemedyUnknown": "This version does not know what to suggest here.",
+  "@statementImportRemedyUnknown": {
+    "description": "Fallback remedy for a reason code this build does not ship."
+  },
+  "statementImportReasonRequiredFieldMissing": "A required field was empty.",
+  "@statementImportReasonRequiredFieldMissing": {
+    "description": "Row refusal: a required field was absent or blank."
+  },
+  "statementImportReasonUnreadableAmount": "The amount is not a number Karar can read.",
+  "@statementImportReasonUnreadableAmount": {
+    "description": "Row refusal: the amount characters are not a number."
+  },
+  "statementImportReasonAmbiguousDecimalSeparator": "The decimal separator could be read two ways, and neither was stated.",
+  "@statementImportReasonAmbiguousDecimalSeparator": {
+    "description": "Row refusal: both a dot and a comma reading are defensible and neither convention was stated."
+  },
+  "statementImportReasonAmbiguousDateOrder": "The date could be read two ways, and neither was stated.",
+  "@statementImportReasonAmbiguousDateOrder": {
+    "description": "Row refusal: day-first and month-first both produce a real date and neither was stated."
+  },
+  "statementImportReasonUnreadableDate": "The date is not in a shape Karar accepts.",
+  "@statementImportReasonUnreadableDate": {
+    "description": "Row refusal: the value is not a date in any accepted shape."
+  },
+  "statementImportReasonUnreadableInstant": "The exact time is not a time Karar can read.",
+  "@statementImportReasonUnreadableInstant": {
+    "description": "Row refusal: a stated instant is not parseable."
+  },
+  "statementImportReasonUnknownTimezone": "The time zone is not one this platform knows.",
+  "@statementImportReasonUnknownTimezone": {
+    "description": "Row refusal: a stated zone is not an IANA zone the platform knows."
+  },
+  "statementImportReasonUnknownCurrency": "The currency is not one this platform supports.",
+  "@statementImportReasonUnknownCurrency": {
+    "description": "Row refusal: the currency code is not supported."
+  },
+  "statementImportReasonCurrencyMismatch": "The currency of this row is not the currency of the account, and nothing here converts between them.",
+  "@statementImportReasonCurrencyMismatch": {
+    "description": "Row refusal: the row currency differs from the account currency and no conversion is performed."
+  },
+  "statementImportReasonAmbiguousDirection": "Karar could not tell whether this row is money in or money out.",
+  "@statementImportReasonAmbiguousDirection": {
+    "description": "Row refusal: a direction word that is neither debit nor credit in any recognised form."
+  },
+  "statementImportReasonDebitAndCreditBothPresent": "The debit and credit columns both carried a value.",
+  "@statementImportReasonDebitAndCreditBothPresent": {
+    "description": "Row refusal: separate debit and credit columns both held a value on one line."
+  },
+  "statementImportReasonDebitAndCreditBothAbsent": "The debit and credit columns were both empty.",
+  "@statementImportReasonDebitAndCreditBothAbsent": {
+    "description": "Row refusal: separate debit and credit columns were both empty on one line."
+  },
+  "statementImportReasonFieldTooLarge": "A field is larger than this import accepts.",
+  "@statementImportReasonFieldTooLarge": {
+    "description": "Row refusal: one field exceeded the per-field byte ceiling."
+  },
+  "statementImportReasonTooManyColumns": "This row has more columns than this import accepts.",
+  "@statementImportReasonTooManyColumns": {
+    "description": "Row refusal: the line had more columns than the declared ceiling."
+  },
+  "statementImportReasonColumnCountMismatch": "This row has a different number of columns from the heading row.",
+  "@statementImportReasonColumnCountMismatch": {
+    "description": "Row refusal: the line had a different number of columns than the header."
+  },
+  "statementImportReasonInvalidEncoding": "This row is not valid UTF-8 text.",
+  "@statementImportReasonInvalidEncoding": {
+    "description": "Row refusal: the bytes are not valid UTF-8."
+  },
+  "statementImportReasonMalformedQuoting": "A quoted value in this row is never closed.",
+  "@statementImportReasonMalformedQuoting": {
+    "description": "Row refusal: quoting that cannot be resolved."
+  },
+  "statementImportReasonAmountExceedsRange": "The amount is too large to hold exactly.",
+  "@statementImportReasonAmountExceedsRange": {
+    "description": "Row refusal: a number too large to be exact minor units."
+  },
+  "statementImportReasonDecimalPlacesExceedCurrency": "The amount has more decimal places than its currency uses.",
+  "@statementImportReasonDecimalPlacesExceedCurrency": {
+    "description": "Row refusal: more decimal places than the currency exponent allows."
+  },
+  "statementImportReasonUnrecognised": "This version does not recognise the reason this row was refused.",
+  "@statementImportReasonUnrecognised": {
+    "description": "Fallback for a row reason code a newer platform sent that this build does not ship."
+  },
+  "statementImportRefusalSourceTooLarge": "The file is larger than this import accepts.",
+  "@statementImportRefusalSourceTooLarge": {
+    "description": "Import refused: past the byte bound."
+  },
+  "statementImportRefusalTooManyRows": "The file has more rows than this import accepts.",
+  "@statementImportRefusalTooManyRows": {
+    "description": "Import refused: past the row bound."
+  },
+  "statementImportRefusalTooManyColumns": "The file has more columns than this import accepts.",
+  "@statementImportRefusalTooManyColumns": {
+    "description": "Import refused: past the column bound."
+  },
+  "statementImportRefusalFieldTooLarge": "One field in the file is larger than this import accepts.",
+  "@statementImportRefusalFieldTooLarge": {
+    "description": "Import refused: one field exceeded the per-field byte ceiling."
+  },
+  "statementImportRefusalBufferedRowsExceeded": "The file needed more rows held at once than this import allows.",
+  "@statementImportRefusalBufferedRowsExceeded": {
+    "description": "Import refused: the buffered-row bound was crossed."
+  },
+  "statementImportRefusalBufferedBytesExceeded": "The file needed more memory held at once than this import allows.",
+  "@statementImportRefusalBufferedBytesExceeded": {
+    "description": "Import refused: the buffered-byte bound was crossed."
+  },
+  "statementImportRefusalDeadlineExceeded": "Reading the file took longer than this import allows.",
+  "@statementImportRefusalDeadlineExceeded": {
+    "description": "Import refused: the wall-clock deadline was crossed."
+  },
+  "statementImportRefusalCancelled": "Reading the file was cancelled.",
+  "@statementImportRefusalCancelled": {
+    "description": "Import refused: the read was cancelled."
+  },
+  "statementImportRefusalTooManyErrors": "Too many rows were refused for the file to be read any further.",
+  "@statementImportRefusalTooManyErrors": {
+    "description": "Import refused: the error ceiling was reached."
+  },
+  "statementImportRefusalUnsupportedMediaType": "The file was not sent as CSV.",
+  "@statementImportRefusalUnsupportedMediaType": {
+    "description": "Import refused: the body was not the accepted media type."
+  },
+  "statementImportRefusalInvalidEncoding": "The file is not valid UTF-8 text.",
+  "@statementImportRefusalInvalidEncoding": {
+    "description": "Import refused: the bytes are not valid UTF-8."
+  },
+  "statementImportRefusalBinaryContent": "The file is not text.",
+  "@statementImportRefusalBinaryContent": {
+    "description": "Import refused: the content is binary."
+  },
+  "statementImportRefusalSpreadsheetContent": "The file is a spreadsheet. Export it as CSV and try again.",
+  "@statementImportRefusalSpreadsheetContent": {
+    "description": "Import refused: the content is a spreadsheet workbook rather than CSV."
+  },
+  "statementImportRefusalCompressedContent": "The file is compressed. Extract it and upload the CSV inside.",
+  "@statementImportRefusalCompressedContent": {
+    "description": "Import refused: the content is a compressed archive."
+  },
+  "statementImportRefusalMalformedQuoting": "A quoted value in the file is never closed.",
+  "@statementImportRefusalMalformedQuoting": {
+    "description": "Import refused: quoting that cannot be resolved."
+  },
+  "statementImportRefusalEmptySource": "The file is empty.",
+  "@statementImportRefusalEmptySource": {
+    "description": "Import refused: the source carried no content."
+  },
+  "statementImportRefusalNoHeaderRow": "The file was read as having a heading row, and it has none.",
+  "@statementImportRefusalNoHeaderRow": {
+    "description": "Import refused: a header row was declared but the file has none."
+  },
+  "statementImportRefusalMappingAmbiguous": "The columns as matched leave too much unstated to read the file.",
+  "@statementImportRefusalMappingAmbiguous": {
+    "description": "Import refused: the mapping is too ambiguous to parse under."
+  },
+  "statementImportRefusalMultipleAccountsInSource": "The file covers more than one account. Karar refuses it rather than mixing them into the account you chose.",
+  "@statementImportRefusalMultipleAccountsInSource": {
+    "description": "Import refused: the file describes more than one account."
+  },
+  "statementImportRefusalCurrencyMismatch": "The currency of the file is not the currency of the account, and nothing here converts between them.",
+  "@statementImportRefusalCurrencyMismatch": {
+    "description": "Import refused: the file currency differs from the account currency."
+  },
+  "statementImportRefusalReconciliationMismatch": "The rows do not add up to the balance the statement states.",
+  "@statementImportRefusalReconciliationMismatch": {
+    "description": "Import refused: reconciliation against the stated balance failed."
+  },
+  "statementImportRefusalSourceAlreadyImported": "You have already imported this exact file.",
+  "@statementImportRefusalSourceAlreadyImported": {
+    "description": "Import refused: this subject already committed the same file."
+  },
+  "statementImportRefusalSourceIntegrityFailed": "The stored file no longer matches what was uploaded, so it was not read.",
+  "@statementImportRefusalSourceIntegrityFailed": {
+    "description": "Import refused: the stored source failed its integrity check."
+  },
+  "statementImportRefusalSourceUnreadable": "The stored file could not be read.",
+  "@statementImportRefusalSourceUnreadable": {
+    "description": "Import refused: the stored source could not be read back."
+  },
+  "statementImportRefusalUnrecognised": "This version does not recognise the reason this import was refused.",
+  "@statementImportRefusalUnrecognised": {
+    "description": "Fallback for an import refusal code a newer platform sent that this build does not ship."
+  },
+  "statementImportStateDraft": "Not started",
+  "@statementImportStateDraft": {
+    "description": "Import state: draft."
+  },
+  "statementImportStateSourceStored": "File uploaded",
+  "@statementImportStateSourceStored": {
+    "description": "Import state: the encrypted source is stored."
+  },
+  "statementImportStateParsing": "Reading the file",
+  "@statementImportStateParsing": {
+    "description": "Import state: the parser is running."
+  },
+  "statementImportStateReviewRequired": "Waiting for your decision",
+  "@statementImportStateReviewRequired": {
+    "description": "Import state: parsed and staged, awaiting the person."
+  },
+  "statementImportStateCommitting": "Importing",
+  "@statementImportStateCommitting": {
+    "description": "Import state: the atomic write is in progress."
+  },
+  "statementImportStateCommitted": "Imported",
+  "@statementImportStateCommitted": {
+    "description": "Import state: the rows became transactions."
+  },
+  "statementImportStateRejected": "Discarded",
+  "@statementImportStateRejected": {
+    "description": "Import state: the person said no."
+  },
+  "statementImportStateFailed": "Refused",
+  "@statementImportStateFailed": {
+    "description": "Import state: something refused the import."
+  },
+  "statementImportStateDuplicate": "Already imported",
+  "@statementImportStateDuplicate": {
+    "description": "Import state: this exact file was already imported."
+  },
+  "statementImportStateErased": "Erased",
+  "@statementImportStateErased": {
+    "description": "Import state: the staged statement has been removed."
+  },
+  "statementImportStateUnrecognised": "A state this version does not recognise",
+  "@statementImportStateUnrecognised": {
+    "description": "Fallback for an import state a newer platform sent that this build does not ship."
+  },
+  "statementImportActionCommit": "Import these transactions",
+  "@statementImportActionCommit": {
+    "description": "Action that commits the reviewed import."
+  },
+  "statementImportActionDiscard": "Discard this import",
+  "@statementImportActionDiscard": {
+    "description": "Action that erases the staged statement without importing it."
+  },
+  "statementImportUploadingStatus": "Uploading your file",
+  "@statementImportUploadingStatus": {
+    "description": "Screen-reader and visible status while the file is being sent."
+  },
+  "statementImportParsingStatus": "Reading your file",
+  "@statementImportParsingStatus": {
+    "description": "Screen-reader and visible status while the platform parses the file."
+  },
+  "statementImportCommittingStatus": "Importing your transactions",
+  "@statementImportCommittingStatus": {
+    "description": "Screen-reader and visible status while the commit is in progress."
+  },
+  "statementImportCommittedTitle": "Statement imported",
+  "@statementImportCommittedTitle": {
+    "description": "Title shown after a successful commit."
+  },
+  "statementImportCommittedCount": "Transactions added",
+  "@statementImportCommittedCount": {
+    "description": "Label for how many transactions the commit wrote."
+  },
+  "statementImportAlreadyCommitted": "This statement was already imported. Nothing was added a second time.",
+  "@statementImportAlreadyCommitted": {
+    "description": "Shown when a commit was an idempotent retry, so a person is told it succeeded rather than failed."
+  },
+  "statementImportDiscardedTitle": "Import discarded",
+  "@statementImportDiscardedTitle": {
+    "description": "Title shown after the staged statement is erased."
+  },
+  "statementImportDiscardedDetail": "The file and the rows it staged are gone. Transactions already imported from it are not affected.",
+  "@statementImportDiscardedDetail": {
+    "description": "Explains that erasing an import does not delete transactions it already produced."
+  },
+  "statementImportUnavailableTitle": "This import cannot be shown",
+  "@statementImportUnavailableTitle": {
+    "description": "Title shown when the import surface could not be reached."
+  },
+  "statementImportUnavailableDescription": "Karar could not reach the platform. Nothing was changed.",
+  "@statementImportUnavailableDescription": {
+    "description": "Body shown when a statement-import request failed, stating that nothing was written."
+  },
+  "statementImportRefusedTitle": "This file was refused",
+  "@statementImportRefusedTitle": {
+    "description": "Title above a typed import refusal code."
+  },
+  "statementImportHeaderRowYes": "Yes, the first row is a heading",
+  "@statementImportHeaderRowYes": {
+    "description": "Answer meaning the file starts with a header row."
+  },
+  "statementImportHeaderRowNo": "No, the first row is a transaction",
+  "@statementImportHeaderRowNo": {
+    "description": "Answer meaning the first row of the file is data rather than a heading."
   }
 }
