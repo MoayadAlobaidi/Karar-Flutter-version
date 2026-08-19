@@ -13,11 +13,13 @@
 //   * a duplicate upload lands on the refusal step rather than the mapping
 //     step, so nobody maps columns for a file that will not be imported;
 //   * a commit carries the version from the last WRITE, never a guess.
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karar_mobile/app/lifecycle/tenant_data_scope.dart';
 import 'package:karar_mobile/core/errors/result.dart';
 import 'package:karar_mobile/features/statement_imports/domain/column_mapping.dart';
 import 'package:karar_mobile/features/statement_imports/domain/import_lifecycle.dart';
@@ -27,6 +29,17 @@ import 'package:karar_mobile/features/statement_imports/domain/statement_source_
 import 'package:karar_mobile/features/statement_imports/presentation/statement_imports_providers.dart';
 
 import 'support/statement_import_harness.dart';
+
+/// A picker that does not answer until the test says so, so the window
+/// between asking and answering can be driven deliberately.
+final class _DeferredPicker implements StatementSourcePicker {
+  final Completer<PickerOutcome> _completer = Completer<PickerOutcome>();
+
+  void complete(PickerOutcome outcome) => _completer.complete(outcome);
+
+  @override
+  Future<PickerOutcome> pickStatementSource() => _completer.future;
+}
 
 const String csvFixture = 'Date,Description,Amount\n2026-04-03,Coffee,-12.50\n';
 
@@ -342,4 +355,86 @@ void main() {
       expect(flow.repository.calls.length, before);
     });
   });
+
+  group('a session that ends mid-flow takes the statement with it', () {
+    // THE LEAK THIS CLOSES. Every await in this controller can resolve after
+    // the person has switched organisation or signed out. The bytes are a
+    // BANK STATEMENT, and the identifiers are an import opened under the
+    // organisation they left. Accepting a late answer hands both to whoever
+    // is signed in next — and the upload that follows sends them under THAT
+    // principal's credential into THAT principal's account, which row-level
+    // security cannot catch, because by then every identifier on the request
+    // is legitimately theirs.
+
+    test('a file chosen after the session ended is not accepted', () async {
+      final picker = _DeferredPicker();
+      final container = ProviderContainer(
+        overrides: <Override>[
+          ...statementImportOverrides(repository: ScriptedStatementImportsRepository()),
+          statementSourcePickerProvider.overrideWithValue(picker),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = controllerOf(container);
+      final Future<void> choosing = controller.chooseSource();
+
+      // The person signs out while the document picker is open.
+      container.read(tenantDataScopeProvider).discardHeldAnswers();
+
+      // The picker answers afterwards, as a platform picker can.
+      picker.complete(
+        PickerOutcomeChosen(
+          PickedStatementSource(
+            bytes: Uint8List.fromList(utf8.encode(csvFixture)),
+            declaredMediaType: 'text/csv',
+          ),
+        ),
+      );
+      await choosing;
+
+      expect(
+        stateOf(container),
+        isNot(isA<ImportFlowSourceReady>()),
+        reason: 'the previous session\'s file must not be staged for the next one',
+      );
+      expect(
+        controllerOf(container).importId,
+        isNull,
+        reason: 'no import identifier from the previous session may survive',
+      );
+    });
+
+    test('rebuilding the controller forgets the bytes it was holding', () async {
+      final flow = flowFor();
+      // A LISTENER IS LOAD-BEARING. Without one the provider has no dependents,
+      // so an invalidation DISPOSES the element and the next read constructs a
+      // brand-new notifier with fresh fields — which is not the situation being
+      // tested and would pass whether or not `build()` forgets anything. A
+      // screen watching the flow is what keeps the element alive, and that is
+      // when Riverpod reuses the notifier and re-runs only `build()`.
+      final subscription =
+          flow.container.listen(statementImportFlowProvider, (_, _) {}, fireImmediately: true);
+      addTearDown(subscription.close);
+
+      final controller = controllerOf(flow.container);
+      await controller.chooseSource();
+      expect(stateOf(flow.container), isA<ImportFlowSourceReady>());
+
+      flow.container.invalidate(statementImportFlowProvider);
+
+      final rebuilt = controllerOf(flow.container);
+      // The SAME notifier instance: this is the situation being tested.
+      expect(identical(controller, rebuilt), isTrue);
+      expect(stateOf(flow.container), isA<ImportFlowIdle>());
+      expect(rebuilt.importId, isNull);
+      expect(
+        rebuilt.holdsSource,
+        isFalse,
+        reason: 'the bytes of the previous session\'s bank statement must not '
+            'still be held by a controller the next session will use',
+      );
+    });
+  });
+
 }

@@ -181,7 +181,15 @@ final class ImportFlowFailed extends StatementImportFlowState {
 /// Drives the sequence: choose -> upload -> map -> parse -> decide.
 final class StatementImportFlowController extends Notifier<StatementImportFlowState> {
   @override
-  StatementImportFlowState build() => const ImportFlowIdle();
+  StatementImportFlowState build() {
+    // FORGET FIRST. Riverpod reuses this notifier across an invalidation — only
+    // `build()` re-runs — so the fields below survive a tenant switch and a
+    // sign-out unless they are cleared here. Without this, the next principal's
+    // session begins holding the previous principal's statement bytes and the
+    // import id opened under their organisation.
+    _forget();
+    return const ImportFlowIdle();
+  }
 
   /// The bytes of the file being imported, held only while they are needed.
   Uint8List? _bytes;
@@ -197,13 +205,30 @@ final class StatementImportFlowController extends Notifier<StatementImportFlowSt
   /// different parse.
   int? _version;
 
+  /// Whether this controller is still holding a chosen file's bytes.
+  ///
+  /// Exposed because "is a statement staged in memory right now" is a question
+  /// worth being able to ask and worth being able to ASSERT. The bytes are the
+  /// most sensitive thing this client holds, and a test that cannot see them
+  /// cannot prove they were let go.
+  bool get holdsSource => _bytes != null;
+
   /// The import currently open, for the surface to address. Null before the
   /// upload and after the flow is reset.
   String? get importId => _importId;
 
   /// Asks the device for a document, then reads enough of it to map columns.
   Future<void> chooseSource() async {
+    final TenantDataGeneration issued = ref.tenantBinding();
     final outcome = await ref.read(statementSourcePickerProvider).pickStatementSource();
+    if (issued.hasEnded) {
+      // The picker answered after the session that opened it ended. Accepting
+      // it would hand the previous principal's file to whoever is signed in
+      // now, and the upload that follows would send it under THEIR credential
+      // into THEIR account — which row-level security cannot catch, because by
+      // then every identifier on the request is legitimately theirs.
+      return;
+    }
     switch (outcome) {
       case PickerOutcomeUnavailable():
         state = const ImportFlowPickerUnavailable();
@@ -253,10 +278,18 @@ final class StatementImportFlowController extends Notifier<StatementImportFlowSt
     final sample = current.sample;
     state = const ImportFlowWorking(ImportFlowStep.uploading);
 
+    final TenantDataGeneration issued = ref.tenantBinding();
     final started = await ref.read(startStatementImportProvider)(
       accountId: accountId,
       connectionId: connectionId,
     );
+    if (issued.hasEnded) {
+      // An import opened under an organisation the session has left. Recording
+      // its id here would let the rest of this flow act on it under the next
+      // principal.
+      _forget();
+      return;
+    }
     switch (started) {
       case Failed<StatementImportSnapshot>(:final failure):
         state = ImportFlowFailed(failure);
@@ -273,6 +306,10 @@ final class StatementImportFlowController extends Notifier<StatementImportFlowSt
     // The bytes have reached the platform, or failed to. Either way this
     // client has no further use for them.
     _bytes = null;
+    if (issued.hasEnded) {
+      _forget();
+      return;
+    }
     switch (uploaded) {
       case Failed<StatementImportSnapshot>(:final failure):
         state = ImportFlowFailed(failure);
@@ -297,11 +334,16 @@ final class StatementImportFlowController extends Notifier<StatementImportFlowSt
     final sample = current.sample;
     state = const ImportFlowWorking(ImportFlowStep.parsing);
 
+    final TenantDataGeneration issued = ref.tenantBinding();
     final parsed = await ref.read(parseStatementSourceProvider)(
       importId: importId,
       mapping: mapping,
       statedBalance: statedBalance,
     );
+    if (issued.hasEnded) {
+      _forget();
+      return;
+    }
     switch (parsed) {
       case Failed<StatementImportSnapshot>(:final failure):
         // The mapping step is where the person can act, so a failed parse
@@ -325,10 +367,18 @@ final class StatementImportFlowController extends Notifier<StatementImportFlowSt
       return;
     }
     state = const ImportFlowWorking(ImportFlowStep.committing);
+    final TenantDataGeneration issued = ref.tenantBinding();
     final committed = await ref.read(commitStatementImportProvider)(
       importId: importId,
       expectedVersion: version,
     );
+    if (issued.hasEnded) {
+      // The commit either landed or did not, under an organisation the session
+      // has left. Either way the RESULT is not this principal's to see, and
+      // the identifiers behind it are not theirs to hold.
+      _forget();
+      return;
+    }
     state = switch (committed) {
       Failed<ImportCommitReceipt>(:final failure) => ImportFlowFailed(failure),
       Success<ImportCommitReceipt>(:final value) => ImportFlowCommitted(value),
@@ -344,7 +394,12 @@ final class StatementImportFlowController extends Notifier<StatementImportFlowSt
       return;
     }
     state = const ImportFlowWorking(ImportFlowStep.discarding);
+    final TenantDataGeneration issued = ref.tenantBinding();
     final erased = await ref.read(eraseStatementImportProvider)(importId: importId);
+    if (issued.hasEnded) {
+      _forget();
+      return;
+    }
     switch (erased) {
       case Failed<ImportErasureReceipt>(:final failure):
         state = ImportFlowFailed(failure);
