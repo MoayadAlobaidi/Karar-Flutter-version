@@ -50,6 +50,18 @@
  * `@karar/financial-accounts`' public API — this module depends on that one,
  * and that one knows nothing about this one.
  *
+ * **One port is declared here for another module to CALL, and it writes rows
+ * rather than reading them.** `SourceObservationWriterPort` says that a
+ * delivery arrived through a source link, and `PrismaSourceObservationWriter`
+ * records it on a transaction the CALLER opened —
+ * `modules/statement-imports`' statement commit, which must land as one unit
+ * or not at all. It is declared here because these are this module's rows and
+ * because that module already depends on this one, so the reverse import
+ * would be a cycle; it is exported because a composition root has to bind it.
+ * What it exposes is deliberately tiny: no link is created, re-pointed,
+ * confirmed or promoted through it, nothing is read back, and the only answer
+ * is how many links moved.
+ *
  * **One port runs the other way, and the dependency still does not.**
  * `FinancialAccountsSourceLinkEraser` satisfies `AccountSourceLinkEraserPort`,
  * which `@karar/financial-accounts` DECLARES so that deleting an account
@@ -252,6 +264,11 @@ export type {
   SourceLinkCreateOutcome,
   SourceLinkUpdateOutcome,
 } from './application/ports/account-source-link-repository.js';
+export type {
+  ObservedSourceDelivery,
+  SourceObservationWriteUnit,
+  SourceObservationWriterPort,
+} from './application/ports/source-observation-writer.js';
 
 // application — use cases
 export {
@@ -294,6 +311,7 @@ export {
 // infrastructure — implementations for the composition root
 export { PrismaFinancialConnectionRepository } from './infrastructure/persistence/prisma-financial-connection-repository.js';
 export { PrismaAccountSourceLinkRepository } from './infrastructure/persistence/prisma-account-source-link-repository.js';
+export { PrismaSourceObservationWriter } from './infrastructure/persistence/prisma-source-observation-writer.js';
 export { Uuidv7IdSource } from './infrastructure/persistence/uuidv7-id-source.js';
 export { FinancialAccountsCanonicalAccountAdapter } from './infrastructure/adapters/financial-accounts-canonical-account-access.js';
 export { FinancialAccountsSourceLinkEraser } from './infrastructure/adapters/financial-accounts-source-link-eraser.js';

@@ -54,11 +54,21 @@
  * module declares, on the same principle as `PrismaFinancialRecordEraser`
  * living there and satisfying a need `modules/financial-accounts` has.
  *
+ * The source freshness observation crosses the same way for the same reason.
+ * `public.account_source_links` belongs to `modules/financial-connections`,
+ * and `PrismaSourceObservationWriter` there satisfies
+ * `SourceObservationWriterPort` that module declares, on the open handle.
+ * **This module writes no table it does not own, and the observation stays
+ * inside the transaction rather than becoming an event** — a lagging
+ * freshness report is untidy, but a link claiming a successful import that
+ * rolled back is false, and only one of the two can be made unwritable.
+ *
  * This port's own implementation, `PrismaStatementCommitUnitOfWork`, opens the
  * ONE transaction, writes this module's own rows in it, and hands the open
- * handle over for the canonical records. That handle is what made the split
- * possible without giving up atomicity: a repository that opens its own
- * transaction per record could never be part of somebody else's unit of work.
+ * handle over for the rows belonging to the other two. That handle is what
+ * made the split possible without giving up atomicity: a repository that
+ * opens its own transaction per record could never be part of somebody else's
+ * unit of work.
  *
  * The PORT stays declared here, because the module that owns the atomicity
  * requirement is the module that declares the contract — and because
@@ -141,7 +151,14 @@ export interface StatementImportCommittedNotice {
   readonly occurredAt: Date;
 }
 
-/** What the source link should record about this import having arrived. */
+/**
+ * What this module reports about the import having arrived through a source.
+ *
+ * It is a description of the DELIVERY, not of a row: no link id, no version,
+ * no column. `modules/financial-connections` turns it into whatever its own
+ * table requires, and it is stated here in this module's own vocabulary so
+ * that the plan a use case builds stays free of the other module's types.
+ */
 export interface SourceFreshnessObservation {
   readonly connectionId: string;
   readonly observedAt: Date;

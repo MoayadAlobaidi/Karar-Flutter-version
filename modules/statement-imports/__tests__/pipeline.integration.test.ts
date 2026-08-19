@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Clock } from '@karar/shared-kernel';
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
+import { PrismaSourceObservationWriter } from '@karar/financial-connections';
 import { PrismaMerchantRuleDirectory, PrismaStatementCommitWriter } from '@karar/transactions';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
@@ -233,6 +234,11 @@ function wire(
         // composition root would wire it.
         new PrismaStatementCommitWriter(),
         outbox,
+        // And the source link's freshness by the module that owns THAT table,
+        // on the same transaction. Passed explicitly even though it is the
+        // constructor's default, so this wiring says what a deployment writes
+        // rather than leaving one of the three writers implied.
+        new PrismaSourceObservationWriter(),
       ),
       accounts,
       sourceStore,

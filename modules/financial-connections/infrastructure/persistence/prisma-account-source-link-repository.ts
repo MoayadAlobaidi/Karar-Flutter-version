@@ -79,8 +79,14 @@ const CONFLICTING_ACCOUNT_SQLSTATE = 'KAR23';
 /**
  * The SQLSTATE a driver error carries, or null. Read structurally out of the
  * driver-adapter cause, never by matching the message.
+ *
+ * Exported for `PrismaSourceObservationWriter`, the sibling adapter in this
+ * layer that writes the same table on a caller's transaction. It reads the
+ * same driver shape for the same reason — no refusal from this table reaches
+ * another module as driver text — and one reading of that shape is safer than
+ * two that can drift apart.
  */
-function sqlStateOf(error: unknown): string | null {
+export function sqlStateOf(error: unknown): string | null {
   if (typeof error !== 'object' || error === null) return null;
   const meta = (error as { meta?: unknown }).meta;
   if (typeof meta !== 'object' || meta === null) return null;

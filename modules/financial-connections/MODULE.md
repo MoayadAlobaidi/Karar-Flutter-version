@@ -125,9 +125,12 @@ A wrong automatic link merges two accounts that were never the same, or splits o
 | `SourceAccountFingerprintPort` | the keyed, per-subject, versioned equality value for one external reference | `infrastructure/providers` locally (root key in process memory); a key-management-backed adapter elsewhere |
 | `FinancialConnectionRetentionDecisionPort` | `DECIDED` \| `PENDING_LEGAL_REVIEW` \| `UNAVAILABLE` \| `NOT_APPLICABLE` for one durable dataset | a labelled synthetic fixture in LOCAL only; a policy-pack reader elsewhere. `NOT_APPLICABLE` is a refusal for both datasets — a subject's data routes and the encrypted identifiers behind them are not outside retention law |
 | `CanonicalAccountAccessPort` | does this account exist for this principal, and is it linkable? Existence and lifecycle state, **no narrative** | `infrastructure/adapters`, over `@karar/financial-accounts`' `public-api.ts` |
+| `SourceObservationWriterPort` | one delivery that ARRIVED through a link, recorded on a transaction the CALLER opened. Answers how many links moved, and nothing else | `PrismaSourceObservationWriter` in `infrastructure/persistence`. Called by `modules/statement-imports` inside its statement-commit unit of work; see the section below |
 | `FinancialConnectionRepository`, `AccountSourceLinkRepository`, `IdSource` | persistence and identity | `infrastructure/persistence` |
 
-**One port this module IMPLEMENTS rather than declares:** `AccountSourceLinkEraserPort`, declared by `@karar/financial-accounts` and satisfied by `FinancialAccountsSourceLinkEraser` in `infrastructure/adapters/`. See the section below.
+**One port this module IMPLEMENTS rather than declares:** `AccountSourceLinkEraserPort`, declared by `@karar/financial-accounts` and satisfied by `FinancialAccountsSourceLinkEraser` in `infrastructure/adapters/`. See 'The inward port `financial-accounts` declares, and this module satisfies'.
+
+**One port declared here for another module to CALL:** `SourceObservationWriterPort`. The two run in opposite directions and both keep the dependency one-way — the interface belongs to whichever module cannot import the other, and the implementation belongs to whichever module owns the rows.
 
 ## The inward port `financial-accounts` declares, and this module satisfies
 
@@ -158,6 +161,47 @@ export interface AccountSourceLinkEraserPort {
 
 **Proven, not asserted.** `__tests__/account-erasure.integration.test.ts` creates an account, links two sources to it (one exact, one confirmed probable), deletes the account through the accounts module's own `DeleteOwnAccount`, and counts the surviving rows **as the bootstrap superuser with RLS bypassed** — because counting as `karar_app` would prove the rows are hidden, not that they are gone. For one phase this port did not exist and an account deleted through `DeleteOwnAccount` left its links behind; the gap was recorded here in exactly this place, which is what made it fixable.
 
+## The port this module declares for ingestion to call, and the write it took back
+
+**`modules/statement-imports` depends on this module; this module must not depend back.** When a person's uploaded statement arrives through one of their connections, the link that carried it should record that it delivered — the observation window, the days the data covered. Those are columns in `account_source_links`, behind this module's RLS policy, its guard trigger and its cascade.
+
+For one phase the ingestion module wrote them itself, with an `updateMany` inside its statement-commit transaction. It was recorded honestly on both sides as the one remaining cross-module write rather than left to be discovered, and that is what made it fixable. It is now a port.
+
+**Declared: `application/ports/source-observation-writer.ts`**
+
+```ts
+export interface SourceObservationWriteUnit {
+  readonly unit: unknown;
+}
+
+export interface ObservedSourceDelivery {
+  readonly connectionId: FinancialConnectionId;
+  readonly accountRef: CanonicalAccountRef;
+  /** Moves last_observed_at AND last_successful_import_at: this port reports a delivery that WORKED. */
+  readonly observedAt: Date;
+  readonly historyCoverage: HistoryCoverage;
+}
+
+export interface SourceObservationWriterPort {
+  /** Joins the caller's open unit, adds no transaction, answers how many links moved. */
+  recordDeliveryObserved(
+    unit: SourceObservationWriteUnit,
+    actor: ConnectionsPrincipal,
+    delivery: ObservedSourceDelivery,
+  ): Promise<number>;
+}
+```
+
+**Why the transaction is a parameter.** A statement commit must land as ONE unit — the canonical records, the staged rows' links, the import's state moves and this observation — or a link claims a successful import that rolled back. `AccountSourceLinkRepository.update` opens its OWN transaction, so it cannot be part of somebody else's unit of work; the caller opens one, binds its principal into it, and `PrismaSourceObservationWriter` joins it. `SourceObservationWriteUnit` is opaque (`unknown`) so the ORM stays out of the application layer, and the adapter that created the handle and the adapter that joins it are the only code that knows what it is. Same shape, same reason, as `ImportedRecordCommitPort` in `modules/transactions` and the transactional outbox itself (ADR-0012).
+
+**Why not `RecordSourceObservation`.** That use case takes a link id and the version the caller read, and folds the observation through the domain. An importer has neither: finding the link would mean reading rows whose whole point is that nobody reads them — the encrypted external reference and the keyed fingerprint — and a lost optimistic update inside somebody's commit could only be answered by failing their import or retrying inside the widest transaction in the platform. The port is a set-based write instead, and the columns it may touch are exactly the ones the fold would have produced.
+
+**An observation is a report, never a decision** — the same rule `RecordSourceObservation` states, made unreachable rather than merely intended. Nothing through this port creates a link, points one at another account, changes a status, a match basis, a priority or an authority, or records a confirmation. Nothing is read back: it cannot be used to learn that a link exists, let alone anything about the source account behind it. The only answer is a count, and **zero is ordinary** — a person may import a file through no connection at all, and an import must not fail because the route it came in by is gone.
+
+**Two things the owning side does that the direct write did not.** It advances `version` in the same statement, because `account_source_links_guard` raises `KAR22` on any UPDATE that does not — the old write never set it, so every link it actually matched would have aborted somebody's import, and it only looked correct because no test had a link for it to match. And it excludes links whose `first_observed_at` is AFTER the delivery, because `account_source_links_observation_order_check` would refuse those: a clock problem on one row of this table is not a person's statement import's to fail over, so such a link is left alone and the count says so.
+
+**Proven, not asserted.** `__tests__/source-observation-writer.integration.test.ts` links two source accounts from one connection to one account, records a delivery on a transaction it opens itself, and reads the rows back **as the bootstrap superuser with RLS bypassed**: both links moved, the token advanced by exactly one, and every column that says what a link IS — account, connection, fingerprint, status, subject confirmation, priority, capabilities — is byte-for-byte what it was. It then proves the writer opens no transaction of its own by rolling the caller's back and finding the links untouched.
+
 ## Events published
 
 None. This module publishes no event this phase. When it does, the payload rule is identifier-only and the external reference and fingerprint are not identifiers — neither may ever appear in one.
@@ -174,6 +218,8 @@ None. This module publishes no event this phase. When it does, the payload rule 
 ## Dependencies
 
 Cross-module dependencies resolve through `public-api.ts` only. This module imports `@karar/financial-accounts` in **exactly two files**, both under `infrastructure/adapters/` — `financial-accounts-canonical-account-access.ts` and `financial-accounts-source-link-eraser.ts` — and imports the package root, never a subpath. `modules/financial-accounts` imports nothing from here.
+
+**`modules/statement-imports` depends on this module, and this module imports nothing from it.** That direction is what decides where `SourceObservationWriterPort` is declared: the contract for these rows is declared here and called from there, because the reverse import would be a cycle. `modules/statement-imports/__tests__/module-boundary.test.ts` asserts both halves — that it names this module as a dependency, and that nothing here imports `@karar/statement-imports`.
 
 Cross-module references carry a raw UUID plus a reference type declared **in this module** (`domain/refs.ts`): `CanonicalAccountRef` for an account, `InstitutionRef` for a catalogue entry. Neither is another module's identifier type, and no foreign key crosses a module boundary.
 

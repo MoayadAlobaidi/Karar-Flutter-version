@@ -12,7 +12,8 @@
  *     deterministic category assignment — written by `@karar/transactions`
  *     ON THIS TRANSACTION (see below);
  *  4. the staged rows' write-once links back to what they produced;
- *  5. the source freshness observation on the account-source link;
+ *  5. the source freshness observation on the account-source links, written
+ *     by `@karar/financial-connections` ON THIS TRANSACTION (see below);
  *  6. the identifier-only outbox notice;
  *  7. the import's `COMMITTED` state.
  *
@@ -23,7 +24,7 @@
  *
  * A throw at any point rolls all of it back. **There is no subset.**
  *
- * ## Why the canonical rows are written by another module, on this transaction
+ * ## Why other modules' rows are written by those modules, on this transaction
  *
  * `public.transactions`, `public.transaction_revisions`,
  * `public.transaction_provenance` and `public.transaction_category_assignments`
@@ -40,9 +41,29 @@
  * that JOINS a caller's transaction has no such problem, and the module that
  * owns the tables is the one allowed to open or join a transaction over them.
  *
- * **Nothing in this module writes a table `modules/transactions` owns, and
- * nothing may start to.** `__tests__/module-boundary.test.ts` scans this
- * module's own source for exactly that and fails on it.
+ * **Step 5 is the same story on a second table, and it was the last one.**
+ * `public.account_source_links` belongs to `modules/financial-connections`,
+ * and this file used to `updateMany` it directly — recorded honestly as the
+ * one remaining cross-module write, which is what made it fixable.
+ * `PrismaSourceObservationWriter` now lives in that module and satisfies
+ * `SourceObservationWriterPort`, which THAT module declares, and it receives
+ * the same opaque handle. This file says a delivery landed; what that means
+ * in columns — which rows, which token, which of the table's own CHECKs
+ * decide whether a row may move at all — is decided over there.
+ *
+ * **The observation stays inside this transaction rather than becoming an
+ * event, and the direction of the risk is why.** A stale
+ * `last_successful_import_at` after a commit is a report that lags; a fresh
+ * one after a rollback is a claim that a person's statement was imported when
+ * it was not. Only the second is a lie, and putting the write in the
+ * transaction whose success it describes is what makes it unwritable. It
+ * costs one statement against an indexed predicate — no key provider, no
+ * policy pack, no service call — so it breaks none of the rules the rest of
+ * this file keeps about what may happen while this transaction is open.
+ *
+ * **Nothing in this module writes a table another module owns, and nothing
+ * may start to.** `__tests__/module-boundary.test.ts` scans this module's own
+ * source for exactly that and fails on it.
  *
  * ## Idempotency is decided inside the transaction, not before it
  *
@@ -83,6 +104,14 @@ import {
   type TransactionsPrincipal,
 } from '@karar/transactions';
 import {
+  CanonicalAccountRef as SourceLinkAccountRef,
+  FinancialConnectionId,
+  PrismaSourceObservationWriter,
+  type ConnectionsPrincipal,
+  type ObservedSourceDelivery,
+  type SourceObservationWriterPort,
+} from '@karar/financial-connections';
+import {
   withPrincipalContext,
   type PrismaTransactionClient,
 } from '@karar/platform/dist/db/principal-context.js';
@@ -101,7 +130,7 @@ import type {
   CanonicalNarrativeEncryptorPort,
   EncryptedNarrativeColumns,
 } from '../../application/ports/canonical-narrative-encryptor.js';
-import { requiredCalendarDayToDate, statementImportUpdateData } from './row-mappers.js';
+import { statementImportUpdateData } from './row-mappers.js';
 
 /** One prepared row beside the two ciphertexts its narrative became. */
 interface EncryptedRow {
@@ -126,6 +155,21 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
     /** The transactions module's writer, joining the transaction opened here. */
     private readonly records: ImportedRecordCommitPort,
     private readonly outbox: StatementImportOutboxPort,
+    /**
+     * The connections module's writer for step 5, joining the same
+     * transaction.
+     *
+     * It has a default, and the default is the REAL writer from the module
+     * that owns `public.account_source_links` — never a no-op. A do-nothing
+     * default would let a composition root drop a person's source freshness
+     * by omission, which is the failure mode `DeleteOwnAccount` refuses by
+     * making its three erasers required; here the same protection comes from
+     * the default being the only honest implementation there is. A
+     * composition root should still bind it explicitly, so that what a
+     * deployment writes is visible where everything else it writes is listed.
+     */
+    private readonly sourceObservations: SourceObservationWriterPort =
+      new PrismaSourceObservationWriter(),
   ) {}
 
   async commit(
@@ -152,12 +196,13 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
     // before the transaction opens, so a malformed one is a refusal rather
     // than a rollback.
     const batch = importedRecordBatch(plan, narratives);
+    const delivery = observedDelivery(plan);
 
     try {
       return await withPrincipalContext(
         this.handle,
         { tenantId: actor.tenantId, userId: actor.userId },
-        async (tx) => this.write(tx, actor, plan, batch),
+        async (tx) => this.write(tx, actor, plan, batch, delivery),
         { require: ['tenantId', 'userId'] },
       );
     } catch (error) {
@@ -188,6 +233,7 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
     actor: ImportsPrincipal,
     plan: StatementCommitPlan,
     batch: ImportedRecordBatch,
+    delivery: ObservedSourceDelivery | null,
   ): Promise<StatementCommitReceipt> {
     const importId = plan.committedImport.id;
 
@@ -253,25 +299,19 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
       });
     }
 
-    // STEP 5 — source freshness. Best-effort by design: the link belongs to
-    // `modules/financial-connections` and may not exist, and an import must
-    // not fail because the route it arrived through was deleted. `updateMany`
-    // over zero rows is the correct no-op.
-    if (plan.freshness !== null) {
-      await tx.accountSourceLink.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          connectionId: plan.freshness.connectionId,
-          accountId: plan.committedImport.accountRef.accountId,
-        },
-        data: {
-          lastObservedAt: plan.freshness.observedAt,
-          lastSuccessfulImportAt: plan.freshness.observedAt,
-          historyCoverageStart: requiredCalendarDayToDate(plan.freshness.coverageStart),
-          historyCoverageEnd: requiredCalendarDayToDate(plan.freshness.coverageEnd),
-        },
-      });
+    // STEP 5 — source freshness, written by the module that owns
+    // `public.account_source_links`, on THIS transaction. Best-effort by
+    // design: the link may not exist, and an import must not fail because the
+    // route it arrived through was deleted. The count is deliberately ignored
+    // — zero is the ordinary answer for a person who imported a file without
+    // ever linking its source, and there is nothing for this module to decide
+    // about a number describing another module's rows.
+    if (delivery !== null) {
+      await this.sourceObservations.recordDeliveryObserved(
+        { unit: tx },
+        connectionsPrincipal(actor),
+        delivery,
+      );
     }
 
     // STEP 6 — the identifier-only notice, on THIS transaction. An event for a
@@ -319,6 +359,54 @@ function transactionsPrincipal(actor: ImportsPrincipal): TransactionsPrincipal {
     userId: actor.userId,
     ...(actor.sessionId !== undefined ? { sessionId: actor.sessionId } : {}),
     ...(actor.requestId !== undefined ? { requestId: actor.requestId } : {}),
+  };
+}
+
+/**
+ * The acting subject in the connections module's own vocabulary.
+ *
+ * Restated field by field for the same reason `transactionsPrincipal` is: a
+ * cast would keep compiling if either principal shape gained a field, and in
+ * that module the principal is also what the source-account fingerprint key is
+ * derived from — getting it wrong there is not a scoping mistake but a
+ * cross-subject one.
+ */
+function connectionsPrincipal(actor: ImportsPrincipal): ConnectionsPrincipal {
+  return {
+    tenantId: actor.tenantId,
+    userId: actor.userId,
+    ...(actor.sessionId !== undefined ? { sessionId: actor.sessionId } : {}),
+    ...(actor.requestId !== undefined ? { requestId: actor.requestId } : {}),
+  };
+}
+
+/**
+ * The freshness observation as the delivery the connections module accepts,
+ * or `null` when this import has nothing to report.
+ *
+ * Built BEFORE the transaction opens, like the record batch: the connection
+ * and the account cross as that module's own branded references rather than
+ * as bare strings, so a malformed identifier is a refusal instead of a
+ * rollback three writes into somebody's commit.
+ *
+ * The coverage days cross as `CalendarDay` and are never turned into an
+ * instant here. Which midnight in which timezone a `date` column is written
+ * through is a decision belonging to the module that owns the column
+ * (ADR-0027), and this module no longer takes it.
+ */
+function observedDelivery(plan: StatementCommitPlan): ObservedSourceDelivery | null {
+  if (plan.freshness === null) return null;
+  return {
+    connectionId: FinancialConnectionId.of(plan.freshness.connectionId),
+    accountRef: SourceLinkAccountRef.of(
+      plan.committedImport.accountRef.accountId,
+      plan.committedImport.accountRef.referenceType,
+    ),
+    observedAt: plan.freshness.observedAt,
+    historyCoverage: {
+      start: plan.freshness.coverageStart,
+      end: plan.freshness.coverageEnd,
+    },
   };
 }
 

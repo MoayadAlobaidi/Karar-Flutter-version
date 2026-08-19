@@ -92,11 +92,6 @@ export function calendarDayToDate(day: CalendarDay | null): Date | null {
   return day === null ? null : day.toUtcMidnight();
 }
 
-/** The same, for a NOT NULL column, so a null never reaches one by inference. */
-export function requiredCalendarDayToDate(day: CalendarDay): Date {
-  return day.toUtcMidnight();
-}
-
 /**
  * A `Uint8Array` backed by its own `ArrayBuffer`.
  *
