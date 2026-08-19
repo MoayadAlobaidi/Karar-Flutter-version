@@ -1772,7 +1772,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceSectionTitle => 'Where this data comes from';
 
   @override
-  String get sourceLastSynchronisedLabel => 'Last synchronized';
+  String get sourceLastSynchronisedLabel => 'Data last arrived';
 
   @override
   String get sourceNeverImportedTitle => 'No import has completed yet';
@@ -1815,7 +1815,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceCoverageLabel => 'Days covered';
 
   @override
-  String sourceCoverageRange(String end, String start) {
+  String sourceCoverageRange(String start, String end) {
     return '$start to $end';
   }
 
@@ -2448,17 +2448,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String a11yAccountSummary(String currency, String name, String type) {
+  String a11yAccountSummary(String name, String type, String currency) {
     return '$name, $type, $currency';
   }
 
   @override
-  String a11yBalanceSummary(String amount, String asOf, String kind) {
+  String a11yBalanceSummary(String kind, String amount, String asOf) {
     return '$kind, $amount, $asOf';
   }
 
   @override
-  String a11yInstrumentSummary(String label, String status, String type) {
+  String a11yInstrumentSummary(String label, String type, String status) {
     return '$label, $type, $status';
   }
 
@@ -3328,4 +3328,352 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get transferMatchesLoadingMore => 'Loading more pairs';
+
+  @override
+  String get dataSourcesScreenTitle => 'Where your data comes from';
+
+  @override
+  String get dataSourcesIntro =>
+      'Everything in Karar is here because you put it here. Karar does not connect to any bank, wallet or card issuer, and it holds no credential for any of them.';
+
+  @override
+  String get dataSourcesNoLiveLinkTitle => 'No link to any institution';
+
+  @override
+  String get dataSourcesCredentialNote =>
+      'Karar never asks for a password, PIN, mPIN, one-time code, recovery code or card number, and stores none of them.';
+
+  @override
+  String get dataSourcesConnectionsHeading => 'Your data sources';
+
+  @override
+  String get dataSourcesFilterLabel => 'Show';
+
+  @override
+  String get dataSourcesFilterAll => 'All';
+
+  @override
+  String get dataSourcesFilterAccepting => 'Accepting what you supply';
+
+  @override
+  String get dataSourcesFilterNotConfigured => 'Not set up';
+
+  @override
+  String get dataSourcesFilterUnavailable => 'Not usable now';
+
+  @override
+  String get dataSourcesFilterRetired => 'Finished with';
+
+  @override
+  String get dataSourcesFilterNotImplemented => 'Never built';
+
+  @override
+  String get dataSourcesEmptyTitle => 'No data sources yet';
+
+  @override
+  String get dataSourcesEmptyDescription =>
+      'Nothing has been recorded about how your data arrives. Add an account by hand or import a statement file, and a source will appear here.';
+
+  @override
+  String get dataSourcesFilteredEmptyTitle => 'Nothing matches this filter';
+
+  @override
+  String get dataSourcesFilteredEmptyDescription =>
+      'Choose “All” to see every data source you hold.';
+
+  @override
+  String get dataSourcesUnavailableTitle =>
+      'Your data sources could not be read';
+
+  @override
+  String get dataSourcesUnavailableDescription =>
+      'Karar could not read where your data comes from just now. Nothing about your data has changed.';
+
+  @override
+  String get dataSourcesLoadMore => 'Show more data sources';
+
+  @override
+  String get dataSourcesLoadingMore => 'Loading more data sources';
+
+  @override
+  String get connectionLabelFieldLabel => 'Your name for this';
+
+  @override
+  String get connectionRailFieldLabel => 'How data arrives';
+
+  @override
+  String get connectionStatusFieldLabel => 'State of this record';
+
+  @override
+  String get connectionAvailabilityFieldLabel =>
+      'Can Karar run this way of receiving data';
+
+  @override
+  String get connectionAddedAtLabel => 'Added';
+
+  @override
+  String get connectionRecordChangedLabel => 'This record last changed';
+
+  @override
+  String get connectionRecordChangedNote =>
+      'That is when the record itself changed. It is not when data arrived, and it is not a check with any institution.';
+
+  @override
+  String get connectionShowDetailAction => 'Show details';
+
+  @override
+  String get connectionHideDetailAction => 'Hide details';
+
+  @override
+  String get connectionRailManual => 'Typed in by you';
+
+  @override
+  String get connectionRailUserFileUpload => 'A file you upload';
+
+  @override
+  String get connectionRailOpenFinanceApi => 'Open finance interface';
+
+  @override
+  String get connectionRailDirectBankOrWalletApi =>
+      'Direct bank or wallet interface';
+
+  @override
+  String get connectionRailLicensedAggregatorApi =>
+      'Licensed aggregator interface';
+
+  @override
+  String get connectionRailHostToHostSftp => 'Host-to-host file transfer';
+
+  @override
+  String get connectionRailIso20022File => 'ISO 20022 file';
+
+  @override
+  String get connectionRailSwiftMtFile => 'SWIFT MT file';
+
+  @override
+  String get connectionRailOfxQfxFile => 'OFX or QFX file';
+
+  @override
+  String get connectionRailQifFile => 'QIF file';
+
+  @override
+  String get connectionRailPdfStatement => 'PDF statement';
+
+  @override
+  String get connectionRailSecureEmailStatement => 'Statement by secure email';
+
+  @override
+  String get connectionRailDeviceSignal => 'Signal from this device';
+
+  @override
+  String get connectionRailUnrecognised =>
+      'A way of receiving data this version does not know';
+
+  @override
+  String get railStandingBadgeYouEnterIt => 'You enter it';
+
+  @override
+  String get railStandingBadgeYouUploadIt => 'You upload it';
+
+  @override
+  String get railStandingBadgeNotBuilt => 'Not built';
+
+  @override
+  String get railStandingBadgeUnknown => 'Unknown to this version';
+
+  @override
+  String get railStandingYouEnterIt =>
+      'You type this in yourself. Karar records exactly what you enter and nothing else.';
+
+  @override
+  String get railStandingYouUploadIt =>
+      'You upload a file and Karar reads it. You choose the file, and Karar reads nothing you have not given it.';
+
+  @override
+  String get railStandingNotBuilt =>
+      'Karar has not built this. It is not switched off and it is not scheduled: there is no code for it, nothing to set up, and nothing to wait for.';
+
+  @override
+  String get railStandingUnknown =>
+      'This version of Karar does not know this way of receiving data and will not describe it.';
+
+  @override
+  String get railAvailabilityExecutable => 'Yes';
+
+  @override
+  String get railAvailabilityNotImplemented => 'No, Karar has never built it';
+
+  @override
+  String get railAvailabilityUnrecognised =>
+      'An answer this version of Karar does not know';
+
+  @override
+  String get connectionStatusAcceptsWhatYouSupply => 'Accepts what you supply';
+
+  @override
+  String get connectionStatusNotConfigured =>
+      'Nothing has been set up on this yet';
+
+  @override
+  String get connectionStatusUnavailable =>
+      'Set up, and not usable at the moment';
+
+  @override
+  String get connectionStatusRetired =>
+      'You are finished with this. What it already supplied stays readable.';
+
+  @override
+  String get connectionStatusNotImplemented =>
+      'The way of receiving data this names was never built';
+
+  @override
+  String get connectionStatusUnrecognised =>
+      'A state this version of Karar does not know';
+
+  @override
+  String get dataSourcesBuiltRailsHeading =>
+      'The only two ways data reaches Karar';
+
+  @override
+  String get dataSourcesRailsHeading =>
+      'Ways of receiving data Karar has not built';
+
+  @override
+  String get dataSourcesRailsExplanation =>
+      'These are named so Karar can describe the world accurately. None of them exists here: there is no code for any of them, nothing to set up, and nothing to wait for. Naming one is not a plan to build it.';
+
+  @override
+  String get dataSourcesAccountsHeading => 'Which sources feed each account';
+
+  @override
+  String get dataSourcesAccountsEmpty =>
+      'You hold no accounts yet, so nothing feeds anything.';
+
+  @override
+  String get dataSourcesAccountsUnavailable =>
+      'Your accounts could not be read just now, so they cannot be listed here.';
+
+  @override
+  String get dataSourcesOpenAccountSourcesAction => 'Where its data comes from';
+
+  @override
+  String dataSourcesOpenAccountSourcesA11y(String account) {
+    return 'Where the data for $account comes from';
+  }
+
+  @override
+  String get accountSourcesScreenTitle => 'Sources feeding this account';
+
+  @override
+  String get accountSourcesIntro =>
+      'Every source below is something you supplied. Karar does not contact your bank, wallet or card issuer, so no date here is a check with anyone.';
+
+  @override
+  String get accountSourcesEmptyTitle => 'No source feeds this account';
+
+  @override
+  String get accountSourcesEmptyDescription =>
+      'Nothing has been attached to this account yet. Enter figures by hand or import a statement file, and the source will appear here.';
+
+  @override
+  String get accountSourcesUnavailableTitle => 'Sources could not be read';
+
+  @override
+  String get accountSourcesUnavailableDescription =>
+      'Karar could not read the sources for this account just now.';
+
+  @override
+  String accountSourcesCardHeading(int position) {
+    return 'Source $position';
+  }
+
+  @override
+  String get accountSourcesPriorityLabel => 'Priority stated by Karar';
+
+  @override
+  String accountSourcesPriorityValue(int priority) {
+    return 'Rank $priority';
+  }
+
+  @override
+  String get accountSourcesPriorityNote =>
+      'Sources are listed in the order Karar stated, strongest first. A smaller rank is a stronger source.';
+
+  @override
+  String get accountSourcesPriorityAmbiguous =>
+      'Two of these sources claim the same rank, so which one takes precedence is not decided. Karar will not choose one for you.';
+
+  @override
+  String sourceArrivalYouSupplied(String instant) {
+    return 'You last supplied data through this source on $instant.';
+  }
+
+  @override
+  String get sourceArrivalNone =>
+      'Nothing has arrived through this source yet.';
+
+  @override
+  String get accountSourcesArrivalNote =>
+      'Karar does not contact your bank, so this is a record of what you did, not a check with anyone.';
+
+  @override
+  String get accountSourcesFirstRecordedLabel => 'First recorded';
+
+  @override
+  String get accountSourcesLastRecordedLabel => 'Last recorded activity';
+
+  @override
+  String get accountSourcesLastRecordedNote =>
+      'Karar last recorded something about this source then. Recording is not receiving: an upload that failed to read moves this date too.';
+
+  @override
+  String get accountSourcesCoverageNote =>
+      'This is the range of dates the supplied data itself covers. It is not a freshness date and says nothing about what happened after it.';
+
+  @override
+  String get accountSourcesConfirmedLabel => 'You confirmed this source';
+
+  @override
+  String get accountSourcesConfirmedPending => 'Waiting for you to confirm';
+
+  @override
+  String get accountSourcesMatchLabel => 'Why this source was attached';
+
+  @override
+  String get sourceMatchBasisExact => 'The reference matched exactly';
+
+  @override
+  String get sourceMatchBasisProbable =>
+      'A probable match, waiting for you to say';
+
+  @override
+  String get sourceMatchBasisUnrecognised =>
+      'A reason this version of Karar does not know';
+
+  @override
+  String get accountSourcesNoScoreNote =>
+      'Karar gives a source no confidence score. Either the reference matched exactly, or you are asked.';
+
+  @override
+  String get accountSourcesCapabilitiesHeading =>
+      'What this source was seen to supply';
+
+  @override
+  String get accountSourcesCapabilitiesNote =>
+      'Seen, not supported. A thing nobody looked for is not the same answer as a thing looked for and absent.';
+
+  @override
+  String get dataSourcesRefusalGone =>
+      'This is no longer there. Nothing about your data changed.';
+
+  @override
+  String get dataSourcesRefusalOffline =>
+      'Karar could not reach the network. Nothing about your data changed.';
+
+  @override
+  String get dataSourcesRefusalGeneric =>
+      'This could not be read just now. Nothing about your data changed.';
+
+  @override
+  String get sourceAuthorityFieldLabel => 'How much weight this source carries';
 }

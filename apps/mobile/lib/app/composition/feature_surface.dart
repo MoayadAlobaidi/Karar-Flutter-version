@@ -31,6 +31,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/authentication/presentation/routes/identity_module.dart';
 import '../../features/financial_accounts/presentation/financial_feature_registration.dart';
 import '../../features/financial_accounts/presentation/financial_home_shell.dart';
+import '../../features/financial_connections/presentation/financial_connections_feature_registration.dart';
 import '../../features/platform_bootstrap/presentation/platform_feature_registration.dart';
 import '../../features/session_management/presentation/security_state_screens.dart';
 import '../../features/statement_imports/presentation/statement_import_feature_registration.dart';
@@ -65,6 +66,7 @@ List<Override> featureSurfaceOverrides() => <Override>[
         // place a contract path could hide.
         ...statementImportRoutes(),
         ...transferMatchingRoutes(),
+        ...financialConnectionRoutes(),
       ]),
       startupScreenOverridesProvider.overrideWithValue(
         <StartupStage, StartupScreenBuilder>{
@@ -82,6 +84,7 @@ List<Override> featureSurfaceOverrides() => <Override>[
         ...financialTenantScopedProviders(),
         ...statementImportFeatureTenantScopedProviders(),
         ...transferMatchingTenantScopedProviders(),
+        ...financialConnectionTenantScopedProviders(),
       ]),
       ...themeOverrides(),
     ];

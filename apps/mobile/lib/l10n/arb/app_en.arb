@@ -2303,9 +2303,9 @@
     "description": "Section heading for the source and freshness summary of an account."
   },
 
-  "sourceLastSynchronisedLabel": "Last synchronized",
+  "sourceLastSynchronisedLabel": "Data last arrived",
   "@sourceLastSynchronisedLabel": {
-    "description": "Label for the moment an import last finished successfully."
+    "description": "Label for the moment an import last finished successfully. It must not read as the platform having checked with an institution: this platform contacts none, and the moment is a record of what the person supplied."
   },
 
   "sourceNeverImportedTitle": "No import has completed yet",
@@ -2375,12 +2375,12 @@
 
   "sourceCoverageRange": "{start} to {end}",
   "@sourceCoverageRange": {
-    "description": "A closed range of calendar days, both rendered as days rather than moments.",
+    "description": "A closed range of calendar days, both rendered as days rather than moments. The placeholders are declared START FIRST because gen-l10n orders the generated positional parameters by this map, not by the order they appear in the message: declared end-first, every caller passing (start, end) silently rendered the range backwards.",
     "placeholders": {
-      "end": {
+      "start": {
         "type": "String"
       },
-      "start": {
+      "end": {
         "type": "String"
       }
     }
@@ -3381,49 +3381,31 @@
 
   "a11yAccountSummary": "{name}, {type}, {currency}",
   "@a11yAccountSummary": {
-    "description": "Screen reader label for one account row in the portfolio.",
+    "description": "Screen reader label for one account row in the portfolio. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.",
     "placeholders": {
-      "currency": {
-        "type": "String"
-      },
-      "name": {
-        "type": "String"
-      },
-      "type": {
-        "type": "String"
-      }
+      "name": { "type": "String" },
+      "type": { "type": "String" },
+      "currency": { "type": "String" }
     }
   },
 
   "a11yBalanceSummary": "{kind}, {amount}, {asOf}",
   "@a11yBalanceSummary": {
-    "description": "Screen reader label for one reported balance figure.",
+    "description": "Screen reader label for one reported balance figure. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.",
     "placeholders": {
-      "amount": {
-        "type": "String"
-      },
-      "asOf": {
-        "type": "String"
-      },
-      "kind": {
-        "type": "String"
-      }
+      "kind": { "type": "String" },
+      "amount": { "type": "String" },
+      "asOf": { "type": "String" }
     }
   },
 
   "a11yInstrumentSummary": "{label}, {type}, {status}",
   "@a11yInstrumentSummary": {
-    "description": "Screen reader label for one payment instrument nested under an account.",
+    "description": "Screen reader label for one payment instrument nested under an account. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.",
     "placeholders": {
-      "label": {
-        "type": "String"
-      },
-      "status": {
-        "type": "String"
-      },
-      "type": {
-        "type": "String"
-      }
+      "label": { "type": "String" },
+      "type": { "type": "String" },
+      "status": { "type": "String" }
     }
   },
 
@@ -4409,5 +4391,413 @@
   "transferMatchesLoadingMore": "Loading more pairs",
   "@transferMatchesLoadingMore": {
     "description": "Screen-reader and visible status while the next page of pairs is read."
+  },
+  "dataSourcesScreenTitle": "Where your data comes from",
+  "@dataSourcesScreenTitle": {
+    "description": "Title of the screen that lists the data sources a person holds."
+  },
+  "dataSourcesIntro": "Everything in Karar is here because you put it here. Karar does not connect to any bank, wallet or card issuer, and it holds no credential for any of them.",
+  "@dataSourcesIntro": {
+    "description": "Opening paragraph stating that data arrives only because the person supplied it."
+  },
+  "dataSourcesNoLiveLinkTitle": "No link to any institution",
+  "@dataSourcesNoLiveLinkTitle": {
+    "description": "Title of the banner stating that no live institution link exists."
+  },
+  "dataSourcesCredentialNote": "Karar never asks for a password, PIN, mPIN, one-time code, recovery code or card number, and stores none of them.",
+  "@dataSourcesCredentialNote": {
+    "description": "States that no credential of any kind is requested or stored anywhere."
+  },
+  "dataSourcesConnectionsHeading": "Your data sources",
+  "@dataSourcesConnectionsHeading": {
+    "description": "Heading above the list of data sources the person holds."
+  },
+  "dataSourcesFilterLabel": "Show",
+  "@dataSourcesFilterLabel": {
+    "description": "Label of the control that narrows the data-source list."
+  },
+  "dataSourcesFilterAll": "All",
+  "@dataSourcesFilterAll": {
+    "description": "Filter option showing every data source."
+  },
+  "dataSourcesFilterAccepting": "Accepting what you supply",
+  "@dataSourcesFilterAccepting": {
+    "description": "Filter option for sources that accept data the person supplies."
+  },
+  "dataSourcesFilterNotConfigured": "Not set up",
+  "@dataSourcesFilterNotConfigured": {
+    "description": "Filter option for sources with nothing set up on them yet."
+  },
+  "dataSourcesFilterUnavailable": "Not usable now",
+  "@dataSourcesFilterUnavailable": {
+    "description": "Filter option for sources that are set up and not usable at the moment."
+  },
+  "dataSourcesFilterRetired": "Finished with",
+  "@dataSourcesFilterRetired": {
+    "description": "Filter option for sources the person has retired."
+  },
+  "dataSourcesFilterNotImplemented": "Never built",
+  "@dataSourcesFilterNotImplemented": {
+    "description": "Filter option for sources whose way of receiving data was never built."
+  },
+  "dataSourcesEmptyTitle": "No data sources yet",
+  "@dataSourcesEmptyTitle": {
+    "description": "Empty-state title when the person holds no data sources at all."
+  },
+  "dataSourcesEmptyDescription": "Nothing has been recorded about how your data arrives. Add an account by hand or import a statement file, and a source will appear here.",
+  "@dataSourcesEmptyDescription": {
+    "description": "Empty-state description naming the two ways a source can come to exist."
+  },
+  "dataSourcesFilteredEmptyTitle": "Nothing matches this filter",
+  "@dataSourcesFilteredEmptyTitle": {
+    "description": "Empty-state title when a filter hides every data source."
+  },
+  "dataSourcesFilteredEmptyDescription": "Choose “All” to see every data source you hold.",
+  "@dataSourcesFilteredEmptyDescription": {
+    "description": "Empty-state description telling the person how to clear the filter."
+  },
+  "dataSourcesUnavailableTitle": "Your data sources could not be read",
+  "@dataSourcesUnavailableTitle": {
+    "description": "Error-state title when the data-source list could not be read."
+  },
+  "dataSourcesUnavailableDescription": "Karar could not read where your data comes from just now. Nothing about your data has changed.",
+  "@dataSourcesUnavailableDescription": {
+    "description": "Error-state description, ending with the statement that nothing changed."
+  },
+  "dataSourcesLoadMore": "Show more data sources",
+  "@dataSourcesLoadMore": {
+    "description": "Action that follows the platform cursor to the next page of data sources."
+  },
+  "dataSourcesLoadingMore": "Loading more data sources",
+  "@dataSourcesLoadingMore": {
+    "description": "Screen-reader and visible status while the next page of data sources is read."
+  },
+  "connectionLabelFieldLabel": "Your name for this",
+  "@connectionLabelFieldLabel": {
+    "description": "Field label for the name the person gave one data source."
+  },
+  "connectionRailFieldLabel": "How data arrives",
+  "@connectionRailFieldLabel": {
+    "description": "Field label for the way data reaches the platform on one data source."
+  },
+  "connectionStatusFieldLabel": "State of this record",
+  "@connectionStatusFieldLabel": {
+    "description": "Field label for the lifecycle state of one data-source record."
+  },
+  "connectionAvailabilityFieldLabel": "Can Karar run this way of receiving data",
+  "@connectionAvailabilityFieldLabel": {
+    "description": "Field label for whether the platform can run the way of receiving data."
+  },
+  "connectionAddedAtLabel": "Added",
+  "@connectionAddedAtLabel": {
+    "description": "Field label for when a data-source record was created."
+  },
+  "connectionRecordChangedLabel": "This record last changed",
+  "@connectionRecordChangedLabel": {
+    "description": "Field label for when the data-source record itself was last edited."
+  },
+  "connectionRecordChangedNote": "That is when the record itself changed. It is not when data arrived, and it is not a check with any institution.",
+  "@connectionRecordChangedNote": {
+    "description": "Note preventing the record-changed date from being read as a freshness date."
+  },
+  "connectionShowDetailAction": "Show details",
+  "@connectionShowDetailAction": {
+    "description": "Action that opens the detail of one data source."
+  },
+  "connectionHideDetailAction": "Hide details",
+  "@connectionHideDetailAction": {
+    "description": "Action that closes the detail of one data source."
+  },
+  "connectionRailManual": "Typed in by you",
+  "@connectionRailManual": {
+    "description": "Name of the MANUAL way of receiving data."
+  },
+  "connectionRailUserFileUpload": "A file you upload",
+  "@connectionRailUserFileUpload": {
+    "description": "Name of the USER_FILE_UPLOAD way of receiving data."
+  },
+  "connectionRailOpenFinanceApi": "Open finance interface",
+  "@connectionRailOpenFinanceApi": {
+    "description": "Name of the OPEN_FINANCE_API way of receiving data, which is not built."
+  },
+  "connectionRailDirectBankOrWalletApi": "Direct bank or wallet interface",
+  "@connectionRailDirectBankOrWalletApi": {
+    "description": "Name of the DIRECT_BANK_OR_WALLET_API way of receiving data, which is not built."
+  },
+  "connectionRailLicensedAggregatorApi": "Licensed aggregator interface",
+  "@connectionRailLicensedAggregatorApi": {
+    "description": "Name of the LICENSED_AGGREGATOR_API way of receiving data, which is not built."
+  },
+  "connectionRailHostToHostSftp": "Host-to-host file transfer",
+  "@connectionRailHostToHostSftp": {
+    "description": "Name of the HOST_TO_HOST_SFTP way of receiving data, which is not built."
+  },
+  "connectionRailIso20022File": "ISO 20022 file",
+  "@connectionRailIso20022File": {
+    "description": "Name of the ISO_20022_FILE way of receiving data, which is not built."
+  },
+  "connectionRailSwiftMtFile": "SWIFT MT file",
+  "@connectionRailSwiftMtFile": {
+    "description": "Name of the SWIFT_MT_FILE way of receiving data, which is not built."
+  },
+  "connectionRailOfxQfxFile": "OFX or QFX file",
+  "@connectionRailOfxQfxFile": {
+    "description": "Name of the OFX_QFX_FILE way of receiving data, which is not built."
+  },
+  "connectionRailQifFile": "QIF file",
+  "@connectionRailQifFile": {
+    "description": "Name of the QIF_FILE way of receiving data, which is not built."
+  },
+  "connectionRailPdfStatement": "PDF statement",
+  "@connectionRailPdfStatement": {
+    "description": "Name of the PDF_STATEMENT way of receiving data, which is not built."
+  },
+  "connectionRailSecureEmailStatement": "Statement by secure email",
+  "@connectionRailSecureEmailStatement": {
+    "description": "Name of the SECURE_EMAIL_STATEMENT way of receiving data, which is not built."
+  },
+  "connectionRailDeviceSignal": "Signal from this device",
+  "@connectionRailDeviceSignal": {
+    "description": "Name of the DEVICE_SIGNAL way of receiving data, which is not built."
+  },
+  "connectionRailUnrecognised": "A way of receiving data this version does not know",
+  "@connectionRailUnrecognised": {
+    "description": "Name used when the platform sent a way of receiving data this build does not know."
+  },
+  "railStandingBadgeYouEnterIt": "You enter it",
+  "@railStandingBadgeYouEnterIt": {
+    "description": "Short badge for a way of receiving data where the person types the data in."
+  },
+  "railStandingBadgeYouUploadIt": "You upload it",
+  "@railStandingBadgeYouUploadIt": {
+    "description": "Short badge for a way of receiving data where the person uploads a file."
+  },
+  "railStandingBadgeNotBuilt": "Not built",
+  "@railStandingBadgeNotBuilt": {
+    "description": "Short badge for a way of receiving data that has no implementation at all."
+  },
+  "railStandingBadgeUnknown": "Unknown to this version",
+  "@railStandingBadgeUnknown": {
+    "description": "Short badge for a way of receiving data this build does not know."
+  },
+  "railStandingYouEnterIt": "You type this in yourself. Karar records exactly what you enter and nothing else.",
+  "@railStandingYouEnterIt": {
+    "description": "Sentence for the MANUAL way of receiving data."
+  },
+  "railStandingYouUploadIt": "You upload a file and Karar reads it. You choose the file, and Karar reads nothing you have not given it.",
+  "@railStandingYouUploadIt": {
+    "description": "Sentence for the USER_FILE_UPLOAD way of receiving data."
+  },
+  "railStandingNotBuilt": "Karar has not built this. It is not switched off and it is not scheduled: there is no code for it, nothing to set up, and nothing to wait for.",
+  "@railStandingNotBuilt": {
+    "description": "Sentence for a way of receiving data that has no implementation. It must not read as a promise."
+  },
+  "railStandingUnknown": "This version of Karar does not know this way of receiving data and will not describe it.",
+  "@railStandingUnknown": {
+    "description": "Sentence for a way of receiving data this build does not know."
+  },
+  "railAvailabilityExecutable": "Yes",
+  "@railAvailabilityExecutable": {
+    "description": "The platform answer that it can run this way of receiving data."
+  },
+  "railAvailabilityNotImplemented": "No, Karar has never built it",
+  "@railAvailabilityNotImplemented": {
+    "description": "The platform answer that this way of receiving data was never implemented."
+  },
+  "railAvailabilityUnrecognised": "An answer this version of Karar does not know",
+  "@railAvailabilityUnrecognised": {
+    "description": "Shown when the platform answer about a way of receiving data is unknown to this build."
+  },
+  "connectionStatusAcceptsWhatYouSupply": "Accepts what you supply",
+  "@connectionStatusAcceptsWhatYouSupply": {
+    "description": "ACTIVE lifecycle state. It means the record accepts data the person supplies, never that anything is connected."
+  },
+  "connectionStatusNotConfigured": "Nothing has been set up on this yet",
+  "@connectionStatusNotConfigured": {
+    "description": "NOT_CONFIGURED lifecycle state, kept distinct from unavailable and never built."
+  },
+  "connectionStatusUnavailable": "Set up, and not usable at the moment",
+  "@connectionStatusUnavailable": {
+    "description": "UNAVAILABLE lifecycle state, kept distinct from not set up and never built."
+  },
+  "connectionStatusRetired": "You are finished with this. What it already supplied stays readable.",
+  "@connectionStatusRetired": {
+    "description": "RETIRED lifecycle state."
+  },
+  "connectionStatusNotImplemented": "The way of receiving data this names was never built",
+  "@connectionStatusNotImplemented": {
+    "description": "NOT_IMPLEMENTED lifecycle state, kept distinct from not set up and unavailable."
+  },
+  "connectionStatusUnrecognised": "A state this version of Karar does not know",
+  "@connectionStatusUnrecognised": {
+    "description": "Lifecycle state this build does not know."
+  },
+  "dataSourcesBuiltRailsHeading": "The only two ways data reaches Karar",
+  "@dataSourcesBuiltRailsHeading": {
+    "description": "Heading above the two ways of receiving data that actually exist."
+  },
+  "dataSourcesRailsHeading": "Ways of receiving data Karar has not built",
+  "@dataSourcesRailsHeading": {
+    "description": "Heading above every way of receiving data that has no implementation."
+  },
+  "dataSourcesRailsExplanation": "These are named so Karar can describe the world accurately. None of them exists here: there is no code for any of them, nothing to set up, and nothing to wait for. Naming one is not a plan to build it.",
+  "@dataSourcesRailsExplanation": {
+    "description": "Explains why unimplemented ways of receiving data are named at all, and states that naming is not a promise."
+  },
+  "dataSourcesAccountsHeading": "Which sources feed each account",
+  "@dataSourcesAccountsHeading": {
+    "description": "Heading above the list of accounts, each linking to the sources feeding it."
+  },
+  "dataSourcesAccountsEmpty": "You hold no accounts yet, so nothing feeds anything.",
+  "@dataSourcesAccountsEmpty": {
+    "description": "Shown when the person holds no accounts, so no account can be listed."
+  },
+  "dataSourcesAccountsUnavailable": "Your accounts could not be read just now, so they cannot be listed here.",
+  "@dataSourcesAccountsUnavailable": {
+    "description": "Shown when the account list could not be read."
+  },
+  "dataSourcesOpenAccountSourcesAction": "Where its data comes from",
+  "@dataSourcesOpenAccountSourcesAction": {
+    "description": "Action opening the sources feeding one account."
+  },
+  "dataSourcesOpenAccountSourcesA11y": "Where the data for {account} comes from",
+  "@dataSourcesOpenAccountSourcesA11y": {
+    "description": "Screen-reader label naming the account whose sources the action opens.",
+    "placeholders": {
+      "account": { "type": "String" }
+    }
+  },
+  "accountSourcesScreenTitle": "Sources feeding this account",
+  "@accountSourcesScreenTitle": {
+    "description": "Title of the screen listing the sources that feed one account."
+  },
+  "accountSourcesIntro": "Every source below is something you supplied. Karar does not contact your bank, wallet or card issuer, so no date here is a check with anyone.",
+  "@accountSourcesIntro": {
+    "description": "Opening paragraph of the per-account sources screen."
+  },
+  "accountSourcesEmptyTitle": "No source feeds this account",
+  "@accountSourcesEmptyTitle": {
+    "description": "Empty-state title when nothing feeds the account."
+  },
+  "accountSourcesEmptyDescription": "Nothing has been attached to this account yet. Enter figures by hand or import a statement file, and the source will appear here.",
+  "@accountSourcesEmptyDescription": {
+    "description": "Empty-state description for an account with no sources."
+  },
+  "accountSourcesUnavailableTitle": "Sources could not be read",
+  "@accountSourcesUnavailableTitle": {
+    "description": "Error-state title when the sources for one account could not be read."
+  },
+  "accountSourcesUnavailableDescription": "Karar could not read the sources for this account just now.",
+  "@accountSourcesUnavailableDescription": {
+    "description": "Error-state description when the sources for one account could not be read."
+  },
+  "accountSourcesCardHeading": "Source {position}",
+  "@accountSourcesCardHeading": {
+    "description": "Heading of one source card, numbered by its place in the stated order.",
+    "placeholders": {
+      "position": { "type": "int" }
+    }
+  },
+  "accountSourcesPriorityLabel": "Priority stated by Karar",
+  "@accountSourcesPriorityLabel": {
+    "description": "Field label for the priority the platform stated for one source."
+  },
+  "accountSourcesPriorityValue": "Rank {priority}",
+  "@accountSourcesPriorityValue": {
+    "description": "The stated priority of one source, as a rank.",
+    "placeholders": {
+      "priority": { "type": "int" }
+    }
+  },
+  "accountSourcesPriorityNote": "Sources are listed in the order Karar stated, strongest first. A smaller rank is a stronger source.",
+  "@accountSourcesPriorityNote": {
+    "description": "Explains that the order on screen is the order the platform stated."
+  },
+  "accountSourcesPriorityAmbiguous": "Two of these sources claim the same rank, so which one takes precedence is not decided. Karar will not choose one for you.",
+  "@accountSourcesPriorityAmbiguous": {
+    "description": "Shown when two sources share a priority, so no precedence is stated."
+  },
+  "sourceArrivalYouSupplied": "You last supplied data through this source on {instant}.",
+  "@sourceArrivalYouSupplied": {
+    "description": "States when data last arrived, naming the person as the origin so it cannot read as a check with an institution.",
+    "placeholders": {
+      "instant": { "type": "String" }
+    }
+  },
+  "sourceArrivalNone": "Nothing has arrived through this source yet.",
+  "@sourceArrivalNone": {
+    "description": "Shown when no import has ever succeeded for one source."
+  },
+  "accountSourcesArrivalNote": "Karar does not contact your bank, so this is a record of what you did, not a check with anyone.",
+  "@accountSourcesArrivalNote": {
+    "description": "Note preventing the arrival date from being read as a check with an institution."
+  },
+  "accountSourcesFirstRecordedLabel": "First recorded",
+  "@accountSourcesFirstRecordedLabel": {
+    "description": "Field label for when this source was first observed."
+  },
+  "accountSourcesLastRecordedLabel": "Last recorded activity",
+  "@accountSourcesLastRecordedLabel": {
+    "description": "Field label for when this source was last observed."
+  },
+  "accountSourcesLastRecordedNote": "Karar last recorded something about this source then. Recording is not receiving: an upload that failed to read moves this date too.",
+  "@accountSourcesLastRecordedNote": {
+    "description": "Note separating the last-observed date from the moment data actually arrived."
+  },
+  "accountSourcesCoverageNote": "This is the range of dates the supplied data itself covers. It is not a freshness date and says nothing about what happened after it.",
+  "@accountSourcesCoverageNote": {
+    "description": "Note preventing the coverage range from being read as a freshness guarantee."
+  },
+  "accountSourcesConfirmedLabel": "You confirmed this source",
+  "@accountSourcesConfirmedLabel": {
+    "description": "Field label for when the person confirmed a source link."
+  },
+  "accountSourcesConfirmedPending": "Waiting for you to confirm",
+  "@accountSourcesConfirmedPending": {
+    "description": "Shown when the person has not yet confirmed a source link."
+  },
+  "accountSourcesMatchLabel": "Why this source was attached",
+  "@accountSourcesMatchLabel": {
+    "description": "Field label for the basis on which a source was attached to an account."
+  },
+  "sourceMatchBasisExact": "The reference matched exactly",
+  "@sourceMatchBasisExact": {
+    "description": "EXACT_EXTERNAL_REFERENCE basis for attaching a source to an account."
+  },
+  "sourceMatchBasisProbable": "A probable match, waiting for you to say",
+  "@sourceMatchBasisProbable": {
+    "description": "PROBABLE basis for attaching a source to an account."
+  },
+  "sourceMatchBasisUnrecognised": "A reason this version of Karar does not know",
+  "@sourceMatchBasisUnrecognised": {
+    "description": "Basis for attaching a source that this build does not know."
+  },
+  "accountSourcesNoScoreNote": "Karar gives a source no confidence score. Either the reference matched exactly, or you are asked.",
+  "@accountSourcesNoScoreNote": {
+    "description": "States that no confidence figure exists, so none is shown."
+  },
+  "accountSourcesCapabilitiesHeading": "What this source was seen to supply",
+  "@accountSourcesCapabilitiesHeading": {
+    "description": "Heading above what a source was observed to supply."
+  },
+  "accountSourcesCapabilitiesNote": "Seen, not supported. A thing nobody looked for is not the same answer as a thing looked for and absent.",
+  "@accountSourcesCapabilitiesNote": {
+    "description": "Keeps NOT_OBSERVED and NOT_PROVIDED apart in words."
+  },
+  "dataSourcesRefusalGone": "This is no longer there. Nothing about your data changed.",
+  "@dataSourcesRefusalGone": {
+    "description": "Refusal shown when what was asked for is gone."
+  },
+  "dataSourcesRefusalOffline": "Karar could not reach the network. Nothing about your data changed.",
+  "@dataSourcesRefusalOffline": {
+    "description": "Refusal shown when the device has no usable connection or the request timed out."
+  },
+  "dataSourcesRefusalGeneric": "This could not be read just now. Nothing about your data changed.",
+  "@dataSourcesRefusalGeneric": {
+    "description": "Refusal shown for any other reason a read did not complete."
+  },
+  "sourceAuthorityFieldLabel": "How much weight this source carries",
+  "@sourceAuthorityFieldLabel": {
+    "description": "Field label for how authoritative a source claims to be. It names the field; the value beside it is the weight itself."
   }
 }

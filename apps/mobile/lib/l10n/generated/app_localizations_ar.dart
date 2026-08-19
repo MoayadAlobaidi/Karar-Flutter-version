@@ -1754,7 +1754,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sourceSectionTitle => 'من أين تأتي هذه البيانات';
 
   @override
-  String get sourceLastSynchronisedLabel => 'آخر مزامنة';
+  String get sourceLastSynchronisedLabel => 'آخر وصول للبيانات';
 
   @override
   String get sourceNeverImportedTitle => 'لم يكتمل أي استيراد بعد';
@@ -1797,7 +1797,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sourceCoverageLabel => 'الأيام المشمولة';
 
   @override
-  String sourceCoverageRange(String end, String start) {
+  String sourceCoverageRange(String start, String end) {
     return 'من $start إلى $end';
   }
 
@@ -2427,17 +2427,17 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String a11yAccountSummary(String currency, String name, String type) {
+  String a11yAccountSummary(String name, String type, String currency) {
     return '$name، $type، $currency';
   }
 
   @override
-  String a11yBalanceSummary(String amount, String asOf, String kind) {
+  String a11yBalanceSummary(String kind, String amount, String asOf) {
     return '$kind، $amount، $asOf';
   }
 
   @override
-  String a11yInstrumentSummary(String label, String status, String type) {
+  String a11yInstrumentSummary(String label, String type, String status) {
     return '$label، $type، $status';
   }
 
@@ -3293,4 +3293,342 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get transferMatchesLoadingMore => 'يجري تحميل أزواج أخرى';
+
+  @override
+  String get dataSourcesScreenTitle => 'من أين تأتي بياناتك';
+
+  @override
+  String get dataSourcesIntro =>
+      'كل ما في كرار موجود لأنك أنت وضعته. لا يتصل كرار بأي بنك أو محفظة أو جهة إصدار بطاقات، ولا يحتفظ بأي بيانات دخول لأي منها.';
+
+  @override
+  String get dataSourcesNoLiveLinkTitle => 'لا رابط مع أي مؤسسة';
+
+  @override
+  String get dataSourcesCredentialNote =>
+      'لا يطلب كرار كلمة مرور ولا رمزًا سريًا ولا رمز محفظة ولا رمزًا لمرة واحدة ولا رمز استرداد ولا رقم بطاقة، ولا يخزّن أيًا منها.';
+
+  @override
+  String get dataSourcesConnectionsHeading => 'مصادر بياناتك';
+
+  @override
+  String get dataSourcesFilterLabel => 'اعرض';
+
+  @override
+  String get dataSourcesFilterAll => 'الكل';
+
+  @override
+  String get dataSourcesFilterAccepting => 'يقبل ما تزوّده به';
+
+  @override
+  String get dataSourcesFilterNotConfigured => 'لم يُهيَّأ';
+
+  @override
+  String get dataSourcesFilterUnavailable => 'غير صالح للاستخدام الآن';
+
+  @override
+  String get dataSourcesFilterRetired => 'انتهيت منه';
+
+  @override
+  String get dataSourcesFilterNotImplemented => 'لم يُبنَ إطلاقًا';
+
+  @override
+  String get dataSourcesEmptyTitle => 'لا مصادر بيانات بعد';
+
+  @override
+  String get dataSourcesEmptyDescription =>
+      'لم يُسجَّل شيء عن كيفية وصول بياناتك. أضف حسابًا يدويًا أو استورد ملف كشف حساب، وسيظهر المصدر هنا.';
+
+  @override
+  String get dataSourcesFilteredEmptyTitle => 'لا شيء يطابق هذا المرشّح';
+
+  @override
+  String get dataSourcesFilteredEmptyDescription =>
+      'اختر «الكل» لترى كل مصادر بياناتك.';
+
+  @override
+  String get dataSourcesUnavailableTitle => 'تعذّرت قراءة مصادر بياناتك';
+
+  @override
+  String get dataSourcesUnavailableDescription =>
+      'تعذّر على كرار قراءة مصادر بياناتك الآن. لم يتغير شيء في بياناتك.';
+
+  @override
+  String get dataSourcesLoadMore => 'أظهر مصادر بيانات أخرى';
+
+  @override
+  String get dataSourcesLoadingMore => 'يجري تحميل مصادر بيانات أخرى';
+
+  @override
+  String get connectionLabelFieldLabel => 'اسمك لهذا المصدر';
+
+  @override
+  String get connectionRailFieldLabel => 'كيف تصل البيانات';
+
+  @override
+  String get connectionStatusFieldLabel => 'حالة هذا السجل';
+
+  @override
+  String get connectionAvailabilityFieldLabel =>
+      'هل يستطيع كرار تشغيل طريقة الاستلام هذه';
+
+  @override
+  String get connectionAddedAtLabel => 'أُضيف في';
+
+  @override
+  String get connectionRecordChangedLabel => 'آخر تغيير على هذا السجل';
+
+  @override
+  String get connectionRecordChangedNote =>
+      'هذا وقت تغيّر السجل نفسه. ليس وقت وصول بيانات، وليس تحققًا مع أي مؤسسة.';
+
+  @override
+  String get connectionShowDetailAction => 'أظهر التفاصيل';
+
+  @override
+  String get connectionHideDetailAction => 'أخفِ التفاصيل';
+
+  @override
+  String get connectionRailManual => 'تدخلها بنفسك';
+
+  @override
+  String get connectionRailUserFileUpload => 'ملف ترفعه أنت';
+
+  @override
+  String get connectionRailOpenFinanceApi => 'واجهة التمويل المفتوح';
+
+  @override
+  String get connectionRailDirectBankOrWalletApi =>
+      'واجهة مباشرة لبنك أو محفظة';
+
+  @override
+  String get connectionRailLicensedAggregatorApi => 'واجهة مجمّع بيانات مرخّص';
+
+  @override
+  String get connectionRailHostToHostSftp => 'نقل ملفات بين الأنظمة';
+
+  @override
+  String get connectionRailIso20022File => 'ملف ISO 20022';
+
+  @override
+  String get connectionRailSwiftMtFile => 'ملف SWIFT MT';
+
+  @override
+  String get connectionRailOfxQfxFile => 'ملف OFX أو QFX';
+
+  @override
+  String get connectionRailQifFile => 'ملف QIF';
+
+  @override
+  String get connectionRailPdfStatement => 'كشف حساب PDF';
+
+  @override
+  String get connectionRailSecureEmailStatement => 'كشف حساب ببريد آمن';
+
+  @override
+  String get connectionRailDeviceSignal => 'إشارة من هذا الجهاز';
+
+  @override
+  String get connectionRailUnrecognised => 'طريقة استلام لا تعرفها هذه النسخة';
+
+  @override
+  String get railStandingBadgeYouEnterIt => 'تدخلها أنت';
+
+  @override
+  String get railStandingBadgeYouUploadIt => 'ترفعها أنت';
+
+  @override
+  String get railStandingBadgeNotBuilt => 'غير مبني';
+
+  @override
+  String get railStandingBadgeUnknown => 'غير معروف لهذه النسخة';
+
+  @override
+  String get railStandingYouEnterIt =>
+      'تكتب هذه البيانات بنفسك. يسجّل كرار ما تدخله تمامًا ولا شيء غيره.';
+
+  @override
+  String get railStandingYouUploadIt =>
+      'ترفع ملفًا ويقرأه كرار. أنت من يختار الملف، ولا يقرأ كرار شيئًا لم تعطه إياه.';
+
+  @override
+  String get railStandingNotBuilt =>
+      'لم يبنِ كرار هذه الطريقة. ليست معطّلة وليست مجدولة: لا توجد لها برمجة، ولا شيء لتهيئته، ولا شيء لانتظاره.';
+
+  @override
+  String get railStandingUnknown =>
+      'لا تعرف هذه النسخة من كرار طريقة الاستلام هذه ولن تصفها.';
+
+  @override
+  String get railAvailabilityExecutable => 'نعم';
+
+  @override
+  String get railAvailabilityNotImplemented => 'لا، لم يبنِها كرار إطلاقًا';
+
+  @override
+  String get railAvailabilityUnrecognised => 'جواب لا تعرفه هذه النسخة من كرار';
+
+  @override
+  String get connectionStatusAcceptsWhatYouSupply => 'يقبل ما تزوّده به';
+
+  @override
+  String get connectionStatusNotConfigured => 'لم يُهيَّأ عليه شيء بعد';
+
+  @override
+  String get connectionStatusUnavailable => 'مُهيَّأ، وغير صالح للاستخدام الآن';
+
+  @override
+  String get connectionStatusRetired =>
+      'انتهيت منه. ويبقى ما زوّدك به مقروءًا.';
+
+  @override
+  String get connectionStatusNotImplemented =>
+      'طريقة الاستلام التي يسمّيها لم تُبنَ إطلاقًا';
+
+  @override
+  String get connectionStatusUnrecognised =>
+      'حالة لا تعرفها هذه النسخة من كرار';
+
+  @override
+  String get dataSourcesBuiltRailsHeading =>
+      'الطريقتان الوحيدتان اللتان تصل بهما البيانات إلى كرار';
+
+  @override
+  String get dataSourcesRailsHeading => 'طرق استلام لم يبنِها كرار';
+
+  @override
+  String get dataSourcesRailsExplanation =>
+      'هذه الطرق مسمّاة كي يصف كرار العالم وصفًا دقيقًا. ولا وجود لأي منها هنا: لا برمجة لها، ولا شيء لتهيئته، ولا شيء لانتظاره. وتسمية الطريقة ليست خطة لبنائها.';
+
+  @override
+  String get dataSourcesAccountsHeading => 'أي المصادر تغذّي كل حساب';
+
+  @override
+  String get dataSourcesAccountsEmpty =>
+      'لا تملك حسابات بعد، فلا شيء يغذّي شيئًا.';
+
+  @override
+  String get dataSourcesAccountsUnavailable =>
+      'تعذّرت قراءة حساباتك الآن، فلا يمكن سردها هنا.';
+
+  @override
+  String get dataSourcesOpenAccountSourcesAction => 'من أين تأتي بياناته';
+
+  @override
+  String dataSourcesOpenAccountSourcesA11y(String account) {
+    return 'من أين تأتي بيانات $account';
+  }
+
+  @override
+  String get accountSourcesScreenTitle => 'المصادر التي تغذّي هذا الحساب';
+
+  @override
+  String get accountSourcesIntro =>
+      'كل مصدر أدناه شيء زوّدته أنت. لا يتواصل كرار مع بنكك أو محفظتك أو جهة إصدار بطاقتك، فليس أي تاريخ هنا تحققًا مع أحد.';
+
+  @override
+  String get accountSourcesEmptyTitle => 'لا مصدر يغذّي هذا الحساب';
+
+  @override
+  String get accountSourcesEmptyDescription =>
+      'لم يُربط بهذا الحساب شيء بعد. أدخل الأرقام يدويًا أو استورد ملف كشف حساب، وسيظهر المصدر هنا.';
+
+  @override
+  String get accountSourcesUnavailableTitle => 'تعذّرت قراءة المصادر';
+
+  @override
+  String get accountSourcesUnavailableDescription =>
+      'تعذّر على كرار قراءة مصادر هذا الحساب الآن.';
+
+  @override
+  String accountSourcesCardHeading(int position) {
+    return 'المصدر $position';
+  }
+
+  @override
+  String get accountSourcesPriorityLabel => 'الأولوية كما ذكرها كرار';
+
+  @override
+  String accountSourcesPriorityValue(int priority) {
+    return 'المرتبة $priority';
+  }
+
+  @override
+  String get accountSourcesPriorityNote =>
+      'تُعرض المصادر بالترتيب الذي ذكره كرار، الأقوى أولًا. والرقم الأصغر يعني مصدرًا أقوى.';
+
+  @override
+  String get accountSourcesPriorityAmbiguous =>
+      'مصدران هنا يدّعيان المرتبة نفسها، فأيهما يُقدَّم أمر غير محسوم. ولن يختار كرار نيابة عنك.';
+
+  @override
+  String sourceArrivalYouSupplied(String instant) {
+    return 'زوّدت هذا المصدر ببيانات آخر مرة في $instant.';
+  }
+
+  @override
+  String get sourceArrivalNone => 'لم يصل شيء عبر هذا المصدر بعد.';
+
+  @override
+  String get accountSourcesArrivalNote =>
+      'لا يتواصل كرار مع بنكك، فهذا سجل لما فعلته أنت، وليس تحققًا مع أحد.';
+
+  @override
+  String get accountSourcesFirstRecordedLabel => 'أول تسجيل';
+
+  @override
+  String get accountSourcesLastRecordedLabel => 'آخر نشاط مسجَّل';
+
+  @override
+  String get accountSourcesLastRecordedNote =>
+      'سجّل كرار آخر شيء عن هذا المصدر حينها. والتسجيل ليس استلامًا: رفع ملف تعذّرت قراءته يحرّك هذا التاريخ أيضًا.';
+
+  @override
+  String get accountSourcesCoverageNote =>
+      'هذا نطاق التواريخ التي تغطيها البيانات المزوَّدة نفسها. ليس تاريخ حداثة، ولا يقول شيئًا عمّا جرى بعده.';
+
+  @override
+  String get accountSourcesConfirmedLabel => 'أكدت هذا المصدر في';
+
+  @override
+  String get accountSourcesConfirmedPending => 'بانتظار تأكيدك';
+
+  @override
+  String get accountSourcesMatchLabel => 'لماذا رُبط هذا المصدر';
+
+  @override
+  String get sourceMatchBasisExact => 'تطابق المرجع تمامًا';
+
+  @override
+  String get sourceMatchBasisProbable => 'تطابق محتمل، بانتظار كلمتك';
+
+  @override
+  String get sourceMatchBasisUnrecognised => 'سبب لا تعرفه هذه النسخة من كرار';
+
+  @override
+  String get accountSourcesNoScoreNote =>
+      'لا يمنح كرار المصدر درجة ثقة. إما أن يتطابق المرجع تمامًا، وإما أن تُسأل أنت.';
+
+  @override
+  String get accountSourcesCapabilitiesHeading =>
+      'ما شوهد أن هذا المصدر يزوّده';
+
+  @override
+  String get accountSourcesCapabilitiesNote =>
+      'ما شوهد، لا ما هو مدعوم. وما لم يبحث عنه أحد ليس الجواب نفسه لشيء بُحث عنه فلم يوجد.';
+
+  @override
+  String get dataSourcesRefusalGone =>
+      'لم يعد هذا موجودًا. لم يتغير شيء في بياناتك.';
+
+  @override
+  String get dataSourcesRefusalOffline =>
+      'تعذّر على كرار الوصول إلى الشبكة. لم يتغير شيء في بياناتك.';
+
+  @override
+  String get dataSourcesRefusalGeneric =>
+      'تعذّرت قراءة هذا الآن. لم يتغير شيء في بياناتك.';
+
+  @override
+  String get sourceAuthorityFieldLabel => 'وزن هذا المصدر';
 }

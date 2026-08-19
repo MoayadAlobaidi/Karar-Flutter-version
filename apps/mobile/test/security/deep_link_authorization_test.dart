@@ -30,6 +30,7 @@ import 'package:karar_mobile/features/financial_accounts/presentation/accounts_a
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_feature_registration.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_routes.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_unavailable_screen.dart';
+import 'package:karar_mobile/features/financial_connections/presentation/financial_connections_feature_registration.dart';
 import 'package:karar_mobile/features/statement_imports/presentation/statement_import_feature_registration.dart';
 import 'package:karar_mobile/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:karar_mobile/features/transactions/presentation/transactions_screen.dart';
@@ -65,6 +66,7 @@ List<String> everyFinancialPath() {
     ...financialFeatureRoutes(),
     ...statementImportRoutes(),
     ...transferMatchingRoutes(),
+    ...financialConnectionRoutes(),
   ]) {
     if (route is! GoRoute) {
       continue;
@@ -116,6 +118,7 @@ void main() {
         ...financialFeatureRoutes(),
         ...statementImportRoutes(),
         ...transferMatchingRoutes(),
+        ...financialConnectionRoutes(),
       ].whereType<GoRoute>().length;
 
       expect(derived, hasLength(declared));

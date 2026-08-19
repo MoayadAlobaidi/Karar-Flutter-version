@@ -3041,10 +3041,10 @@ abstract class AppLocalizations {
   /// **'Where this data comes from'**
   String get sourceSectionTitle;
 
-  /// Label for the moment an import last finished successfully.
+  /// Label for the moment an import last finished successfully. It must not read as the platform having checked with an institution: this platform contacts none, and the moment is a record of what the person supplied.
   ///
   /// In en, this message translates to:
-  /// **'Last synchronized'**
+  /// **'Data last arrived'**
   String get sourceLastSynchronisedLabel;
 
   /// Shown when a source is attached but has never delivered anything.
@@ -3125,11 +3125,11 @@ abstract class AppLocalizations {
   /// **'Days covered'**
   String get sourceCoverageLabel;
 
-  /// A closed range of calendar days, both rendered as days rather than moments.
+  /// A closed range of calendar days, both rendered as days rather than moments. The placeholders are declared START FIRST because gen-l10n orders the generated positional parameters by this map, not by the order they appear in the message: declared end-first, every caller passing (start, end) silently rendered the range backwards.
   ///
   /// In en, this message translates to:
   /// **'{start} to {end}'**
-  String sourceCoverageRange(String end, String start);
+  String sourceCoverageRange(String start, String end);
 
   /// Shown when a source has supplied no days at all.
   ///
@@ -4295,23 +4295,23 @@ abstract class AppLocalizations {
   /// **'{amount}, {direction}'**
   String a11yFinancialAmount(String amount, String direction);
 
-  /// Screen reader label for one account row in the portfolio.
+  /// Screen reader label for one account row in the portfolio. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.
   ///
   /// In en, this message translates to:
   /// **'{name}, {type}, {currency}'**
-  String a11yAccountSummary(String currency, String name, String type);
+  String a11yAccountSummary(String name, String type, String currency);
 
-  /// Screen reader label for one reported balance figure.
+  /// Screen reader label for one reported balance figure. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.
   ///
   /// In en, this message translates to:
   /// **'{kind}, {amount}, {asOf}'**
-  String a11yBalanceSummary(String amount, String asOf, String kind);
+  String a11yBalanceSummary(String kind, String amount, String asOf);
 
-  /// Screen reader label for one payment instrument nested under an account.
+  /// Screen reader label for one payment instrument nested under an account. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.
   ///
   /// In en, this message translates to:
   /// **'{label}, {type}, {status}'**
-  String a11yInstrumentSummary(String label, String status, String type);
+  String a11yInstrumentSummary(String label, String type, String status);
 
   /// Title of the statement-import surface.
   ///
@@ -5734,6 +5734,600 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading more pairs'**
   String get transferMatchesLoadingMore;
+
+  /// Title of the screen that lists the data sources a person holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Where your data comes from'**
+  String get dataSourcesScreenTitle;
+
+  /// Opening paragraph stating that data arrives only because the person supplied it.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in Karar is here because you put it here. Karar does not connect to any bank, wallet or card issuer, and it holds no credential for any of them.'**
+  String get dataSourcesIntro;
+
+  /// Title of the banner stating that no live institution link exists.
+  ///
+  /// In en, this message translates to:
+  /// **'No link to any institution'**
+  String get dataSourcesNoLiveLinkTitle;
+
+  /// States that no credential of any kind is requested or stored anywhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar never asks for a password, PIN, mPIN, one-time code, recovery code or card number, and stores none of them.'**
+  String get dataSourcesCredentialNote;
+
+  /// Heading above the list of data sources the person holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data sources'**
+  String get dataSourcesConnectionsHeading;
+
+  /// Label of the control that narrows the data-source list.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get dataSourcesFilterLabel;
+
+  /// Filter option showing every data source.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get dataSourcesFilterAll;
+
+  /// Filter option for sources that accept data the person supplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepting what you supply'**
+  String get dataSourcesFilterAccepting;
+
+  /// Filter option for sources with nothing set up on them yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set up'**
+  String get dataSourcesFilterNotConfigured;
+
+  /// Filter option for sources that are set up and not usable at the moment.
+  ///
+  /// In en, this message translates to:
+  /// **'Not usable now'**
+  String get dataSourcesFilterUnavailable;
+
+  /// Filter option for sources the person has retired.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished with'**
+  String get dataSourcesFilterRetired;
+
+  /// Filter option for sources whose way of receiving data was never built.
+  ///
+  /// In en, this message translates to:
+  /// **'Never built'**
+  String get dataSourcesFilterNotImplemented;
+
+  /// Empty-state title when the person holds no data sources at all.
+  ///
+  /// In en, this message translates to:
+  /// **'No data sources yet'**
+  String get dataSourcesEmptyTitle;
+
+  /// Empty-state description naming the two ways a source can come to exist.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been recorded about how your data arrives. Add an account by hand or import a statement file, and a source will appear here.'**
+  String get dataSourcesEmptyDescription;
+
+  /// Empty-state title when a filter hides every data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches this filter'**
+  String get dataSourcesFilteredEmptyTitle;
+
+  /// Empty-state description telling the person how to clear the filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose “All” to see every data source you hold.'**
+  String get dataSourcesFilteredEmptyDescription;
+
+  /// Error-state title when the data-source list could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data sources could not be read'**
+  String get dataSourcesUnavailableTitle;
+
+  /// Error-state description, ending with the statement that nothing changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read where your data comes from just now. Nothing about your data has changed.'**
+  String get dataSourcesUnavailableDescription;
+
+  /// Action that follows the platform cursor to the next page of data sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more data sources'**
+  String get dataSourcesLoadMore;
+
+  /// Screen-reader and visible status while the next page of data sources is read.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more data sources'**
+  String get dataSourcesLoadingMore;
+
+  /// Field label for the name the person gave one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name for this'**
+  String get connectionLabelFieldLabel;
+
+  /// Field label for the way data reaches the platform on one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'How data arrives'**
+  String get connectionRailFieldLabel;
+
+  /// Field label for the lifecycle state of one data-source record.
+  ///
+  /// In en, this message translates to:
+  /// **'State of this record'**
+  String get connectionStatusFieldLabel;
+
+  /// Field label for whether the platform can run the way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'Can Karar run this way of receiving data'**
+  String get connectionAvailabilityFieldLabel;
+
+  /// Field label for when a data-source record was created.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get connectionAddedAtLabel;
+
+  /// Field label for when the data-source record itself was last edited.
+  ///
+  /// In en, this message translates to:
+  /// **'This record last changed'**
+  String get connectionRecordChangedLabel;
+
+  /// Note preventing the record-changed date from being read as a freshness date.
+  ///
+  /// In en, this message translates to:
+  /// **'That is when the record itself changed. It is not when data arrived, and it is not a check with any institution.'**
+  String get connectionRecordChangedNote;
+
+  /// Action that opens the detail of one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Show details'**
+  String get connectionShowDetailAction;
+
+  /// Action that closes the detail of one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide details'**
+  String get connectionHideDetailAction;
+
+  /// Name of the MANUAL way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'Typed in by you'**
+  String get connectionRailManual;
+
+  /// Name of the USER_FILE_UPLOAD way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'A file you upload'**
+  String get connectionRailUserFileUpload;
+
+  /// Name of the OPEN_FINANCE_API way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Open finance interface'**
+  String get connectionRailOpenFinanceApi;
+
+  /// Name of the DIRECT_BANK_OR_WALLET_API way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct bank or wallet interface'**
+  String get connectionRailDirectBankOrWalletApi;
+
+  /// Name of the LICENSED_AGGREGATOR_API way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Licensed aggregator interface'**
+  String get connectionRailLicensedAggregatorApi;
+
+  /// Name of the HOST_TO_HOST_SFTP way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Host-to-host file transfer'**
+  String get connectionRailHostToHostSftp;
+
+  /// Name of the ISO_20022_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'ISO 20022 file'**
+  String get connectionRailIso20022File;
+
+  /// Name of the SWIFT_MT_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'SWIFT MT file'**
+  String get connectionRailSwiftMtFile;
+
+  /// Name of the OFX_QFX_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'OFX or QFX file'**
+  String get connectionRailOfxQfxFile;
+
+  /// Name of the QIF_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'QIF file'**
+  String get connectionRailQifFile;
+
+  /// Name of the PDF_STATEMENT way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF statement'**
+  String get connectionRailPdfStatement;
+
+  /// Name of the SECURE_EMAIL_STATEMENT way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement by secure email'**
+  String get connectionRailSecureEmailStatement;
+
+  /// Name of the DEVICE_SIGNAL way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal from this device'**
+  String get connectionRailDeviceSignal;
+
+  /// Name used when the platform sent a way of receiving data this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A way of receiving data this version does not know'**
+  String get connectionRailUnrecognised;
+
+  /// Short badge for a way of receiving data where the person types the data in.
+  ///
+  /// In en, this message translates to:
+  /// **'You enter it'**
+  String get railStandingBadgeYouEnterIt;
+
+  /// Short badge for a way of receiving data where the person uploads a file.
+  ///
+  /// In en, this message translates to:
+  /// **'You upload it'**
+  String get railStandingBadgeYouUploadIt;
+
+  /// Short badge for a way of receiving data that has no implementation at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Not built'**
+  String get railStandingBadgeNotBuilt;
+
+  /// Short badge for a way of receiving data this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown to this version'**
+  String get railStandingBadgeUnknown;
+
+  /// Sentence for the MANUAL way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'You type this in yourself. Karar records exactly what you enter and nothing else.'**
+  String get railStandingYouEnterIt;
+
+  /// Sentence for the USER_FILE_UPLOAD way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'You upload a file and Karar reads it. You choose the file, and Karar reads nothing you have not given it.'**
+  String get railStandingYouUploadIt;
+
+  /// Sentence for a way of receiving data that has no implementation. It must not read as a promise.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar has not built this. It is not switched off and it is not scheduled: there is no code for it, nothing to set up, and nothing to wait for.'**
+  String get railStandingNotBuilt;
+
+  /// Sentence for a way of receiving data this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Karar does not know this way of receiving data and will not describe it.'**
+  String get railStandingUnknown;
+
+  /// The platform answer that it can run this way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get railAvailabilityExecutable;
+
+  /// The platform answer that this way of receiving data was never implemented.
+  ///
+  /// In en, this message translates to:
+  /// **'No, Karar has never built it'**
+  String get railAvailabilityNotImplemented;
+
+  /// Shown when the platform answer about a way of receiving data is unknown to this build.
+  ///
+  /// In en, this message translates to:
+  /// **'An answer this version of Karar does not know'**
+  String get railAvailabilityUnrecognised;
+
+  /// ACTIVE lifecycle state. It means the record accepts data the person supplies, never that anything is connected.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepts what you supply'**
+  String get connectionStatusAcceptsWhatYouSupply;
+
+  /// NOT_CONFIGURED lifecycle state, kept distinct from unavailable and never built.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been set up on this yet'**
+  String get connectionStatusNotConfigured;
+
+  /// UNAVAILABLE lifecycle state, kept distinct from not set up and never built.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up, and not usable at the moment'**
+  String get connectionStatusUnavailable;
+
+  /// RETIRED lifecycle state.
+  ///
+  /// In en, this message translates to:
+  /// **'You are finished with this. What it already supplied stays readable.'**
+  String get connectionStatusRetired;
+
+  /// NOT_IMPLEMENTED lifecycle state, kept distinct from not set up and unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The way of receiving data this names was never built'**
+  String get connectionStatusNotImplemented;
+
+  /// Lifecycle state this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A state this version of Karar does not know'**
+  String get connectionStatusUnrecognised;
+
+  /// Heading above the two ways of receiving data that actually exist.
+  ///
+  /// In en, this message translates to:
+  /// **'The only two ways data reaches Karar'**
+  String get dataSourcesBuiltRailsHeading;
+
+  /// Heading above every way of receiving data that has no implementation.
+  ///
+  /// In en, this message translates to:
+  /// **'Ways of receiving data Karar has not built'**
+  String get dataSourcesRailsHeading;
+
+  /// Explains why unimplemented ways of receiving data are named at all, and states that naming is not a promise.
+  ///
+  /// In en, this message translates to:
+  /// **'These are named so Karar can describe the world accurately. None of them exists here: there is no code for any of them, nothing to set up, and nothing to wait for. Naming one is not a plan to build it.'**
+  String get dataSourcesRailsExplanation;
+
+  /// Heading above the list of accounts, each linking to the sources feeding it.
+  ///
+  /// In en, this message translates to:
+  /// **'Which sources feed each account'**
+  String get dataSourcesAccountsHeading;
+
+  /// Shown when the person holds no accounts, so no account can be listed.
+  ///
+  /// In en, this message translates to:
+  /// **'You hold no accounts yet, so nothing feeds anything.'**
+  String get dataSourcesAccountsEmpty;
+
+  /// Shown when the account list could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Your accounts could not be read just now, so they cannot be listed here.'**
+  String get dataSourcesAccountsUnavailable;
+
+  /// Action opening the sources feeding one account.
+  ///
+  /// In en, this message translates to:
+  /// **'Where its data comes from'**
+  String get dataSourcesOpenAccountSourcesAction;
+
+  /// Screen-reader label naming the account whose sources the action opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Where the data for {account} comes from'**
+  String dataSourcesOpenAccountSourcesA11y(String account);
+
+  /// Title of the screen listing the sources that feed one account.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources feeding this account'**
+  String get accountSourcesScreenTitle;
+
+  /// Opening paragraph of the per-account sources screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Every source below is something you supplied. Karar does not contact your bank, wallet or card issuer, so no date here is a check with anyone.'**
+  String get accountSourcesIntro;
+
+  /// Empty-state title when nothing feeds the account.
+  ///
+  /// In en, this message translates to:
+  /// **'No source feeds this account'**
+  String get accountSourcesEmptyTitle;
+
+  /// Empty-state description for an account with no sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been attached to this account yet. Enter figures by hand or import a statement file, and the source will appear here.'**
+  String get accountSourcesEmptyDescription;
+
+  /// Error-state title when the sources for one account could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources could not be read'**
+  String get accountSourcesUnavailableTitle;
+
+  /// Error-state description when the sources for one account could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read the sources for this account just now.'**
+  String get accountSourcesUnavailableDescription;
+
+  /// Heading of one source card, numbered by its place in the stated order.
+  ///
+  /// In en, this message translates to:
+  /// **'Source {position}'**
+  String accountSourcesCardHeading(int position);
+
+  /// Field label for the priority the platform stated for one source.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority stated by Karar'**
+  String get accountSourcesPriorityLabel;
+
+  /// The stated priority of one source, as a rank.
+  ///
+  /// In en, this message translates to:
+  /// **'Rank {priority}'**
+  String accountSourcesPriorityValue(int priority);
+
+  /// Explains that the order on screen is the order the platform stated.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources are listed in the order Karar stated, strongest first. A smaller rank is a stronger source.'**
+  String get accountSourcesPriorityNote;
+
+  /// Shown when two sources share a priority, so no precedence is stated.
+  ///
+  /// In en, this message translates to:
+  /// **'Two of these sources claim the same rank, so which one takes precedence is not decided. Karar will not choose one for you.'**
+  String get accountSourcesPriorityAmbiguous;
+
+  /// States when data last arrived, naming the person as the origin so it cannot read as a check with an institution.
+  ///
+  /// In en, this message translates to:
+  /// **'You last supplied data through this source on {instant}.'**
+  String sourceArrivalYouSupplied(String instant);
+
+  /// Shown when no import has ever succeeded for one source.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has arrived through this source yet.'**
+  String get sourceArrivalNone;
+
+  /// Note preventing the arrival date from being read as a check with an institution.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not contact your bank, so this is a record of what you did, not a check with anyone.'**
+  String get accountSourcesArrivalNote;
+
+  /// Field label for when this source was first observed.
+  ///
+  /// In en, this message translates to:
+  /// **'First recorded'**
+  String get accountSourcesFirstRecordedLabel;
+
+  /// Field label for when this source was last observed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last recorded activity'**
+  String get accountSourcesLastRecordedLabel;
+
+  /// Note separating the last-observed date from the moment data actually arrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar last recorded something about this source then. Recording is not receiving: an upload that failed to read moves this date too.'**
+  String get accountSourcesLastRecordedNote;
+
+  /// Note preventing the coverage range from being read as a freshness guarantee.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the range of dates the supplied data itself covers. It is not a freshness date and says nothing about what happened after it.'**
+  String get accountSourcesCoverageNote;
+
+  /// Field label for when the person confirmed a source link.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirmed this source'**
+  String get accountSourcesConfirmedLabel;
+
+  /// Shown when the person has not yet confirmed a source link.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for you to confirm'**
+  String get accountSourcesConfirmedPending;
+
+  /// Field label for the basis on which a source was attached to an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this source was attached'**
+  String get accountSourcesMatchLabel;
+
+  /// EXACT_EXTERNAL_REFERENCE basis for attaching a source to an account.
+  ///
+  /// In en, this message translates to:
+  /// **'The reference matched exactly'**
+  String get sourceMatchBasisExact;
+
+  /// PROBABLE basis for attaching a source to an account.
+  ///
+  /// In en, this message translates to:
+  /// **'A probable match, waiting for you to say'**
+  String get sourceMatchBasisProbable;
+
+  /// Basis for attaching a source that this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A reason this version of Karar does not know'**
+  String get sourceMatchBasisUnrecognised;
+
+  /// States that no confidence figure exists, so none is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar gives a source no confidence score. Either the reference matched exactly, or you are asked.'**
+  String get accountSourcesNoScoreNote;
+
+  /// Heading above what a source was observed to supply.
+  ///
+  /// In en, this message translates to:
+  /// **'What this source was seen to supply'**
+  String get accountSourcesCapabilitiesHeading;
+
+  /// Keeps NOT_OBSERVED and NOT_PROVIDED apart in words.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen, not supported. A thing nobody looked for is not the same answer as a thing looked for and absent.'**
+  String get accountSourcesCapabilitiesNote;
+
+  /// Refusal shown when what was asked for is gone.
+  ///
+  /// In en, this message translates to:
+  /// **'This is no longer there. Nothing about your data changed.'**
+  String get dataSourcesRefusalGone;
+
+  /// Refusal shown when the device has no usable connection or the request timed out.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not reach the network. Nothing about your data changed.'**
+  String get dataSourcesRefusalOffline;
+
+  /// Refusal shown for any other reason a read did not complete.
+  ///
+  /// In en, this message translates to:
+  /// **'This could not be read just now. Nothing about your data changed.'**
+  String get dataSourcesRefusalGeneric;
+
+  /// Field label for how authoritative a source claims to be. It names the field; the value beside it is the weight itself.
+  ///
+  /// In en, this message translates to:
+  /// **'How much weight this source carries'**
+  String get sourceAuthorityFieldLabel;
 }
 
 class _AppLocalizationsDelegate
