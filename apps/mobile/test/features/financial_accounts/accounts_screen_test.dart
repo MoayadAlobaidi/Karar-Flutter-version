@@ -448,7 +448,7 @@ void main() {
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       // Measured from the render tree, because the guideline above does not
       // see this product's own pressable.
-      expectEveryTapTargetLargeEnough(tester);
+      expectEveryTapTargetLargeEnough(tester, expectAtLeast: 1);
       handle.dispose();
     });
   });

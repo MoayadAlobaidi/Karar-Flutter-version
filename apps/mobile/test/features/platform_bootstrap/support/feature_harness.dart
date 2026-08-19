@@ -245,9 +245,27 @@ Future<void> settleMicrotasks() => Future<void>.delayed(Duration.zero);
 ///
 /// The minimum is the larger of the two platform figures — Android asks for
 /// 48dp, iOS for 44pt — because one build serves both.
-void expectEveryTapTargetLargeEnough(WidgetTester tester, {double minimum = 48.0}) {
+/// [expectAtLeast] is the number of pressables the caller believes are on
+/// screen, and it is REQUIRED to be stated rather than defaulted, because the
+/// loop below passes trivially when it finds nothing. A read-only surface
+/// legitimately has none — the statement-import review is one — and passing
+/// `0` there says so deliberately, where a silent empty measurement said
+/// nothing at all while a test named "every interactive control is big
+/// enough" reported success.
+void expectEveryTapTargetLargeEnough(
+  WidgetTester tester, {
+  required int expectAtLeast,
+  double minimum = 48.0,
+}) {
   final Finder pressables = find.byType(KararPressable);
   final int count = pressables.evaluate().length;
+  expect(
+    count,
+    greaterThanOrEqualTo(expectAtLeast),
+    reason: 'the surface was expected to carry at least $expectAtLeast pressable '
+        'control(s) and carries $count; either the screen changed or this '
+        'measurement is not reaching it',
+  );
   final List<String> tooSmall = <String>[];
 
   for (int index = 0; index < count; index += 1) {

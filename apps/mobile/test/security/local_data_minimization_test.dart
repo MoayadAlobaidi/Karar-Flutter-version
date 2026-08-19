@@ -52,7 +52,20 @@ const Set<String> persistencePackages = <String>{
 /// Direct file writes. `path_provider` is how an app finds a writable
 /// directory, so its absence is most of the guarantee, but a `File` written
 /// against any path at all is the same disclosure.
-final RegExp fileWrite = RegExp(r'\b(writeAsString|writeAsBytes|openWrite)\s*\(');
+///
+/// The `Sync` variants are named explicitly. An earlier version matched
+/// `writeAsString\s*\(` and therefore could not match `writeAsStringSync(` at
+/// all — the `\s*\(` found the `S` — so the most idiomatic synchronous write
+/// in Dart passed a test named for catching written files. `create` is here
+/// Deliberately NOT matching a bare `create(` — a first attempt did, and
+/// flagged `AccountFormController.create` and three other domain methods that
+/// have nothing to do with files. A guard that cries wolf gets an exemption
+/// list, and an exemption list is how a guard stops guarding. These names
+/// belong to `File` and to almost nothing else.
+final RegExp fileWrite = RegExp(
+  r'\b(writeAsString|writeAsStringSync|writeAsBytes|writeAsBytesSync'
+  r'|openWrite|openSync)\s*\(',
+);
 
 Directory get libRoot => Directory('lib');
 
