@@ -112,7 +112,7 @@ export interface PaymentInstrumentEraserPort {
 }
 ```
 
-One argument for it is optional at `DeleteOwnAccount`'s constructor, and that module records why: zero is the true answer for a deployment that does not compose this module at all, since these rows can only exist if this module wrote them. The residual — a deployment that composes it and forgets the wiring — is a composition-root concern, stated there rather than hidden.
+**The argument is REQUIRED at `DeleteOwnAccount`'s constructor**, as every cross-module eraser now is. This file previously recorded it as optional with a do-nothing default, on the reasoning that zero is the true answer for a deployment composing no instruments at all. That reasoning traded a real hazard for a hypothetical convenience: the default cannot tell a deployment that has no instruments from one that has them and forgot a line of wiring, and in the second case it erases nothing, reports success, and leaves the cards that spent from a deleted account in the database. The default is gone. A suite with genuinely no instruments hands in a **named** no-op instead — `ERASES_NO_INSTRUMENTS` — which a reader can see and a reviewer can question.
 
 **Called from `DeleteOwnAccount`**, beside `AccountSourceLinkEraserPort` and with the same failure semantics: a throw or any non-`erased` outcome means the account is **not** deleted, the counts reported are honest about what did and did not go, and the account row survives so a retry has something to finish. The refusal has its own kind, `instrument_erasure_incomplete`, because three erasures are three ports with three implementers and an operator needs to know which store refused.
 

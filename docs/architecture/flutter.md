@@ -70,6 +70,10 @@ As landed in Phase 4, the mechanism is an **allowlist, never a denylist**, in `f
 
 `navigableCapabilityIds` is **empty in this build**, which is the correct state: no capability is implemented anywhere, so nothing is navigable.
 
+**Phase 5 does not change that, and the reason is worth stating because it is the exact place a mistake would be made.** The server has grown a financial data foundation — accounts and wallets, transactions, connections and source links, payment instruments, transfer matching — and `apps/mobile` is **untouched by it**: no feature folder, no generated client method, no route, no fixture, no screen. Schema existing on the server is not a capability being available, so `TRANSACTIONS` stays outside `navigableCapabilityIds` until it is implemented *and* deployed *and* deliberately added to the set. Three separate acts, in that order.
+
+When that surface is eventually built, one rule from the data model comes with it: **nothing may render "Connected", "Synced" or "Linked" for financial data.** Only the `MANUAL` and `USER_FILE_UPLOAD` rails may exist, no credential is stored anywhere, and no issuer exposes an interface to Karar — so a connection badge would be the legacy's most misleading screen rebuilt in a new framework, which is precisely what §1's rebuild-rather-than-port argument exists to prevent. The server cannot express the claim; the client must not invent it in a label.
+
 Four rules:
 
 1. **Deny by default.** An unknown capability renders as absent, never as available. `BootstrapSnapshot.hasCapability` returns false for an absent id, and false for *every* id when capability resolution did not complete.

@@ -112,7 +112,7 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 
 **Port / adapter** — an interface declared in `application/`, implemented in `infrastructure/`. Every external dependency is a port.
 
-**shared-kernel** — exactly ten universals. A type belongs only if a module that has never heard of any other module still needs it.
+**shared-kernel** — exactly ten universals: `CalendarDay`, `Clock`, `Currency`, `DomainEvent`, `ExchangeRate`, `Money`, `Percentage`, `Result`, `TenantId`, `UserId`. A type belongs only if a module that has never heard of any other module still needs it. The cap is enforced by architecture test 20 in **both** directions — missing and extra — and was raised from nine to ten by [ADR-0027](adr/0027-calendar-day-and-instant.md); an eleventh needs its own ADR, architecture justification, test change and Platform Owner approval.
 
 **Projection / read model** — a non-authoritative, rebuildable view in `readmodel`, built from events. **Never a source of truth.** Always shows an "as of" timestamp.
 
@@ -249,6 +249,46 @@ Terms with a specific meaning in Karar. Where a word is used differently elsewhe
 **Build environment guard** — the build-time check that refuses to produce a package for any environment other than `LOCAL` without an HTTPS endpoint that carries no credentials and whose host is not a developer-machine address. A **build failure**, not a runtime warning: on Android at Gradle configuration time, on iOS in a build phase that runs before code signing.
 
 **Golden baseline** — a committed image compared pixel-for-pixel. Karar keeps four, of two design-system compositions in two locales, and they are **not CI-enforced**; they are banned outright under `test/features`, because a golden captures whatever was on screen and an MFA setup key or a recovery code must never end up in one.
+
+---
+
+## Financial data foundation (Phase 5)
+
+Added while Phase 5 was in progress. **Every term below names schema and backend code that no route, client method or screen reaches**, under [ADR-0027](adr/0027-calendar-day-and-instant.md) and [ADR-0028](adr/0028-multi-rail-financial-sources.md).
+
+**Issuer** — who offers a financial product: a bank, e-money issuer, mobile-money operator, telco financial service, payment institution, fintech wallet, card issuer, exchange house, or other. **One row per issuer globally**, in a reviewed catalogue. Its code carries no country prefix, because a code beginning `QA_` reads as a fact about where the issuer belongs and invites a duplicate the moment a second market appears.
+
+**Institution market** — where an issuer operates and under what status, **per country**, one row per issuer per country. A group operating in four countries is one issuer with four market rows, never four issuers. **Country is not Jurisdiction**: this table keys on country and has no jurisdiction column.
+
+**Financial connection** — *how* data arrives for one subject. Never an account, and never a credential. One connection may feed many accounts; one person may hold several connections to one institution.
+
+**Acquisition rail** — the channel a connection uses. **Thirteen are named and only `MANUAL` and `USER_FILE_UPLOAD` may exist**, refused otherwise by a database CHECK rather than by application code. The vocabulary CHECK and the implemented-rail CHECK are deliberately separate, so implementing a rail widens the gate and leaves the vocabulary untouched.
+
+**Account source link** — which connection feeds which account, many-to-many in both directions. It is what lets an account created by CSV later receive API data without becoming a second account and splitting a person's history in two.
+
+**Source-account fingerprint** — a **keyed, per-subject, versioned** HMAC over a normalised external account reference. Not a plain hash, which would be a confirmation oracle over a real account number; not platform-keyed, which would be a cross-subject join key inside a shared table.
+
+**Origin** — how an account *first came to exist* (`MANUAL`, `CSV`, `EXTERNAL_PROVIDER`), immutable, and nothing more. **It is not the current source**: an account may be typed in, then fed by CSV, then linked to an API, and remain one account. The column that asserted a single permanent provider connection is gone from the schema.
+
+**Wallet kind** — which kind of wallet an account is (`MOBILE_MONEY`, `E_MONEY`, `PREPAID`, `PAYROLL`, `SUPER_APP`, `OTHER`), present **if and only if** the account type is `WALLET`. A wallet holds a balance, so it is an account; a card does not, so it is not.
+
+**Account nature** — `ASSET`, `LIABILITY`, or `UNKNOWN`, so a credit-card liability is not read as cash. `UNKNOWN` is the honest default rather than a placeholder, and nothing sums, nets or totals with it.
+
+**Balance kind** — which balance a source reported (`BOOKED`, `AVAILABLE`, `CURRENT`, `OUTSTANDING`, `CREDIT_LIMIT`, `OTHER_SOURCE_REPORTED`). `NOT NULL` **with no default**: a default would be a guess written on a caller's behalf and stored as though a source had said it, and someone asking what can be spent could silently receive a settled figure.
+
+**Payment instrument** — what *spends from* a balance-bearing account: a physical, virtual, prepaid or tokenized card, or a QR payment identity. **Carries no balance column**, so two virtual cards on one wallet cannot read as two more balances.
+
+**Transfer match** — two of a person's transactions recorded as one movement of their own money. **Carries no amount**: the figures stay on the transactions it names, where a third copy cannot disagree with them.
+
+**Transaction provenance** — where one stored transaction value came from: source kind, import and row reference, parser, mapping, normalisation and fingerprint versions. Distinct from the recommendation **Provenance** under *Financial* above, which records how a calculated figure was produced.
+
+**Dedup fingerprint** — the keyed, per-subject, versioned **content identity** of a movement, over exactly six length-prefixed fields and no clock, no timezone and no row id. Version `dedup/hmac-sha256/calendar-day/v3`.
+
+**Occurrence ordinal** — how a *legitimate repeat* is expressed, deliberately outside the fingerprint. Two identical coffees are one content identity that happened twice. An inserted ordinal must be exactly one more than the highest surviving one for its content identity, so the only ordinal a caller can choose is the next.
+
+**CalendarDay** — the **tenth** shared-kernel universal ([ADR-0027](adr/0027-calendar-day-and-instant.md), ACCEPTED). A date on a statement is what an institution wrote on its books: no time, therefore no timezone, therefore nothing to shift by. Stored as an instant it moves across day and month boundaries for readers at different offsets, and a statement for August gains or loses a line depending on where it is read.
+
+**HSF field encryption** — per-field AES-256-GCM for `HIGHLY_SENSITIVE_FINANCIAL` values, stored as a ciphertext / nonce / auth-tag triple with algorithm and key version per row and **no plaintext column**. The AAD binds tenant, user, table, row and field, so a ciphertext moved elsewhere fails to open rather than decoding as another subject's data.
 
 ---
 

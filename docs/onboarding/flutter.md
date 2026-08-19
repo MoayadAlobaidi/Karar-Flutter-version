@@ -141,7 +141,7 @@ What a screen test is expected to assert, because the existing suites do: every 
 ## 12. What must never appear in the client?
 
 - A financial figure the platform did not compute (ADR-0007) — and no placeholder, skeleton or "example" figure either.
-- A fabricated account, connection, or sync status. This was the legacy's worst surface.
+- A fabricated account, connection, or sync status. This was the legacy's worst surface, and Phase 5 has made the temptation concrete rather than hypothetical: the server now holds accounts, connections and payment instruments in its schema. **None of it is reachable, no feature folder exists for it, and none may be added yet** — and when one is, the word "Connected" is still forbidden, because only the `MANUAL` and `USER_FILE_UPLOAD` rails may exist, no credential is stored anywhere, and no issuer exposes an interface to Karar. The server cannot express the claim; the client must not invent it in a label.
 - A capability the server did not return. An omitted capability is one the client **must not know exists**; rendering "coming soon" for it defeats the server-side filter entirely.
 - A token, header, cookie, password, verification or reset code, MFA secret, recovery code, consent evidence, or request/response body in a log.
 - Any analytics, crash-reporting, advertising or fingerprinting SDK.

@@ -26,6 +26,20 @@
 
 > Amanat: **no `amanat.content.read` for any admin role.** Not restricted — absent.
 
+### The Phase 5 financial permissions, and the staff permissions that do not exist
+
+Five bounded contexts declare ten permissions between them, every one held by `USER` and by nothing else. **None of them is seeded, mounted or reachable** — no controller, route or guard consults any of them, because no endpoint exists.
+
+| Module | Permissions |
+|---|---|
+| `financial-accounts` | `accounts.account.read` · `accounts.account.write` |
+| `financial-connections` | `accounts.connection.read` · `accounts.connection.write` |
+| `payment-instruments` | `accounts.instrument.read` · `accounts.instrument.write` |
+| `transactions` | `transactions.transaction.read` · `transactions.transaction.write` |
+| `transfer-matching` | `accounts.transfer.read` · `accounts.transfer.write` |
+
+**What is absent is the design.** There is no staff permission returning one customer's accounts, connections, source links, instruments, transactions or transfer matches, and none may be added — each of those sets is a different disclosure about the same person. A source link says which institutions someone deals with and, through its fingerprint, which of their accounts are the same account; an instrument list says which products they hold and which accounts they spend from; a transfer-match set says which of their accounts feed which, and how often. And no `?userId=` parameter is accepted anywhere.
+
 ## 3. Roles
 
 ### Consumer

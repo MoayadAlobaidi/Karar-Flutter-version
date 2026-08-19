@@ -1,8 +1,25 @@
 # Architecture Tests
 
-**26 CI-blocking tests.** Plan v2 §13 specifies 21; the Phase 0.2 legacy audit added five (22–26).
+**26 CI-blocking tests**, plus a canary-purity check that is not numbered because it guards an artefact rather than a structure. Plan v2 §13 specifies 21; the Phase 0.2 legacy audit added five (22–26).
 
 **Gates block the merge, not merely the workflow run.** The legacy's gates *"block a workflow run, not a merge or a deploy; no enforcement path exists in the repository"* (INFRA-07).
+
+## Current status, and why four tests are asleep
+
+`pnpm arch:test` over the tree at `66ad086`: **24 passed, 0 failed, 4 deferred by activation phase**, registry errors 0, self-test ok, plus two supplementary checks (`admin-no-db-driver`, `phase5-ingestion-not-mounted-early`).
+
+Each test carries an **activation phase** in [`architecture-test-registry.json`](architecture-test-registry.json), and the runner enforces the gate in both directions: a test whose activation phase has been reached with no implementation is a **registry error**, not a silent skip. The registry's `currentPhase` is **4**.
+
+| Deferred | Activation | Waiting on |
+|---|---|---|
+| 13 Sealed containment | 13 | No code carries `SEALED`-marked content to scan (Documents + Sealed Vault phase) |
+| 14 Grant required | 13 | Vault transaction isolation becomes implementable and checkable with the same phase |
+| 24 Resource limits declared | 5 | **A first ingestion path — manual or CSV — that is actually mounted.** None exists |
+| canary-purity | 13 | The sealed-integrity canary is designed and implemented (key-custody phase) |
+
+**Test 24 is the one worth explaining, because it looks like an omission and is not.** Its activation phase is 5 and Phase 5 is in progress, but the registry's `currentPhase` deliberately stays at **4**. Setting it to 5 would make test 24 a live obligation while no ingestion path exists for it to scan — so it would scan nothing and pass, which is the failure mode this repository has already been bitten by three times. The lock runs both ways: test 24 will refuse a phase-5 tree whose ingestion paths declare no limits, and the supplementary `phase5-ingestion-not-mounted-early` check refuses a pre-phase-5 tree that mounts an ingestion path at all. **Neither the marker nor the path can move without the other**, and `currentPhase` advances to 5 in the same change that lands the first mounted ingestion path.
+
+The **self-test runs on every invocation**, not as a separate job: it seeds a violation per checker in a temporary tree and asserts each one fails and names the seeded file, then asserts that a set of legitimate shapes stays unflagged. A suite whose passes have not been shown to be non-vacuous on the same run is a suite that reports its own configuration.
 
 ---
 
@@ -18,9 +35,9 @@
 | 6 | No business logic in controllers | A controller exceeds declared complexity or calls more than one use case |
 | 10 | No direct provider access | A domain or application file names a vendor or **cloud SDK** — any GCP/AWS/Azure SDK import in `domain/` or `application/`; a provider-specific URI or resource name (`gs://`, `arn:`, project paths) in a domain entity; a database, storage, messaging, secrets, KMS, or AI provider client (Cloud SQL, RDS, GCS, S3, Pub/Sub, Secret Manager, Secrets Manager, Vertex, …) referenced outside its own adapter in `infrastructure/providers/` or `infrastructure/persistence/` |
 | 11 | Deterministic domain | `domain/` reads the system clock or a random source |
-| 17 | Pure packages | `jurisdiction-policy` or `state-machine` gains a framework dependency |
+| 17 | Pure packages | One of the five constrained packages gains a framework dependency: `shared-kernel`, `financial-engine`, `jurisdiction-policy` and `state-machine` are pure by manifest and source; `capability-registry` is purity-constrained by both |
 | 18 | Storage access | A domain touches `ObjectStorage` directly rather than via `documents` |
-| 20 | Kernel surface | `shared-kernel` exports anything beyond the ten universals, or is missing one |
+| 20 | Kernel surface | `shared-kernel` exports anything beyond the **ten** universals, or is missing one. The ten are `CalendarDay`, `Clock`, `Currency`, `DomainEvent`, `ExchangeRate`, `Money`, `Percentage`, `Result`, `TenantId`, `UserId`; [ADR-0027](../adr/0027-calendar-day-and-instant.md) raised the cap from nine to ten and authorises that one distinction and nothing more. The check runs in **both** directions — a fixture that omits a universal and one that adds a stranger — because a rename is absent under its old name and extra under its new one, which is also how an aliasing re-export that changes the public surface is caught |
 
 ## Correctness
 

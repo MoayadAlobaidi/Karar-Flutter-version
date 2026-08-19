@@ -23,19 +23,14 @@ Every persistent dataset declares its full lifecycle (ADR-0026, architecture tes
 | `transaction_revisions` | `SUBJECT_OWNED` | append-only history keeping the imported value attributable after a user correction, so a correction never silently overwrites the source fact | `HIGHLY_SENSITIVE_FINANCIAL` | as above — unresolved, fails closed outside LOCAL/TEST | included with the transaction | `CASCADE_DELETE` |
 | `transaction_provenance` | `SUBJECT_DERIVED` | the traceable origin of every stored financial fact: source kind, import and row reference, parser, mapping, normalisation and fingerprint versions | `HIGHLY_SENSITIVE_FINANCIAL` | as above | included — a subject may see where their own data came from | `CASCADE_DELETE` |
 | `transaction_category_assignments` | `SUBJECT_DERIVED` | which category applies, by which source (user or deterministic rule), with supersession history | `HIGHLY_SENSITIVE_FINANCIAL` | as above | included | `CASCADE_DELETE` |
-| `statement_imports` | `SUBJECT_OWNED` | one ingestion attempt and its state, from draft through reviewed commit or refusal | `HIGHLY_SENSITIVE_FINANCIAL` | as above | included as import metadata, never raw source bytes | `CASCADE_DELETE` |
-| `statement_import_sources` | `SUBJECT_OWNED` | the uploaded statement bytes, **encrypted before durable storage**, with key reference and integrity metadata only | `HIGHLY_SENSITIVE_FINANCIAL` | **unresolved and materially so** — whether an original statement is retained, and for how long, is exactly the decision counsel owes. Nothing here retains by default outside LOCAL/TEST | **excluded** — the subject's export contains their transactions, not a re-download of the source file | `CASCADE_DELETE` |
-| `statement_import_rows` | `SUBJECT_OWNED` | staged rows awaiting review, with encrypted source text and typed parse results | `HIGHLY_SENSITIVE_FINANCIAL` | as above; staging is transient by intent | excluded (superseded by committed transactions) | `CASCADE_DELETE` |
-| `statement_import_row_errors` | `SUBJECT_DERIVED` | typed, non-echoing validation failures naming row, field and reason code | `HIGHLY_SENSITIVE_FINANCIAL` | as above | excluded — these are diagnostics about an import attempt, not facts about the subject; the rows they describe are either committed as transactions (and exported as such) or discarded, so exporting the error list would add process detail without adding anything the subject holds | `CASCADE_DELETE` |
 | `financial_categories` | `NON_PERSONAL` | versioned catalogue of category codes with English and Arabic labels | `PUBLIC` | the catalogue outlives any assignment referencing it | n/a | `NON_PERSONAL_BY_DESIGN` |
 | `merchant_rules` | `NON_PERSONAL` | reviewed, generalised patterns mapping merchant text to a category, derived from many subjects and linked to none | `INTERNAL` | no subject-derived bound applies because no subject is linked | n/a | `NON_PERSONAL_BY_DESIGN` |
 
+**Four statement-import datasets are deliberately NOT declared above.** This table used to carry `statement_imports`, `statement_import_sources`, `statement_import_rows` and `statement_import_row_errors`, and **this module owns none of them and creates none of them.** They were forward declarations: a lifecycle register describes what exists, and a forward declaration inside one reads as schema that is already there, leaving a reader who checks the database against it unable to tell a gap from a plan. They were removed from `packages/platform/db/DATA_LIFECYCLE.md` on exactly that reasoning and are removed here on the same grounds. Their declarations belong to whichever module owns statement import, land in the same change as the migration that creates them, and are that module's obligation rather than this one's — which is also the change that makes their retention question answerable rather than rhetorical.
+
 ## Events published
 
-| Event | Classification | Allowed consumers | Payload rule |
-|---|---|---|---|
-| `TransactionCommitted` | `HIGHLY_SENSITIVE_FINANCIAL` | insights, budgets, projections | identifier-only |
-| `StatementImported` | `HIGHLY_SENSITIVE_FINANCIAL` | audit, projections | identifier-only |
+_None._ This module publishes no bus event today: it has no publish call site, and the event catalogue (`packages/api-contracts/events/catalogue.json`) carries no entry for one. `TransactionCommitted` and `StatementImported` (both `HIGHLY_SENSITIVE_FINANCIAL`, identifier-only payloads) are **planned** and enter the catalogue with their first publisher, under event-governance rules (ADR-0025) — the convention `modules/identity` and `modules/consent` already follow. This section previously listed both as though they were published, which they never have been.
 
 ## Permissions
 
@@ -56,7 +51,7 @@ carry a raw UUID plus a reference type declared **in this module**.
 | Port | Answers | Bound by the composition root to |
 |---|---|---|
 | `TransactionRetentionDecisionPort` | how long a transaction record may be kept: `DECIDED` · `PENDING_LEGAL_REVIEW` · `UNAVAILABLE` | the PolicyPack retention slot for the subject's jurisdiction; in a **local environment only**, `LocalSyntheticRetentionDecisionProvider` |
-| `FinancialAccountAccessPort` | the minimum about an account **visible to this principal**: existence, currency, lifecycle state, provider claim — never account narrative | a composition adapter over `modules/financial-accounts`' `public-api.ts`. **This module imports nothing from that module** |
+| `FinancialAccountAccessPort` | the minimum about an account **visible to this principal**: existence, currency, lifecycle state, provider claim — never account narrative | an adapter over `modules/financial-accounts`' `public-api.ts`. This module imports that package root — never a subpath — in exactly two production files, both outside `domain/`: the port aliases in `application/ports/financial-record-lifecycle.ts` and the adapter in `infrastructure/persistence/`. **`modules/financial-accounts` imports nothing from here**, which is the direction that matters |
 | `DedupFingerprintPort` | the keyed, per-subject, versioned content identity of a movement — definition `dedup/hmac-sha256/calendar-day/v3`, stated in full below | LOCAL/TEST: `LocalKeyedDedupFingerprintProvider`. Production: a key-management-backed adapter (ADR-0017) |
 | `HsfFieldEncryptionPort` | per-field encryption of merchant, description and note | LOCAL/TEST: `LocalAesGcmFieldEncryptionProvider`. Production: as above |
 | `TransferMatchEraserPort` | erase every transfer match naming one transaction, or touching one account, returning the exact count | `TransactionsTransferMatchEraser` in `modules/transfer-matching`. **This module imports nothing from that module** |
@@ -110,7 +105,7 @@ reference, and it is not a proposal for a period.
 
 ## Notes and known limitations
 
-**Manual entry and CSV import are first-class `IMPLEMENTED`** (challenge C9), not stopgaps.
+**Manual entry and CSV import are intended to be first-class rather than stopgaps** (challenge C9) — and today **neither is a running path.** `CreateManualTransaction` exists as a use case with its gates and its tests; nothing calls it, because no controller, route or composition root does. The CSV pipeline does not exist at all: no parser, no staging tables, no import state machine. The normalisation rules below are therefore a specification with test cases behind it, not a description of something a person can currently use.
 
 Rules ported from the legacy as *rules plus test cases*, not code: Arabic-Indic digit and U+066B/U+066C separator normalisation; accounting negatives and trailing minus; **unreadable rows return null, never a substituted zero**; ambiguous dates flagged rather than assumed; exact reconciliation with **no tolerance**; duplicate rejection by content hash; review before commit.
 
@@ -190,7 +185,7 @@ relabels which content or which occurrence a row is.
 
 `merchant_rules` `NON_PERSONAL_BY_DESIGN` justification: a curated pattern corpus derived from many subjects, retained without subject linkage. **It must not hold narrative text lifted verbatim from a single customer's statement** — the legacy's does, unencrypted and permanent, and cannot use its own converter because the repository sorts on `LENGTH(pattern)` (legacy C12). Patterns here are reviewed and generalised before entry.
 
-**Explicit ingestion limits** — bytes, rows, wall-clock, memory — rejecting rather than degrading (legacy FILES-2, HIGH).
+**Explicit ingestion limits are declared and enforced by nothing yet.** `packages/platform/src/ingestion/limits.ts` states them — bytes, rows, wall-clock, memory — with no optional members and no way to express "unlimited", and its validator refuses non-finite, zero, negative and non-integer bounds. The rule they encode is reject rather than degrade (legacy FILES-2, HIGH). There is no ingestion path to apply them to, which is also why architecture test 24 (resource limits declared) stays phase-deferred: a test scanning an empty tree passes vacuously, and a limit nothing consults is a declaration rather than a control.
 
 ---
 
