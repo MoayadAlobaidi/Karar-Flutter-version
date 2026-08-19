@@ -13,9 +13,9 @@
 // writes canonical transactions, so it is gated on exactly the capability the
 // rest of the financial surface is.
 import 'package:flutter/widgets.dart';
-import '../../../app/lifecycle/tenant_data_scope.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../financial_accounts/presentation/financial_capability.dart';
 import 'statement_import_review_screen.dart';
 import 'statement_import_routes.dart';

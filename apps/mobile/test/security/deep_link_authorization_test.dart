@@ -28,9 +28,9 @@ import 'package:karar_mobile/core/security/token_store.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/account_detail_screen.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/accounts_and_wallets_screen.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_feature_registration.dart';
-import 'package:karar_mobile/features/statement_imports/presentation/statement_import_feature_registration.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_routes.dart';
 import 'package:karar_mobile/features/financial_accounts/presentation/financial_unavailable_screen.dart';
+import 'package:karar_mobile/features/statement_imports/presentation/statement_import_feature_registration.dart';
 import 'package:karar_mobile/features/transactions/presentation/transaction_detail_screen.dart';
 import 'package:karar_mobile/features/transactions/presentation/transactions_screen.dart';
 
