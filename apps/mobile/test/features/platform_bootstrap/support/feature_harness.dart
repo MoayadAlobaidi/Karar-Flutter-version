@@ -236,12 +236,24 @@ Future<void> settleMicrotasks() => Future<void>.delayed(Duration.zero);
 
 /// Asserts every pressable control on screen is big enough to hit.
 ///
-/// `androidTapTargetGuideline` is asserted alongside this, but it does NOT
-/// substitute for it: a `KararPressable` rendered at 20x20 passes the
-/// guideline while a plain `ElevatedButton` at the same size fails it, so the
-/// guideline alone would report a surface as accessible whose every control
-/// is this product's own button. Measured here from the render tree instead,
-/// which cannot be fooled by how a semantics node is composed.
+/// `androidTapTargetGuideline` is asserted alongside this and does NOT
+/// substitute for it — but the reason recorded here previously was WRONG, and
+/// the correction matters more than the original claim.
+///
+/// It said the guideline could not see `KararPressable`, on the strength of
+/// two probes: a `KararPressable` at 20x20 passing and an `ElevatedButton` at
+/// 20x20 failing. Those probes used DIFFERENT HARNESSES, which was the
+/// variable nobody controlled. Run in one tree, both behave identically: both
+/// are flagged on a phone-sized surface, and NEITHER is flagged on this
+/// harness's default 1000x4000 one. The guideline skips nodes it considers
+/// offscreen relative to the render view, and on a four-thousand-pixel
+/// surface almost everything is.
+///
+/// So the guideline is not blind to a widget; it is blind to a SURFACE. That
+/// is why this measurement exists and why it is the load-bearing control: it
+/// walks the render tree and is indifferent to how large the test surface is.
+/// Screens are pumped tall on purpose — a lazy list only builds what fits —
+/// so the guideline alone would be near-vacuous on every long screen here.
 ///
 /// The minimum is the larger of the two platform figures — Android asks for
 /// 48dp, iOS for 44pt — because one build serves both.

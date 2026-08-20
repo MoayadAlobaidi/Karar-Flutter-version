@@ -292,8 +292,10 @@ void main() {
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
-      // Measured from the render tree: the guideline above does not see this
-      // product's own pressable, so it alone would pass at any size.
+      // Measured from the render tree, which is indifferent to the test
+      // surface. The guideline above skips nodes it treats as offscreen, and
+      // these screens are pumped tall so a lazy list builds all of them — so
+      // on its own it would pass at any control size here.
       expectEveryTapTargetLargeEnough(tester, expectAtLeast: 1);
       handle.dispose();
     });
