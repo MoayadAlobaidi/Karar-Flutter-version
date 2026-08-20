@@ -28,6 +28,7 @@ import { enqueueInTransaction } from './enqueue.js';
 import { withIdempotency } from './receipts.js';
 import { OutboxRelay } from './relay.js';
 import type { EventPublisher } from '../events/bus.js';
+import { dropScratchDatabase } from '../db/scratch-database.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -160,7 +161,7 @@ describe.skipIf(unreachable !== null)('transactional outbox (live PostgreSQL)', 
     await app?.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, dbName);
     } finally {
       await maintenance.end();
     }

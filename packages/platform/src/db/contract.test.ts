@@ -22,6 +22,7 @@ import {
   verifyMigrations,
 } from './migrations.js';
 import { SecretValue } from '../config/secret-value.js';
+import { dropScratchDatabase } from './scratch-database.js';
 
 // Contract tests against a real PostgreSQL (docs/architecture/
 // database-portability.md section 7). All database tests live in this one
@@ -149,7 +150,7 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
       for (const database of createdDatabases) {
-        await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+        await dropScratchDatabase(maintenance, database);
       }
     } finally {
       await maintenance.end();

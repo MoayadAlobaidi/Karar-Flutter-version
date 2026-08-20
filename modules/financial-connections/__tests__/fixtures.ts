@@ -32,6 +32,7 @@ import { expect } from 'vitest';
 
 import { Clock, TenantId, UserId } from '@karar/shared-kernel';
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -239,7 +240,7 @@ export async function provisionDatabase(database: string): Promise<void> {
 export async function dropDatabase(database: string): Promise<void> {
   const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
   try {
-    await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropScratchDatabase(maintenance, database);
   } finally {
     await maintenance.end();
   }

@@ -11,6 +11,7 @@ import {
 } from './connection-profile.js';
 import { PostgresPersistenceAdapter } from './adapter.js';
 import { createPrismaClient, type PrismaHandle } from './prisma.js';
+import { dropScratchDatabase } from './scratch-database.js';
 import {
   DEFAULT_REQUIRED_CONTEXT,
   PrincipalContextError,
@@ -196,7 +197,7 @@ describe.skipIf(unreachable !== null)('principal context on a live PostgreSQL', 
   afterAll(async () => {
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }

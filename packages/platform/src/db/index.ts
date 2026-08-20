@@ -53,3 +53,4 @@ export {
   type MigrationRunnerOptions,
   type VerifyReport,
 } from './migrations.js';
+export { dropScratchDatabase } from './scratch-database.js';

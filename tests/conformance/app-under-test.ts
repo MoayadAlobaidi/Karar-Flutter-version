@@ -38,6 +38,7 @@ import pg from 'pg';
 import { loadConfig } from '@karar/platform/dist/config/index.js';
 import { redisEndpointFromEnv } from '@karar/platform/dist/config/index.js';
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -361,7 +362,7 @@ export class ComposedApp {
     await this.superuser.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${this.database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, this.database);
     } finally {
       await maintenance.end();
     }
