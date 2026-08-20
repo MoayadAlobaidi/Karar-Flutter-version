@@ -40,13 +40,13 @@ Delivered so far — the data platform and its first HTTP surface:
 | Deduplication (keyed, versioned, content-only fingerprints) | Built; exercised by the CSV commit path |
 | Financial connections and account source links | Built; read-only over HTTP |
 | Payment instruments | Built; read-only over HTTP |
-| Transfer matching | Built; list, confirm and reject served — suggestion is not |
+| Transfer matching | Built; list, confirm and reject served, and the platform now GENERATES suggestions internally after a transaction is recorded. A client still cannot propose one — the contract has no such verb, deliberately |
 | Ingestion limit policies | Declared centrally, validated at startup, **enforced on the mounted CSV upload** |
 | Manual transaction entry as a running path | **Built** (`POST /financial/transactions`) |
 | CSV statement ingestion | **Built** — draft, upload, parse, preview, commit, erase |
-| Categorization as a running path | Partial: assignment is served; the automatic pipeline over merchant rules is **not built** |
+| Categorization as a running path | **Built** — a deterministic merchant-rule pass runs on manual entry and on the CSV commit, in the same unit of work as the record |
 | API surface / OpenAPI operations | **Built** — 27 operations over 21 paths |
-| Flutter surface | **Built** — seven financial feature folders, every route capability-gated; **no file picker adapter**, so a statement cannot yet be chosen on a device |
+| Flutter surface | **Built** — seven financial feature folders, every route capability-gated, and the system document picker implemented on Android and iOS. **No device execution**: both native halves compile and the Dart side is exercised against a fake channel, but nothing here has run on a phone |
 | Account deletion over HTTP | **Deliberately not exposed** — the cross-module cascade is not atomic and its contract is unchosen |
 | Provider connectors | **Not built** — `provider-capabilities` describes potential and executes nothing |
 | Erasure strategies enforced | Ports and cascade built across four modules; **retention unresolved** |
@@ -237,7 +237,7 @@ The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, wh
 - **Nothing is deployed, and no capability is available.** Every entry in the capability registry is `NOT_IMPLEMENTED`, `TRANSACTIONS` included; no jurisdiction is approved; `qa/v1` clears nothing; and a mounted route in a local process is not an available capability. A request answering correctly here proves the code path, not the product.
 - **No provider connector exists, and no real provider capability is `VERIFIED`.** No issuer named in the catalogue exposes an interface to Karar, no credential of any kind is stored, there is no scraping and no app automation, and `provider_access_status` is `NOT_IMPLEMENTED` everywhere. `modules/provider-capabilities` describes what a rail *could* do in types, owns no table, and executes nothing — a described rail is not an executable one. Nothing in the product may render "Connected", "Synced" or "Linked" for data a person typed or uploaded.
 - **Account deletion is not exposed over HTTP**, and this is the one omission most likely to be read as an oversight. The cross-module cascade is **not atomic** — four module transactions, nothing spanning them — so a partial outcome is a real answer and the contract for reporting one has not been chosen. The use case exists, is tested, and is deliberately absent from the bundle the controllers can call.
-- **Categorization is assignment, not a pipeline.** A subject can set a transaction's category over HTTP; nothing applies merchant rules automatically, and no use case reads them.
+- **Categorization is now a pipeline.** Both write paths — manual entry and the CSV canonical commit — offer the narrative to a deterministic merchant-rule evaluator before the record lands, in the same unit of work. No AI, no scoring, no fallback: an unmatched transaction stays uncategorised, and a subject's own choice always wins.
 
 **Carried forward from Phase 4, unfixed by this work:** no build has run on a device, so the biometric prompt has never been shown to appear; no build is signed and no signing material exists; no Apple Team ID exists; the compound credential-abandonment guarantee is local-only; golden baselines are not CI-enforced; **EV-427 is `PENDING` and overdue**, with no DNS record and all seven registrar hardening rows still `TO_VERIFY`; and one maintainer holds every role. Runtime conformance still covers 82 of the 128 non-financial declared pairs — the Phase 5 surface brought its own suite covering 139 of its 172, so the merged contract's 300 pairs are 221 covered and 79 not.
 ## Review findings and their disposition
