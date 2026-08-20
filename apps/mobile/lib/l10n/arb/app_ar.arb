@@ -1,8 +1,6 @@
 {
   "@@locale": "ar",
-
   "appName": "كرار",
-
   "actionContinue": "متابعة",
   "actionCancel": "إلغاء",
   "actionConfirm": "تأكيد",
@@ -19,7 +17,6 @@
   "actionRefresh": "تحديث",
   "actionCopy": "نسخ",
   "actionSelectAll": "تحديد الكل",
-
   "fieldOptionalSuffix": "{label} (اختياري)",
   "fieldRequiredMarker": "مطلوب",
   "fieldRequiredIndicator": "*",
@@ -28,14 +25,12 @@
   "fieldHideValue": "إخفاء {label}",
   "fieldCharacterCount": "{used} من {limit} حرفًا",
   "fieldErrorAnnouncement": "يوجد خطأ في {label}. {message}",
-
   "statusSuccess": "ناجح",
   "statusWarning": "تحذير",
   "statusError": "خطأ",
   "statusInfo": "معلومة",
   "statusPending": "قيد المعالجة",
   "statusNeutral": "لم يبدأ",
-
   "stateLoading": "جارٍ التحميل",
   "stateLoadingWithSubject": "جارٍ تحميل {subject}",
   "stateEmptyTitle": "لا يوجد شيء هنا بعد",
@@ -45,7 +40,6 @@
   "stateOfflineTitle": "أنت غير متصل بالإنترنت",
   "stateOfflineDescription": "أعد الاتصال لتحميل أحدث المعلومات.",
   "stateErrorReference": "الرقم المرجعي {reference}",
-
   "a11yDialog": "مربع حوار",
   "a11ySheet": "لوحة سفلية",
   "a11yBanner": "تنبيه",
@@ -58,20 +52,16 @@
   "a11yControlBusy": "{label}، قيد التنفيذ",
   "a11yTitleWithSubtitle": "{title}. {subtitle}",
   "a11yBannerTitled": "{role}: {title}",
-
   "selectionCount": "{count, plural, =0{لم يتم تحديد أي عنصر} =1{تم تحديد عنصر واحد} =2{تم تحديد عنصرين} few{تم تحديد {count} عناصر} many{تم تحديد {count} عنصرًا} other{تم تحديد {count} عنصر}}",
   "paginationPosition": "الصفحة {page} من {total}",
   "retryCountdown": "{seconds, plural, =1{أعد المحاولة بعد ثانية واحدة} =2{أعد المحاولة بعد ثانيتين} few{أعد المحاولة بعد {seconds} ثوان} many{أعد المحاولة بعد {seconds} ثانية} other{أعد المحاولة بعد {seconds} ثانية}}",
   "lastUpdatedAt": "آخر تحديث {timestamp}",
-
   "languageSettingTitle": "اللغة",
   "languageSystemDefault": "لغة النظام",
   "languageEnglish": "English",
   "languageArabic": "العربية",
-
   "legalDocumentLanguageNotice": "هذا المستند مقدم من كرار باللغة {language}.",
   "legalDocumentUnavailable": "هذا المستند غير متاح حاليا.",
-
   "signInTitle": "تسجيل الدخول",
   "signInSubtitle": "استخدم البريد الإلكتروني وكلمة المرور الخاصة بحسابك في كرار.",
   "signInAction": "تسجيل الدخول",
@@ -85,7 +75,6 @@
   "signOutConfirmTitle": "تسجيل الخروج؟",
   "signOutConfirmMessage": "ستحتاج إلى بريدك الإلكتروني وكلمة المرور لتسجيل الدخول مجددًا على هذا الجهاز.",
   "signOutIncompleteNotice": "تم تسجيل خروجك على هذا الجهاز. لم نتمكن من الوصول إلى كرار لإنهاء الجلسة في كل مكان، لذا راجع جلساتك النشطة عند عودة الاتصال.",
-
   "registerTitle": "إنشاء حساب",
   "registerSubtitle": "سنرسل رمز تحقق إلى البريد الإلكتروني الذي تدخله.",
   "registerAction": "إنشاء الحساب",
@@ -94,7 +83,6 @@
   "registerAcknowledgementTitle": "تحقّق من بريدك الإلكتروني",
   "registerAcknowledgementMessage": "إذا كان بالإمكان تسجيل هذا العنوان، فرمز التحقق في طريقه إليك. أدخله في الشاشة التالية لإكمال إعداد حسابك.",
   "registerBackToSignIn": "العودة إلى تسجيل الدخول",
-
   "verifyEmailTitle": "تأكيد بريدك الإلكتروني",
   "verifyEmailSubtitle": "أدخل الرمز المكوّن من 8 خانات الذي أرسلناه إليك. لا يظهر هذا الرمز في أي مكان آخر.",
   "verifyEmailCodeLabel": "رمز التحقق",
@@ -104,13 +92,11 @@
   "verifyEmailResendAcknowledgement": "إذا كان هذا العنوان بحاجة إلى رمز، فرمز آخر في طريقه إليك.",
   "verifyEmailInvalidCode": "لم يتم التحقق من هذا الرمز. ربما انتهت صلاحيته أو استُخدم من قبل.",
   "verifyEmailSuccess": "تم تأكيد بريدك الإلكتروني.",
-
   "forgotPasswordTitle": "إعادة تعيين كلمة المرور",
   "forgotPasswordSubtitle": "أدخل بريدك الإلكتروني وسنرسل رابط إعادة التعيين إذا كان العنوان قادرًا على استقباله.",
   "forgotPasswordAction": "إرسال تعليمات إعادة التعيين",
   "forgotPasswordAcknowledgementTitle": "تحقّق من بريدك الإلكتروني",
   "forgotPasswordAcknowledgementMessage": "إذا كان بإمكان هذا العنوان استقبال إعادة تعيين، فالتعليمات في طريقها إليك. تنتهي صلاحية الرابط بعد 30 دقيقة من إرساله.",
-
   "resetPasswordTitle": "تعيين كلمة مرور جديدة",
   "resetPasswordSubtitle": "الصق رمز إعادة التعيين من بريدك الإلكتروني، ثم اختر كلمة مرور جديدة.",
   "resetPasswordTokenLabel": "رمز إعادة التعيين",
@@ -120,7 +106,6 @@
   "resetPasswordInvalidToken": "رمز إعادة التعيين هذا غير صالح. ربما انتهت صلاحيته أو استُخدم من قبل. اطلب رمزًا جديدًا.",
   "resetPasswordSuccessTitle": "تم تغيير كلمة المرور",
   "resetPasswordSuccessMessage": "تم تسجيل الخروج من جميع الجلسات، على هذا الجهاز وعلى أي جهاز آخر. سجّل الدخول بكلمة المرور الجديدة.",
-
   "changePasswordTitle": "تغيير كلمة المرور",
   "changePasswordSubtitle": "تغيير كلمة المرور يسجّل الخروج من كل الأجهزة الأخرى. يبقى هذا الجهاز مسجّلًا.",
   "changePasswordCurrentLabel": "كلمة المرور الحالية",
@@ -129,7 +114,6 @@
   "changePasswordIncorrectCurrent": "لم يطابق ذلك كلمة المرور الحالية.",
   "changePasswordSuccessTitle": "تم تغيير كلمة المرور",
   "changePasswordSuccessMessage": "تم تسجيل الخروج من كل الأجهزة الأخرى.",
-
   "confirmPasswordMismatch": "كلمتا المرور غير متطابقتين.",
   "passwordEmpty": "أدخل كلمة مرور.",
   "passwordTooShort": "استخدم {count} أحرف على الأقل.",
@@ -138,7 +122,6 @@
   "emailMalformed": "أدخل بريدًا إلكترونيًا كاملًا.",
   "codeEmpty": "أدخل الرمز.",
   "tokenEmpty": "أدخل رمز إعادة التعيين.",
-
   "mfaSecurityTitle": "التحقق بخطوتين",
   "mfaEnrolTitle": "إعداد التحقق بخطوتين",
   "mfaEnrolIntro": "يطلب التحقق بخطوتين رمزًا من تطبيق المصادقة في كل مرة تسجّل فيها الدخول.",
@@ -153,11 +136,9 @@
   "mfaInvalidCode": "لم يتم التحقق من هذا الرمز. راجع تطبيق المصادقة وحاول مرة أخرى.",
   "mfaAlreadyEnrolled": "التحقق بخطوتين مفعّل بالفعل على هذا الحساب.",
   "mfaNoPendingEnrolment": "لم يعد هذا الإعداد معلّقًا. ابدأ من جديد.",
-
   "mfaRecoveryCodesTitle": "رموز الاسترجاع الخاصة بك",
   "mfaRecoveryCodesWarning": "تظهر هذه الرموز مرة واحدة فقط ولن تظهر مجددًا. يسجّل كل رمز دخولك مرة واحدة إذا فقدت تطبيق المصادقة. دوّنها واحتفظ بها في مكان لا يصل إليه سواك.",
   "mfaRecoveryCodesAcknowledge": "حفظت هذه الرموز في مكان آمن",
-
   "mfaChallengeTitle": "أدخل رمزك",
   "mfaChallengeSubtitle": "افتح تطبيق المصادقة وأدخل الرمز المكوّن من 6 أرقام.",
   "mfaChallengeUseRecovery": "استخدام رمز استرجاع بدلًا من ذلك",
@@ -167,14 +148,12 @@
   "mfaRecoveryCodeLabel": "رمز الاسترجاع",
   "mfaRecoveryCodeHint": "أحد الرموز التي حفظتها",
   "mfaRecoveryCodeSubtitle": "أدخل أحد رموز الاسترجاع التي حفظتها عند تفعيل التحقق بخطوتين. يعمل كل رمز مرة واحدة.",
-
   "mfaDisableTitle": "إيقاف التحقق بخطوتين",
   "mfaDisableWarning": "سيتم إتلاف رموز الاسترجاع الخاصة بك وسيصبح حسابك محميًا بكلمة المرور وحدها.",
   "mfaDisableAction": "إيقاف",
   "mfaDisableConfirmTitle": "إيقاف التحقق بخطوتين؟",
   "mfaDisableSuccess": "تم إيقاف التحقق بخطوتين.",
   "mfaNotEnrolled": "التحقق بخطوتين غير مفعّل على هذا الحساب.",
-
   "sessionsTitle": "الجلسات النشطة",
   "sessionsSubtitle": "كل جهاز مسجّل الدخول حاليًا إلى حسابك. سجّل الخروج من أي جهاز لا تعرفه.",
   "sessionsCurrentBadge": "هذا الجهاز",
@@ -193,7 +172,6 @@
   "sessionsRevokedNotice": "تم تسجيل الخروج من ذلك الجهاز.",
   "sessionsRevokedOthersNotice": "تم تسجيل الخروج من الأجهزة الأخرى (العدد: {count}).",
   "sessionsRevokeUnavailable": "لم تعد تلك الجلسة نشطة، لذا لم يكن هناك ما يُسجَّل الخروج منه.",
-
   "appLockTitle": "قفل التطبيق",
   "appLockSettingsTitle": "قفل هذا التطبيق",
   "appLockSettingsDescription": "اطلب فتح قفل جهازك قبل عرض كرار. هذا إعداد خصوصية على هذا الجهاز فقط. لا يحل محل تسجيل الدخول أبدًا، ولا يستقبل كرار بصمتك أو بيانات وجهك.",
@@ -216,7 +194,6 @@
   "securityStateUnavailableMessage": "لم يُبلّغ هذا الجهاز عمّا إذا كان قفل التطبيق مفعّلًا. لن يفتح كرار حسابك قبل أن يتأكد، لذا لا يُعرض شيء الآن. حاول مرة أخرى، وأعد تشغيل الجهاز إذا تكرّر ذلك.",
   "securityRecoveryBlockedTitle": "تعذّرت إزالة تلك الجلسة",
   "securityRecoveryBlockedMessage": "تعذّر على كرار حذف الجلسة المخزّنة على هذا الجهاز، وتعذّر عليه تسجيل أنك تخليت عنها. تسجيل الدخول الآن لن يجعلها آمنة، لذا ينتظر كرار بدلًا من ذلك. حاول مرة أخرى. وإذا استمر الفشل، سجّل الخروج من هذا الجهاز عبر جهاز آخر.",
-
   "sessionEndedTitle": "تم تسجيل خروجك",
   "sessionEndedExpired": "انتهت صلاحية جلستك. سجّل الدخول مجددًا للمتابعة.",
   "sessionEndedRevoked": "تم تسجيل الخروج من هذه الجلسة من جهاز آخر. إذا لم تكن أنت، غيّر كلمة المرور بعد تسجيل الدخول.",
@@ -224,7 +201,6 @@
   "sessionEndedRefreshRejected": "تعذّر على كرار تجديد هذه الجلسة، لذا تم إنهاؤها ومسح بياناتها من هذا الجهاز. سجّل الدخول مجددًا.",
   "sessionEndedSignedOut": "تم تسجيل خروجك.",
   "sessionEndedAction": "تسجيل الدخول",
-
   "failureOffline": "يبدو أنك غير متصل. تحقق من اتصالك وحاول مرة أخرى.",
   "failureTimeout": "استغرق ذلك وقتًا طويلًا. تحقق من اتصالك وحاول مرة أخرى.",
   "failureRateLimited": "محاولات كثيرة. انتظر قليلًا ثم حاول مرة أخرى.",
@@ -242,14 +218,11 @@
   "failureTenantSelection": "اختر مؤسسة قبل المتابعة.",
   "failureConfiguration": "هذه النسخة من كرار غير مهيأة بشكل صحيح ولا يمكنها المتابعة.",
   "failureUnexpected": "حدث خطأ ما. حاول مرة أخرى.",
-
   "a11yPasswordRules": "كلمة المرور. {count} أحرف على الأقل.",
   "a11yRecoveryCodePosition": "رمز الاسترجاع {position} من {total}",
   "a11ySensitiveScreen": "معلومات حساسة. تُخفى عندما يكون كرار في الخلفية.",
-
   "consentScreenTitle": "الخصوصية والموافقة",
   "consentScreenDescription": "ما سجّلته المنصة بشأن قراراتك. المستندات ينشرها الكيان المشغّل، ولا يكتب هذا التطبيق أي صياغة منها.",
-
   "consentStateNotRequired": "لا حاجة إلى موافقة",
   "consentStateRequired": "موافقتك مطلوبة",
   "consentStateReconsentRequired": "إصدار جديد يتطلب موافقتك",
@@ -258,7 +231,6 @@
   "consentStateUnavailable": "تعذّر التحقق",
   "consentStateDocumentUnavailable": "لا يوجد مستند منشور",
   "consentStatePolicyNotApproved": "لا يمكن تسجيلها بعد",
-
   "consentDescribeNotRequired": "لا يغطي أي مستند منشور هذا الغرض، فلا يُطلب منك شيء هنا.",
   "consentDescribeRequired": "يوجد إصدار منشور ساري المفعول ولم توافق عليه بعد.",
   "consentDescribeReconsentRequired": "يوجد إصدار جرى تغييره جوهرياً وهو ساري المفعول، ولم تعد موافقتك السابقة تغطيه.",
@@ -267,10 +239,8 @@
   "consentDescribeUnavailable": "لم تجب المنصة، لذلك لا يُعرض شيء ولا يمكن الموافقة على شيء هنا.",
   "consentDescribeDocumentUnavailable": "المستند الذي كان سينطبق ليس له إصدار منشور، فلا يوجد ما يُقرأ ولا ما يُوافَق عليه.",
   "consentDescribePolicyNotApproved": "لا يمكن للمنصة تسجيل موافقة لهذا الغرض بعد، لذلك لا يُعرض أي زر.",
-
   "consentNothingToAgreeTitle": "لا شيء ينتظر موافقتك",
   "consentNothingToAgreeDescription": "لا تدرج المنصة أي مستند ينطبق على حسابك حالياً.",
-
   "consentPurposeLabel": "الغرض",
   "consentDocumentLabel": "المستند",
   "consentVersionLabel": "الإصدار",
@@ -282,7 +252,6 @@
   "consentActionNotice": "للعلم فقط",
   "consentActionNone": "لا يُطلب منك شيء",
   "consentActionUnstated": "لم تحدده المنصة",
-
   "consentAcceptAction": "الموافقة على هذا الإصدار",
   "consentWithdrawAction": "سحب الموافقة",
   "consentAcceptedConfirmation": "سجّلت المنصة موافقتك.",
@@ -290,7 +259,6 @@
   "consentHistoryPreservedNote": "يُحتفظ بالسجل السابق كدليل ولا يُحذف.",
   "consentReconsentCreatesNewGrantNote": "تنشئ الموافقة سجلاً جديداً مقابل الإصدار الجديد، ويبقى السجل السابق كما هو.",
   "consentNoticeRequiredNote": "نُشر إصدار أحدث للعلم فقط، ولا تزال موافقتك الحالية سارية.",
-
   "consentBlockerJurisdiction": "لم يُحدد نطاق قضائي لحسابك، لذلك لا تنطبق عليك أي سياسة بعد.",
   "consentBlockerPolicy": "لا توجد سياسة معتمدة سارية، لذلك لا يمكن للمنصة تسجيل أي موافقة.",
   "consentBlockerEntity": "لا يوجد كيان مشغّل محدد، لذلك لن تحمل الموافقة اسم أي ناشر.",
@@ -299,7 +267,6 @@
   "consentActionFailedTitle": "لم يُسجَّل ذلك",
   "consentActionFailedDescription": "لم تسجّل المنصة التغيير، لذلك لم يطرأ أي تغيير على موافقتك.",
   "consentGrantReferenceLabel": "مرجع السجل",
-
   "platformHomeTitle": "حسابك",
   "platformSectionServices": "الخدمات",
   "platformSectionAccount": "الحساب والملف الشخصي",
@@ -309,7 +276,6 @@
   "platformSectionLegal": "الشؤون القانونية والكيان المشغّل",
   "platformSectionConsent": "الخصوصية والموافقة",
   "platformSectionSettings": "الإعدادات",
-
   "platformNoServicesTitle": "لا تتوفر لك أي خدمات",
   "platformNoServicesDescription": "حسابك سليم. أكدت المنصة عدم تفعيل أي خدمة له حتى الآن، فلا يوجد ما يمكن فتحه هنا.",
   "platformCapabilitiesUnresolvedTitle": "تعذّر التحقق من الخدمات",
@@ -318,7 +284,6 @@
   "platformServiceUnavailableDescription": "تعذّر تحميل سياق المنصة الخاص بك، لذلك لا يُعرض شيء بدلاً من عرض ما قد يكون غير صحيح. لم يتأثر حسابك ولا بياناتك.",
   "platformServiceUnavailableFinalDescription": "تعذّر تحميل سياق المنصة الخاص بك، وأفادت المنصة بأن إعادة المحاولة الآن لن تغيّر ذلك. أغلق التطبيق وافتحه لاحقاً.",
   "platformActionStartOver": "البدء من جديد",
-
   "platformProfileRowTitle": "الملف الشخصي",
   "platformProfileRowSubtitle": "اسمك ولغتك وحالة حسابك",
   "platformSessionActive": "تم تسجيل الدخول على هذا الجهاز",
@@ -327,7 +292,6 @@
   "platformOrganisationRowSubtitle": "المؤسسة المرتبطة بهذه الجلسة",
   "platformOrganisationUnbound": "هذه الجلسة غير مرتبطة بأي مؤسسة",
   "platformRoleHintLabel": "الدور",
-
   "platformJurisdictionNone": "غير محدد",
   "platformJurisdictionUnverified": "مُعلَن وغير موثَّق",
   "platformJurisdictionVerified": "موثَّق",
@@ -342,7 +306,6 @@
   "platformJurisdictionRecorded": "تم تسجيل إعلانك.",
   "platformJurisdictionAlreadyInEffect": "كان ذلك النطاق القضائي سارياً بالفعل، فلم يتغيّر شيء.",
   "platformJurisdictionRemainsUnverified": "مسجَّل بإعلان منك، وغير موثَّق.",
-
   "platformLegalScreenTitle": "الشؤون القانونية",
   "platformLegalRowSubtitle": "الجهة المتعاقد معها والمستندات المنطبقة",
   "platformOperatingEntityHeading": "الكيان المشغّل",
@@ -362,7 +325,6 @@
   "platformPolicyPackAbsent": "لا توجد سياسة سارية",
   "platformConsentRowSubtitle": "ما وافقت عليه وما لا يزال معلقاً",
   "platformSettingsRowSubtitle": "اللغة والمظهر والحساب",
-
   "profileScreenTitle": "الملف الشخصي",
   "profileDisplayNameLabel": "الاسم المعروض",
   "profileDisplayNameHelper": "الاسم الذي يظهر للأشخاص في مؤسستك.",
@@ -373,14 +335,12 @@
   "profileAccountReferenceLabel": "مرجع الحساب",
   "profileMemberSinceLabel": "تاريخ إنشاء الحساب",
   "profileLastUpdatedLabel": "آخر تحديث",
-
   "profileStatusActive": "نشط",
   "profileStatusDisableRequested": "طُلب التعطيل",
   "profileStatusDeletionRequested": "طُلب الحذف",
   "profileStatusDisabled": "معطَّل",
   "profileStatusUnrecognised": "غير معروفة في هذا الإصدار",
   "profileStatusDisableRequestedNote": "سُجّل طلبك. ولم يُعطَّل أو يُحذف أي شيء بموجبه حتى الآن.",
-
   "profileSaveConfirmation": "تم تحديث ملفك الشخصي.",
   "profileSaveFailedTitle": "لم يُحدَّث ملفك الشخصي",
   "profileSaveFailedDescription": "لم تقبل المنصة التغيير. ولم يتغيّر شيء.",
@@ -389,7 +349,6 @@
   "profileUnavailableTitle": "تعذّر تحميل ملفك الشخصي",
   "profileUnavailableDescription": "لم تجب المنصة. ولم يتغيّر شيء.",
   "profileNotStated": "غير محدد",
-
   "settingsScreenTitle": "الإعدادات",
   "settingsAppearanceTitle": "المظهر",
   "settingsThemeSystem": "حسب الجهاز",
@@ -401,7 +360,6 @@
   "settingsJurisdictionRow": "النطاق القضائي",
   "settingsLegalRow": "الشؤون القانونية والكيان المشغّل",
   "settingsConsentRow": "الخصوصية والموافقة",
-
   "settingsDangerTitle": "إغلاق حسابك",
   "settingsDisableTitle": "طلب تعطيل حسابك",
   "settingsDisableDescription": "يسجّل هذا نيتك. ولا يُعطَّل أو يُحذف شيء بموجب الطلب نفسه، وتبقى مسجّل الدخول.",
@@ -413,7 +371,6 @@
   "settingsDisableAuditWarning": "سُجّل الطلب، لكن تعذّر على المنصة كتابة قيد التدقيق الخاص به. اذكر هذا للدعم إذا تابعت الأمر.",
   "settingsDisableFailedTitle": "لم يُسجَّل طلبك",
   "settingsDisableFailedMessage": "لم تقبل المنصة الطلب. ولم يتغيّر شيء.",
-
   "tenantSelectionTitle": "اختر مؤسسة",
   "tenantSelectionDescription": "ينتمي حسابك إلى أكثر من مؤسسة. اختر المؤسسة التي ستستخدمها في هذه الجلسة. تظهر هنا المؤسسات التي أدرجتها المنصة لك فقط.",
   "tenantNoMembershipTitle": "لا تنتمي إلى أي مؤسسة بعد",
@@ -424,7 +381,6 @@
   "tenantRoleValuePattern": "{label}: {value}",
   "tenantUnboundTitle": "هذه الجلسة غير مرتبطة بأي مؤسسة",
   "tenantUnboundDescription": "لا يتوفر أي شيء يخص المؤسسات ما دامت الجلسة غير مرتبطة.",
-
   "tenantSwitchHeading": "تبديل المؤسسة",
   "tenantSwitchDescription": "يؤدي التبديل إلى إنهاء الجلسة الحالية وبدء جلسة جديدة في المؤسسة الأخرى. يُتخلّص من كل ما حُمّل للمؤسسة الحالية، ويُسجَّل دخول هذا الجهاز من جديد تلقائياً.",
   "tenantSwitchAction": "تبديل",
@@ -439,7 +395,6 @@
   "tenantMembershipRefusedTitle": "تلك المؤسسة غير متاحة لك",
   "tenantMembershipRefusedDescription": "لم تقبل المنصة الاختيار. ولم يطرأ أي تغيير على جلستك.",
   "tenantSelectSemanticPrefix": "اختيار المؤسسة",
-
   "tenantInvitationHeading": "استخدام دعوة",
   "tenantInvitationDescription": "إذا دعتك مؤسسة، أدخل الرمز الوارد في تلك الدعوة. والدعوة نفسها هي التي تحدد المؤسسة التي تنضم إليها.",
   "tenantInvitationFieldLabel": "رمز الدعوة",
@@ -447,7 +402,6 @@
   "tenantInvitationRedeemed": "تم استخدام الدعوة. تجري إعادة التحقق من عضوياتك.",
   "tenantInvitationFailedTitle": "تعذّر استخدام الدعوة",
   "tenantInvitationFailedDescription": "لم يُقبل الرمز. ربما استُخدم من قبل، أو سُحب، أو صدر لحساب آخر.",
-
   "financialHomeTabHome": "الرئيسية",
   "financialHomeTabAccounts": "الحسابات",
   "financialUnavailableTitle": "غير متاح",
@@ -748,7 +702,6 @@
   "a11yAccountSummary": "{name}، {type}، {currency}",
   "a11yBalanceSummary": "{kind}، {amount}، {asOf}",
   "a11yInstrumentSummary": "{label}، {type}، {status}",
-
   "statementImportTitle": "استيراد كشف حساب",
   "statementImportStartTitle": "اختر حساباً وملفاً",
   "statementImportMappingTitle": "طابق الأعمدة",
@@ -762,8 +715,8 @@
   "statementImportFileRules": "ملفات CSV فقط، حتى {megabytes} ميغابايت.",
   "statementImportFileChosen": "الملف جاهز للرفع",
   "statementImportActionUpload": "ارفع وتابع",
-  "statementImportPickerUnavailableTitle": "هذه النسخة لا تستطيع فتح منتقي الملفات",
-  "statementImportPickerUnavailableDetail": "بقية الاستيراد جاهزة. عند إضافة اختيار الملفات سيطلب الملف الذي تختاره وحده، ولن يطلب الوصول إلى مساحة التخزين.",
+  "statementImportPickerUnavailableTitle": "لا يوجد منتقي ملفات هنا",
+  "statementImportPickerUnavailableDetail": "لم يُقدِّم هذا الجهاز منتقي مستندات، لذلك لا يمكن اختيار كشف عليه. لم يتغيّر شيء آخر في الاستيراد — حيث يتوفّر المنتقي، يطلب كرار الملف الذي تختاره وحده ولا يطلب الوصول إلى مساحة التخزين أبدًا.",
   "statementImportPickerUnreadable": "تعذّرت قراءة هذا الملف من جهازك.",
   "statementImportSourceEmpty": "هذا الملف فارغ.",
   "statementImportSourceTooLarge": "هذا الملف أكبر من {megabytes} ميغابايت التي يقبلها هذا الاستيراد.",
@@ -926,7 +879,6 @@
   "statementImportRefusedTitle": "رُفض هذا الملف",
   "statementImportHeaderRowYes": "نعم، الصف الأول عناوين",
   "statementImportHeaderRowNo": "لا، الصف الأول معاملة",
-
   "transferMatchesScreenTitle": "التحويلات بين حساباتك",
   "transferMatchesIntro": "نقل المال بين حسابين تملكهما هو حركة واحدة مسجّلة مرتين: مرة عند الخروج ومرة عند الوصول. يقترح كرار الأزواج التي وجدها، ولا يتغير شيء حتى تجيب.",
   "transferMatchesFilterLabel": "اعرض",

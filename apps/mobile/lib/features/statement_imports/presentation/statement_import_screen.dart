@@ -91,6 +91,10 @@ class _Step extends ConsumerWidget {
           onAccountChosen: onAccountChosen,
           message: null,
         ),
+      // Reached only where no adapter is registered — a desktop host, the test
+      // suite — or where the device presented no document provider. Android and
+      // iOS open the system picker, so the copy no longer promises one is
+      // coming; it says this device has none.
       ImportFlowPickerUnavailable() => _ChooseSource(
           accountId: accountId,
           onAccountChosen: onAccountChosen,

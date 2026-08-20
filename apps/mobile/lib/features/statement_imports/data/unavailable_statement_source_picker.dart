@@ -1,38 +1,29 @@
-// THE PICKER SEAM, LEFT HONESTLY EMPTY.
+// THE PICKER SEAM WHERE NO SYSTEM PICKER EXISTS.
 //
-// This build ships no document-picker adapter. The reason is recorded in full
-// in `domain/statement_source_picker.dart`; in short, every available way to
-// implement it required something that is not this feature's to change:
+// Android and iOS now have a real adapter: the system document picker over a
+// first-party platform channel, in `platform_statement_source_picker.dart`. It
+// asks for ONE DOCUMENT — `ACTION_OPEN_DOCUMENT` and
+// `UIDocumentPickerViewController` — which grants access to the single file the
+// person chose, needs no manifest permission and no entitlement, and therefore
+// leaves the merged-manifest allow-list in
+// `test/security/platform_hardening_test.dart` unchanged. That was the whole
+// argument against a file-picker dependency: every such library contributes
+// manifest entries, and a storage or media permission bought to read one chosen
+// file is the wrong trade.
 //
-//   * a third-party plugin means a new direct dependency in `pubspec.yaml`,
-//     whose header requires an exact, reviewed pin, and which is not a file
-//     this work owns;
-//   * every such plugin contributes manifest entries, and
-//     `test/security/platform_hardening_test.dart` asserts the merged manifest
-//     declares EXACTLY `INTERNET`, `USE_BIOMETRIC`, `USE_FINGERPRINT` and one
-//     androidx signature-level permission. Adding a storage or media permission
-//     to read one file the person chose is the wrong trade, and that test
-//     exists so the trade cannot be made quietly;
-//   * a first-party platform channel over `ACTION_OPEN_DOCUMENT` and
-//     `UIDocumentPickerViewController` is the right answer and needs NO
-//     manifest permission at all — the system picker grants access to the one
-//     chosen document. It is also native code in two languages, and a
-//     half-written one would be worse than a stated seam.
+// THIS CLASS IS STILL REACHED, AND IS STILL THE HONEST ANSWER, on every host
+// where no native half is registered — the machine the test suite runs on, and
+// any platform this product has not shipped a picker for. `platformStatementSourcePicker()`
+// selects it there. It answers [PickerOutcomeUnavailable] — a distinct outcome,
+// not a failure — and the surface above it says the device cannot offer a file,
+// offering no retry, because a retry cannot succeed.
 //
-// So this class answers [PickerOutcomeUnavailable] — a distinct outcome, not a
-// failure. The surface above it says the device cannot offer a file in this
-// build, and offers no retry, because a retry cannot succeed. Nothing here
-// throws: an `UnimplementedError` reaching a screen would be a crash presented
-// to a person as though something had broken, when in fact nothing did.
-//
-// EVERYTHING ELSE IN THE FLOW IS REAL. The upload, the mapping, the parse, the
-// review and the commit are implemented and tested against the platform's
-// contract; a fake picker in the tests supplies bytes, and the real one is the
-// only piece missing. When the platform channel lands, it replaces this class
-// and nothing above the port changes.
+// Nothing here throws: an `UnimplementedError` reaching a screen would be a
+// crash presented to a person as though something had broken, when in fact
+// nothing did.
 import '../domain/statement_source_picker.dart';
 
-/// A [StatementSourcePicker] that reports, truthfully, that this build cannot
+/// A [StatementSourcePicker] that reports, truthfully, that this host cannot
 /// ask the device for a document.
 final class UnavailableStatementSourcePicker implements StatementSourcePicker {
   const UnavailableStatementSourcePicker();

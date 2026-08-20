@@ -4394,13 +4394,13 @@ abstract class AppLocalizations {
   /// Title shown when the build ships no document-picker adapter.
   ///
   /// In en, this message translates to:
-  /// **'This build cannot open a file picker'**
+  /// **'No file picker is available here'**
   String get statementImportPickerUnavailableTitle;
 
-  /// Explains that the missing piece is only file selection, and that it will be least-privilege when added.
+  /// Shown where no document picker exists — a desktop host, or a device that presented no provider. Must not promise a future feature: Android and iOS already open the system picker.
   ///
   /// In en, this message translates to:
-  /// **'The rest of the import is ready. When file selection is added it will ask only for the one file you pick, never for access to your storage.'**
+  /// **'This device offered no document picker, so a statement cannot be chosen on it. Nothing else about the import has changed — where a picker is available, Karar asks for the one file you choose and never for access to your storage.'**
   String get statementImportPickerUnavailableDetail;
 
   /// Shown when the device could not read the chosen document. Names no path and no filename.

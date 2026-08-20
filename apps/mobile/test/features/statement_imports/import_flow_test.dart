@@ -1,9 +1,12 @@
 // THE SEQUENCE, DRIVEN THROUGH THE PORTS.
 //
 // The picker is a fake and the repository is a script, so every step above the
-// picker port runs for real. That is the point of the port: this build ships no
-// document-picker adapter, and the flow it feeds is nonetheless exercised end
-// to end rather than left untested until one arrives.
+// picker port runs for real. That is the point of the port: the real adapter is
+// the system document picker over a platform channel, which no host running
+// this suite has, and the flow it feeds is exercised end to end regardless.
+//
+// NO TEST IN THIS FILE TOUCHES A DEVICE. The channel-backed adapter and its
+// contract are covered, without a device, in document_picker_channel_test.dart.
 //
 // The properties under test are the ones a person would be harmed by:
 //
@@ -82,9 +85,13 @@ StatementImportFlowState stateOf(ProviderContainer container) =>
 
 void main() {
   group('choosing a source', () {
-    test('the shipped picker reports itself unavailable rather than throwing', () async {
-      // The seam is honest: a person is told the build cannot offer a file
-      // picker, and is not shown a crash or a retry that cannot succeed.
+    test('a host with no document picker reports itself unavailable, not a throw',
+        () async {
+      // This suite runs on a desktop host, where no native half is registered,
+      // so the provider selects the picker that says so. The seam is honest
+      // there: a person is told the device cannot offer a file, and is not
+      // shown a crash or a retry that cannot succeed. Android and iOS select
+      // the channel-backed adapter instead.
       final container = ProviderContainer();
       addTearDown(container.dispose);
 

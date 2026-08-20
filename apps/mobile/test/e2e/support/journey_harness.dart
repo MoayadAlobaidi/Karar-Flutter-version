@@ -19,11 +19,14 @@
 //                          nothing from a person's statement or credential
 //                          reached a log record. Silent is the default, and a
 //                          silent logger cannot be checked;
-//   * `statementSourcePickerProvider` — the device document picker. This build
-//                          ships no adapter for one and installs the port that
-//                          reports itself unavailable, so without a fake there
-//                          is no step above it to exercise at all. The feature
-//                          documents exactly this substitution.
+//   * `statementSourcePickerProvider` — the device document picker. The real
+//                          adapter is the system document picker over a
+//                          platform channel, which exists only on Android and
+//                          iOS; on the host this suite runs on the provider
+//                          installs the port that reports itself unavailable,
+//                          so without a fake there is no step above it to
+//                          exercise at all. The feature documents exactly this
+//                          substitution.
 //
 // Everything else — `apiTransportProvider`, `tokenRefreshCoordinatorProvider`,
 // `apiClientProvider`, `sessionManagerProvider`, `startupCoordinatorProvider`,
@@ -155,10 +158,11 @@ final class JourneyHarness {
     loggerProvider.overrideWithValue(
       AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
     ),
-    // The document picker is a DEVICE capability this build ships no adapter
-    // for — `UnavailableStatementSourcePicker` is what production installs, and
-    // it reports itself unavailable. Overriding the port is the only way any
-    // step above it runs at all, and the feature's own documentation says so.
+    // The document picker is a DEVICE capability. On the host this suite runs
+    // on there is no native half, so `UnavailableStatementSourcePicker` is what
+    // the provider installs and it reports itself unavailable. Overriding the
+    // port is the only way any step above it runs at all, and the feature's own
+    // documentation says so. No journey here reaches a device picker.
     // It hands over the bytes BY IDENTITY, which is what lets the journey prove
     // the file reaches the socket unaltered.
     statementSourcePickerProvider.overrideWithValue(picker),

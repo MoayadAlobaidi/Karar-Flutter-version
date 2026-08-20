@@ -2,7 +2,10 @@
 //
 // The repository is a scripted double and the picker is a fake that returns
 // bytes, which is what lets every step above the picker port be exercised for
-// real even though this build ships no document-picker adapter.
+// real on a host that has no document picker of its own. The real adapter — the
+// system document picker over a platform channel — is selected only on Android
+// and iOS, and is covered, without a device, in
+// features/statement_imports/document_picker_channel_test.dart.
 //
 // EVERY FIXTURE IS SYNTHETIC. No real institution is named, and the adversarial
 // corpus below is deliberately hostile text rather than anybody's statement.

@@ -2513,11 +2513,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statementImportPickerUnavailableTitle =>
-      'This build cannot open a file picker';
+      'No file picker is available here';
 
   @override
   String get statementImportPickerUnavailableDetail =>
-      'The rest of the import is ready. When file selection is added it will ask only for the one file you pick, never for access to your storage.';
+      'This device offered no document picker, so a statement cannot be chosen on it. Nothing else about the import has changed — where a picker is available, Karar asks for the one file you choose and never for access to your storage.';
 
   @override
   String get statementImportPickerUnreadable =>

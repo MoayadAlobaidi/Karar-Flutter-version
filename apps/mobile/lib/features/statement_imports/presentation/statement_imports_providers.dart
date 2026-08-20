@@ -26,7 +26,7 @@ import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_statement_imports_repository.dart';
 import '../data/csv_sample_reader.dart';
-import '../data/unavailable_statement_source_picker.dart';
+import '../data/platform_statement_source_picker.dart';
 import '../domain/column_mapping.dart';
 import '../domain/import_lifecycle.dart';
 import '../domain/statement_import.dart';
@@ -40,15 +40,20 @@ final Provider<StatementImportsRepository> statementImportsRepositoryProvider =
   (Ref ref) => ApiStatementImportsRepository(ref.watch(apiClientProvider)),
 );
 
-/// The document picker.
+/// The document picker for the host this process is running on.
 ///
-/// This build supplies the one that reports itself unavailable; see
-/// `data/unavailable_statement_source_picker.dart` for exactly why, and
-/// `domain/statement_source_picker.dart` for what a real one must do. A test
-/// overrides this with a fake that returns bytes, which is how every step above
-/// the port is exercised for real.
+/// Android and iOS get the system document picker over a first-party platform
+/// channel — `ACTION_OPEN_DOCUMENT` and `UIDocumentPickerViewController`, which
+/// grant access to the one chosen file and need no permission and no
+/// entitlement. Every other host, the machine the test suite runs on included,
+/// gets `UnavailableStatementSourcePicker`, because no native half is
+/// registered there. See `data/platform_statement_source_picker.dart`, which
+/// also records that DEVICE EXECUTION IS NOT VERIFIED.
+///
+/// A test overrides this with a fake that returns bytes, which is how every
+/// step above the port is exercised without a device.
 final Provider<StatementSourcePicker> statementSourcePickerProvider =
-    Provider<StatementSourcePicker>((Ref ref) => const UnavailableStatementSourcePicker());
+    Provider<StatementSourcePicker>((Ref ref) => platformStatementSourcePicker());
 
 final Provider<StartStatementImport> startStatementImportProvider =
     Provider<StartStatementImport>(
@@ -97,8 +102,12 @@ final class ImportFlowIdle extends StatementImportFlowState {
   const ImportFlowIdle();
 }
 
-/// This build cannot ask the device for a document. A fact about the build, not
-/// a failure, and presented as one.
+/// This host cannot ask the device for a document. A fact about where the
+/// application is running, not a failure, and presented as one.
+///
+/// Still reachable, and still correct, on every host with no document-picker
+/// adapter — and on a device where the system could present no document
+/// provider at all.
 final class ImportFlowPickerUnavailable extends StatementImportFlowState {
   const ImportFlowPickerUnavailable();
 }

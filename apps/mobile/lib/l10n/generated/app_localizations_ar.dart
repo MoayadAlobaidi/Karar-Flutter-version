@@ -2491,12 +2491,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get statementImportActionUpload => 'ارفع وتابع';
 
   @override
-  String get statementImportPickerUnavailableTitle =>
-      'هذه النسخة لا تستطيع فتح منتقي الملفات';
+  String get statementImportPickerUnavailableTitle => 'لا يوجد منتقي ملفات هنا';
 
   @override
   String get statementImportPickerUnavailableDetail =>
-      'بقية الاستيراد جاهزة. عند إضافة اختيار الملفات سيطلب الملف الذي تختاره وحده، ولن يطلب الوصول إلى مساحة التخزين.';
+      'لم يُقدِّم هذا الجهاز منتقي مستندات، لذلك لا يمكن اختيار كشف عليه. لم يتغيّر شيء آخر في الاستيراد — حيث يتوفّر المنتقي، يطلب كرار الملف الذي تختاره وحده ولا يطلب الوصول إلى مساحة التخزين أبدًا.';
 
   @override
   String get statementImportPickerUnreadable =>

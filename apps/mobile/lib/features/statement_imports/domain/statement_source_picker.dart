@@ -33,25 +33,28 @@
 //     platform's job, and a client that decoded-and-re-encoded would hand the
 //     platform a file its owner never wrote.
 //
-// ## Why the shipped adapter is unimplemented, stated plainly
+// ## What is behind this port, stated plainly
 //
-// There is no document-picker adapter in this build. Every option available
-// required something this repository does not permit on its own:
+// Android and iOS are served by a FIRST-PARTY PLATFORM CHANNEL over the system
+// document picker (`data/platform_statement_source_picker.dart`, with the
+// native halves under `android/` and `ios/`). That mechanism was chosen because
+// it is the only one that satisfies the requirements above: a file-picker
+// dependency would contribute manifest entries, and the merged-manifest
+// allow-list test names the exact permission set of a real build, whereas the
+// system document picker needs no manifest permission and no entitlement at
+// all.
 //
-//   * a third-party plugin means a new direct dependency in `pubspec.yaml`,
-//     which is not this feature's file to edit and whose header requires an
-//     exact, reviewed pin;
-//   * every such plugin contributes manifest entries, and the merged-manifest
-//     allow-list test names the exact permission set of a real build;
-//   * a first-party platform channel is the RIGHT answer — the system document
-//     picker needs no manifest permission at all — but it is native code in
-//     two languages, and shipping it half-written would be worse than shipping
-//     the seam.
+// DEVICE EXECUTION IS NOT VERIFIED. What is verified is the Dart mapping from
+// every channel answer onto the outcomes below, the channel contract itself
+// against the framework's mock messenger, and — at the source level — that both
+// native halves speak the same names. Behaviour against a real document
+// provider has not been exercised in this repository, and no comment or test
+// name here may imply otherwise.
 //
-// So the port ships, the fake ships, every screen above it is real and tested,
-// and [UnavailableStatementSourcePicker] answers [PickerOutcomeUnavailable]
-// honestly. The interface says the device cannot offer a file yet; it does not
-// pretend to try and it does not fail as though something broke.
+// Every other host — the machine the test suite runs on included — gets
+// [UnavailableStatementSourcePicker], which answers [PickerOutcomeUnavailable]
+// honestly. There the interface says the device cannot offer a file; it does
+// not pretend to try and it does not fail as though something broke.
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -94,11 +97,14 @@ final class PickerOutcomeCancelled extends PickerOutcome {
   const PickerOutcomeCancelled();
 }
 
-/// This build cannot ask the device for a document.
+/// This host cannot ask the device for a document.
 ///
-/// A distinct outcome rather than a failure, because it is a fact about the
-/// build rather than something that went wrong: the surface says so plainly
-/// instead of showing a retry that cannot succeed.
+/// A distinct outcome rather than a failure, because it is a fact about where
+/// the application is running rather than something that went wrong: the
+/// surface says so plainly instead of showing a retry that cannot succeed.
+///
+/// Reached on any host with no document-picker adapter registered, and on
+/// Android or iOS where the system could present no document provider at all.
 @immutable
 final class PickerOutcomeUnavailable extends PickerOutcome {
   const PickerOutcomeUnavailable();
