@@ -630,3 +630,5 @@ export const FORBIDDEN_DIRECT_PAIRS: ReadonlyArray<readonly [ContentTrustClass, 
     ['OPAQUE_IDENTIFIER', 'AUTHORIZATION_DECISION'],
     ['OPAQUE_IDENTIFIER', 'STORAGE_PATH'],
   ]);
+
+export * from './red-team-corpus.js';
