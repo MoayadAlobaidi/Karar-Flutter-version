@@ -116,6 +116,37 @@ Phase 5 establishes the boundary; Phase 7 inherits these as requirements, not su
 - **Retrieval results stay untrusted.** Text that comes back from a search, an index or an embedding store is `UNTRUSTED_EXTERNAL_CONTENT` at whatever remove — the classification travels with the origin and is not laundered by a round trip through storage.
 - **The model cannot alter a PolicyPack, capability availability, RLS, ownership, a retention decision, or a source fact.** These are decided by reviewed configuration and by the database, and no model output is an input to any of them.
 
+### 8a. Future chat, specifically
+
+A chat message is `UNTRUSTED_USER_CONTENT` carrying **user intent**. Intent is a request, not an authority: it asks the platform to do something the person may already do, and every "may" is decided by the same deterministic code that decides it today.
+
+A future chat message therefore cannot:
+
+- become a system, developer or platform instruction — those are `TRUSTED_PLATFORM_INSTRUCTION` and constructible only from the closed origin registry;
+- enable, widen or reinstate a capability;
+- select a tenant outside the ordinary tenancy flow, or act as another subject;
+- override row-level security, or read a row the session's principal could not read directly;
+- alter a PolicyPack, a jurisdiction, a legal-document version or a retention decision;
+- grant a provider permission;
+- change a verified source fact — a person may CORRECT a record through the ordinary correction path, which writes a revision with provenance, and that path does not become writable because the request arrived as a sentence;
+- authorize a tool call or a network destination.
+
+**Prompt assembly is structural, never textual.** A future prompt is built from typed slots — a platform instruction from the registry, a user turn, and a minimised projection of verified facts — each carried in its own field. There is no `systemPrompt += userText`, and no format string a user turn could close and reopen. The reason is exact: concatenation is what makes "ignore previous instructions" meaningful at all. Given separate fields, that sentence is a sentence in the user's own turn, which is where it belongs and where it has no force.
+
+### 8b. Retrieval and memory, specifically
+
+Nothing a person uploads becomes an embedding, a vector-store record, a retrieval corpus entry, a semantic memory or a long-term agent memory by virtue of having been uploaded. A future layer requests an explicit, minimised projection, and gets exactly that.
+
+**Trust travels with the origin, and storage does not launder it.** Text that returns from Karar's own index is `UNTRUSTED_EXTERNAL_CONTENT` if that is what went in. "It came from our vector database" is not a provenance claim about the content; it is a claim about the last place the content sat.
+
+Memory, when it exists, is scoped to one tenant and one subject, is labelled with the trust class of what it holds, and cannot promote user or external text into instruction authority. A memory that could be written by content is a memory an attacker writes once and the platform believes forever.
+
+### 8c. Egress, specifically
+
+A future outbound destination is chosen **server-side from an allow-list**. It is never read out of untrusted text, never taken from a model's output, and never derived from a URL found in a statement — a source URL is displayed as text and is not followed, then or now.
+
+Whatever leaves is minimised before it goes: the projection is the same explicit, allow-listed field set the retrieval rule requires, not "the record" and not "the file".
+
 ### The flow
 
 ```mermaid

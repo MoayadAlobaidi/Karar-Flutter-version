@@ -939,6 +939,9 @@ importers:
       '@karar/capability-registry':
         specifier: workspace:*
         version: link:../../packages/capability-registry
+      '@karar/content-trust':
+        specifier: workspace:*
+        version: link:../../packages/content-trust
       '@karar/platform':
         specifier: workspace:*
         version: link:../../packages/platform
