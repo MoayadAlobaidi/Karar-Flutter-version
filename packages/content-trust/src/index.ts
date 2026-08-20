@@ -417,7 +417,9 @@ export class InvalidPlatformInstructionOriginError extends Error {
  * intent: a guarantee that rests on one mechanism rests on whoever last edited
  * it being careful.
  */
-export function platformInstruction(origin: PlatformInstructionOriginId): TrustedPlatformInstruction {
+export function platformInstruction(
+  origin: PlatformInstructionOriginId,
+): TrustedPlatformInstruction {
   if (!PLATFORM_INSTRUCTION_ORIGIN_SET.has(origin)) {
     throw new InvalidPlatformInstructionOriginError(origin);
   }

@@ -86,10 +86,9 @@ describe('the sink policy', () => {
     // Provenance differs; authority does not. A field is not trustworthy
     // because its owner typed it.
     for (const sink of SENSITIVE_SINKS) {
-      expect(
-        mayReachDirectly('UNTRUSTED_USER_CONTENT', sink),
-        sink,
-      ).toBe(mayReachDirectly('UNTRUSTED_EXTERNAL_CONTENT', sink));
+      expect(mayReachDirectly('UNTRUSTED_USER_CONTENT', sink), sink).toBe(
+        mayReachDirectly('UNTRUSTED_EXTERNAL_CONTENT', sink),
+      );
     }
     expect(untrustedContent('SUBJECT_TYPED').trust).toBe('UNTRUSTED_USER_CONTENT');
     expect(untrustedContent('SUBJECT_UPLOADED_FILE').trust).toBe('UNTRUSTED_EXTERNAL_CONTENT');
