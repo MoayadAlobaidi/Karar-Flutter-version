@@ -58,7 +58,7 @@
  * compared arrive as arguments.
  */
 
-import type { CalendarDay } from '@karar/shared-kernel';
+import { CalendarDay } from '@karar/shared-kernel';
 
 /** Milliseconds in one calendar day, used only to divide two UTC midnights. */
 const MILLISECONDS_PER_DAY = 86_400_000;
@@ -121,4 +121,45 @@ export function isWithinSuggestionWindow(
   inflowBookingDate: CalendarDay,
 ): boolean {
   return calendarDaysBetween(outflowBookingDate, inflowBookingDate) <= SUGGESTION_WINDOW_DAYS;
+}
+
+/** The two calendar days a window spans, inclusive at both ends. */
+export interface SuggestionWindowBounds {
+  readonly earliest: CalendarDay;
+  readonly latest: CalendarDay;
+}
+
+/**
+ * The window around one booking date, as the two calendar days that bound it.
+ *
+ * ## Why this belongs here and not at the reader that uses it
+ *
+ * A suggestion pass has to ASK the store for the days a counterpart could have
+ * been booked on, and the only honest source for those two days is the
+ * constant above. A reader that computed `anchor ± 3` for itself would be a
+ * second statement of the rule, in a file that does not carry the version
+ * label, and the two would drift the first time the constant moved — which is
+ * exactly what `SUGGESTION_WINDOW_DAYS` exists to prevent. So the bounds are
+ * derived here, from the same constant `isWithinSuggestionWindow` reads.
+ *
+ * **The bounds NARROW a read; they never decide a pair.** Whether two booking
+ * dates are close enough is still `isWithinSuggestionWindow`, run over the
+ * candidate in the domain rule. A store that returned a day too many would
+ * change nothing about what may be suggested — it would only make the read
+ * wider than it needed to be.
+ *
+ * The arithmetic is the same TIME arithmetic `calendarDaysBetween` performs
+ * and in the same units: both ends are computed from `toUtcMidnight()` and
+ * read back as calendar days at the SAME offset, so the offset cancels
+ * exactly and neither end can land a day out for a reader elsewhere. No money
+ * is touched, and no division is introduced — the module's one division stays
+ * the one above.
+ */
+export function suggestionWindowBounds(bookingDate: CalendarDay): SuggestionWindowBounds {
+  const midnight = bookingDate.toUtcMidnight().getTime();
+  const span = SUGGESTION_WINDOW_DAYS * MILLISECONDS_PER_DAY;
+  return Object.freeze({
+    earliest: CalendarDay.fromInstant(new Date(midnight - span), 'UTC'),
+    latest: CalendarDay.fromInstant(new Date(midnight + span), 'UTC'),
+  });
 }

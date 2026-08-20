@@ -127,6 +127,20 @@ export {
   type FinancialCategory,
 } from './domain/category-catalogue.js';
 export {
+  MERCHANT_NARRATIVE_MAX_LENGTH,
+  MERCHANT_NORMALIZATION_VERSION,
+  MERCHANT_PATTERN_KINDS,
+  InvalidMerchantRuleError,
+  createMerchantRule,
+  decideMerchantCategory,
+  normalizeMerchantNarrative,
+  selectMerchantRule,
+  type MerchantNarrative,
+  type MerchantPatternKind,
+  type MerchantRule,
+  type MerchantRuleDecision,
+} from './domain/merchant-rules.js';
+export {
   ASSIGNMENT_SOURCES,
   ASSIGNMENT_STATUSES,
   InvalidAssignmentError,
@@ -212,6 +226,19 @@ export type {
   TransferMatchEraserPort,
   TransferMatchErasureOutcome,
 } from './application/ports/transfer-match-eraser.js';
+// The port that runs the OTHER way at write time: after transactions are
+// written, the platform looks for the movements among them. Declared here
+// because this module owns what a written transaction is, satisfied by
+// `modules/transfer-matching`, and called by BOTH write paths — this module's
+// manual entry, and `modules/statement-imports`' reviewed statement commit,
+// which imports this declaration rather than restating it. A caller hands over
+// ids that were WRITTEN and never a pairing: naming a pair would be asserting a
+// relationship nobody observed.
+export {
+  SUGGESTS_NO_TRANSFERS,
+  type TransferSuggestionPassOutcome,
+  type TransferSuggestionTriggerPort,
+} from './application/ports/transfer-suggestion-trigger.js';
 // The port this module declares for `modules/statement-imports`, and the
 // writer that fills it. Both live here because the four tables a statement
 // commit writes are this module's; the port takes the caller's OPEN
@@ -228,6 +255,7 @@ export {
   DuplicateTransactionError,
   OccurrenceOrdinalNotNextError,
   TransactionVersionConflictError,
+  type RuleCategoryAssignment,
   type TransactionCommit,
   type TransactionCorrectionCommit,
   type TransactionCursor,
@@ -241,8 +269,11 @@ export {
   type CategoryAssignmentRepository,
   type FinancialCategoryCatalogue,
   type MerchantRuleDirectory,
-  type MerchantRuleMatch,
 } from './application/ports/category-repository.js';
+// The ONE service both write paths categorise through. `modules/statement-imports`
+// binds it behind its own `DeterministicCategoryPort`; `CreateManualTransaction`
+// takes it directly. There is no second implementation to drift from.
+export { CATEGORISES_NOTHING, MerchantRuleEvaluator } from './application/merchant-rule-evaluator.js';
 // The two ports the statement-ingestion workstream binds.
 export type {
   DedupFingerprint,
@@ -296,6 +327,14 @@ export {
   type AssignCategoryError,
   type AssignCategoryInput,
 } from './application/use-cases/assign-category.js';
+// The re-run: idempotent, precedence-respecting, and the only one of the three
+// categorisation paths that operates on a transaction already stored.
+export {
+  ApplyMerchantRules,
+  type ApplyMerchantRulesError,
+  type ApplyMerchantRulesInput,
+  type MerchantRuleApplication,
+} from './application/use-cases/apply-merchant-rules.js';
 
 // infrastructure — implementations for the composition root
 export { PrismaTransactionRepository } from './infrastructure/persistence/prisma-transaction-repository.js';

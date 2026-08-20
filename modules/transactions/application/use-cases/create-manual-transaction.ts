@@ -40,6 +40,36 @@
  * encrypted, and before the repository is touched. Refusing after encryption
  * would already have produced ciphertext of the subject's narrative; refusing
  * after a write would leave the record the gate exists to prevent.
+ *
+ * ## Categorisation, in the same database transaction as the record
+ *
+ * After both gates, the typed narrative is offered to `MerchantRuleEvaluator`
+ * — the same shared service the reviewed CSV canonical commit reaches through
+ * its adapter, so a merchant categorises identically whether it was typed or
+ * imported. If a reviewed rule matches, its assignment travels with the
+ * commit and lands atomically with the transaction, its revision and its
+ * provenance; if none matches, nothing is written and the transaction is
+ * uncategorised, which is a true statement about it.
+ *
+ * **Deterministic only: no AI, no LLM, no scoring, no fallback** (MODULE.md).
+ * The narrative is untrusted external content (ADR-0029) and is compared as
+ * inert text — never interpreted, never used to build SQL, a path or a
+ * command.
+ *
+ * ## The transfer-suggestion pass, AFTER the record and outside its unit
+ *
+ * A movement between two of the person's own accounts is ONE movement recorded
+ * twice, and counted as two it overstates both what they spent and what they
+ * earned (ADR-0028). Once the record is committed, the newly written
+ * transaction is handed to `TransferSuggestionTriggerPort`, which looks for its
+ * counterpart among the subject's own rows and may write a `SUGGESTED`
+ * relationship. That relationship changes NEITHER transaction and is not a
+ * fact: only the person's own confirmation makes a match authoritative.
+ *
+ * **It cannot fail this use case.** The record is what happened to the person's
+ * money; the suggestion is a question about it. A question that could not be
+ * asked leaves the record standing, so the outcome is not read and a throw is
+ * swallowed at the call site.
  */
 
 import { Clock, Money, Result } from '@karar/shared-kernel';
@@ -64,6 +94,7 @@ import {
   type RetentionUndecided,
   type StoreFailure,
 } from '../errors.js';
+import { CATEGORISES_NOTHING, type MerchantRuleEvaluator } from '../merchant-rule-evaluator.js';
 import type { DedupFingerprintPort } from '../ports/dedup-fingerprint.js';
 import {
   isWritableLifecycleState,
@@ -81,8 +112,13 @@ import type {
 import {
   DuplicateTransactionError,
   OccurrenceOrdinalNotNextError,
+  type RuleCategoryAssignment,
   type TransactionRepository,
 } from '../ports/transaction-repository.js';
+import {
+  SUGGESTS_NO_TRANSFERS,
+  type TransferSuggestionTriggerPort,
+} from '../ports/transfer-suggestion-trigger.js';
 
 /**
  * The processing versions a manual entry records.
@@ -155,6 +191,37 @@ export class CreateManualTransaction {
     private readonly clock: Clock,
     private readonly retention: TransactionRetentionDecisionPort,
     private readonly accounts: FinancialAccountAccessPort,
+    /**
+     * The shared rules evaluator — the SAME object the CSV canonical commit
+     * reaches through its own adapter, not a second implementation of the
+     * same question.
+     *
+     * It defaults to `CATEGORISES_NOTHING` so that suites about retention,
+     * dedup or timezones need not seed a corpus, and so that adding it did
+     * not require editing a fixture inside another workstream's module. A
+     * default on a collaborator like this is normally how a pipeline
+     * silently stops being one, so the hole is closed explicitly: a test
+     * reads the composition root's source and fails if the real evaluator
+     * stops being passed here.
+     */
+    private readonly merchantRules: MerchantRuleEvaluator = CATEGORISES_NOTHING,
+    /**
+     * The platform's own transfer-suggestion pass, run AFTER the record is
+     * committed — never before, and never as part of it.
+     *
+     * A movement between two of the person's own accounts is ONE movement
+     * recorded twice, and counted as two it overstates both what they spent
+     * and what they earned (ADR-0028). Something has to notice; this is where
+     * the manual path notices. What it produces is a QUESTION — a `SUGGESTED`
+     * relationship that changes neither transaction and that only the person's
+     * own confirmation can make authoritative.
+     *
+     * It defaults to `SUGGESTS_NO_TRANSFERS` for the same reason the evaluator
+     * above defaults, and the same hole is closed the same way: a test reads
+     * the composition root's source and fails if the real trigger stops being
+     * passed here.
+     */
+    private readonly transferSuggestions: TransferSuggestionTriggerPort = SUGGESTS_NO_TRANSFERS,
   ) {}
 
   async execute(
@@ -269,6 +336,39 @@ export class CreateManualTransaction {
       normalizedNarrative: description.reveal(),
     });
 
+    // The rules pass, over the narrative the person just typed, treated as
+    // untrusted external content (ADR-0029): normalised and compared as inert
+    // characters, never interpreted. `null` — no reviewed rule matched — is
+    // the ordinary answer, and it writes no assignment at all rather than
+    // inventing a fallback category.
+    //
+    // It runs HERE, after both gates and before anything is written, for two
+    // reasons. A refused entry must not have consulted the corpus on behalf
+    // of a caller the platform may not write for at all. And the answer is
+    // needed before the provenance record is built, because provenance
+    // records what the category source WAS at commit time, and it and the
+    // assignment land in the same database transaction — so the two cannot
+    // disagree.
+    let ruleDecision;
+    try {
+      ruleDecision = await this.merchantRules.evaluate({
+        merchant: merchant?.reveal() ?? null,
+        description: description.reveal(),
+      });
+    } catch (error) {
+      return Result.err(toStoreFailure(error));
+    }
+    const ruleCategoryAssignment: RuleCategoryAssignment | null =
+      ruleDecision === null
+        ? null
+        : {
+            id: this.ids.nextId(),
+            categoryCode: ruleDecision.categoryCode,
+            ruleVersion: ruleDecision.ruleVersion,
+            assignedBy: actorRef,
+            assignedAt: now,
+          };
+
     const provenance = createProvenance({
       id: this.ids.nextId(),
       transactionId: transaction.id,
@@ -291,7 +391,13 @@ export class CreateManualTransaction {
       // manual entry is never mistaken for a bank-frame import.
       sourceDirection: sourceDirectionOf(amount),
       directionMapping: 'MANUAL_ENTRY',
-      categoryAssignmentSource: 'NONE' satisfies CategoryAssignmentSource,
+      // The honest snapshot: `RULE` exactly when this commit is also writing
+      // a rule's assignment, `NONE` when it is not. Both rows go in one
+      // database transaction, so provenance cannot end up claiming a category
+      // source for a category that was never written.
+      categoryAssignmentSource: (ruleCategoryAssignment === null
+        ? 'NONE'
+        : 'RULE') satisfies CategoryAssignmentSource,
       createdAt: now,
     });
 
@@ -302,6 +408,7 @@ export class CreateManualTransaction {
         provenance,
         fingerprint,
         occurrenceOrdinal,
+        ruleCategoryAssignment,
       });
     } catch (error) {
       if (error instanceof DuplicateTransactionError) {
@@ -326,6 +433,20 @@ export class CreateManualTransaction {
         });
       }
       return Result.err(toStoreFailure(error));
+    }
+
+    // AFTER the record is committed, and outside its unit of work. The order
+    // is the point twice over: a suggestion is about a transaction that
+    // EXISTS, and the record must not depend on whether the platform managed
+    // to ask a question about it. So the outcome is not read, a throw is
+    // swallowed here rather than allowed to turn a recorded movement into a
+    // refusal, and the person's transaction stands either way.
+    try {
+      await this.transferSuggestions.suggestTransfersFor(principal, [transaction.id]);
+    } catch {
+      // Deliberately ignored — see `TransferSuggestionTriggerPort`. A missing
+      // suggestion leaves a question unasked; a failed write would leave the
+      // person unable to record what happened to their money.
     }
     return Result.ok(transaction);
   }

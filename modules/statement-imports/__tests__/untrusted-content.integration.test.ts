@@ -43,6 +43,7 @@ import type { Clock } from '@karar/shared-kernel';
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 import { PrismaSourceObservationWriter } from '@karar/financial-connections';
 import {
+  MerchantRuleEvaluator,
   PrismaMerchantRuleDirectory,
   PrismaStatementCommitWriter,
   PrismaTransactionRepository,
@@ -279,7 +280,9 @@ function wire(handle: PrismaHandle, clock: Clock): Wiring {
       accounts,
       sourceStore,
       dedup,
-      new TransactionsDeterministicCategoryAdapter(new PrismaMerchantRuleDirectory(handle)),
+      new TransactionsDeterministicCategoryAdapter(
+        new MerchantRuleEvaluator(new PrismaMerchantRuleDirectory(handle)),
+      ),
       retention,
       ids,
       clock,

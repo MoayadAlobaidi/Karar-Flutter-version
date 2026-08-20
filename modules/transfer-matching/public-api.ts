@@ -95,6 +95,8 @@ export {
   TRANSFER_SUGGESTION_WINDOW,
   calendarDaysBetween,
   isWithinSuggestionWindow,
+  suggestionWindowBounds,
+  type SuggestionWindowBounds,
 } from './domain/suggestion-window.js';
 export {
   MATCHED_ACCOUNT_REFERENCE_TYPES,
@@ -167,6 +169,11 @@ export {
   type TransferMatchRetentionDecisionPort,
 } from './application/ports/transfer-match-retention-decision.js';
 export type {
+  MatchCandidateQuery,
+  MatchCandidateSearchPort,
+  MatchCandidateWindow,
+} from './application/ports/match-candidate-search.js';
+export type {
   TransferMatchCreateOutcome,
   TransferMatchPage,
   TransferMatchPageQuery,
@@ -179,12 +186,32 @@ export type {
   TransferMatchEraserPort,
   TransferMatchErasureOutcome,
 } from './application/ports/transfer-match-eraser.js';
+// The second port running that way, and the one that finally makes the module
+// speak: after transactions are written, the platform looks for the movements
+// among them. Declared by @karar/transactions, satisfied by
+// `TransactionsTransferSuggestionTrigger` below, and called by BOTH write
+// paths. A caller hands over ids that were written and never a pairing.
+export type {
+  TransferSuggestionPassOutcome,
+  TransferSuggestionTriggerPort,
+} from './application/ports/transfer-suggestion-trigger.js';
 
 // application — use cases
 export {
   SuggestTransferMatch,
   type SuggestTransferMatchInput,
 } from './application/use-cases/suggest-transfer-match.js';
+// The platform-side proposer. It is the ONLY caller of SuggestTransferMatch
+// that exists, it takes ONE id — the transaction that was just written — and
+// it finds the counterpart itself. No transport reaches either: a caller that
+// could name a pair would be asserting a relationship it never observed.
+export {
+  CANDIDATE_WINDOW_READ_CAP,
+  GenerateTransferMatchSuggestions,
+  type GenerateTransferMatchSuggestionsError,
+  type GenerateTransferMatchSuggestionsInput,
+  type TransferSuggestionOutcome,
+} from './application/use-cases/generate-transfer-match-suggestions.js';
 export {
   ConfirmTransferMatch,
   type ConfirmTransferMatchInput,
@@ -206,9 +233,11 @@ export {
 
 // infrastructure — implementations for the composition root
 export { PrismaTransferMatchRepository } from './infrastructure/persistence/prisma-transfer-match-repository.js';
+export { PrismaMatchCandidateReader } from './infrastructure/persistence/prisma-match-candidate-reader.js';
 export { Uuidv7IdSource } from './infrastructure/persistence/uuidv7-id-source.js';
 export { TransactionsMatchableTransactionAdapter } from './infrastructure/adapters/transactions-matchable-transaction-access.js';
 export { TransactionsTransferMatchEraser } from './infrastructure/adapters/transactions-transfer-match-eraser.js';
+export { TransactionsTransferSuggestionTrigger } from './infrastructure/adapters/transactions-transfer-suggestion-trigger.js';
 export {
   LocalRetentionFixtureEnvironmentError,
   LocalRetentionFixtureMissingError,

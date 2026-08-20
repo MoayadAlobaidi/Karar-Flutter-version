@@ -14,8 +14,9 @@
  * exercised here as well as against live PostgreSQL.
  */
 
-import type { TransactionCategoryAssignment } from '../../domain/category-assignment.js';
+import { createAssignment, type TransactionCategoryAssignment } from '../../domain/category-assignment.js';
 import { createFinancialCategory, type CategoryCode, type FinancialCategory } from '../../domain/category-catalogue.js';
+import { createMerchantRule, type MerchantRule } from '../../domain/merchant-rules.js';
 import type { TransactionProvenance } from '../../domain/provenance.js';
 import type { TransactionRevision } from '../../domain/revision.js';
 import type { TransactionId } from '../../domain/refs.js';
@@ -25,6 +26,7 @@ import {
   type AssignmentCommit,
   type CategoryAssignmentRepository,
   type FinancialCategoryCatalogue,
+  type MerchantRuleDirectory,
 } from '../../application/ports/category-repository.js';
 import type { IdSource } from '../../application/ports/id-source.js';
 import type {
@@ -35,6 +37,7 @@ import {
   DuplicateTransactionError,
   OccurrenceOrdinalNotNextError,
   TransactionVersionConflictError,
+  type RuleCategoryAssignment,
   type TransactionCommit,
   type TransactionCorrectionCommit,
   type TransactionPage,
@@ -107,6 +110,23 @@ export class InMemoryTransactionRepository implements TransactionRepository {
   readonly #rows = new Map<string, StoredTransaction>();
 
   /**
+   * The assignment store a commit writes into, when one is wired.
+   *
+   * In PostgreSQL the two writes are two statements in one transaction; here
+   * they are two objects, so the double is handed the assignment store to
+   * write into. Optional because most suites do not categorise and should not
+   * have to construct one — but when it IS wired, a commit carrying a rule's
+   * assignment writes it, exactly as the live repository does.
+   */
+  assignments: InMemoryCategoryAssignmentRepository | null = null;
+
+  /** Wire the assignment store, returning `this` so seeding stays one line. */
+  writingAssignmentsInto(assignments: InMemoryCategoryAssignmentRepository): this {
+    this.assignments = assignments;
+    return this;
+  }
+
+  /**
    * The stored occurrences of one content identity. Derived from the rows
    * rather than from a counter kept beside them, so deletion behaves exactly
    * as the live rule does: `max(occurrence_ordinal)` is taken over surviving
@@ -152,6 +172,14 @@ export class InMemoryTransactionRepository implements TransactionRepository {
       identityKey,
       occurrenceOrdinal: commit.occurrenceOrdinal,
     });
+    // The double holds the REAL contract here too: a commit carrying a rule's
+    // assignment writes it, in the same call, or writes nothing. A double that
+    // silently dropped it would make every "manual entry gets categorised"
+    // test pass against a repository that never wrote a category.
+    if (commit.ruleCategoryAssignment !== null) {
+      const assignment = commit.ruleCategoryAssignment;
+      this.assignments?.seedFromCommit(principal, commit.transaction.id, assignment);
+    }
     return Promise.resolve();
   }
 
@@ -263,6 +291,35 @@ export class InMemoryTransactionRepository implements TransactionRepository {
 export class InMemoryCategoryAssignmentRepository implements CategoryAssignmentRepository {
   readonly #rows = new Map<string, TransactionCategoryAssignment>();
 
+  /**
+   * The assignment a `commit` carried, written as the live repository writes
+   * it: ACTIVE, `RULE`-sourced, naming its rule version, superseding nothing
+   * — a transaction that has only just been created has no chain to supersede.
+   */
+  seedFromCommit(
+    principal: TransactionsPrincipal,
+    transactionId: string,
+    assignment: RuleCategoryAssignment,
+  ): void {
+    this.#rows.set(
+      assignment.id,
+      createAssignment({
+        id: assignment.id,
+        transactionId: transactionId as TransactionId,
+        tenantId: principal.tenantId,
+        userId: principal.userId,
+        categoryCode: assignment.categoryCode,
+        assignmentSource: 'RULE',
+        ruleVersion: assignment.ruleVersion,
+        assignedBy: assignment.assignedBy,
+        assignedAt: assignment.assignedAt,
+        status: 'ACTIVE',
+        supersededById: null,
+        supersededAt: null,
+      }),
+    );
+  }
+
   assign(principal: TransactionsPrincipal, commit: AssignmentCommit): Promise<void> {
     if (commit.supersedesId !== null) {
       const previous = this.#rows.get(commit.supersedesId);
@@ -334,6 +391,71 @@ export class StaticCategoryCatalogue implements FinancialCategoryCatalogue {
 
   list(): Promise<readonly FinancialCategory[]> {
     return Promise.resolve([...this.#byCode.values()]);
+  }
+}
+
+/**
+ * The reviewed merchant corpus, stated by the test.
+ *
+ * Rules go through `createMerchantRule`, so a test cannot seed a pattern the
+ * database would refuse — an uppercase token, a token with reference
+ * punctuation in it, an unversioned rule. A double that accepted those would
+ * let a test prove matching works on rules that could never exist.
+ *
+ * `listActiveRules` returns the seeded order UNCHANGED and offers a
+ * `shuffled()` reader, because the contract is that order does not matter:
+ * the selection is total, so the same corpus in any order must decide the
+ * same way, and that is a thing to assert rather than assume.
+ */
+export class InMemoryMerchantRuleDirectory implements MerchantRuleDirectory {
+  #rules: MerchantRule[] = [];
+  reads = 0;
+
+  constructor(
+    seed: ReadonlyArray<{
+      patternKind: string;
+      patternToken: string;
+      categoryCode: string;
+      ruleVersion: string;
+    }> = [],
+  ) {
+    for (const rule of seed) this.add(rule);
+  }
+
+  add(rule: {
+    patternKind: string;
+    patternToken: string;
+    categoryCode: string;
+    ruleVersion: string;
+  }): this {
+    this.#rules.push(createMerchantRule(rule));
+    return this;
+  }
+
+  /** Replace the corpus wholesale — how a test models "the rules changed". */
+  replaceWith(
+    rules: ReadonlyArray<{
+      patternKind: string;
+      patternToken: string;
+      categoryCode: string;
+      ruleVersion: string;
+    }>,
+  ): this {
+    this.#rules = [];
+    for (const rule of rules) this.add(rule);
+    return this;
+  }
+
+  /** The same corpus, reversed. Deterministic, so the assertion is stable. */
+  reversed(): InMemoryMerchantRuleDirectory {
+    const other = new InMemoryMerchantRuleDirectory();
+    for (const rule of [...this.#rules].reverse()) other.add(rule);
+    return other;
+  }
+
+  listActiveRules(): Promise<readonly MerchantRule[]> {
+    this.reads += 1;
+    return Promise.resolve([...this.#rules]);
   }
 }
 

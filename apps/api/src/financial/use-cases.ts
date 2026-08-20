@@ -63,6 +63,7 @@ import type {
   StoreImportSource,
 } from '@karar/statement-imports';
 import type {
+  ApplyMerchantRules,
   AssignCategory,
   CreateManualTransaction,
   DeleteOwnTransaction,
@@ -97,6 +98,16 @@ export interface FinancialUseCases {
   readonly updateOwnTransaction: UpdateOwnTransaction;
   readonly deleteOwnTransaction: DeleteOwnTransaction;
   readonly assignCategory: AssignCategory;
+  /**
+   * The idempotent rules re-run over a transaction already stored.
+   *
+   * Present in the bundle and bound to no route on purpose. The two paths a
+   * person can reach — manual entry and the reviewed statement commit —
+   * categorise as they write; this is the maintenance pass for after the
+   * reviewed corpus changes, and mounting it would mean an api-contracts
+   * change and a regenerated Dart client for an action no person asks for.
+   */
+  readonly applyMerchantRules: ApplyMerchantRules;
 
   readonly listOwnConnections: ListOwnConnections;
   readonly listOwnAccountSourceLinks: ListOwnAccountSourceLinks;

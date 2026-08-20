@@ -22,7 +22,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Clock } from '@karar/shared-kernel';
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 import { PrismaSourceObservationWriter } from '@karar/financial-connections';
-import { PrismaMerchantRuleDirectory, PrismaStatementCommitWriter } from '@karar/transactions';
+import {
+  MerchantRuleEvaluator,
+  PrismaMerchantRuleDirectory,
+  PrismaStatementCommitWriter,
+} from '@karar/transactions';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
 import { CommitStatementImport } from '../application/use-cases/commit-statement-import.js';
@@ -253,7 +257,9 @@ function wire(
       accounts,
       sourceStore,
       dedup,
-      new TransactionsDeterministicCategoryAdapter(new PrismaMerchantRuleDirectory(handle)),
+      new TransactionsDeterministicCategoryAdapter(
+        new MerchantRuleEvaluator(new PrismaMerchantRuleDirectory(handle)),
+      ),
       retention,
       ids,
       clock,

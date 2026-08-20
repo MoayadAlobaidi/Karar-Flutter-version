@@ -770,12 +770,21 @@ async function seedVirtualCards(): Promise<void> {
  * Two SUGGESTED transfer matches over four REAL transactions, so the decision
  * routes have something to decide about.
  *
- * `SuggestTransferMatch` is deliberately not mounted — a client-driven "match
- * these two" would let a person assert a relationship the equal-and-opposite
- * rule refuses — so the suggestion itself is seeded. Every field the domain
- * cares about is honest: two DIFFERENT transactions on two DIFFERENT accounts,
- * the same currency, equal and opposite, under the module's own declared
- * window label. The table carries no encrypted column.
+ * There is still no client-driven "match these two" — that would let a person
+ * assert a relationship the equal-and-opposite rule refuses — but the PLATFORM
+ * now proposes matches itself when a transaction is recorded. So this no
+ * longer seeds unconditionally: it looks for the suggestion the platform
+ * already made about these two transactions and uses that, and seeds one only
+ * when the generator did not pair them.
+ *
+ * Seeding regardless is what this used to do, and it began failing the moment
+ * generation was mounted: the rows were already in a live match, and the
+ * "one transaction, at most one live match" rule refused the second — which
+ * is the rule working, not a fixture that needed loosening.
+ *
+ * Every seeded field is honest either way: two DIFFERENT transactions on two
+ * DIFFERENT accounts, the same currency, equal and opposite, under the
+ * module's own declared window label. The table carries no encrypted column.
  */
 async function seedTransferMatch(
   outflowTransactionId: string,
@@ -783,6 +792,18 @@ async function seedTransferMatch(
   inflowTransactionId: string,
   inflowAccount: string,
 ): Promise<string> {
+  // The platform's own suggestion, if it made one about this pair.
+  const existing = await app.sql<{ id: string }>(
+    `SELECT id FROM public.transfer_matches
+      WHERE tenant_id = $1
+        AND outflow_transaction_id = $2
+        AND inflow_transaction_id = $3
+        AND match_state <> 'REJECTED'
+      LIMIT 1`,
+    [TENANT, outflowTransactionId, inflowTransactionId],
+  );
+  if (existing.length > 0 && existing[0] !== undefined) return existing[0].id;
+
   const id = randomUUID();
   await app.sql(
     `INSERT INTO public.transfer_matches

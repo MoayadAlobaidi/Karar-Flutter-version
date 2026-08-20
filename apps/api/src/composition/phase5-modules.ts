@@ -59,12 +59,25 @@
  * `EraseTransferMatches` use case behind it — are the real adapters, used by
  * the transaction delete path that IS mounted.
  *
- * TRANSFER-MATCHING'S RETENTION RESOLVER IS NOT CONSULTED, and that is
- * correct rather than an omission: the only transfer-match writes this
- * surface mounts are confirm and reject, which change the state of a row that
- * already exists. Creating a match is `SuggestTransferMatch`, which is not
- * mounted; the moment it is, its retention port becomes a required argument
- * and this file will refuse to compose without one.
+ * TRANSFER-MATCHING'S RETENTION RESOLVER IS NOW CONSULTED, and the sentence
+ * that used to stand here said why it would have to be one day: "the only
+ * transfer-match writes this surface mounts are confirm and reject, which
+ * change the state of a row that already exists. Creating a match is
+ * `SuggestTransferMatch`, which is not mounted; the moment it is, its
+ * retention port becomes a required argument and this file will refuse to
+ * compose without one." That moment is this change. A match row is now
+ * created by the platform after a transaction is written, so
+ * `resolveMatchesRetention` joins the fail-closed block above and this file
+ * refuses to compose outside `local` without an approved decision — exactly
+ * as it does for accounts, transactions and imports.
+ *
+ * SUGGESTING A TRANSFER IS NOT MOUNTED ON ANY ROUTE, AND MUST NEVER BE. The
+ * generator is reached from inside the platform, after a transaction is
+ * written — by `CreateManualTransaction` and by `CommitStatementImport`,
+ * through the port `@karar/transactions` declares. There is no HTTP verb that
+ * proposes a match, and adding one would let a caller assert a relationship
+ * between two records it never observed. What a person CAN do over HTTP is
+ * answer: confirm, reject, list. Those three are mounted; the fourth is not.
  */
 
 import type { DynamicModule } from '@nestjs/common';
@@ -102,6 +115,7 @@ import {
   resolveHsfFieldEncryptionPort as resolveInstrumentsEncryption,
 } from '@karar/payment-instruments';
 import {
+  ApplyMerchantRules,
   AssignCategory,
   CreateManualTransaction,
   DeleteOwnTransaction,
@@ -109,6 +123,7 @@ import {
   PrismaCategoryAssignmentRepository,
   PrismaFinancialCategoryCatalogue,
   PrismaFinancialRecordPresenceReader,
+  MerchantRuleEvaluator,
   PrismaMerchantRuleDirectory,
   PrismaStatementCommitWriter,
   PrismaTransactionRepository,
@@ -122,10 +137,17 @@ import {
 import {
   ConfirmTransferMatch,
   EraseTransferMatches,
+  GenerateTransferMatchSuggestions,
   ListOwnTransferMatches,
+  PrismaMatchCandidateReader,
   PrismaTransferMatchRepository,
   RejectTransferMatch,
+  SuggestTransferMatch,
+  TransactionsMatchableTransactionAdapter,
   TransactionsTransferMatchEraser,
+  TransactionsTransferSuggestionTrigger,
+  Uuidv7IdSource as MatchesIdSource,
+  resolveRetentionDecisionPort as resolveMatchesRetention,
 } from '@karar/transfer-matching';
 import {
   CommitStatementImport,
@@ -195,6 +217,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   const transactionsRetention = resolveTransactionsRetention({ env: environment });
   const transactionsEncryption = resolveTransactionsEncryption({ env: environment });
   const dedupFingerprints = resolveDedupFingerprintPort({ env: environment });
+  const matchesRetention = resolveMatchesRetention({ env: environment });
 
   // --- the capability gate -------------------------------------------------
   // Not a port of any module: it is the question of whether this SURFACE may
@@ -219,12 +242,30 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   const assignments = new PrismaCategoryAssignmentRepository(prisma);
   const categories = new PrismaFinancialCategoryCatalogue(prisma);
   const merchantRules = new PrismaMerchantRuleDirectory(prisma);
+  // ONE evaluator, constructed once and shared. Both write paths that can
+  // produce a categorised transaction take THIS object: the manual entry use
+  // case directly, and the reviewed CSV commit through
+  // `TransactionsDeterministicCategoryAdapter` below. Two instances would be
+  // harmless; two implementations would not, which is why there is only one.
+  const merchantRuleEvaluator = new MerchantRuleEvaluator(merchantRules);
   const transactionIds = new TransactionsIdSource();
   const transactionsPrincipalScope = new RequestScopedTransactionsPrincipalContext();
   const accountAccess = new FinancialAccountsAccessAdapter(accounts);
   // The presence port the accounts module declares and this module fills: it
   // is what stops a currency change on an account that already has records.
   const recordPresence = new PrismaFinancialRecordPresenceReader(prisma);
+  // Hoisted out of the bundle literal because `ApplyMerchantRules` writes
+  // THROUGH it rather than beside it: the precedence rule — a person's
+  // category is never replaced by a rule's — is enforced in exactly one place,
+  // and the re-run pass has to go through that place to be subject to it.
+  const assignCategory = new AssignCategory(
+    transactionsPrincipalScope,
+    transactionRepository,
+    assignments,
+    categories,
+    transactionIds,
+    clock,
+  );
 
   // --- transfer matching ---------------------------------------------------
   const matches = new PrismaTransferMatchRepository(prisma);
@@ -233,6 +274,28 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   // relationships that name it, and a no-op would report success over rows
   // that survive.
   const transferMatchEraser = new TransactionsTransferMatchEraser(eraseTransferMatches);
+  // The platform-side proposer, and the reason this surface now resolves
+  // transfer-matching's retention port at all: it is the only thing here that
+  // CREATES a match row. It is reached ONLY from the two write paths below —
+  // no route mounts it, and none may, because a caller that could name a pair
+  // would be asserting a relationship it never observed.
+  const matchCandidates = new PrismaMatchCandidateReader(prisma);
+  const matchableTransactions = new TransactionsMatchableTransactionAdapter(transactionRepository);
+  const transferSuggestionTrigger = new TransactionsTransferSuggestionTrigger(
+    new GenerateTransferMatchSuggestions(
+      new SuggestTransferMatch(
+        matches,
+        matchableTransactions,
+        matchesRetention,
+        new MatchesIdSource(),
+        clock,
+      ),
+      matches,
+      matchableTransactions,
+      matchCandidates,
+      matchesRetention,
+    ),
+  );
 
   // --- connections and instruments ----------------------------------------
   const connections = new PrismaFinancialConnectionRepository(prisma, connectionsEncryption);
@@ -254,7 +317,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
   // ciphertext written for a staged row must not authenticate against
   // `public.transactions`, so the two labels stay apart.
   const canonicalNarrative = new TransactionsCanonicalNarrativeAdapter(transactionsEncryption);
-  const deterministicCategory = new TransactionsDeterministicCategoryAdapter(merchantRules);
+  const deterministicCategory = new TransactionsDeterministicCategoryAdapter(merchantRuleEvaluator);
   const outbox = new PlatformOutboxStatementImportRecorder(
     readDefaultEventCatalogue(),
     clock,
@@ -309,6 +372,8 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
           clock,
           transactionsRetention,
           accountAccess,
+          merchantRuleEvaluator,
+          transferSuggestionTrigger,
         ),
         readOwnTransaction: new ReadOwnTransaction(
           transactionsPrincipalScope,
@@ -326,13 +391,18 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
           transactionRepository,
           transferMatchEraser,
         ),
-        assignCategory: new AssignCategory(
+        assignCategory: assignCategory,
+        // The re-run, over a transaction already stored. Constructed here so
+        // the wiring is proved by the type checker; deliberately NOT mounted
+        // on an HTTP route, because a route is an api-contracts change and a
+        // Dart client regeneration, and the pass is a maintenance action
+        // rather than something a person asks for.
+        applyMerchantRules: new ApplyMerchantRules(
           transactionsPrincipalScope,
           transactionRepository,
           assignments,
-          categories,
-          transactionIds,
-          clock,
+          merchantRuleEvaluator,
+          assignCategory,
         ),
 
         listOwnConnections: new ListOwnConnections(connections),
@@ -376,6 +446,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
           importsRetention,
           importIds,
           clock,
+          transferSuggestionTrigger,
         ),
         eraseStatementImport: new EraseStatementImport(imports, importsSourceStore, clock),
 

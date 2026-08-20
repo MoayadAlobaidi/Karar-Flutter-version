@@ -243,6 +243,34 @@ export class PrismaTransactionRepository implements TransactionRepository {
           data: revisionData(revision, revisionNarrative),
         });
         await tx.transactionProvenance.create({ data: provenanceData(provenance) });
+
+        // The reviewed rule's assignment, in the SAME transaction as the
+        // record it describes. `null` writes nothing at all, which is the
+        // honest record of "no rule matched" — an ACTIVE assignment with no
+        // decision behind it would be indistinguishable from one a person
+        // made. This is the first assignment for a transaction that has only
+        // just come into existence, so there is nothing to supersede: no
+        // chain can predate the row it hangs off.
+        if (commit.ruleCategoryAssignment !== null) {
+          const assignment = commit.ruleCategoryAssignment;
+          await tx.transactionCategoryAssignment.create({
+            data: {
+              id: assignment.id,
+              transactionId: transaction.id,
+              tenantId: principal.tenantId,
+              userId: principal.userId,
+              categoryCode: assignment.categoryCode,
+              assignmentSource: 'RULE',
+              ruleVersion: assignment.ruleVersion,
+              assignedBy: assignment.assignedBy,
+              assignedAt: assignment.assignedAt,
+              status: 'ACTIVE',
+              supersededById: null,
+              supersededAt: null,
+              createdAt: assignment.assignedAt,
+            },
+          });
+        }
       });
     } catch (error) {
       if (isUniqueViolation(error)) {

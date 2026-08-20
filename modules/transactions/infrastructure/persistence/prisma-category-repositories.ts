@@ -23,6 +23,7 @@ import {
   CategoryCode,
   type FinancialCategory,
 } from '../../domain/category-catalogue.js';
+import { createMerchantRule, type MerchantRule } from '../../domain/merchant-rules.js';
 import type { TransactionId } from '../../domain/refs.js';
 import {
   AssignmentConflictError,
@@ -30,7 +31,6 @@ import {
   type CategoryAssignmentRepository,
   type FinancialCategoryCatalogue,
   type MerchantRuleDirectory,
-  type MerchantRuleMatch,
 } from '../../application/ports/category-repository.js';
 import type { TransactionsPrincipal } from '../../application/ports/principal-context.js';
 import { toAssignment, type AssignmentRow } from './row-mappers.js';
@@ -168,39 +168,47 @@ export class PrismaFinancialCategoryCatalogue implements FinancialCategoryCatalo
 }
 
 /**
- * Exact and prefix matching against the reviewed corpus, deterministic and
- * unscored. Retired rules never match: a rule is withdrawn by setting
- * `retired_at`, never by deleting the row, so the corpus stays reviewable.
+ * The reviewed corpus, read and mapped — and NOTHING else.
  *
- * Ordering is by pattern length descending so the most specific reviewed
- * prefix wins — a total, deterministic rule with no weighting involved.
+ * This class used to decide which rule won, and that is exactly what it must
+ * not do. The decision lived in a loop over `findMany` with no `orderBy`,
+ * keeping the first-seen rule among equally long patterns; PostgreSQL
+ * promises no order for such a query, so two reviewed patterns of the same
+ * length matching the same narrative resolved to whichever row the plan
+ * happened to emit first. Same input, same corpus, two possible answers —
+ * invisible until the day a tie exists, and then invisible again because the
+ * two servers each looked internally consistent.
+ *
+ * Selection now lives in `domain/merchant-rules.ts` under a comparator that
+ * is total, so no tie survives to be broken by a query plan. The `orderBy`
+ * below is belt and braces on top of that: it makes the READ deterministic
+ * too, so a test asserting on the corpus sees a stable sequence.
+ *
+ * `createMerchantRule` re-checks each row against the constraints migration
+ * 0092 already enforces. That is not distrust of the database; it is the
+ * boundary where "a row" becomes "a reviewed rule", and a malformed pattern
+ * that got in some other way should stop here loudly rather than sit in the
+ * corpus looking like a working rule while matching nothing.
  */
 export class PrismaMerchantRuleDirectory implements MerchantRuleDirectory {
   constructor(private readonly handle: PrismaHandle) {}
 
-  async match(normalizedMerchant: string): Promise<MerchantRuleMatch | null> {
-    if (typeof normalizedMerchant !== 'string' || normalizedMerchant.trim() === '') return null;
-    const candidates = await this.handle.client.merchantRule.findMany({
+  async listActiveRules(): Promise<readonly MerchantRule[]> {
+    // Retired rules are excluded here rather than filtered later: a withdrawn
+    // rule must not reach the decision at all. Withdrawal is `retired_at`,
+    // never a deleted row, so the corpus stays reviewable.
+    const rows = await this.handle.client.merchantRule.findMany({
       where: { retiredAt: null },
       select: { patternKind: true, patternToken: true, categoryCode: true, ruleVersion: true },
+      orderBy: [{ patternToken: 'asc' }, { patternKind: 'asc' }, { ruleVersion: 'asc' }],
     });
-    let best: { patternToken: string; categoryCode: string; ruleVersion: string } | null = null;
-    for (const rule of candidates) {
-      const matches =
-        rule.patternKind === 'EXACT'
-          ? normalizedMerchant === rule.patternToken
-          : normalizedMerchant.startsWith(rule.patternToken);
-      if (!matches) continue;
-      if (best === null || rule.patternToken.length > best.patternToken.length) {
-        best = {
-          patternToken: rule.patternToken,
-          categoryCode: rule.categoryCode,
-          ruleVersion: rule.ruleVersion,
-        };
-      }
-    }
-    return best === null
-      ? null
-      : { categoryCode: CategoryCode.of(best.categoryCode), ruleVersion: best.ruleVersion };
+    return rows.map((row) =>
+      createMerchantRule({
+        patternKind: row.patternKind,
+        patternToken: row.patternToken,
+        categoryCode: row.categoryCode,
+        ruleVersion: row.ruleVersion,
+      }),
+    );
   }
 }

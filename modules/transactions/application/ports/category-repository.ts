@@ -16,6 +16,7 @@ import type {
   TransactionCategoryAssignment,
 } from '../../domain/category-assignment.js';
 import type { CategoryCode, FinancialCategory } from '../../domain/category-catalogue.js';
+import type { MerchantRule } from '../../domain/merchant-rules.js';
 import type { TransactionId } from '../../domain/refs.js';
 import type { TransactionsPrincipal } from './principal-context.js';
 
@@ -78,27 +79,42 @@ export interface FinancialCategoryCatalogue {
 /**
  * The reviewed merchant-rule corpus, read-only from this module.
  *
- * Declared here so the rules path has a seam, and pointedly narrow: a rule
- * answers with a category code and the version that produced it, and nothing
- * else. There is no score, no confidence, no ordered candidate list — a rule
- * matched or it did not (MODULE.md: deterministic only; no AI, no LLM).
+ * **This port READS, it does not DECIDE.** It hands back the live rules and
+ * nothing more; which of them applies to a narrative is
+ * `domain/merchant-rules.ts`, and it is there rather than here for two
+ * reasons that both bite in practice. A selection rule living in an adapter
+ * is a selection rule nobody can unit-test without a database, so the
+ * tie-break between two matching patterns goes unexercised until it is wrong
+ * in production. And an adapter that reduces rows to one answer inherits
+ * whatever order the database returned them in — for an unordered `SELECT`,
+ * no order at all — which makes the answer depend on the query plan. The
+ * domain's comparator is total, so it does not.
+ *
+ * There is no score, no confidence and no ordered candidate list anywhere on
+ * this surface: a rule matched or it did not (MODULE.md: deterministic only;
+ * no AI, no LLM).
  *
  * The corpus itself carries **no subject linkage of any kind** — no tenant,
  * no user, no account, no statement row, and no verbatim customer narrative
  * (migration 0092 enforces the shape structurally). Patterns are reviewed and
- * generalised before entry.
+ * generalised before entry. That is also why this port takes no principal:
+ * there is no predicate to bind, and asking for one would imply a
+ * relationship the table is built to be incapable of. What IS subject-scoped
+ * is everything the decision is then applied to — the transaction read and
+ * the assignment written both go through `CategoryAssignmentRepository` and
+ * `TransactionRepository` above, which are RLS-FORCEd on both principal GUCs.
  */
-export interface MerchantRuleMatch {
-  readonly categoryCode: CategoryCode;
-  readonly ruleVersion: string;
-}
-
 export interface MerchantRuleDirectory {
   /**
-   * The category a reviewed rule assigns to already-normalised merchant text,
-   * or `null` when no rule matches. Exact, deterministic matching only.
+   * Every rule currently in force — retired ones excluded, because a rule is
+   * withdrawn by setting `retired_at` rather than by deleting the row, so the
+   * corpus stays reviewable and a withdrawn rule stays visible to an auditor
+   * while matching nothing.
+   *
+   * Order is not part of the contract. The domain's selection is total, so a
+   * caller cannot depend on one.
    */
-  match(normalizedMerchant: string): Promise<MerchantRuleMatch | null>;
+  listActiveRules(): Promise<readonly MerchantRule[]>;
 }
 
 /** Re-exported so callers of the assignment flow name the same source union. */

@@ -244,13 +244,32 @@ export interface DeterministicCategoryMatch {
   readonly ruleVersion: string;
 }
 
+/**
+ * The two narrative fields of one staged row, as plaintext.
+ *
+ * BOTH are passed, and the far side decides which to prefer, because that
+ * preference is a categorisation rule and categorisation rules do not live in
+ * this module. Passing only the description — which is what this port used to
+ * take — meant a row whose bank supplied a clean `merchant` column had that
+ * column ignored in favour of the whole statement line.
+ *
+ * The text is RAW and UNTRUSTED (ADR-0029). It is not normalised here: the
+ * normalisation is part of the rule definition, it is versioned with the
+ * rules, and a copy of it on this side of the seam would be a second
+ * definition free to drift from the one the rules were authored against.
+ */
+export interface DeterministicCategoryNarrative {
+  readonly merchant: string | null;
+  readonly description: string | null;
+}
+
 export interface DeterministicCategoryPort {
   /**
-   * The category an exact reviewed rule assigns to this normalised narrative,
-   * or `null` when no rule matches. `null` is the ordinary answer.
+   * The category an exact reviewed rule assigns to this row's narrative, or
+   * `null` when no rule matches. `null` is the ordinary answer.
    */
   match(
     actor: ImportsPrincipal,
-    normalizedNarrative: string,
+    narrative: DeterministicCategoryNarrative,
   ): Promise<DeterministicCategoryMatch | null>;
 }

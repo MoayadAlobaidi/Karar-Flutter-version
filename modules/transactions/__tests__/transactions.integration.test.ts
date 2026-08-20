@@ -43,6 +43,7 @@ import { DeleteOwnTransaction } from '../application/use-cases/delete-own-transa
 import { ListOwnTransactions } from '../application/use-cases/list-own-transactions.js';
 import { ReadOwnTransaction } from '../application/use-cases/read-own-transaction.js';
 import { UpdateOwnTransaction } from '../application/use-cases/update-own-transaction.js';
+import { MerchantRuleEvaluator } from '../application/merchant-rule-evaluator.js';
 import type { TransactionsPrincipal } from '../application/ports/principal-context.js';
 import { TransactionId } from '../domain/refs.js';
 import { PrismaTransactionRepository } from '../infrastructure/persistence/prisma-transaction-repository.js';
@@ -810,11 +811,14 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
        VALUES ($1, 'EXACT', 'corner shop', 'FOOD', 'rules/merchant/1', 'review:phase5-0001')`,
       [ruleId],
     );
-    expect(await rules.match('corner shop')).toEqual({
+    const evaluator = new MerchantRuleEvaluator(rules);
+    expect(await evaluator.evaluate({ merchant: 'Corner Shop', description: 'x' })).toMatchObject({
       categoryCode: 'FOOD',
       ruleVersion: 'rules/merchant/1',
     });
-    expect(await rules.match('somewhere else')).toBeNull();
+    expect(
+      await evaluator.evaluate({ merchant: 'somewhere else', description: 'somewhere else' }),
+    ).toBeNull();
 
     // Arabic patterns are storable: the constraints exclude digits and
     // reference punctuation, not a script.
@@ -823,7 +827,9 @@ describe.skipIf(unreachable !== null)('transactions (live PostgreSQL)', () => {
        VALUES ($1, 'EXACT', 'بقالة الحي', 'FOOD.GROCERIES', 'rules/merchant/1', 'review:phase5-0002')`,
       [randomUUID()],
     );
-    expect(await rules.match('بقالة الحي')).toEqual({
+    expect(
+      await evaluator.evaluate({ merchant: 'بقالة الحي', description: null }),
+    ).toMatchObject({
       categoryCode: 'FOOD.GROCERIES',
       ruleVersion: 'rules/merchant/1',
     });

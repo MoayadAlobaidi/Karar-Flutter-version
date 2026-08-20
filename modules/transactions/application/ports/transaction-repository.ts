@@ -27,7 +27,8 @@ import type { CalendarDay } from '@karar/shared-kernel';
 import type { Transaction } from '../../domain/transaction.js';
 import type { TransactionProvenance } from '../../domain/provenance.js';
 import type { TransactionRevision } from '../../domain/revision.js';
-import type { AccountRef, TransactionId } from '../../domain/refs.js';
+import type { CategoryCode } from '../../domain/category-catalogue.js';
+import type { AccountRef, ActorRef, TransactionId } from '../../domain/refs.js';
 import type { DedupFingerprint } from './dedup-fingerprint.js';
 import type { TransactionsPrincipal } from './principal-context.js';
 
@@ -50,6 +51,43 @@ export interface TransactionCommit {
    * caller cannot skip duplicate review by naming a high number.
    */
   readonly occurrenceOrdinal: number;
+  /**
+   * The assignment a reviewed merchant rule produced, or `null` — which is
+   * the ordinary answer and writes no assignment row at all.
+   *
+   * It travels WITH the commit rather than being written after it, for the
+   * reason the aggregate travels together at all: the two orders a separate
+   * write could fail in are both bad. Assign first and the foreign key
+   * refuses, because the transaction does not exist yet. Assign after and a
+   * failure leaves the provenance row saying a rule decided the category
+   * while no category exists — a record that contradicts itself, on the one
+   * table whose job is to explain where facts came from.
+   *
+   * This is also the shape the CSV path already uses
+   * (`ImportedRecordCommit.categoryCode`), so both write paths put the
+   * assignment in the same database transaction as the record it describes.
+   *
+   * Always `RULE`-sourced: a person cannot categorise a transaction that does
+   * not exist yet, so there is no way for a `USER` assignment to arrive here,
+   * and the type says so rather than accepting a source and validating it.
+   */
+  readonly ruleCategoryAssignment: RuleCategoryAssignment | null;
+}
+
+/**
+ * The one assignment a commit may carry — a rule's, never a person's.
+ *
+ * `ruleVersion` is required and non-nullable here for the same reason the
+ * column is `NOT NULL` when the source is `RULE`: a rule result that cannot
+ * name the reviewed version that produced it cannot be re-derived, which
+ * makes it indistinguishable from a guess.
+ */
+export interface RuleCategoryAssignment {
+  readonly id: string;
+  readonly categoryCode: CategoryCode;
+  readonly ruleVersion: string;
+  readonly assignedBy: ActorRef;
+  readonly assignedAt: Date;
 }
 
 /** Everything one accepted correction writes. */

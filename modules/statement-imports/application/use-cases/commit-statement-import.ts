@@ -60,6 +60,13 @@
 
 import { Currency, Result } from '@karar/shared-kernel';
 import type { CalendarDay, Clock } from '@karar/shared-kernel';
+// Declared by the module that owns what a written transaction is, and imported
+// rather than restated: two structurally identical declarations do not fail
+// when they drift, they diverge silently.
+import {
+  SUGGESTS_NO_TRANSFERS,
+  type TransferSuggestionTriggerPort,
+} from '@karar/transactions';
 
 import { permitsCommit, reconcile } from '../../domain/reconciliation.js';
 import { transitionTo, type StatementImport } from '../../domain/statement-import.js';
@@ -158,6 +165,22 @@ export class CommitStatementImport {
     private readonly retention: StatementRetentionDecisionPort,
     private readonly ids: IdSource,
     private readonly clock: Clock,
+    /**
+     * The platform's own transfer-suggestion pass, declared by
+     * `@karar/transactions` and satisfied by `modules/transfer-matching`. Run
+     * AFTER the commit unit has landed, over the transactions it wrote.
+     *
+     * A statement is where both sides of one movement usually arrive together
+     * — the outflow on one account's file and the inflow on another's — so
+     * this is the call site that matters most for a person's totals not being
+     * doubled (ADR-0028). What it produces is a QUESTION and never a fact.
+     *
+     * It defaults to `SUGGESTS_NO_TRANSFERS` so that this module's own suites
+     * need not stand up a transfer-matching repository, and the hole that
+     * default opens is closed by a test that reads the composition root's
+     * source and fails if the real trigger stops being passed here.
+     */
+    private readonly transferSuggestions: TransferSuggestionTriggerPort = SUGGESTS_NO_TRANSFERS,
   ) {}
 
   async execute(
@@ -355,13 +378,21 @@ export class CommitStatementImport {
       const ordinal = (highest.get(digest) ?? 0) + 1;
       highest.set(digest, ordinal);
 
-      let category = null;
-      if (row.merchant !== null || description !== null) {
-        try {
-          category = await this.categories.match(acting, description.reveal());
-        } catch (error) {
-          return Result.err(storeFailure('resolve a deterministic category', error));
-        }
+      // Both narrative fields go to the rules, raw. Which one a rule is
+      // matched against is a categorisation rule and lives with the rules, not
+      // here — this loop used to pass only the description, so a bank that
+      // supplied a clean merchant column had it ignored.
+      // Declared without an initialiser, as the manual path does: the catch
+      // returns, so there is no route past this block with it unassigned, and
+      // a  here is a value nothing ever reads.
+      let category;
+      try {
+        category = await this.categories.match(acting, {
+          merchant: row.merchant?.reveal() ?? null,
+          description: description.reveal(),
+        });
+      } catch (error) {
+        return Result.err(storeFailure('resolve a deterministic category', error));
       }
 
       prepared.push({
@@ -425,6 +456,30 @@ export class CommitStatementImport {
         return Result.err(commitFailed(error));
       }
       return Result.err(commitFailed(error));
+    }
+
+    // AFTER the unit of work has landed, and never inside it. Two reasons, and
+    // both are load-bearing. A suggestion is about transactions that EXIST, so
+    // it cannot run against rows a rollback may still remove. And the import
+    // must not fail because a question could not be asked: the outcome is not
+    // read, a throw is swallowed, and the person's committed statement stands.
+    //
+    // The already-committed early return above deliberately does NOT reach
+    // here. That path writes nothing, and re-scanning a person's windows every
+    // time a client repeats a commit call would turn an idempotent answer into
+    // repeated work over their history.
+    try {
+      await this.transferSuggestions.suggestTransfersFor(
+        // Restated field by field rather than cast: the two principal shapes
+        // are structurally identical today, and a cast would keep compiling if
+        // either gained a field this module has no business forwarding.
+        { tenantId: acting.tenantId, userId: acting.userId },
+        receipt.transactionIds,
+      );
+    } catch {
+      // Deliberately ignored — see `TransferSuggestionTriggerPort`. A missing
+      // suggestion leaves a question unasked; a failed commit would leave a
+      // person's reviewed statement unrecorded.
     }
 
     return Result.ok({
