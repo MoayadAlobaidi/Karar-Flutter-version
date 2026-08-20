@@ -626,6 +626,9 @@ importers:
       '@karar/api-contracts':
         specifier: workspace:*
         version: link:../../packages/api-contracts
+      '@karar/content-trust':
+        specifier: workspace:*
+        version: link:../../packages/content-trust
       '@karar/financial-accounts':
         specifier: workspace:*
         version: link:../financial-accounts
@@ -830,6 +833,8 @@ importers:
         version: 25.9.5
 
   packages/consent-local-fixtures: {}
+
+  packages/content-trust: {}
 
   packages/financial-engine:
     dependencies:

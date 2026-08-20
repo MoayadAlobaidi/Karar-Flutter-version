@@ -368,12 +368,20 @@ describe('instruction authority is unconstructible from content', () => {
     ).toThrow();
   });
 
-  it('carries no score, and the vocabulary is exactly four words', () => {
+  it('carries no score, and the vocabulary is exactly six words', () => {
+    // Four when this file was written, for one surface. The same question
+    // turned out to be asked by passwords, deep links, future chat and tool
+    // output, so the model moved to `@karar/content-trust` and gained the two
+    // classes those need. The assertion that matters is unchanged: the
+    // vocabulary is CLOSED and it is a set of names, not a number — a score
+    // would let a caller argue that content is trusted enough.
     expect([...CONTENT_TRUST_CLASSES]).toEqual([
       'TRUSTED_PLATFORM_INSTRUCTION',
       'TRUSTED_STRUCTURED_PLATFORM_FACT',
       'UNTRUSTED_USER_CONTENT',
       'UNTRUSTED_EXTERNAL_CONTENT',
+      'SECRET_AUTH_MATERIAL',
+      'OPAQUE_IDENTIFIER',
     ]);
     const everyArm = [
       platformInstruction('karar/statement-imports/normalization-ruleset'),

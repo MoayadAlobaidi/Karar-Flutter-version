@@ -49,7 +49,16 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
 const REGISTRY_REL = path.join('docs', 'testing', 'architecture-test-registry.json');
 
-const PURE_PACKAGES = ['shared-kernel', 'financial-engine', 'jurisdiction-policy', 'state-machine'];
+//  is pure for the reason the others are: every layer needs to
+// ask what an input may be used for, and a package that dragged a framework
+// behind it could not be asked from a domain file.
+const PURE_PACKAGES = [
+  'shared-kernel',
+  'financial-engine',
+  'jurisdiction-policy',
+  'state-machine',
+  'content-trust',
+];
 const KERNEL_EXPORTS = [
   'Money',
   // Tenth universal, ADR-0027: a calendar day is not an instant. Added once,

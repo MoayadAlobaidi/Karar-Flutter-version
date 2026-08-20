@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@karar/api-contracts": "workspace:*",
+    "@karar/content-trust": "workspace:*",
     "@karar/financial-accounts": "workspace:*",
     "@karar/financial-connections": "workspace:*",
     "@karar/platform": "workspace:*",
