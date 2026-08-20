@@ -20,7 +20,6 @@ import { mapStatementRow } from '../domain/statement-row.js';
 import type { StatementColumnMapping } from '../domain/column-mapping.js';
 
 const QAR = Currency.get('QAR');
-const NUL = '\u0000';
 
 const MAPPING: StatementColumnMapping = {
   bookingDateColumn: 0,
@@ -76,7 +75,20 @@ describe('the shared red-team corpus is data on every current surface', () => {
     // line. Everything else — quotes, dollars, angle brackets, formula
     // sigils, bidi overrides, Arabic, base64 — survives byte for byte,
     // because each of those is somebody's real merchant name.
-    const CONTROLS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+    // Expressed by code point rather than as a regex literal: a regex full of
+    // control escapes is both unreadable and something eslint rightly objects
+    // to, and suppressing that rule to keep a prettier line would be the wrong
+    // trade in a security test.
+    const isControl = (codePoint: number): boolean =>
+      (codePoint >= 0x00 && codePoint <= 0x08) ||
+      codePoint === 0x0b ||
+      codePoint === 0x0c ||
+      (codePoint >= 0x0e && codePoint <= 0x1f) ||
+      (codePoint >= 0x7f && codePoint <= 0x9f);
+    const stripControls = (text: string): string =>
+      [...text].filter((character) => !isControl(character.charCodeAt(0))).join('');
+    const hasControl = (text: string): boolean =>
+      [...text].some((character) => isControl(character.charCodeAt(0)));
     let mapped = 0;
     for (const entry of REACHABLE_TODAY) {
       const outcome = mapWith(entry.value);
@@ -90,9 +102,9 @@ describe('the shared red-team corpus is data on every current surface', () => {
       // controls outright and turns CR/LF/tab into a space, so an exact
       // byte comparison would assert the collapsing rule rather than the
       // security property — and the security property is the one at stake.
-      const visible = (text: string) => text.replace(CONTROLS, '').replace(/\s+/g, ' ').trim();
+      const visible = (text: string) => stripControls(text).replace(/\s+/g, ' ').trim();
       const stored = outcome.row.description.reveal();
-      expect(stored, entry.id).not.toMatch(CONTROLS);
+      expect(hasControl(stored), entry.id).toBe(false);
       expect(visible(stored), entry.id).toBe(visible(entry.value));
       expect(visible(outcome.row.merchant?.reveal() ?? ''), entry.id).toBe(visible(entry.value));
       expect(visible(outcome.row.sourceReference?.reveal() ?? ''), entry.id).toBe(
@@ -108,8 +120,11 @@ describe('the shared red-team corpus is data on every current surface', () => {
 
   it('removes the control characters that make a name lie', () => {
     // Named separately because it is a DIFFERENT claim from preservation.
-    const controlBearing = REACHABLE_TODAY.filter((entry) =>
-      /[\u0000\r\n]/.test(entry.value),
+    const controlBearing = REACHABLE_TODAY.filter(
+      (entry) =>
+        entry.value.includes('\r') ||
+        entry.value.includes('\n') ||
+        [...entry.value].some((character) => character.charCodeAt(0) === 0),
     );
     expect(controlBearing.length).toBeGreaterThan(0);
 
@@ -118,7 +133,12 @@ describe('the shared red-team corpus is data on every current surface', () => {
       expect(outcome.ok, entry.id).toBe(true);
       if (!outcome.ok) continue;
       const stored = outcome.row.description.reveal();
-      expect(stored, entry.id).not.toMatch(/[\u0000\r\n]/);
+      expect(
+        stored.includes('\r') ||
+          stored.includes('\n') ||
+          [...stored].some((character) => character.charCodeAt(0) === 0),
+        entry.id,
+      ).toBe(false);
       // The visible text is still there; only the control byte is gone.
       expect(stored.length, entry.id).toBeGreaterThan(0);
     }
