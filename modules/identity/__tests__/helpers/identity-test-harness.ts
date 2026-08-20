@@ -179,7 +179,27 @@ export async function createIdentityHarness(options: HarnessOptions): Promise<Id
       await prisma.end();
       const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
       try {
-        await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+        // WAIT FOR THE BACKENDS TO GO, THEN DROP WITHOUT FORCE.
+        //
+        // `DROP DATABASE ... WITH (FORCE)` terminates whatever is still
+        // attached, and the pool this harness just closed can still have a
+        // backend the server has not reaped. The client sees its socket cut,
+        // raises SQLSTATE 57P01 (admin_shutdown) with no query in flight, and
+        // vitest reports an unhandled error — every test passing and the run
+        // exiting 1. It happened once in nine consecutive runs.
+        //
+        // Draining first removes the race without hiding anything: FORCE would
+        // also have masked a harness that genuinely leaked a connection, and a
+        // plain DROP still fails loudly if one is left behind.
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          const remaining = await maintenance.query<{ count: string }>(
+            `SELECT count(*)::text AS count FROM pg_stat_activity WHERE datname = $1`,
+            [database],
+          );
+          if ((remaining.rows[0]?.count ?? '0') === '0') break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        await maintenance.query(`DROP DATABASE IF EXISTS "${database}"`);
       } finally {
         await maintenance.end();
       }
