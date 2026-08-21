@@ -1712,6 +1712,36 @@ describe.skipIf(unreachable !== null)(
         ]);
       });
 
+      it('the contract cannot grow a status pair that lands in no ledger', () => {
+        // The financial suite PARTITIONS its surface: every declared pair is in
+        // exactly one of covered/uncovered, so a status added to a contract
+        // fragment tomorrow has somewhere to land and fails if it does not.
+        // This suite has no uncovered ledger to partition against, so the same
+        // protection is bought the only other way it can be: by pinning the
+        // size of the declared surface. A new status on identity.yaml or
+        // consent.yaml changes this number and fails here, which is what forces
+        // the decision about whether it is covered rather than letting it pass
+        // unnoticed in neither list.
+        const declared = contract
+          .operations()
+          .filter((operation) => !operation.path.startsWith('/financial'))
+          .flatMap((operation) =>
+            [...operation.responses.keys()].map(
+              (status) => `${operation.operationId} ${status}`,
+            ),
+          )
+          .sort();
+
+        // Every pair this suite validated must be one the contract declares.
+        // Without this, a typo in the list above would pin a pair that does not
+        // exist and the list would still "match".
+        expect([...validated].filter((pair) => !declared.includes(pair))).toEqual([]);
+
+        expect(declared).toHaveLength(128);
+        expect([...validated]).toHaveLength(82);
+      });
+
+
       it('served EVERY problem body as application/problem+json — no deviations at all', () => {
         // Was 25. The expected value is the empty set now, and it stays that
         // way: a handler that answers a problem through the reply object again

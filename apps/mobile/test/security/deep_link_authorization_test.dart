@@ -57,22 +57,67 @@ const String foreignTransactionId = 'transaction-belonging-to-another-tenant';
 /// `financialFeatureRoutes()` appears here without anyone editing this file.
 List<String> everyFinancialPath() {
   final paths = <String>[];
-  // BOTH contributions, because both are mounted. The statement-import routes
-  // live under their own location prefix rather than `/financial…`, and a
-  // derivation that read only one of the two functions would have declared the
-  // surface covered while leaving half of it unvisited.
-  for (final route in everyFinancialRoute()) {
-    if (route is! GoRoute) {
-      continue;
+  // EVERY contribution, because all of them are mounted. The statement-import
+  // routes live under their own location prefix rather than `/financial…`, and
+  // a derivation that read only one of the functions would have declared the
+  // surface covered while leaving the rest unvisited.
+  //
+  // NESTED routes are walked too. This used to stop at the top level on BOTH
+  // sides of its own assertion — `derived` skipped a child route, and
+  // `declared` counted the same top-level list — so a financial route added as
+  // a child would have been absent from both and the length check would still
+  // have agreed. Every route is flat today, which is exactly why the gap was
+  // invisible.
+  paths.addAll(pathsOf(everyFinancialRoute()));
+  return paths;
+}
+
+/// The walk itself, over any route list.
+///
+/// Separated from the registration so the recursion can be exercised: every
+/// financial route is flat today, so a walk tested only against the real list
+/// would never take its own nested branch.
+List<String> pathsOf(List<RouteBase> routes) {
+  final paths = <String>[];
+  void visit(RouteBase route) {
+    if (route is GoRoute) {
+      paths.add(
+        route.path
+            .replaceAll(':accountId', foreignAccountId)
+            .replaceAll(':transactionId', foreignTransactionId)
+            .replaceAll(':importId', foreignImportId),
+      );
     }
-    paths.add(
-      route.path
-          .replaceAll(':accountId', foreignAccountId)
-          .replaceAll(':transactionId', foreignTransactionId)
-          .replaceAll(':importId', foreignImportId),
-    );
+    for (final child in route.routes) {
+      visit(child);
+    }
+  }
+
+  for (final route in routes) {
+    visit(route);
   }
   return paths;
+}
+
+/// Every `GoRoute` in the financial contributions, nested ones included.
+///
+/// Counted by the same walk the derivation uses, so the two cannot disagree by
+/// both being blind in the same way.
+int everyFinancialGoRouteCount() {
+  var total = 0;
+  void visit(RouteBase route) {
+    if (route is GoRoute) {
+      total += 1;
+    }
+    for (final child in route.routes) {
+      visit(child);
+    }
+  }
+
+  for (final route in everyFinancialRoute()) {
+    visit(route);
+  }
+  return total;
 }
 
 /// Bootstrap answers with and without the financial capability, in the shape
@@ -134,11 +179,41 @@ void main() {
       expect(mounted, isNotEmpty);
     });
 
+    test('the derivation walks nested routes, which the real list cannot prove', () {
+      // Constructed rather than registered: the point is to take the branch the
+      // real route list never reaches. Before this walk recursed, `derived`
+      // skipped the child and `declared` counted only the parent, so the two
+      // agreed while both were blind.
+      final nested = <RouteBase>[
+        GoRoute(
+          path: '/financial/parent',
+          builder: (_, _) => const SizedBox.shrink(),
+          routes: <RouteBase>[
+            GoRoute(
+              path: 'child',
+              builder: (_, _) => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ];
+
+      expect(pathsOf(nested), <String>['/financial/parent', 'child']);
+      expect(nested.whereType<GoRoute>().length, 1);
+    });
+
     test('covers every financial route EVERY workstream contributes', () {
       final derived = everyFinancialPath();
-      final declared = everyFinancialRoute().whereType<GoRoute>().length;
+      final declared = everyFinancialGoRouteCount();
 
       expect(derived, hasLength(declared));
+      // The count must also see past the top level. If a nested route is ever
+      // added, this is what notices that the flat count stopped being the
+      // whole surface.
+      expect(
+        declared,
+        greaterThanOrEqualTo(everyFinancialRoute().whereType<GoRoute>().length),
+        reason: 'the recursive count can never be smaller than the flat one',
+      );
       expect(
         derived,
         contains(FinancialRoutes.accounts),
