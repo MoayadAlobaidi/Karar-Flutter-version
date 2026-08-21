@@ -348,7 +348,9 @@ function checkDerivedFacts() {
   // A. The pure-package list in the docs must match the executable checker.
   const runner = read('scripts/checks/architecture.mjs');
   if (runner === null) {
-    problems.push('scripts/checks/architecture.mjs missing — the pure-package fact cannot be derived');
+    problems.push(
+      'scripts/checks/architecture.mjs missing — the pure-package fact cannot be derived',
+    );
   } else {
     const block = /const PURE_PACKAGES = \[([\s\S]*?)\];/.exec(runner);
     if (block === null) {
@@ -357,7 +359,10 @@ function checkDerivedFacts() {
       const actual = [...block[1].matchAll(/'([\w-]+)'/g)].map((m) => m[1]);
       const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
       const expected = WORDS[actual.length] ?? String(actual.length);
-      for (const rel of ['docs/testing/architecture-test-registry.json', 'docs/testing/architecture-tests.md']) {
+      for (const rel of [
+        'docs/testing/architecture-test-registry.json',
+        'docs/testing/architecture-tests.md',
+      ]) {
         const text = read(rel);
         if (text === null) continue;
         for (const word of WORDS) {
@@ -387,7 +392,9 @@ function checkDerivedFacts() {
   }
 
   // C. The phase report must not deny a picker that is registered.
-  const androidPicker = read('apps/mobile/android/app/src/main/kotlin/com/kararfinance/app/StatementDocumentPicker.kt');
+  const androidPicker = read(
+    'apps/mobile/android/app/src/main/kotlin/com/kararfinance/app/StatementDocumentPicker.kt',
+  );
   const iosPicker = read('apps/mobile/ios/Runner/StatementDocumentPicker.swift');
   // Every document a reader consults for current state, not just the phase
   // report: the contradiction recurred across four of them last time.
@@ -426,8 +433,10 @@ function checkDerivedFacts() {
   }
 
   // D. The phase report must not deny work whose invocation is in the source.
-  const manual = read('modules/transactions/application/use-cases/create-manual-transaction.ts') ?? '';
-  const csv = read('modules/statement-imports/application/use-cases/commit-statement-import.ts') ?? '';
+  const manual =
+    read('modules/transactions/application/use-cases/create-manual-transaction.ts') ?? '';
+  const csv =
+    read('modules/statement-imports/application/use-cases/commit-statement-import.ts') ?? '';
   if (phase !== null) {
     if (manual.includes('merchantRules.evaluate') && csv.includes('this.categories.match')) {
       for (const rel of CURRENT_STATE_DOCS) {
@@ -484,8 +493,9 @@ function checkDerivedFacts() {
     'neither is a running path',
   ];
   const EMPTINESS_DENIALS = ['no application code exists yet', 'this directory is a skeleton'];
-  for (const rel of walkFiles(path.join(REPO_ROOT, 'modules'), { exts: MD_EXTS })
-    .map((f) => path.relative(REPO_ROOT, f))) {
+  for (const rel of walkFiles(path.join(REPO_ROOT, 'modules'), { exts: MD_EXTS }).map((f) =>
+    path.relative(REPO_ROOT, f),
+  )) {
     // modules/README.md sits directly under modules/ and names no module.
     const moduleName = rel.split(path.sep)[1];
     if (moduleName === undefined) continue;
@@ -507,10 +517,7 @@ function checkDerivedFacts() {
     // skeleton" is describing its own layer, and several modules have layers
     // that are genuinely still empty next to layers that are not.
     const ownDir = path.dirname(rel);
-    const ownSourceCount = countFiles(
-      ownDir,
-      (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'),
-    );
+    const ownSourceCount = countFiles(ownDir, (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
     if (ownSourceCount > 0) {
       for (const denial of EMPTINESS_DENIALS) {
         if (lower.includes(denial)) {

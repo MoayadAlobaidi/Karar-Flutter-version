@@ -83,6 +83,16 @@ jobs:
       - name: Start local PostgreSQL and Redis (compose)
         run: docker compose up -d postgres redis --wait
 
+      # The SERVER, not `psql --version`. A checkpoint once reported "all runs
+      # are against PostgreSQL 17.10" while the instance serving 5432 was 16.14
+      # -- 17 was installed and not running. This fails the lane rather than
+      # letting the next report inherit the same mistake.
+      - name: Canonical database gate (server major 17, session UTC)
+        env:
+          KARAR_ENV: local
+          POSTGRES_PORT: '5432'
+        run: pnpm db:canonical-check
+
       - name: Test
         env:
           KARAR_ENV: local

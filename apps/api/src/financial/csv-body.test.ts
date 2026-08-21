@@ -149,7 +149,10 @@ describe('the catch-all parser answers only for the route it exists for', () => 
     return stream as never;
   }
 
-  function answer(url: string | undefined, contentType: string): { error: Error | null; body: unknown } {
+  function answer(
+    url: string | undefined,
+    contentType: string,
+  ): { error: Error | null; body: unknown } {
     const { parser } = register();
     let outcome: { error: Error | null; body: unknown } = { error: null, body: undefined };
     parser(

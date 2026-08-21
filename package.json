@@ -14,7 +14,8 @@
     "build": "pnpm -r build",
     "test": "vitest run",
     "arch:test": "node scripts/checks/architecture.mjs",
-    "docs:check": "node scripts/checks/docs-check.mjs"
+    "docs:check": "node scripts/checks/docs-check.mjs",
+    "db:canonical-check": "node scripts/checks/canonical-postgres.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

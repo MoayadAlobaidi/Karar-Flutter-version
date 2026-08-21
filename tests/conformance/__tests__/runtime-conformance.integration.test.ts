@@ -1726,9 +1726,7 @@ describe.skipIf(unreachable !== null)(
           .operations()
           .filter((operation) => !operation.path.startsWith('/financial'))
           .flatMap((operation) =>
-            [...operation.responses.keys()].map(
-              (status) => `${operation.operationId} ${status}`,
-            ),
+            [...operation.responses.keys()].map((status) => `${operation.operationId} ${status}`),
           )
           .sort();
 
@@ -1740,7 +1738,6 @@ describe.skipIf(unreachable !== null)(
         expect(declared).toHaveLength(128);
         expect([...validated]).toHaveLength(82);
       });
-
 
       it('served EVERY problem body as application/problem+json — no deviations at all', () => {
         // Was 25. The expected value is the empty set now, and it stays that
