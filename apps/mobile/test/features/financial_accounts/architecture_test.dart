@@ -19,13 +19,10 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// The four feature folders this workstream owns.
-const List<String> financialRoots = <String>[
-  'lib/features/financial_accounts',
-  'lib/features/payment_instruments',
-  'lib/features/transactions',
-  'lib/features/transaction_categories',
-];
+import '../../support/financial_roots.dart';
+
+/// Every financial feature folder, from the one shared list.
+const List<String> financialRoots = financialFeatureRoots;
 
 List<_Source> _sources({String? layer}) {
   final found = <_Source>[];
@@ -168,6 +165,43 @@ void main() {
         isEmpty,
         reason: 'a binary float is not a ledger value (ADR-0006):\n'
             '${offenders.join('\n')}',
+      );
+    });
+
+    test('no money is COMPUTED on the client, exactly or otherwise', () {
+      // The `double` family above stops a float. It does not stop an EXACT
+      // integer total — `int.parse(a.minorUnits) + int.parse(b.minorUnits)`
+      // is precise arithmetic and still forbidden, because the client is not
+      // where a total is decided. Summing balances is net worth, summing
+      // across currencies needs a rate, and both are Phase 6 (ADR-0007).
+      //
+      // Scoped to money-bearing expressions rather than to arithmetic in
+      // general: a page index, an item count and a widget dimension are all
+      // integers a screen may legitimately add.
+      final offenders = <String>[];
+      const money = r'(?:minorUnits|amount|amounts|balance|balances|total|totals)';
+      for (final source in _sources()) {
+        for (final pattern in <RegExp>[
+          // int.parse over a money-named expression: the exact-integer total.
+          RegExp('int\\.parse\\([^)]*$money', caseSensitive: false),
+          // Arithmetic where one side is money-named. The operator must be
+          // SPACED: `import '../domain/balance_snapshot.dart'` contains a
+          // slash next to a money word and is a path, not a division.
+          RegExp('$money' r'[A-Za-z0-9_]*\s+[+\-*/]\s+[A-Za-z0-9_(]', caseSensitive: false),
+          RegExp(r'[A-Za-z0-9_)]\s+[+\-*/]\s+[A-Za-z0-9_.]*' '$money', caseSensitive: false),
+          // Aggregation over a collection of them.
+          RegExp(r'\.(?:fold|reduce)\s*[(<][^;]{0,120}' '$money', caseSensitive: false),
+        ]) {
+          for (final match in pattern.allMatches(source.body)) {
+            offenders.add('${source.path}:${source.lineOf(match.start)}');
+          }
+        }
+      }
+      expect(
+        offenders,
+        isEmpty,
+        reason: 'the client does not compute money — a total, a net worth or a '
+            'cross-currency sum is Phase 6 (ADR-0007):\n${offenders.join('\n')}',
       );
     });
 

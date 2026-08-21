@@ -48,7 +48,7 @@ The **self-test runs on every invocation**, not as a separate job: it seeds a vi
 
 | # | Test | Fails when |
 |---|---|---|
-| 7 | Money discipline | A float, `number`, or `double` appears in a monetary position |
+| 7 | Money discipline | A monetary position is typed `number`, or a float operation appears, anywhere in the pure packages, any module layer, or the api/worker apps. Dart `double` is a SEPARATE control, in `apps/mobile/test`, not this one |
 | 12 | No jurisdiction branching | A conditional or pattern match on a country/jurisdiction identifier appears in `domain/`, `application/`, or `presentation/`. **Country codes in localization, reference data, formatting, fixtures, and seed data are permitted** |
 | 21 | Pinning | A table declared to carry legal consequence lacks `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, or `subjectPolicySelectionVersion` |
 

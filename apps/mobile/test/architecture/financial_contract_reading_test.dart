@@ -34,17 +34,15 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/financial_roots.dart';
+
 /// The production source this guard reads.
 const String productionRoot = 'lib';
 
 /// The financial features. Rules 2 and 3 are about how the FINANCIAL contract
 /// is read, so they are scoped here; rule 1 covers the whole of production.
-const List<String> financialRoots = <String>[
-  'lib/features/financial_accounts',
-  'lib/features/payment_instruments',
-  'lib/features/transactions',
-  'lib/features/transaction_categories',
-];
+/// Every financial feature folder, from the one shared list.
+const List<String> financialRoots = financialFeatureRoots;
 
 /// The generated client and DTOs. This is the ONE reading of the contract, so
 /// it is the one place a contract path is spelled out.

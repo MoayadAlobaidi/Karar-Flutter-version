@@ -1469,9 +1469,23 @@ export function checkApprovalPolicy(ctx) {
 export function checkMoneyDiscipline(ctx) {
   const { root } = ctx;
   const violations = [];
+  // Scope: the pure packages, EVERY module layer, and the API/worker apps.
+  //
+  // It used to stop at domain and application, which left out exactly the two
+  // boundaries where a float would enter from outside — the DB-to-domain
+  // row-mappers under `infrastructure`, and the wire-to-domain input readers
+  // under `apps/api/src`. Nothing else scanned them either, so the guarantee
+  // `docs/testing/architecture-tests.md` states was wider than the check.
+  //
+  // NOT `packages/*/src` wholesale: `packages/platform/src/outbox/relay.ts`
+  // records an outbox lag GAUGE in seconds with `Number.parseFloat`, which is a
+  // duration and not money. Widening to every package would make this check
+  // fire on it, and a check that cries wolf is one somebody switches off.
   const files = codeFiles([
     ...PURE_PACKAGES.map((p) => path.join(root, 'packages', p, 'src')),
-    ...moduleLayerDirs(root, ['domain', 'application']),
+    ...moduleLayerDirs(root, ['domain', 'application', 'infrastructure', 'presentation']),
+    path.join(root, 'apps', 'api', 'src'),
+    path.join(root, 'apps', 'worker', 'src'),
   ]);
   const monetaryNumber =
     /\b(minorUnits|basisPoints|amount|amounts|balance|balances|price|prices|fee|fees|monetaryValue)\s*\??\s*:\s*number\b/g;

@@ -31,7 +31,7 @@ At Phase 0.5 no code existed, so **every technical entry was `PENDING`** — the
 
 | id | claim | type | scope | evidence | owner | status |
 |---|---|---|---|---|---|---|
-| AC-001 | No floating point in the money path across the pure packages and every module `domain` and `application` layer, which is the scope test 7 scans | TECHNICAL | platform | test 7 | Platform | UNVERIFIED |
+| AC-001 | No floating point in the money path across the pure packages, every module layer and the api/worker apps (the scope test 7 scans), and no client-side money computation — exact or floating — across the seven Flutter financial roots | TECHNICAL | platform | test 7; `apps/mobile/test/features/financial_accounts/architecture_test.dart` | Platform | UNVERIFIED |
 | AC-002 | `SEALED` never appears in projections, events, logs, analytics, or AI context | TECHNICAL | sealed-vault | test 13 | Platform | PENDING |
 | AC-003 | Sealed reads require a `SealAccessGrant` at the type level | TECHNICAL | sealed-vault | test 14 | Platform | PENDING |
 | AC-004 | Every table is RLS-enabled and FORCEd or explicitly allow-listed | TECHNICAL | platform | test 22 | Platform | UNVERIFIED |
