@@ -98,7 +98,7 @@ export interface CapabilityDescriptor<Id extends string = CapabilityId> {
    * is not yet available"). Absent means NOT explainable — the fail-closed
    * default: without the opt-in, a provider-pending capability is simply
    * omitted from client output rather than advertised with a reason. No
-   * production descriptor opts in while every capability is unbuilt.
+   * production descriptor opts in, because nothing is deployed.
    */
   readonly providerPendingExplainable?: boolean;
 }

@@ -225,7 +225,7 @@ Append-only. Nothing existing is modified.
 
 ## 10. Current registry
 
-Every real capability is honestly unbuilt. This table is the descriptor content, not an ambition:
+One real capability is built and six are not, and none is deployed. This table is the descriptor content, not an ambition:
 
 | Capability | Lifecycle | Implementation | Deployment | `declaredJurisdictions` | Client exposure |
 |---|---|---|---|---|---|

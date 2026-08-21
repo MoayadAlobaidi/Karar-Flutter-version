@@ -79,7 +79,7 @@ That commit contains, together: the CSV upload and parse routes; `checkResourceL
 |---|---|
 | A helper hardcodes `maxBytes`/`maxRows` instead of reading the central policy | **FAIL**, naming `apps/api/src/financial/csv-body.ts` |
 | A mounted controller stops referencing `INGESTION_LIMIT_POLICIES` | **FAIL**, naming `statement-import-source.controller.ts` |
-| Neither mutation | PASS, 51 files scanned |
+| Neither mutation | PASS, 56 files scanned |
 
 The first mutation is why the check is shaped the way it is. It originally scanned only files that mount a route, and **passed** while a helper carried an inline bound — a controller can dutifully reference the central policy and then call a helper that hardcodes the number, and the helper is where the bound actually bites. The scan now covers the whole ingestion surface. That hole was found by mutating the real tree, not by the seeded self-tests, which is the argument for doing both.
 
@@ -198,7 +198,7 @@ All CANONICAL runs at this checkpoint are against **PostgreSQL 17.11**, in the r
 
 | Suite | Result | Measured at |
 |---|---|---|
-| Architecture (`pnpm arch:test`) | **28 passed, 0 failed, 3 deferred to phase 13**; registry errors 0; self-test PASS over 70 cases; all three supplementary checks pass | checkpoint |
+| Architecture (`pnpm arch:test`) | **28 passed, 0 failed, 3 deferred to phase 13**; registry errors 0; self-test PASS over 70 cases; all four supplementary checks pass | checkpoint |
 | Documentation (`pnpm docs:check`) | **14/14**, self-test ok over 16 cases, 293 markdown files scanned | checkpoint |
 | Prisma mapping (`node scripts/db/prisma-mapping-check.mjs`) | **61 mapped tables match the live database** | checkpoint |
 | Workspace (`pnpm test`) | **3138 passed / 12 skipped / 0 failed (3150 total)** across 221 files (220 passed, 1 skipped) | checkpoint |
@@ -218,7 +218,7 @@ All CANONICAL runs at this checkpoint are against **PostgreSQL 17.11**, in the r
 
 The **one `modules/transactions` test that did not pass** in a shared local database at `66ad086` was `financial-record-lifecycle.integration.test.ts`, which asserts against the live catalogue that no table other than `transactions` carries the dedup identity's column names. It failed when the database also held statement-import staging tables created by a concurrent workstream — which was the assertion working, not failing: it is designed to notice exactly that, and the module that adds such a table owns the decision about whether its columns may share those names. Those tables are now committed as `0101`, and the question is settled the way the assertion intended: `statement_import_rows` names its columns `staged_row_fingerprint` and `staged_row_fingerprint_version`, deliberately not `dedup_fingerprint`, `fingerprint_version` or `occurrence_ordinal`, so a staged row cannot be mistaken for a canonical one by a reader scanning the catalogue.
 
-**Architecture test 24 is ACTIVE and passing**, scanning 51 — 49 files plus the two central policies. The two mutations recorded under *Phase activation* prove the PATH side is not vacuous; they are both path-side, and for a time this document called the whole test proven on the strength of them while its policy side could not fail at all. Four further mutations now cover that side: a missing bound, a bound of zero, a policy nothing references, and two policies claiming one `pathId`. Nothing on the registry is deferred to phase 5 any longer; the three remaining deferrals all wait on phase 13.
+**Architecture test 24 is ACTIVE and passing**, scanning 56 — 54 files plus the two central policies. The two mutations recorded under *Phase activation* prove the PATH side is not vacuous; they are both path-side, and for a time this document called the whole test proven on the strength of them while its policy side could not fail at all. Four further mutations now cover that side: a missing bound, a bound of zero, a policy nothing references, and two policies claiming one `pathId`. Nothing on the registry is deferred to phase 5 any longer; the three remaining deferrals all wait on phase 13.
 
 **The ordinary parallel invocation was made reliable earlier in this phase, and that work stands.** It had failed intermittently for two separate reasons, both since closed: F4 (a real defect — a concurrent dedup loser arrived untyped) and connection exhaustion on a 12-core machine, which made suites SKIP rather than fail so the run stayed green while it had quietly stopped verifying. The worker count now derives from the connection budget, and `KARAR_INTEGRATION=1` makes an unreachable database a failure. Evidence recorded at that checkpoint: **ten consecutive `pnpm test` runs, 10/10 passed, identical 12 skips each time, zero orphan scratch databases.** That evidence is about the reasons above and is not contradicted by the timeout in this run, which is a machine under three concurrent suites rather than a flaky test — but nor does it license reading this run as green.
 
@@ -228,7 +228,7 @@ The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, wh
 
 **The workspace suite is 3138 passed / 12 skipped / 0 failed, over ten consecutive runs with identical counts and zero orphan scratch databases, under both server timezones.** A previous revision of this section recorded **six** failures — five-second timeouts in the three suites that provision and drop whole databases — and explained them as a machine under concurrent load. That explanation was wrong, and the six were not a resource observation. `pnpm test` scoped collection in two places that could disagree, and neither excluded `.claude`, so the agent worktrees under it — checkouts of other commits — had their test files collected and run, duplicating exactly those database-provisioning suites against one PostgreSQL. With collection scoped in one place the suite is green and stays green: ten runs, identical counts each time. Nothing was re-run until green and no timeout was raised to hide a failure; the earlier six are recorded here because a report that quietly drops a number it has explained away is not evidence.
 
-**Architecture and documentation figures.** `pnpm arch:test` prints **28 passed, 0 failed, 3 skipped**, self-test **70 cases**, and test 24 scans **51** — 49 surface files plus the two central policies, and test 7 scans **591**, which it did not read at all until the offset defect recorded under *Phase activation* was fixed. There are **three** supplementary checks, not two. `pnpm docs:check` prints **14/14**, self-test ok over **16** cases, **293** markdown files scanned. `pnpm typecheck`, `pnpm build` and `pnpm lint` all exit **0**.
+**Architecture and documentation figures.** `pnpm arch:test` prints **28 passed, 0 failed, 3 skipped**, self-test **70 cases**, and test 24 scans **56** — 54 surface files plus the two central policies, and test 7 scans **591**, which it did not read at all until the offset defect recorded under *Phase activation* was fixed. There are **four** supplementary checks: `capability-registry-truth` joined them at this checkpoint. `pnpm docs:check` prints **14/14**, self-test ok over **16** cases, **293** markdown files scanned. `pnpm typecheck`, `pnpm build` and `pnpm lint` all exit **0**.
 
 `pnpm build` passes across the workspace. No mobile artifact was produced, no build was signed, and nothing was deployed.
 ## Financial rate limiting
@@ -422,15 +422,33 @@ The test that claimed to pin the two bounds used `****1234`, pure ASCII, where c
 
 The Flutter route-derivation test never descended into `route.routes`, and asserted its length against a count using the same top-level-only filter, so a nested financial route would have been absent from both sides and the check would still have agreed. The non-financial conformance suite pinned only its covered list, with no partition, so a status added to a contract fragment landed in neither ledger silently. Both closed, and both proved on the real scenario rather than by adjusting a number.
 
-### Reported and not changed
+### Reported and not changed, at the FIRST independent review
 
-**No rate limiting on the financial routes.** Confirmed: those controllers carry only `FinancialCapabilityGuard`, and the Redis sliding-window limiter composed in `phase3-modules.ts` is not applied to them. It is not fixed here because it is a design decision about the whole surface rather than a defect in one path, and R1 — which is what made it a sustained outage rather than a single stall — is fixed. Recorded in *Deferred work*.
+**HISTORICAL — this subsection records what the first review round reported and
+what was NOT fixed at that time. All three were closed at this checkpoint, and
+the record is kept rather than deleted so the sequence stays legible.** Each row
+was left in the present tense after being closed, which made this document
+contradict its own *Deferred work* list three times; that is the exact failure
+the derived-facts rules exist to catch, in the one document that describes them.
 
-**`phase5-ingestion-not-mounted-early` cannot fail again.** Correct: `currentPhase` is 5 and moves only forward, so the check scans zero files and its pass is counted in the headline 27. This was already disclosed here; it was NOT disclosed in `README.md` or `docs/testing/architecture-tests.md`, which presented the supplementary checks as passing controls. Both now say so.
+**No rate limiting on the financial routes.** True when reported. **CLOSED** —
+see *Financial rate limiting* above: all 27 mounted operations carry a central
+policy, enforced after the capability gate and before any handler.
 
-**Architecture test 7 does not scan the layers where a float would enter.** Correct: it covers the pure packages and every module `domain` and `application`, not `infrastructure/persistence/row-mappers.ts` or `apps/api/src/financial/transaction-input.ts`. The reviewer checked both by hand and found them correct today, so this is a scope gap rather than a violation. AC-001's claim has been narrowed to the scope its evidence actually covers, which is what was overstated.
+**Architecture test 7 does not scan the layers where a float would enter.** True
+when reported: it covered the pure packages and every module `domain` and
+`application`, not the DB-to-domain or wire-to-domain mappers. **CLOSED** — the
+scope is now every module layer plus the api and worker apps, 360 files became
+591, and the Dart guards cover all seven financial roots.
 
-**Categorization is proven end-to-end through a stub the test configures.** Correct, and the test says so. The default wiring uses the real evaluator over an empty rule corpus, so no test exercises real rule matching on the live commit path. Recorded in *Deferred work* rather than papered over.
+**Categorization is proven end-to-end through a stub the test configures.** True
+when reported. **CLOSED** — both write paths are now proved against real
+`merchant_rules` rows on live PostgreSQL, with six mutations failing.
+
+**`phase5-ingestion-not-mounted-early` cannot fail again.** Still true, and still
+disclosed: `currentPhase` is 5 and moves only forward, so the check scans zero
+files and its pass is counted in the headline. It is retained as the other half
+of a lock test 24 has taken over.
 
 ## Accepted risks
 

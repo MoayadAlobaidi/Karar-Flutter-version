@@ -3314,6 +3314,38 @@ function buildSelfTestFixture() {
     fs.writeFileSync(full, content);
   };
 
+  // capability-registry-truth fixtures. Arm A needs a mounted financial
+  // surface and a TRANSACTIONS descriptor that denies its own code exists;
+  // arm B needs a built capability that helps itself to a deployment and a
+  // jurisdiction. Both were mutation-proved by hand when the check landed and
+  // by NOTHING afterwards, which is the state every other checker here exists
+  // to refuse.
+  write(
+    'apps/api/src/financial/fixture-financial.controller.ts',
+    [
+      "@Controller('financial/fixture')",
+      'export class FixtureFinancialController {',
+      '  @Get()',
+      '  list() {}',
+      '}',
+    ].join('\n'),
+  );
+  write(
+    'apps/api/src/financial/financial.module.ts',
+    'export class FinancialApiModule { static register() { return { controllers: [FixtureFinancialController] }; } }',
+  );
+  write('apps/api/src/composition/phase5-modules.ts', 'export const wired = FinancialApiModule;');
+
+  // checkMoneyDiscipline: a float in each of the layers the WIDENED scope
+  // added. The single pre-existing seed lives in a pure package, which was in
+  // scope before the widening — so narrowing the scope back would not have
+  // failed the self-test, and the widening was proved by nothing.
+  write(
+    'modules/beta/infrastructure/persistence/row-mappers.ts',
+    'export function toDomain(row) { return { balance: Number.parseFloat(row.balance_minor) }; }',
+  );
+  write('apps/worker/src/money-boundary.ts', 'export interface Wire { readonly amount: number; }');
+
   // Test 24 fixture: every failure shape at once, so a single seeded tree
   // proves each arm rather than only the first one the checker happens to hit.
   //
@@ -3857,6 +3889,42 @@ function buildSelfTestFixture() {
     ].join('\n'),
   );
 
+  // Appended rather than written: `packages/capability-registry/src/index.ts`
+  // is already the fixture for test 19 (disclosure-bearing capabilities), and
+  // overwriting it made THIS check's three cases silently vacuous while test
+  // 19 kept passing. Two checkers sharing one fixture path is fine; the second
+  // one clobbering the first is not.
+  fs.appendFileSync(
+    path.join(root, 'packages', 'capability-registry', 'src', 'index.ts'),
+    [
+      '',
+      'export const CAPABILITY_REGISTRY = Object.freeze({',
+      '  TRANSACTIONS: Object.freeze({',
+      "    id: 'TRANSACTIONS',",
+      "    lifecycle: 'PLANNED',",
+      "    implementation: 'NOT_IMPLEMENTED',",
+      '    deployment: Object.freeze({}),',
+      '    declaredJurisdictions: Object.freeze([]),',
+      '  }),',
+      '  OVERSTATED: Object.freeze({',
+      "    id: 'OVERSTATED',",
+      "    lifecycle: 'ALPHA',",
+      "    implementation: 'IMPLEMENTED',",
+      "    deployment: Object.freeze({ production: 'DEPLOYED' }),",
+      "    declaredJurisdictions: Object.freeze(['QA']),",
+      '  }),',
+      '  HONEST: Object.freeze({',
+      "    id: 'HONEST',",
+      "    lifecycle: 'ALPHA',",
+      "    implementation: 'IMPLEMENTED',",
+      '    deployment: Object.freeze({}),',
+      '    declaredJurisdictions: Object.freeze([]),',
+      '  }),',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
   return root;
 }
 
@@ -3922,6 +3990,27 @@ const SELF_TEST_CASES = [
   { fn: 'checkControllerComplexity', expect: /domain/ },
   { fn: 'checkControllerComplexity', expect: /route handlers/ },
   { fn: 'checkMoneyDiscipline', expect: /amount/ },
+  // The WIDENED scope, seeded in each layer it added. Without these, reverting
+  // the scope to domain+application would have kept the self-test green.
+  { fn: 'checkMoneyDiscipline', expect: /row-mappers/ },
+  { fn: 'checkMoneyDiscipline', expect: /money-boundary/ },
+  // capability-registry-truth, both arms. `ctx` gives each case its own cached
+  // run, and the phase is passed in rather than read from the fixture registry.
+  {
+    fn: 'checkCapabilityRegistryTruth',
+    expect: /TRANSACTIONS is NOT_IMPLEMENTED while the financial surface is mounted/,
+    ctx: { currentPhase: 5 },
+  },
+  {
+    fn: 'checkCapabilityRegistryTruth',
+    expect: /OVERSTATED is IMPLEMENTED and claims DEPLOYED/,
+    ctx: { currentPhase: 5 },
+  },
+  {
+    fn: 'checkCapabilityRegistryTruth',
+    expect: /OVERSTATED is IMPLEMENTED and declares jurisdictions/,
+    ctx: { currentPhase: 5 },
+  },
   { fn: 'checkEventCatalogue', expect: /FakeThingHappened/ },
   { fn: 'checkProviderBoundary', expect: /@aws-sdk/ },
   { fn: 'checkDeterministicDomain', expect: /Date\.now/ },
