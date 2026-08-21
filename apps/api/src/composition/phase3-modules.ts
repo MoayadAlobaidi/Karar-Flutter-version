@@ -45,6 +45,8 @@ import { LocalDevEncryptionProvider } from '@karar/platform/dist/keys/index.js';
 import { LocalMailSink } from '@karar/platform/dist/notifications/index.js';
 import {
   RateLimitRedisConnection,
+  RateLimitKeyHasher,
+  RateLimitService,
   RedisSlidingWindowRateLimiter,
   createRateLimitRedisClient,
 } from '@karar/platform/dist/ratelimit/index.js';
@@ -168,8 +170,18 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       logger.debug({ err: error }, 'rate-limit store connection error');
     },
   });
+  const identityConfig = loadIdentityConfig(config.env, env);
+  // ONE Redis client, one lifecycle, one readiness probe. The financial
+  // surface shares the client identity already opened rather than adding a
+  // second connection whose outage nothing would report.
+  const rateLimits = new RateLimitService({ primary: new RedisSlidingWindowRateLimiter(redis) });
+  // The SAME pepper identity uses. identity-config.ts already documents
+  // KARAR_DIGEST_PEPPER as the pepper for rate-limit subject keys, and a second
+  // deployment secret would buy nothing: the `subject:` domain tag and the
+  // per-policy storage-key prefix already keep the namespaces disjoint.
+  const rateLimitKeys = new RateLimitKeyHasher(identityConfig.digestPepper);
   const identityRuntime = createIdentityRuntime({
-    config: loadIdentityConfig(config.env, env),
+    config: identityConfig,
     prisma,
     recordAudit,
     notifications: new LocalMailSink({ env: config.env }),
@@ -341,6 +353,8 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       clock,
       producer: config.service.name,
       capabilityResolution: phase35.capabilityResolution,
+      rateLimits,
+      rateLimitKeys,
     }),
   ];
 

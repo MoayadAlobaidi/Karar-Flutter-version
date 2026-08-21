@@ -34,6 +34,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { APP_LOGGER } from '../di-tokens.js';
 import { GlobalExceptionFilter } from '../errors/global-exception.filter.js';
 import { PROBLEM_JSON_CONTENT_TYPE } from '../errors/problem-response.js';
+import { testRateLimits } from './__test-rate-limits.js';
 import type { FinancialCapabilityDecision, FinancialCapabilityGate } from './capability-gate.js';
 import { FinancialApiModule } from './financial.module.js';
 import type { FinancialPrincipal, FinancialPrincipalSource } from './principal.js';
@@ -125,6 +126,7 @@ async function boot(options: BootOptions): Promise<NestFastifyApplication> {
       FinancialApiModule.register({
         useCases: trapUseCases(),
         clock: { now: () => new Date('2026-08-19T09:00:00.000Z') },
+        rateLimits: testRateLimits(),
         capabilityGate: options.gate,
         principalSource: options.principalSource ?? boundPrincipal,
       }),

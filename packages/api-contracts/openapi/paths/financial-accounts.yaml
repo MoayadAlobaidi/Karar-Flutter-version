@@ -98,6 +98,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -190,6 +192,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   post:
@@ -284,6 +288,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '422':
         $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -318,6 +324,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   patch:
@@ -396,6 +404,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -459,6 +469,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 

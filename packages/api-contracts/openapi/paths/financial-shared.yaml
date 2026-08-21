@@ -90,6 +90,25 @@ components:
         type: boolean
         description: Present only where retrying could change the answer.
       requestId: { type: string }
+  RateLimited:
+    description: >-
+      RFC 7807 with `code: RATE_LIMITED`. `details.retryAfterSeconds` is the
+      wait; `details.policy` names the budget that refused. The attempt was NOT
+      processed: no record was read, written, parsed or committed.
+
+
+      The budget is a SECURITY ceiling on request rate, not a product quota, a
+      subscription limit or a jurisdiction rule, and it is charged to the
+      authenticated principal the server resolved -- never to anything the
+      caller supplied.
+
+
+      The body is the PLATFORM problem shape, the same document identity's 429
+      already produces. Authoring a second 429 shape here would give one API two
+      error models, which is what the single problem writer exists to prevent.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
   ProblemResponse:
     description: RFC 7807 problem document.
     content:

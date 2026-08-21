@@ -95,6 +95,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -166,6 +168,8 @@
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
       '403':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 

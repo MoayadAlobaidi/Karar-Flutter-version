@@ -35,6 +35,7 @@ import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.
 import type { AssignmentSource } from '@karar/transactions';
 
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { categoryAssignmentWire, provenanceWire } from './dto/transactions.js';
 import { pageOf, readPageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
@@ -66,7 +67,7 @@ const USER_ASSIGNMENT: AssignmentSource = 'USER';
 
 const CATEGORY_CODE = /^[A-Z][A-Z0-9_]{1,31}(\.[A-Z][A-Z0-9_]{1,31}){0,2}$/;
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial/transactions')
 export class FinancialTransactionDetailController {
   constructor(

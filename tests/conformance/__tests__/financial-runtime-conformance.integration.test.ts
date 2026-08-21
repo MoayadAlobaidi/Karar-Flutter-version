@@ -35,6 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
+import { RATE_LIMIT_POLICIES } from '@karar/platform/dist/ratelimit/index.js';
 
 import { Contract } from '../contract.js';
 import { validateAgainstSchema } from '../schema-validator.js';
@@ -277,12 +278,14 @@ const EXPECTED_VALIDATED: readonly string[] = [
   'commitOwnStatementImport 403',
   'commitOwnStatementImport 404',
   'commitOwnStatementImport 409',
+  'commitOwnStatementImport 429',
   'confirmOwnTransferMatch 200',
   'confirmOwnTransferMatch 400',
   'confirmOwnTransferMatch 401',
   'confirmOwnTransferMatch 403',
   'confirmOwnTransferMatch 404',
   'confirmOwnTransferMatch 409',
+  'confirmOwnTransferMatch 429',
   'correctOwnTransaction 200',
   'correctOwnTransaction 400',
   'correctOwnTransaction 401',
@@ -300,6 +303,7 @@ const EXPECTED_VALIDATED: readonly string[] = [
   'createOwnManualTransaction 403',
   'createOwnManualTransaction 404',
   'createOwnManualTransaction 409',
+  'createOwnManualTransaction 429',
   'createOwnStatementImport 201',
   'createOwnStatementImport 400',
   'createOwnStatementImport 401',
@@ -342,6 +346,7 @@ const EXPECTED_VALIDATED: readonly string[] = [
   'listOwnFinancialAccounts 400',
   'listOwnFinancialAccounts 401',
   'listOwnFinancialAccounts 403',
+  'listOwnFinancialAccounts 429',
   'listOwnFinancialConnections 200',
   'listOwnFinancialConnections 400',
   'listOwnFinancialConnections 401',
@@ -370,6 +375,7 @@ const EXPECTED_VALIDATED: readonly string[] = [
   'parseOwnStatementImportSource 403',
   'parseOwnStatementImportSource 404',
   'parseOwnStatementImportSource 409',
+  'parseOwnStatementImportSource 429',
   'readOwnFinancialAccount 200',
   'readOwnFinancialAccount 400',
   'readOwnFinancialAccount 401',
@@ -405,40 +411,81 @@ const EXPECTED_VALIDATED: readonly string[] = [
   'uploadOwnStatementImportSource 409',
   'uploadOwnStatementImportSource 413',
   'uploadOwnStatementImportSource 415',
+  'uploadOwnStatementImportSource 429',
 ];
 
 /** The reviewed uncovered set: pair, then the reason it is not reachable. */
+
+/**
+ * WHY THESE 429s ARE NOT DRIVEN INDIVIDUALLY. Every mounted operation carries a
+ * budget, and there are six budgets, not twenty-seven. One operation per budget
+ * is driven past its real limit against the live Redis limiter above; the
+ * remaining operations share those same six policies and emit the identical
+ * refusal document through the identical writer, so driving each one would
+ * exhaust the same six windows twenty-one more times and prove nothing further.
+ *
+ * What is NOT taken on trust: that every operation HAS a budget. That is proved
+ * structurally, from Nest's own route metadata, in
+ * apps/api/src/financial/rate-limit-mounting.test.ts — a mounted route with no
+ * policy fails there, and so does a route whose guards are out of order.
+ */
+const RATE_LIMIT_SHARED_POLICY =
+  'RATE_LIMIT_SHARED_POLICY: this operation shares one of the six financial budgets, each of ' +
+  'which is driven past its real limit above through a sibling operation. That every mounted ' +
+  'operation HAS a budget is proved from route metadata in rate-limit-mounting.test.ts.';
+
 const EXPECTED_UNCOVERED: ReadonlyArray<readonly [string, string]> = [
   ['assignOwnTransactionCategory 409', RULE_ONLY_409],
+  ['assignOwnTransactionCategory 429', RATE_LIMIT_SHARED_POLICY],
   ['assignOwnTransactionCategory 503', STORE_OUTAGE],
   ['commitOwnStatementImport 422', RETENTION_UNRESOLVED],
   ['commitOwnStatementImport 503', STORE_OUTAGE],
   ['confirmOwnTransferMatch 503', STORE_OUTAGE],
+  ['correctOwnTransaction 429', RATE_LIMIT_SHARED_POLICY],
   ['correctOwnTransaction 503', STORE_OUTAGE],
   ['createOwnManualFinancialAccount 422', RETENTION_UNRESOLVED],
+  ['createOwnManualFinancialAccount 429', RATE_LIMIT_SHARED_POLICY],
   ['createOwnManualFinancialAccount 503', STORE_OUTAGE],
   ['createOwnManualTransaction 422', RETENTION_UNRESOLVED],
   ['createOwnManualTransaction 503', STORE_OUTAGE],
   ['createOwnStatementImport 422', RETENTION_UNRESOLVED],
+  ['createOwnStatementImport 429', RATE_LIMIT_SHARED_POLICY],
   ['createOwnStatementImport 503', STORE_OUTAGE],
+  ['deleteOwnTransaction 429', RATE_LIMIT_SHARED_POLICY],
   ['deleteOwnTransaction 503', STORE_OUTAGE],
+  ['eraseOwnStatementImport 429', RATE_LIMIT_SHARED_POLICY],
   ['eraseOwnStatementImport 503', STORE_OUTAGE],
+  ['listFinancialCategories 429', RATE_LIMIT_SHARED_POLICY],
   ['listFinancialCategories 503', STORE_OUTAGE],
+  ['listFinancialInstitutions 429', RATE_LIMIT_SHARED_POLICY],
   ['listFinancialInstitutions 503', STORE_OUTAGE],
+  ['listOwnAccountBalanceSnapshots 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnAccountBalanceSnapshots 503', STORE_OUTAGE],
+  ['listOwnAccountPaymentInstruments 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnAccountPaymentInstruments 503', STORE_OUTAGE],
+  ['listOwnAccountSourceLinks 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnAccountSourceLinks 503', STORE_OUTAGE],
   ['listOwnFinancialAccounts 503', STORE_OUTAGE],
+  ['listOwnFinancialConnections 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnFinancialConnections 503', STORE_OUTAGE],
+  ['listOwnStatementImportPreview 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnStatementImportPreview 503', STORE_OUTAGE],
+  ['listOwnTransactionProvenance 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnTransactionProvenance 503', STORE_OUTAGE],
+  ['listOwnTransactions 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnTransactions 503', STORE_OUTAGE],
+  ['listOwnTransferMatches 429', RATE_LIMIT_SHARED_POLICY],
   ['listOwnTransferMatches 503', STORE_OUTAGE],
   ['parseOwnStatementImportSource 503', STORE_OUTAGE],
+  ['readOwnFinancialAccount 429', RATE_LIMIT_SHARED_POLICY],
   ['readOwnFinancialAccount 503', STORE_OUTAGE],
+  ['readOwnStatementImport 429', RATE_LIMIT_SHARED_POLICY],
   ['readOwnStatementImport 503', STORE_OUTAGE],
+  ['readOwnTransaction 429', RATE_LIMIT_SHARED_POLICY],
   ['readOwnTransaction 503', STORE_OUTAGE],
+  ['rejectOwnTransferMatch 429', RATE_LIMIT_SHARED_POLICY],
   ['rejectOwnTransferMatch 503', STORE_OUTAGE],
+  ['updateOwnFinancialAccount 429', RATE_LIMIT_SHARED_POLICY],
   ['updateOwnFinancialAccount 503', STORE_OUTAGE],
   ['uploadOwnStatementImportSource 422', RETENTION_UNRESOLVED],
   ['uploadOwnStatementImportSource 503', STORE_OUTAGE],
@@ -2919,6 +2966,111 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
     });
   });
 
+  /**
+   * The 429 on every mounted operation, covered for real against the live
+   * distributed limiter.
+   *
+   * ONE operation per policy group is driven past its declared budget on the
+   * suite's own bound caller — six budgets, six refusals, against the real
+   * Redis-backed limiter and the real policy numbers. No budget is raised, no
+   * policy is disabled and no subject key is varied to make this pass.
+   *
+   * It is declared LAST on purpose: exhausting a budget is destructive to the
+   * principal that spends it, so everything that needs headroom has already
+   * run. Only the ledger follows, and the ledger issues no requests.
+   *
+   * The remaining 21 pairs are recorded in EXPECTED_UNCOVERED rather than
+   * asserted here: they share these six policies and this exact refusal
+   * document, the shape is proved through the real router in
+   * apps/api/src/financial/rate-limit-gate.test.ts, and the coverage guarantee
+   * that matters -- that no mounted operation lacks a budget at all -- is
+   * proved structurally from route metadata in rate-limit-mounting.test.ts.
+   */
+  describe('rate limiting', () => {
+    /** Issues `count` requests and returns the last response. */
+    async function spend(
+      count: number,
+      request: () => Promise<WireResponse>,
+    ): Promise<WireResponse> {
+      let last: WireResponse | null = null;
+      for (let i = 0; i < count; i += 1) last = await request();
+      if (last === null) throw new Error('no request issued');
+      return last;
+    }
+
+    it('refuses an ordinary read past its budget', async () => {
+      const read = () =>
+        app.request({
+          method: 'GET',
+          url: '/financial/accounts',
+          accessToken: bound.accessToken,
+        });
+      const refused = await spend(RATE_LIMIT_POLICIES.financialRead.limit + 1, read);
+      conforms('listOwnFinancialAccounts', 429, refused);
+    });
+
+    it('refuses an ordinary write past its budget', async () => {
+      const write = () =>
+        app.request({
+          method: 'POST',
+          url: '/financial/transactions',
+          accessToken: bound.accessToken,
+          payload: {},
+        });
+      const refused = await spend(RATE_LIMIT_POLICIES.financialWrite.limit + 1, write);
+      conforms('createOwnManualTransaction', 429, refused);
+    });
+
+    it('refuses a statement upload past its budget', async () => {
+      const upload = () =>
+        app.request({
+          method: 'POST',
+          url: `/financial/statement-imports/${randomUUID()}/source`,
+          accessToken: bound.accessToken,
+          headers: { 'content-type': CSV_REQUEST_MEDIA_TYPE },
+          payload: 'date,amount\n2026-01-01,100\n',
+        });
+      const refused = await spend(RATE_LIMIT_POLICIES.financialStatementUpload.limit + 1, upload);
+      conforms('uploadOwnStatementImportSource', 429, refused);
+    });
+
+    it('refuses a parse past its budget', async () => {
+      const parse = () =>
+        app.request({
+          method: 'POST',
+          url: `/financial/statement-imports/${randomUUID()}/parse`,
+          accessToken: bound.accessToken,
+          payload: {},
+        });
+      const refused = await spend(RATE_LIMIT_POLICIES.financialStatementParse.limit + 1, parse);
+      conforms('parseOwnStatementImportSource', 429, refused);
+    });
+
+    it('refuses a commit past its budget', async () => {
+      const commit = () =>
+        app.request({
+          method: 'POST',
+          url: `/financial/statement-imports/${randomUUID()}/commit`,
+          accessToken: bound.accessToken,
+          payload: {},
+        });
+      const refused = await spend(RATE_LIMIT_POLICIES.financialCommit.limit + 1, commit);
+      conforms('commitOwnStatementImport', 429, refused);
+    });
+
+    it('refuses a transfer decision past its budget', async () => {
+      const decide = () =>
+        app.request({
+          method: 'POST',
+          url: `/financial/transfer-matches/${randomUUID()}/confirmation`,
+          accessToken: bound.accessToken,
+          payload: {},
+        });
+      const refused = await spend(RATE_LIMIT_POLICIES.financialTransferDecision.limit + 1, decide);
+      conforms('confirmOwnTransferMatch', 429, refused);
+    });
+  });
+
   describe('the ledger', () => {
     it('validated exactly the operations and statuses this suite claims to cover', () => {
       // The guard against the worst failure mode in this file: a suite that
@@ -2946,8 +3098,8 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
       expect([...covered, ...missed].sort()).toEqual(declared);
       // Stated as counts too, because a reader wants the headline figure.
       expect(covered.length + missed.length).toBe(declared.length);
-      expect(covered).toHaveLength(139);
-      expect(declared).toHaveLength(172);
+      expect(covered).toHaveLength(145);
+      expect(declared).toHaveLength(199);
     });
 
     it('served EVERY problem body as the declared problem media type', () => {

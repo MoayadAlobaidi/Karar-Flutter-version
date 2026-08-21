@@ -137,6 +137,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '422':
         $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -180,6 +182,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
   delete:
@@ -235,6 +239,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -322,6 +328,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '422':
         $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -408,6 +416,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -454,6 +464,8 @@
           application/problem+json:
             schema:
               $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
 
@@ -521,6 +533,8 @@
               $ref: './paths/financial-shared.yaml#/components/Problem'
       '422':
         $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
       '503':
         description: >-
           The commit could not be performed (codes COMMIT_FAILED,

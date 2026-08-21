@@ -235,7 +235,7 @@ describe('the OpenAPI document loads and resolves', () => {
     // 2xx schemas is canonical, and it is right to — but the better reason is
     // that a client ignoring 207 and a client ignoring 200 behave identically,
     // so a partial deletion has to be data the caller must read.
-    expect(ledger.length).toBe(286);
+    expect(ledger.length).toBe(313);
     for (const row of ledger) {
       expect(
         contract.responseSchema(row.operationId, row.status, row.mediaType),

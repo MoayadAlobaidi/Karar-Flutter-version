@@ -83,6 +83,7 @@
 import type { DynamicModule } from '@nestjs/common';
 import { readDefaultEventCatalogue } from '@karar/api-contracts';
 import type { Clock } from '@karar/shared-kernel';
+import type { RateLimitKeyHasher, RateLimitService } from '@karar/platform/dist/ratelimit/index.js';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 import {
   INGESTION_LIMIT_POLICIES,
@@ -177,6 +178,7 @@ import {
   type FinancialCapabilityResolution,
 } from './financial-capability-gate.js';
 import { RequestScopedTransactionsPrincipalContext } from '../financial/transactions-principal-context.js';
+import { FinancialRateLimits } from './financial-rate-limits.js';
 import { FinancialAccountsAccessAdapter } from './financial-account-access.js';
 import { FinancialConnectionsAccessAdapter } from './financial-connection-access.js';
 
@@ -194,6 +196,13 @@ export interface Phase5CompositionInput {
    * facts the client was told rather than from a lookup of its own.
    */
   readonly capabilityResolution: FinancialCapabilityResolution;
+  /**
+   * The platform limiter and the subject-key hasher, both built once at the
+   * root over the SAME Redis client identity uses. This surface never
+   * constructs either, and never names Redis or a pepper.
+   */
+  readonly rateLimits: RateLimitService;
+  readonly rateLimitKeys: RateLimitKeyHasher;
 }
 
 export function composePhase5Modules(input: Phase5CompositionInput): DynamicModule[] {
@@ -337,6 +346,7 @@ export function composePhase5Modules(input: Phase5CompositionInput): DynamicModu
     FinancialApiModule.register({
       clock,
       capabilityGate,
+      rateLimits: new FinancialRateLimits(input.rateLimits, input.rateLimitKeys),
       transactionsPrincipalScope,
       useCases: {
         institutions,

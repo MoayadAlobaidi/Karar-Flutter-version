@@ -49,6 +49,7 @@ import {
   statementImportWire,
 } from './dto/imports.js';
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { hasStoredSource, importAwaitsDecision } from './import-state.js';
 import { pageOf, readPageRequest } from './paging.js';
 import {
@@ -77,7 +78,7 @@ interface ReplyLike {
  */
 const LIMITS = INGESTION_LIMIT_POLICIES.csvStatementImport;
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial/statement-imports')
 export class StatementImportsController {
   constructor(

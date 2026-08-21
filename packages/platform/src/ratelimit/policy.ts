@@ -87,6 +87,109 @@ export const RATE_LIMIT_POLICIES = {
     windowMs: HOUR_MS,
     onStoreFailure: 'fail_closed',
   },
+  /**
+   * ---------------------------------------------------------------------
+   * Financial surface (Phase 5). SECURITY/AVAILABILITY ceilings, not product
+   * quotas: none of these is a subscription limit, a billing entitlement or a
+   * jurisdiction rule, and none may ever be presented to a person as one.
+   *
+   * The numbers are derived from what the real client does and what an
+   * admitted request costs the server, recorded per policy below. They are
+   * ENGINEERING budgets, exactly as `packages/platform/src/ingestion/limits.ts`
+   * says of its own — no legal or regulatory claim attaches to any of them.
+   *
+   * Resource limits and rate limits are complementary and BOTH apply: the
+   * ingestion policy bounds what ONE admitted request may cost, and these
+   * bound how many a principal may issue. The CSV parser proved the gap in
+   * between — a request inside every byte bound that still became an
+   * availability problem.
+   *
+   * Every financial policy fails CLOSED except the read: a write admitted
+   * during a limiter outage is unbounded mutation of money records, which is
+   * the same trade this file already makes for credential surfaces.
+   * ---------------------------------------------------------------------
+   */
+  /**
+   * Ordinary financial reads. One accounts screen is up to 20 requests
+   * (page limit 100, maximum 20 pages), a categories load up to 20 more, an
+   * account detail screen 4 concurrent reads, and every write invalidates one
+   * to three of them. 300 per five minutes is roughly six full cold-start-plus-
+   * browse cycles and still bounds bulk scraping of a person's records.
+   *
+   * The ONE financial policy that falls back rather than failing closed, on
+   * the same reasoning as `refresh`: an authenticated, capability-cleared read
+   * of one's own records has no guessing surface worth blanking every balance
+   * screen for during a Redis outage, and the in-process fallback still bounds
+   * volume per instance.
+   */
+  financialRead: {
+    name: 'financial_read',
+    limit: 300,
+    windowMs: 5 * MINUTE_MS,
+    onStoreFailure: 'fail_open_fallback',
+  },
+  /**
+   * Ordinary financial writes: account create/correct, transaction
+   * create/correct/delete, category assignment, import draft. Every one is a
+   * hand-driven form submission, and the manual ingestion policy declares
+   * `maxRows: 1`. 60 per five minutes is one write every five seconds
+   * sustained — far above any human rate, far below a script's.
+   */
+  financialWrite: {
+    name: 'financial_write',
+    limit: 60,
+    windowMs: 5 * MINUTE_MS,
+    onStoreFailure: 'fail_closed',
+  },
+  /**
+   * Statement source upload. Each admitted upload may carry
+   * `csvStatementImport.maxBytes` = 10 MiB into encrypted object storage
+   * BEFORE any parse, so 10 per hour caps one principal at 100 MiB/hour of
+   * stored source bytes. The client issues exactly one upload per chosen file.
+   */
+  financialStatementUpload: {
+    name: 'financial_statement_upload',
+    limit: 10,
+    windowMs: 60 * MINUTE_MS,
+    onStoreFailure: 'fail_closed',
+  },
+  /**
+   * Statement parse and preview. A parse is bounded by `maxRows` 50,000 and
+   * `deadlineMs` 30,000, so up to 30 seconds of CPU each; 30 per hour caps one
+   * principal at 15 minutes of parser time per hour. Higher than the upload
+   * budget because the column-mapping screen legitimately re-parses the same
+   * stored source after a mapping correction.
+   */
+  financialStatementParse: {
+    name: 'financial_statement_parse',
+    limit: 30,
+    windowMs: 60 * MINUTE_MS,
+    onStoreFailure: 'fail_closed',
+  },
+  /**
+   * Statement commit and erase. Each opens one transaction writing up to
+   * `maxBatchSize` 500 rows across two bounded contexts, or deletes stored
+   * source bytes. The client issues exactly one per import, so 20 per hour is
+   * twice the upload budget and covers idempotent retries.
+   */
+  financialCommit: {
+    name: 'financial_commit',
+    limit: 20,
+    windowMs: 60 * MINUTE_MS,
+    onStoreFailure: 'fail_closed',
+  },
+  /**
+   * Transfer-match confirm and reject. Per-match state mutations a person taps
+   * through a list whose page size is 50; 120 per hour clears two full pages
+   * plus corrections, and bounds an enumeration that flips relationships in
+   * bulk.
+   */
+  financialTransferDecision: {
+    name: 'financial_transfer_decision',
+    limit: 120,
+    windowMs: 60 * MINUTE_MS,
+    onStoreFailure: 'fail_closed',
+  },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitPolicyName =

@@ -36,6 +36,8 @@ import { HttpAdapterHost } from '@nestjs/core';
 
 import { FINANCIAL_CAPABILITY_GATE, type FinancialCapabilityGate } from './capability-gate.js';
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
+import { FINANCIAL_RATE_LIMITS, type FinancialRateLimitPort } from './rate-limit-port.js';
 import { registerCsvContentTypeParser } from './csv-body.js';
 import { FinancialAccountsController } from './financial-accounts.controller.js';
 import { FinancialCatalogueController } from './financial-catalogue.controller.js';
@@ -73,6 +75,13 @@ export interface FinancialApiModuleOptions {
    * forgetting into a surface that answers nobody while looking healthy.
    */
   readonly capabilityGate: FinancialCapabilityGate;
+  /**
+   * REQUIRED and undefaulted, for the same reason `capabilityGate` is: both
+   * possible defaults are wrong. A permissive default leaves the whole
+   * financial surface unlimited, and a refusing default refuses everyone. A
+   * caller that has not thought about it must not get either by omission.
+   */
+  readonly rateLimits: FinancialRateLimitPort;
   /** Defaults to the session-backed source; tests may bind their own. */
   readonly principalSource?: FinancialPrincipalSource;
   /** Defaults to a fresh request-scoped context. */
@@ -109,9 +118,12 @@ export class FinancialApiModule {
       providers: [
         { provide: FINANCIAL_USE_CASES, useValue: options.useCases },
         { provide: FINANCIAL_CAPABILITY_GATE, useValue: options.capabilityGate },
-        // Declared here so every controller above can name it; each one does,
-        // and capability-mounting.test.ts reads this same list to prove it.
+        { provide: FINANCIAL_RATE_LIMITS, useValue: options.rateLimits },
+        // Declared here so every controller above can name them; each one names
+        // BOTH, in this order, and capability-mounting.test.ts and
+        // rate-limit-mounting.test.ts read this same list to prove it.
         FinancialCapabilityGuard,
+        FinancialRateLimitGuard,
         { provide: FINANCIAL_CLOCK, useValue: options.clock },
         {
           provide: FINANCIAL_PRINCIPAL_SOURCE,

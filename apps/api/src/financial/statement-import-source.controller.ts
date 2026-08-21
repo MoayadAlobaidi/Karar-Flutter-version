@@ -41,6 +41,7 @@ import {
   isUnsupportedBody,
 } from './csv-body.js';
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { statementImportWire } from './dto/imports.js';
 import { hasStoredSource, importAwaitsDecision } from './import-state.js';
 import { readParseInput } from './import-input.js';
@@ -63,7 +64,7 @@ interface RequestLike {
 /** Every bound this ingestion path obeys, from the CENTRAL registry. */
 const LIMITS = INGESTION_LIMIT_POLICIES.csvStatementImport;
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial/statement-imports')
 export class StatementImportSourceController {
   constructor(

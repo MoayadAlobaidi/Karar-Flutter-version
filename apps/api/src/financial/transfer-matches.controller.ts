@@ -41,6 +41,7 @@ import { MATCH_STATES } from '@karar/transfer-matching';
 import type { MatchState } from '@karar/transfer-matching';
 
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { transferMatchWire } from './dto/matches.js';
 import { offsetPage, readPageRequest } from './paging.js';
 import { invalidCursorProblem, invalidLimitProblem, invalidRequestProblem } from './problems.js';
@@ -63,7 +64,7 @@ interface ReplyLike {
  */
 const LIMITS = INGESTION_LIMIT_POLICIES.manualTransaction;
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial/transfer-matches')
 export class TransferMatchesController {
   constructor(

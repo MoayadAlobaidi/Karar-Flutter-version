@@ -43,6 +43,7 @@ import {
 import { INGESTION_LIMIT_POLICIES } from '@karar/platform/dist/ingestion/limits.js';
 
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { transactionWire, type TransactionWire } from './dto/transactions.js';
 import { ownTransactionViewWire } from './dto/transaction-view.js';
 import { keysetPage, readCursor, readLimit } from './paging.js';
@@ -72,7 +73,7 @@ interface ReplyLike {
  */
 const LIMITS = INGESTION_LIMIT_POLICIES.manualTransaction;
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial/transactions')
 export class FinancialTransactionsController {
   constructor(

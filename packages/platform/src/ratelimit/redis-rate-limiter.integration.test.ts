@@ -8,6 +8,8 @@
  * evidence (same stance as the database suites).
  */
 
+import { RATE_LIMIT_POLICIES } from './policy.js';
+import { SecretValue } from '../config/secret-value.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Redis } from 'ioredis';
@@ -18,7 +20,7 @@ import {
   RateLimitStoreError,
   RedisSlidingWindowRateLimiter,
 } from './redis-rate-limiter.js';
-import { storageKey } from './keys.js';
+import { RateLimitKeyHasher, storageKey } from './keys.js';
 
 const redisPort = Number(process.env['REDIS_PORT'] ?? '6379');
 const redisHost = process.env['REDIS_HOST'] ?? '127.0.0.1';
@@ -195,5 +197,114 @@ describe.skipIf(unreachable !== null)('RateLimitRedisConnection (live Redis)', (
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     await expect(client.ping()).rejects.toThrow();
+  });
+});
+
+/**
+ * The FINANCIAL budgets, driven through the real distributed limiter.
+ *
+ * Two properties the in-process fallback cannot demonstrate: that two service
+ * instances sharing one Redis share ONE window (so a second pod is not a second
+ * budget), and that the declared policy numbers behave as declared against the
+ * real Lua path rather than against a fixture.
+ */
+describe.skipIf(unreachable !== null)('financial budgets against live Redis', () => {
+  let redis: Redis;
+  let limiter: RedisSlidingWindowRateLimiter;
+
+  beforeAll(async () => {
+    redis = createRateLimitRedisClient({ host: redisHost, port: redisPort });
+    await redis.connect();
+    limiter = new RedisSlidingWindowRateLimiter(redis);
+  });
+
+  afterAll(async () => {
+    await redis.quit();
+  });
+
+  const financial = [
+    RATE_LIMIT_POLICIES.financialStatementUpload,
+    RATE_LIMIT_POLICIES.financialCommit,
+    RATE_LIMIT_POLICIES.financialTransferDecision,
+  ];
+
+  for (const policy of financial) {
+    it(`admits exactly ${policy.limit} for ${policy.name} and refuses the next`, async () => {
+      const subjectKey = uniqueSubject(`fin-${policy.name}`);
+      const check = {
+        policyName: policy.name,
+        limit: policy.limit,
+        windowMs: policy.windowMs,
+        subjectKey,
+      };
+      for (let i = 0; i < policy.limit; i += 1) {
+        const decision = await limiter.enforce(check, at(i));
+        expect({ attempt: i, allowed: decision.allowed }).toEqual({ attempt: i, allowed: true });
+      }
+      const refused = await limiter.enforce(check, at(policy.limit));
+      expect(refused.allowed).toBe(false);
+      if (refused.allowed) throw new Error('unreachable');
+      expect(refused.retryAfterMs).toBeGreaterThan(0);
+      expect(refused.retryAfterMs).toBeLessThanOrEqual(policy.windowMs);
+    });
+  }
+
+  it('two service instances sharing one Redis share ONE budget', async () => {
+    // A second pod must not be a second budget. Both limiters are separate
+    // objects over separate clients; the window they enforce is the same one.
+    const second = createRateLimitRedisClient({ host: redisHost, port: redisPort });
+    await second.connect();
+    try {
+      const instanceA = new RedisSlidingWindowRateLimiter(redis);
+      const instanceB = new RedisSlidingWindowRateLimiter(second);
+      const subjectKey = uniqueSubject('fin-shared-window');
+      const check = {
+        policyName: RATE_LIMIT_POLICIES.financialCommit.name,
+        limit: 2,
+        windowMs: 60_000,
+        subjectKey,
+      };
+      // Distinct instants: the window is a sorted set scored by time, so two
+      // admits at the identical millisecond are one member, not two.
+      expect((await instanceA.enforce(check, at(0))).allowed).toBe(true);
+      expect((await instanceB.enforce(check, at(1))).allowed).toBe(true);
+      // The third is refused whichever instance sees it — one window, not two.
+      expect((await instanceA.enforce(check, at(2))).allowed).toBe(false);
+      expect((await instanceB.enforce(check, at(3))).allowed).toBe(false);
+    } finally {
+      await second.quit();
+    }
+  });
+
+  it('stores no raw identifier, and every key expires', async () => {
+    const hasher = new RateLimitKeyHasher(new SecretValue('pepper-at-least-sixteen-chars'));
+    const tenantId = '11111111-1111-4111-8111-111111111111';
+    const userId = '22222222-2222-4222-8222-222222222222';
+    const subjectKey = hasher.subjectKey(tenantId, userId);
+    const policy = RATE_LIMIT_POLICIES.financialWrite;
+    await limiter.enforce(
+      { policyName: policy.name, limit: policy.limit, windowMs: policy.windowMs, subjectKey },
+      T0,
+    );
+
+    const key = storageKey(policy.name, subjectKey);
+    // The identifiers the budget was charged to appear nowhere in the key…
+    expect(key).not.toContain(tenantId);
+    expect(key).not.toContain(userId);
+    expect(key).toContain(subjectKey);
+    expect(subjectKey).toMatch(/^[0-9a-f]{32}$/);
+
+    // …and neither does any key Redis actually holds for this run.
+    const held = await redis.keys(`karar:rl:${policy.name}:*`);
+    for (const heldKey of held) {
+      expect(heldKey).not.toContain(tenantId);
+      expect(heldKey).not.toContain(userId);
+    }
+
+    // No immortal keys: a budget that never expires is a budget that never
+    // refills, and a store that grows without bound.
+    const ttl = await redis.pttl(key);
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(policy.windowMs);
   });
 });

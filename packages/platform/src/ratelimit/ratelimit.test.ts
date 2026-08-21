@@ -167,4 +167,71 @@ describe('RateLimitService failure modes', () => {
       onStoreFailure: 'fail_closed',
     });
   });
+
+  it('declares the financial policy table, and fails CLOSED on every mutation', () => {
+    expect(RATE_LIMIT_POLICIES.financialRead).toMatchObject({
+      name: 'financial_read',
+      limit: 300,
+      windowMs: 300_000,
+      // The one financial policy that falls back rather than refusing.
+      onStoreFailure: 'fail_open_fallback',
+    });
+    expect(RATE_LIMIT_POLICIES.financialWrite).toMatchObject({
+      name: 'financial_write',
+      limit: 60,
+      windowMs: 300_000,
+      onStoreFailure: 'fail_closed',
+    });
+    expect(RATE_LIMIT_POLICIES.financialStatementUpload).toMatchObject({
+      name: 'financial_statement_upload',
+      limit: 10,
+      windowMs: 3_600_000,
+      onStoreFailure: 'fail_closed',
+    });
+    expect(RATE_LIMIT_POLICIES.financialStatementParse).toMatchObject({
+      name: 'financial_statement_parse',
+      limit: 30,
+      windowMs: 3_600_000,
+      onStoreFailure: 'fail_closed',
+    });
+    expect(RATE_LIMIT_POLICIES.financialCommit).toMatchObject({
+      name: 'financial_commit',
+      limit: 20,
+      windowMs: 3_600_000,
+      onStoreFailure: 'fail_closed',
+    });
+    expect(RATE_LIMIT_POLICIES.financialTransferDecision).toMatchObject({
+      name: 'financial_transfer_decision',
+      limit: 120,
+      windowMs: 3_600_000,
+      onStoreFailure: 'fail_closed',
+    });
+  });
+
+  it('every financial mutation policy fails CLOSED', () => {
+    // Stated as a rule rather than as six separate numbers, so a seventh
+    // financial policy cannot arrive failing open by being overlooked.
+    for (const [key, policy] of Object.entries(RATE_LIMIT_POLICIES)) {
+      if (!key.startsWith('financial') || key === 'financialRead') continue;
+      expect({ key, mode: policy.onStoreFailure }).toEqual({ key, mode: 'fail_closed' });
+    }
+  });
+
+  it('pins the policy COUNT, so a new policy cannot arrive unpinned', () => {
+    expect(Object.keys(RATE_LIMIT_POLICIES)).toHaveLength(13);
+  });
+
+  it('charges a financial budget to one principal in one tenant', () => {
+    const hasher = new RateLimitKeyHasher(new SecretValue('pepper-at-least-sixteen-chars'));
+    const key = hasher.subjectKey('tenant-a', 'user-1');
+    expect(key).toMatch(/^[0-9a-f]{32}$/);
+    // A different tenant is a different budget…
+    expect(hasher.subjectKey('tenant-b', 'user-1')).not.toBe(key);
+    // …and so is a different user.
+    expect(hasher.subjectKey('tenant-a', 'user-2')).not.toBe(key);
+    // And it is NOT the bare id key: a person in two tenants must not share
+    // one budget across organisations, because the refusal would be a signal
+    // about the other tenant.
+    expect(hasher.idKey('user-1')).not.toBe(key);
+  });
 });

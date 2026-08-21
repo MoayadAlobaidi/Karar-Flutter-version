@@ -27,6 +27,7 @@
 import { Controller, Get, Inject, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { balanceSnapshotWire } from './dto/accounts.js';
 import { accountSourceLinkWire, connectionSummaryWire } from './dto/connections.js';
 import { paymentInstrumentWire } from './dto/instruments.js';
@@ -52,7 +53,7 @@ function narrowing(value: string | undefined): string | null {
   return value ?? null;
 }
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial')
 export class FinancialViewsController {
   constructor(

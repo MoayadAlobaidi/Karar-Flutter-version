@@ -31,6 +31,12 @@
  */
 
 import type { Clock } from '@karar/shared-kernel';
+import { SecretValue } from '@karar/platform/dist/config/index.js';
+import {
+  InProcessRateLimiter,
+  RateLimitKeyHasher,
+  RateLimitService,
+} from '@karar/platform/dist/ratelimit/index.js';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 import {
   DedupFingerprintKeyUnavailableError,
@@ -103,6 +109,8 @@ function compose(environment: string): void {
     prisma: unusablePrisma(),
     clock: frozenClock,
     producer: 'phase5-fail-closed-test',
+    rateLimits: new RateLimitService({ primary: new InProcessRateLimiter() }),
+    rateLimitKeys: new RateLimitKeyHasher(new SecretValue('test-pepper-at-least-sixteen-chars')),
     capabilityResolution: unusableCapabilityResolution(),
   });
 }
@@ -162,6 +170,8 @@ describe('composePhase5Modules', () => {
       prisma: unusablePrisma(),
       clock: frozenClock,
       producer: 'phase5-fail-closed-test',
+      rateLimits: new RateLimitService({ primary: new InProcessRateLimiter() }),
+      rateLimitKeys: new RateLimitKeyHasher(new SecretValue('test-pepper-at-least-sixteen-chars')),
       capabilityResolution: unusableCapabilityResolution(),
     });
     expect(modules.length).toBeGreaterThan(0);

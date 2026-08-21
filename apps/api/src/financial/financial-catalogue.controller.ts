@@ -25,6 +25,7 @@ import { isAssignable } from '@karar/transactions';
 import type { FinancialCategory } from '@karar/transactions';
 
 import { FinancialCapabilityGuard } from './capability.guard.js';
+import { FinancialRateLimitGuard } from './rate-limit.guard.js';
 import { categoryWire, type CategoryWire } from './dto/transactions.js';
 import { institutionWire, type InstitutionWire } from './dto/accounts.js';
 import { pageOf, readPageRequest, type Page } from './paging.js';
@@ -69,7 +70,7 @@ const INSTITUTION_KINDS = [
   'OTHER',
 ] as const;
 
-@UseGuards(FinancialCapabilityGuard)
+@UseGuards(FinancialCapabilityGuard, FinancialRateLimitGuard)
 @Controller('financial')
 export class FinancialCatalogueController {
   constructor(

@@ -27,6 +27,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { testRateLimits } from './__test-rate-limits.js';
 import { FINANCIAL_CAPABILITY_GATE, type FinancialCapabilityGate } from './capability-gate.js';
 import { FinancialCapabilityGuard } from './capability.guard.js';
 import { FinancialApiModule } from './financial.module.js';
@@ -46,6 +47,7 @@ function mountedModule() {
   return FinancialApiModule.register({
     useCases: {} as FinancialUseCases,
     clock: { now: () => new Date('2026-08-19T09:00:00.000Z') },
+    rateLimits: testRateLimits(),
     capabilityGate: unusedGate,
   });
 }
