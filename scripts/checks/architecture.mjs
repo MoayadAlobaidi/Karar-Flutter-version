@@ -3028,10 +3028,190 @@ const CHECKS = {
 // resolve through this map instead: one place that main() and the self-test
 // both read, so a supplementary check cannot be wired into the run and quietly
 // left out of the proof that it is not vacuous.
+
+// ---------------------------------------------------------------------------
+// Supplementary — capability registry truth
+// ---------------------------------------------------------------------------
+
+/**
+ * The registry must answer "does this capability's code exist?" honestly, and
+ * must not be read as answering anything else.
+ *
+ * TRANSACTIONS sat at NOT_IMPLEMENTED while seven bounded contexts, 27 mounted
+ * operations and seven Flutter feature folders answered for it. That was
+ * defended in prose as conservatism, on a redefinition of IMPLEMENTED that
+ * contradicted the type's own doc comment and its document's own dimension
+ * table. It is a false answer, and a false answer in the direction of "less"
+ * still teaches a reader to distrust the field.
+ *
+ * Two arms, because the failure has two directions:
+ *
+ *   A. UNDERSTATEMENT — phase >= 5 with the financial surface mounted, while
+ *      TRANSACTIONS still claims NOT_IMPLEMENTED.
+ *   B. OVERSTATEMENT — a capability that is IMPLEMENTED must not thereby carry
+ *      a DEPLOYED environment or a declared jurisdiction. Being built grants
+ *      nothing; deployment and declaration are separate reviewed acts.
+ */
+export function checkCapabilityRegistryTruth(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const registryRel = 'packages/capability-registry/src/index.ts';
+  const source = readText(path.join(root, registryRel));
+  if (source === null) {
+    return violationsResult(
+      [
+        {
+          file: registryRel,
+          detail: 'the capability registry is missing — nothing can be derived',
+        },
+      ],
+      0,
+    );
+  }
+
+  // Descriptors, parsed from the literal rather than imported: this runner is
+  // dependency-free and must not execute the tree it judges.
+  const descriptors = new Map();
+  for (const match of source.matchAll(/id:\s*'([A-Z_]+)'/g)) {
+    // Bracket-matched, not "up to the next `}),`". `deployment:
+    // Object.freeze({})` supplies exactly that sequence BEFORE
+    // declaredJurisdictions, so a naive slice cut the literal in half and the
+    // jurisdiction arm below could never fire — a mutation proved it silent.
+    const start = source.lastIndexOf('{', match.index);
+    if (start < 0) continue;
+    let depth = 0;
+    let end = -1;
+    for (let i = start; i < source.length; i += 1) {
+      const ch = source[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end < 0) continue;
+    const body = source.slice(start, end + 1);
+    descriptors.set(match[1], {
+      implementation: /implementation:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      lifecycle: /lifecycle:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      deployedKeys: [...body.matchAll(/(local|dev|staging|production)\s*:\s*'DEPLOYED'/g)].map(
+        (m) => m[1],
+      ),
+      declared: /declaredJurisdictions:\s*Object\.freeze\(\[\s*\]\)/.test(body)
+        ? []
+        : [...body.matchAll(/declaredJurisdictions:\s*Object\.freeze\(\[([^\]]*)\]/g)].flatMap(
+            (m) =>
+              m[1]
+                .split(',')
+                .map((piece) => piece.trim())
+                .filter(Boolean),
+          ),
+    });
+  }
+
+  // The shared helper builds every capability that has no inline literal. Parse
+  // its body too and attribute it to each id it builds, so flipping the DEFAULT
+  // to IMPLEMENTED cannot move six capabilities past arm B unnoticed.
+  const helper = /function descriptor\([^)]*\)[^{]*\{([\s\S]*?)\n\}/.exec(source);
+  if (helper !== null) {
+    const body = helper[1];
+    const helperFacts = {
+      implementation: /implementation:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      lifecycle: /lifecycle:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      deployedKeys: [...body.matchAll(/(local|dev|staging|production)\s*:\s*'DEPLOYED'/g)].map(
+        (m) => m[1],
+      ),
+      declared: /declaredJurisdictions:\s*Object\.freeze\(\[\s*\]\)/.test(body) ? [] : ['<helper>'],
+    };
+    for (const built of source.matchAll(/([A-Z_]+):\s*descriptor\('([A-Z_]+)'\)/g)) {
+      if (!descriptors.has(built[2]))
+        descriptors.set(built[2], { ...helperFacts, viaHelper: true });
+    }
+  }
+
+  // Is the financial surface actually mounted? Measured from the tree, never
+  // from a list somebody maintains.
+  const financialDir = path.join(root, 'apps', 'api', 'src', 'financial');
+  const controllers = fs.existsSync(financialDir)
+    ? fs.readdirSync(financialDir).filter((f) => f.endsWith('.controller.ts'))
+    : [];
+  let routeCount = 0;
+  for (const file of controllers) {
+    const src = readText(path.join(financialDir, file)) ?? '';
+    routeCount += [...src.matchAll(/@(Get|Post|Put|Patch|Delete)\s*\(/g)].length;
+  }
+  const moduleSource = readText(path.join(financialDir, 'financial.module.ts')) ?? '';
+  const composition =
+    readText(path.join(root, 'apps', 'api', 'src', 'composition', 'phase5-modules.ts')) ?? '';
+  const mounted =
+    controllers.length > 0 &&
+    routeCount > 0 &&
+    /controllers\s*:\s*\[/.test(moduleSource) &&
+    composition.includes('FinancialApiModule');
+
+  let currentPhase = ctx.currentPhase;
+  if (typeof currentPhase !== 'number') {
+    try {
+      currentPhase = readJson(path.join(root, REGISTRY_REL))?.currentPhase ?? null;
+    } catch {
+      currentPhase = null;
+    }
+  }
+
+  // ARM A — understatement.
+  const transactions = descriptors.get('TRANSACTIONS');
+  if (typeof currentPhase === 'number' && currentPhase >= 5 && mounted && transactions) {
+    if (transactions.implementation === 'NOT_IMPLEMENTED') {
+      violations.push({
+        file: registryRel,
+        detail:
+          `TRANSACTIONS is NOT_IMPLEMENTED while the financial surface is mounted — ` +
+          `${controllers.length} controllers carrying ${routeCount} routes, registered through ` +
+          `FinancialApiModule at the composition root. 'implementation' asks whether the code ` +
+          `exists in this repository; it does`,
+      });
+    }
+  }
+
+  // ARM B — overstatement. Being IMPLEMENTED grants nothing.
+  for (const [id, descriptor] of descriptors) {
+    if (descriptor.implementation !== 'IMPLEMENTED') continue;
+    if (descriptor.deployedKeys.length > 0) {
+      violations.push({
+        file: registryRel,
+        detail:
+          `${id} is IMPLEMENTED and claims DEPLOYED in ${descriptor.deployedKeys.join(', ')} — ` +
+          `IMPLEMENTED is a fact about this repository and grants nothing; deployment is a ` +
+          `separate reviewed act with no corroborating evidence here`,
+      });
+    }
+    if (descriptor.declared.length > 0) {
+      violations.push({
+        file: registryRel,
+        detail:
+          `${id} is IMPLEMENTED and declares jurisdictions ${descriptor.declared.join(', ')} — ` +
+          `a jurisdiction declaration is a separate reviewed act, not a consequence of the code ` +
+          `existing`,
+      });
+    }
+  }
+
+  return violationsResult(
+    violations,
+    descriptors.size,
+    `descriptors parsed: ${descriptors.size}; financial controllers: ${controllers.length}; ` +
+      `routes: ${routeCount}; phase: ${currentPhase ?? 'unknown'}`,
+  );
+}
+
 const SUPPLEMENTARY_CHECKS = {
   checkAdminNoDbDriver,
   checkIngestionNotMountedBeforePhase5,
   checkModulePermissionsInCatalogue,
+  checkCapabilityRegistryTruth,
 };
 
 // ---------------------------------------------------------------------------
@@ -4002,6 +4182,18 @@ function main() {
     `${declaredPermissionsStatus.padEnd(7)} supplementary     module-permissions-in-catalogue (declarations checked: ${declaredPermissions.scanned}; ${declaredPermissions.note})`,
   );
   for (const v of declaredPermissions.violations) {
+    console.log(`          ${v.file} — ${v.detail}`);
+  }
+
+  const registryTruth = checkCapabilityRegistryTruth({ root: REPO_ROOT });
+  const registryTruthStatus = registryTruth.violations.length === 0 ? 'PASS' : 'FAIL';
+  // Counted on both arms, for the reason given above.
+  if (registryTruthStatus === 'FAIL') failCount += 1;
+  else passCount += 1;
+  console.log(
+    `${registryTruthStatus.padEnd(7)} supplementary     capability-registry-truth (${registryTruth.note})`,
+  );
+  for (const v of registryTruth.violations) {
     console.log(`          ${v.file} — ${v.detail}`);
   }
 

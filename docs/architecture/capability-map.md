@@ -12,7 +12,7 @@ The registry's three separated state dimensions are canonical in [`capability-re
 
 | Capability | Module | Classification | Lifecycle | Implementation | Deployed | `declaredJurisdictions` | Entity licences | External providers | Phase |
 |---|---|---|---|---|---|---|---|---|---|
-| `TRANSACTIONS` | `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none in v1 | 5 |
+| `TRANSACTIONS` | `transactions` | `HIGHLY_SENSITIVE_FINANCIAL` | `ALPHA` | `IMPLEMENTED` | nowhere | `[]` | none | none in v1 | 5 |
 | `BUDGETS` | `budgets` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none | 9 |
 | `GOALS` | `goals` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none | 9 |
 | `INSIGHTS` | `insights` | `HIGHLY_SENSITIVE_FINANCIAL` | `PLANNED` | `NOT_IMPLEMENTED` | nowhere | `[]` | none | none | 6 |
@@ -33,7 +33,7 @@ Two entries that a reader may expect here and will not find in the registry:
 
 **Module boundaries and capability ids are deliberately different things.** The `TRANSACTIONS` capability sits above seven Phase 5 bounded contexts — `financial-accounts`, `transactions`, `financial-connections`, `payment-instruments`, `transfer-matching`, `statement-imports`, `provider-capabilities` — and none of them earns its own id. A user who has accounts but no transactions has nothing, and the reverse is incoherent, so a second id would add a dimension the product does not have while widening the surface that availability, entitlement and PolicyPack clearing all have to reason about. Adding one would need an ADR, a change here, a registry change, and an analysis of its bootstrap and client exposure.
 
-**`TRANSACTIONS` is `NOT_IMPLEMENTED` at the registry even though 27 operations now answer, and that is the row working rather than lagging.** `IMPLEMENTED` here means the capability's code exists as something a deployment *could* expose — and a deployment could not: no environment is provisioned, no PolicyPack clears the capability, `qa/v1` clears nothing, `declaredJurisdictions` is empty, and no client calls a single one of the generated methods. A mounted route in a local process is evidence about a code path, not about availability. The row moves when the capability is exposable, and even then `IMPLEMENTED` gates nothing on its own.
+**`TRANSACTIONS` is `IMPLEMENTED` at the registry, and available nowhere.** `implementation` records one fact — the capability's code exists in this repository — and 27 mounted operations over seven bounded contexts, read by seven Flutter feature folders, are that fact. It grants nothing: deployment is empty, `declaredJurisdictions` is empty, `qa/v1` clears nothing, and the availability tables are empty. The registry records what is built; the other three dimensions record what is exposed, and they still say nowhere.
 
 ## 2. Platform capabilities
 
