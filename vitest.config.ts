@@ -22,6 +22,8 @@
  * instead of a skip.
  */
 import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from 'vitest/config';
 
@@ -43,7 +45,24 @@ export default defineConfig({
     // Fails the WHOLE run when KARAR_INTEGRATION=1 and a dependency is
     // unreachable, so the property those three documents state is a property
     // of the run rather than of the nine files that remembered to check.
-    globalSetup: ['./scripts/checks/integration-required-setup.mts'],
+    //
+    // ABSOLUTE, resolved from this file rather than from the process.
+    // `globalSetup` entries are resolved against `test.root`, which defaults
+    // to the CWD and NOT to the directory holding the config. A relative
+    // './scripts/...' therefore worked for `pnpm test` at the repository root
+    // and failed for every invocation from a package directory — including
+    // CI's own "Readiness recovery suite" step, which runs
+    // `pnpm --filter @karar/api exec vitest` and so looks for
+    // `apps/api/scripts/checks/integration-required-setup.mts`. The run died
+    // at ERR_LOAD_URL before collecting a test, and the twelve readiness
+    // assertions it exists to run are the ones that stop and restart the
+    // containers.
+    globalSetup: [
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        'scripts/checks/integration-required-setup.mts',
+      ),
+    ],
     maxWorkers: budget.workers,
     minWorkers: 1,
   },
