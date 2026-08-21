@@ -287,7 +287,7 @@ Production log level must retain the forensic timeline the incident plan depends
 | `infrastructure/` | Integration against a real PostgreSQL in Docker |
 | Tenant isolation | **Adversarial** cross-tenant tests asserting on **non-empty expected data** |
 | Architecture | 26 tests plus a canary-purity check, CI-blocking; of the 27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred to phase 13 |
-| Database sessions | Pinned to UTC at connection startup, and verified against **PostgreSQL 17.10 with the server default left at `Asia/Qatar`** — CI's `postgres:17-alpine` runs UTC and would agree with the code's assumption rather than test it |
+| Database sessions | Pinned to UTC at connection startup, and verified against **PostgreSQL 17.11 with the server default left at `Asia/Qatar`** — CI's `postgres:17-alpine` runs UTC and would agree with the code's assumption rather than test it |
 
 The non-empty assertion is not pedantry. The legacy's tenant roster returns empty for everyone because a policy is missing, and *an empty result is indistinguishable from correct isolation* — so the isolation claim on that endpoint has never actually been tested.
 

@@ -100,7 +100,7 @@ Its consequences are the shape of migrations 0087 and 0094-0099: issuer kinds on
 **Thirteen rails are named and only two may exist.** `MANUAL` and `USER_FILE_UPLOAD` are the implemented set; every other rail is refused by `financial_connections_rail_implemented_check` at the **database**, so an unimplemented rail cannot be written even by direct SQL from `karar_app`. The vocabulary CHECK and the gate CHECK are deliberately separate, so "we can describe this rail" and "this rail works" never become one edit. **No credential of any kind is stored anywhere** — no username, password, mPIN, OTP, token, cookie, certificate or synchronisation cursor — and the absence is proved by reading `information_schema.columns` against an exhaustive expected list, because a CHECK cannot assert that a column does not exist. **No status means connected**: `impliesLiveInstitutionLink` and `impliesLiveIssuerLink` answer `false` for every value their vocabularies permit, so nothing may display "Connected" for data a person typed or uploaded.
 ## Code and package changes
 
-Seven new module directories, taking `modules/` to **29 directories of which 19 have code** (`ls -d modules/*/`). **No per-module test count is given here, and that is a deliberate refusal rather than an omission.** Three workstreams are writing into these directories concurrently and sharing one local PostgreSQL; between the activation commit and this paragraph being written, two of the seven gained test files. A count taken from a directory somebody is editing measures the edit. The last counts taken against a settled tree were at `66ad086` — financial-accounts 200, transactions 305, financial-connections 135, payment-instruments 95 — and they are recorded under _Tests executed_ against that commit, where the commit they belong to is stated next to them.
+Seven new module directories, taking `modules/` to **29 directories of which 19 have code** (`ls -d modules/*/`). Per-module test counts are given in *Tests executed*, measured on the settled post-review tree. **This paragraph previously refused to give them**, on the reasoning that three workstreams were writing into these directories concurrently and a count taken from a directory somebody is editing measures the edit. That was true while it was true; the workstreams have finished, and a frozen candidate that still describes itself as mid-edit is describing a moment that has passed.
 
 - `modules/financial-accounts` — issuer catalogue, per-country institution markets, financial accounts and wallets, balance snapshots per kind. Holder-sensitive fields (`display_name`, `user_supplied_institution_label`, `mask`) are stored only as ciphertext/nonce/auth_tag triples through an `HsfFieldEncryptionPort` whose AAD binds tenant, user, table, row and field.
 - `modules/transactions` — transactions, revisions, provenance, categories, merchant rules and category assignments; keyed versioned dedup fingerprints; write gates that resolve the target account through a port before accepting a write. The imported-record writer moved here at `0fd2dcc`, into the module that owns the tables.
@@ -190,27 +190,31 @@ None recorded yet. Phase 5 evidence rows begin at EV-469; the Phase 4 range ende
 
 Two different kinds of figure appear below, and conflating them is how a report starts lying. The **tree-derived and single-process checks were re-run at `ef1d155`** and are current. The **workspace and per-module assertion counts were measured at `66ad086`** and are left at that commit rather than restated, because three workstreams are writing to this tree and sharing one local PostgreSQL: a count taken now measures whatever is mid-edit. They are labelled with the commit they belong to.
 
-All runs at this checkpoint are against **PostgreSQL 16.14 (Homebrew)**, verified by `SELECT version()` rather than assumed — this section previously said 17.10, which is a version installed on the machine but not the one serving port 5432. The suite was run under **both** server default timezones and the results are identical: `Asia/Qatar` — the adversarial environment that exposed F3 below — and `UTC`, each 3085 passed / 12 skipped / 0 failed, with zero orphan scratch databases and the server returned to `Asia/Qatar` afterwards. CI builds on `postgres:17-alpine`, which runs UTC, so the local run covers the harder configuration and the CI one, but **not** the CI major version: nothing at this checkpoint was executed against PostgreSQL 17.
+All CANONICAL runs at this checkpoint are against **PostgreSQL 17.11**, in the repository's own `postgres:17-alpine` image — the image `docker-compose.yml` pins and CI starts. The server, not the client, was asked: `SELECT version()` returns `PostgreSQL 17.11 on aarch64-unknown-linux-musl`, `server_version_num` is `170011`.
+
+**Both server default timezones were run from zero, on separate instances and separate volumes.** Configuration A: raw `SHOW TimeZone` is `UTC` on a connection opened before any application startup. Configuration B: raw `SHOW TimeZone` is `Asia/Qatar` — and every application pooled session on that same server reports `UTC`, which is fix F3 holding on 17. Each was bootstrapped from an empty database: roles created, all 53 migrations applied, `db:verify` clean, 61 Prisma-mapped tables matching the live schema, and the full workspace suite green.
+
+**The PostgreSQL 16.14 (Homebrew) results this section previously carried are HISTORICAL and SUPPLEMENTAL.** They are not canonical Phase 5 verification: the earlier checkpoint said plainly that nothing had executed against PostgreSQL 17, which is the major CI builds on, and a run against another major is not the gate it claims to be. `pnpm db:canonical-check` now asks the server for its version and its session timezone and fails on anything but major 17 in UTC; it is wired into CI between the compose start and the test step, and it FAILS against that 16.14 server — which is the proof it is not decorative.
 
 | Suite | Result | Measured at |
 |---|---|---|
-| Architecture (`pnpm arch:test`) | **27 passed, 0 failed, 3 deferred to phase 13**; registry errors 0; self-test PASS over 70 cases; all three supplementary checks pass | checkpoint |
+| Architecture (`pnpm arch:test`) | **28 passed, 0 failed, 3 deferred to phase 13**; registry errors 0; self-test PASS over 70 cases; all three supplementary checks pass | checkpoint |
 | Documentation (`pnpm docs:check`) | **14/14**, self-test ok over 16 cases, 293 markdown files scanned | checkpoint |
 | Prisma mapping (`node scripts/db/prisma-mapping-check.mjs`) | **61 mapped tables match the live database** | checkpoint |
-| Workspace (`pnpm test`) | **3085 passed / 12 skipped / 0 failed (3097 total)** across 218 files (217 passed, 1 skipped) | checkpoint |
+| Workspace (`pnpm test`) | **3138 passed / 12 skipped / 0 failed (3150 total)** across 221 files (220 passed, 1 skipped) | checkpoint |
 | — of which `modules/financial-accounts` | 206 passed across 11 files | checkpoint |
-| — of which `modules/transactions` | 381 passed across 17 files | checkpoint |
+| — of which `modules/transactions` | 384 passed across 17 files | checkpoint |
 | — of which `modules/financial-connections` | 147 passed across 12 files | checkpoint |
 | — of which `modules/payment-instruments` | 99 passed across 10 files | checkpoint |
 | — of which `modules/transfer-matching` | 131 passed across 10 files | checkpoint |
-| — of which `modules/statement-imports` | 341 passed across 14 files | checkpoint |
-| Flutter (`flutter test`) | **2070 passed / 1 skipped**; `flutter analyze` reports no issues | checkpoint |
+| — of which `modules/statement-imports` | 349 passed across 14 files | checkpoint |
+| Flutter (`flutter test`) | **2071 passed / 1 skipped**; `flutter analyze` reports no issues | checkpoint |
 
-**The architecture summary line and the registry-derived figure used to disagree by one, and no longer do.** `pnpm arch:test` prints **27 passed, 0 failed, 3 skipped**. The asymmetry that caused the old discrepancy — `phase5-ingestion-not-mounted-early` incrementing the failure count on a violation and nothing on a pass — is gone now that all three supplementary checks count on both arms. An earlier revision of this section claimed this paragraph had been removed while it was still here, saying `25 passed` and "two supplementary checks"; that claim was wrong in both figures and in the claim of its own removal, and this is what replaced it.
+**The architecture summary line and the registry-derived figure used to disagree by one, and no longer do.** `pnpm arch:test` prints **28 passed, 0 failed, 3 skipped**. The asymmetry that caused the old discrepancy — `phase5-ingestion-not-mounted-early` incrementing the failure count on a violation and nothing on a pass — is gone now that all three supplementary checks count on both arms. An earlier revision of this section claimed this paragraph had been removed while it was still here, saying `25 passed` and "two supplementary checks"; that claim was wrong in both figures and in the claim of its own removal, and this is what replaced it.
 
 **Three qualifications, stated rather than smoothed away.**
 
-**The workspace failure, the absent `transfer-matching` count and the six timeouts are all closed, and the cause of the last of them was not the one this report gave.** Every figure in the table above was taken on a settled tree with no concurrent workstream, and the suite is green: 3085 passed, 12 skipped, **0 failed**. The six timeouts previously recorded in database-provisioning suites were attributed here to "a machine under three concurrent suites". That was wrong. `pnpm test` scoped collection twice — in `vitest.config.ts` and again as `--exclude` flags in the script — and a CLI `--exclude` REPLACES the config list rather than adding to it. Neither listed `.claude`, which holds agent worktrees: checkouts of other commits whose test files were collected and run, duplicating the database-provisioning suites against one PostgreSQL. The scope now lives in one place, and the timeouts are gone.
+**The workspace failure, the absent `transfer-matching` count and the six timeouts are all closed, and the cause of the last of them was not the one this report gave.** Every figure in the table above was taken on a settled tree with no concurrent workstream, and the suite is green: 3138 passed, 12 skipped, **0 failed**. The six timeouts previously recorded in database-provisioning suites were attributed here to "a machine under three concurrent suites". That was wrong. `pnpm test` scoped collection twice — in `vitest.config.ts` and again as `--exclude` flags in the script — and a CLI `--exclude` REPLACES the config list rather than adding to it. Neither listed `.claude`, which holds agent worktrees: checkouts of other commits whose test files were collected and run, duplicating the database-provisioning suites against one PostgreSQL. The scope now lives in one place, and the timeouts are gone.
 
 The **one `modules/transactions` test that did not pass** in a shared local database at `66ad086` was `financial-record-lifecycle.integration.test.ts`, which asserts against the live catalogue that no table other than `transactions` carries the dedup identity's column names. It failed when the database also held statement-import staging tables created by a concurrent workstream — which was the assertion working, not failing: it is designed to notice exactly that, and the module that adds such a table owns the decision about whether its columns may share those names. Those tables are now committed as `0101`, and the question is settled the way the assertion intended: `statement_import_rows` names its columns `staged_row_fingerprint` and `staged_row_fingerprint_version`, deliberately not `dedup_fingerprint`, `fingerprint_version` or `occurrence_ordinal`, so a staged row cannot be mistaken for a canonical one by a reader scanning the catalogue.
 
@@ -220,13 +224,85 @@ The **one `modules/transactions` test that did not pass** in a shared local data
 
 The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, which requires Redis and deliberately stops and restarts its compose containers; CI runs it as a separate step that owns those containers, and running it against a Homebrew PostgreSQL would not have been the same test.
 
-**The Flutter numbers were inherited from Phase 4 and were badly stale**, on the reasoning that "this change touches no Dart or platform code" — which stopped being true when the client surface landed. Re-measured on the settled tree at this checkpoint: **Flutter 2070 passed / 1 skipped**. `flutter analyze` reports no issues, and `dart run tool/generate_api_client.dart --check` reports the client in sync (62 operations, 203 schemas). The goldens, localization and mobile-security splits recorded here previously — 4, 38 and 149/1 — are **HISTORICAL, measured at an earlier tree**, and are not re-derived above because the total is what the table carries.
+**The Flutter numbers were inherited from Phase 4 and were badly stale**, on the reasoning that "this change touches no Dart or platform code" — which stopped being true when the client surface landed. Re-measured on the settled tree at this checkpoint: **Flutter 2071 passed / 1 skipped**. `flutter analyze` reports no issues, and `dart run tool/generate_api_client.dart --check` reports the client in sync (62 operations, 203 schemas). The goldens, localization and mobile-security splits recorded here previously — 4, 38 and 149/1 — are **HISTORICAL, measured at an earlier tree**, and are not re-derived above because the total is what the table carries.
 
-**The workspace suite is 3085 passed / 12 skipped / 0 failed, over ten consecutive runs with identical counts and zero orphan scratch databases, under both server timezones.** A previous revision of this section recorded **six** failures — five-second timeouts in the three suites that provision and drop whole databases — and explained them as a machine under concurrent load. That explanation was wrong, and the six were not a resource observation. `pnpm test` scoped collection in two places that could disagree, and neither excluded `.claude`, so the agent worktrees under it — checkouts of other commits — had their test files collected and run, duplicating exactly those database-provisioning suites against one PostgreSQL. With collection scoped in one place the suite is green and stays green: ten runs, identical counts each time. Nothing was re-run until green and no timeout was raised to hide a failure; the earlier six are recorded here because a report that quietly drops a number it has explained away is not evidence.
+**The workspace suite is 3138 passed / 12 skipped / 0 failed, over ten consecutive runs with identical counts and zero orphan scratch databases, under both server timezones.** A previous revision of this section recorded **six** failures — five-second timeouts in the three suites that provision and drop whole databases — and explained them as a machine under concurrent load. That explanation was wrong, and the six were not a resource observation. `pnpm test` scoped collection in two places that could disagree, and neither excluded `.claude`, so the agent worktrees under it — checkouts of other commits — had their test files collected and run, duplicating exactly those database-provisioning suites against one PostgreSQL. With collection scoped in one place the suite is green and stays green: ten runs, identical counts each time. Nothing was re-run until green and no timeout was raised to hide a failure; the earlier six are recorded here because a report that quietly drops a number it has explained away is not evidence.
 
-**Architecture and documentation figures.** `pnpm arch:test` prints **27 passed, 0 failed, 3 skipped**, self-test **70 cases**, and test 24 scans **51** — 49 surface files plus the two central policies, which it did not read at all until the offset defect recorded under *Phase activation* was fixed. There are **three** supplementary checks, not two. `pnpm docs:check` prints **14/14**, self-test ok over **16** cases, **293** markdown files scanned. `pnpm typecheck`, `pnpm build` and `pnpm lint` all exit **0**.
+**Architecture and documentation figures.** `pnpm arch:test` prints **28 passed, 0 failed, 3 skipped**, self-test **70 cases**, and test 24 scans **51** — 49 surface files plus the two central policies, and test 7 scans **591**, which it did not read at all until the offset defect recorded under *Phase activation* was fixed. There are **three** supplementary checks, not two. `pnpm docs:check` prints **14/14**, self-test ok over **16** cases, **293** markdown files scanned. `pnpm typecheck`, `pnpm build` and `pnpm lint` all exit **0**.
 
 `pnpm build` passes across the workspace. No mobile artifact was produced, no build was signed, and nothing was deployed.
+## Financial rate limiting
+
+**Every one of the 27 mounted `/financial/*` operations carries an abuse ceiling.** These are SECURITY
+budgets on request rate. None is a product quota, a subscription limit, a billing entitlement or a
+jurisdiction rule, and none may be presented to a person as one — the policies themselves say so, and
+nothing in the client reads them.
+
+Six policies, declared centrally in `packages/platform/src/ratelimit/policy.ts` beside identity's, each
+with the reasoning that produced its number:
+
+| Policy | Budget | On store failure | Why this number |
+|---|---|---|---|
+| `financial_read` | 300 / 5 min | `fail_open_fallback` | One accounts screen is up to 20 requests, a categories load 20 more, an account detail screen 4; roughly six full cold-start-plus-browse cycles |
+| `financial_write` | 60 / 5 min | `fail_closed` | Every mounted write is one form submission; one write every five seconds sustained |
+| `financial_statement_upload` | 10 / 1 h | `fail_closed` | Each admitted upload may carry 10 MiB into encrypted storage before any parse: 100 MiB/hour per principal |
+| `financial_statement_parse` | 30 / 1 h | `fail_closed` | A parse is bounded at 30 s of CPU: 15 minutes of parser time per hour |
+| `financial_commit` | 20 / 1 h | `fail_closed` | Each opens one transaction writing up to 500 rows across two bounded contexts |
+| `financial_transfer_decision` | 120 / 1 h | `fail_closed` | Two full 50-row pages plus corrections |
+
+**Everything that mutates fails CLOSED.** A write admitted during a limiter outage is unbounded mutation
+of money records. The single fail-open policy is the read, on the same reasoning `refresh` uses — and a
+test asserts the RULE rather than the six numbers, so a seventh financial policy cannot arrive failing
+open by being overlooked.
+
+**Resource limits and rate limits are different controls and both apply.** The ingestion policy bounds
+what ONE admitted request may cost; these bound how many a principal may issue. The quadratic parser was
+the proof that the gap between them is real: a request inside every declared byte bound that still
+became an availability problem.
+
+**Order is the control, and it is proved behaviourally.** `@UseGuards(FinancialCapabilityGuard,
+FinancialRateLimitGuard)` — one decorator, two arguments — gives principal, then capability, then rate
+limit, then pipes, then handler. With the capability unavailable AND the budget spent the answer is
+**403, not 429**, so a budget cannot become an availability oracle; reversing the two guards fails that
+test. A refused request reaches no use case at all: the bundle is a Proxy that throws on contact, and
+the 429 body does not carry that throw. Three 429s naming resources that do and do not exist are
+byte-identical.
+
+**The subject is server-derived and tenant-scoped.** The budget is charged to an HMAC of tenant plus
+user, from the session's resolved principal — never to a `userId`, `tenantId`, e-mail or account id a
+caller supplied. A person in two tenants gets two budgets, because one tenant's activity refusing the
+other's would itself be a signal about the other. No raw identifier reaches a Redis key, a metric
+attribute or an error body, asserted against the keys Redis actually holds.
+
+**Coverage is structural, not a maintained list.** `rate-limit-mounting.test.ts` enumerates routes from
+Nest's own metadata — 8 controllers, 27 routes — and fails on a route with no policy, an orphaned
+mapping, a missing guard or a reordered pair. There are no exemptions. An unmapped operation is REFUSED
+with a 500 rather than admitted unlimited; the structural test makes that branch unreachable, and the
+branch is what keeps the tree honest if the test is ever deleted.
+
+**Live Redis, not a fixture:** the declared limits admit exactly `limit` and refuse the next, two
+service instances sharing one Redis share ONE window, and every key expires inside its own window.
+
+## Capability state
+
+**`TRANSACTIONS` is `IMPLEMENTED` and `ALPHA`, and available NOWHERE.** The registry's `implementation`
+field answers one question — does the capability's code exist in this repository — and the answer is
+yes: seven bounded contexts behind migrations `0087`-`0101`, 27 mounted operations, seven Flutter
+feature folders calling them.
+
+It recorded `NOT_IMPLEMENTED` until this checkpoint, defended on a second reading of the word that
+contradicted both the type's own doc comment and its document's own dimension table, and that rested on
+a premise which had become false. Under-claiming is not the conservative direction: a field that answers
+"does the code exist?" with "no" while the code exists teaches a reader to distrust the field.
+
+**Nothing follows from the change, and four independent things still deny:** deployment is empty in
+every environment, so gate 1 answers `NOT_DEPLOYED`; `declaredJurisdictions` is empty, so the clearance
+intersection is empty; `qa/v1` declares `clearedCapabilities: []`; and the availability tables ship with
+no rows. `navigableCapabilityIds` in the client stays empty. The `capability-registry-truth`
+supplementary check enforces both directions — understatement while the surface is mounted, and any
+`IMPLEMENTED` capability that thereby carries a deployment or a jurisdiction — and all four mutations
+fail it.
+
 ## Known limitations
 
 **Specific to this phase:**
@@ -271,7 +347,7 @@ The test was mutation-checked: a probe constant added to an unrelated module sou
 **F3 (HIGH) — CLOSED. Prisma misreported `timestamptz` when the PostgreSQL session timezone was not UTC.** Reading the same row in one transaction, the `pg` driver returns the correct instant and Prisma returns it shifted by the server's UTC offset. Every Prisma time-window predicate is then wrong by that offset: on a UTC+3 server a fresh grant reads as not-yet-effective, and — the direction that matters — a time-bounded window reads as still open for `offset` hours after it should have closed. Explicit revocation is unaffected, because it is caught by `status` and `revoked_at` rather than by time.
 
 - **Evidence:** eleven integration tests across `authorization`, `control-plane` and `subject-policy` fail on a server set to `Asia/Qatar` and all 116 pass with the session set to UTC. **Reproduced identically on `main` at `2b0dfca`**, so it is not introduced by Phase 5. It is invisible in CI because the `postgres:17-alpine` container runs UTC.
-**How it was closed.** Every session is pinned to UTC by a connection STARTUP parameter, so a pool cannot hand out a session that missed it and no per-checkout round trip is needed. Both pools now share one session configuration; the Prisma factory previously set none of the raw adapter's defaults. Readiness pings with `SHOW TimeZone` rather than `SELECT 1`, so a session that would misreport time reads as `postgres: down`. Verified on **PostgreSQL 17.10 with the server default deliberately left at Asia/Qatar**: the eleven tests that failed under exactly those conditions pass, 116 of 116, with the earlier role-level workaround removed. Mutation-checked — removing the startup parameter fails four of the seven new tests, including the regression that compares a pg read and a Prisma read of one instant.
+**How it was closed.** Every session is pinned to UTC by a connection STARTUP parameter, so a pool cannot hand out a session that missed it and no per-checkout round trip is needed. Both pools now share one session configuration; the Prisma factory previously set none of the raw adapter's defaults. Readiness pings with `SHOW TimeZone` rather than `SELECT 1`, so a session that would misreport time reads as `postgres: down`. Verified on **PostgreSQL 17.10 with the server default deliberately left at Asia/Qatar** when it was closed: the eleven tests that failed under exactly those conditions pass, 116 of 116, with the earlier role-level workaround removed. **HISTORICAL — measured at that checkpoint.** Re-verified at this one on PostgreSQL 17.11 under both server defaults from zero; see *Tests executed*. Mutation-checked — removing the startup parameter fails four of the seven new tests, including the regression that compares a pg read and a Prisma read of one instant.
 
 **F4 (MEDIUM) — CLOSED. A concurrent dedup loser was refused with an untyped `STORE_FAILURE`.**
 
@@ -366,13 +442,13 @@ Four items deferred at the previous checkpoint have since landed: CSV statement 
 Still deferred **by this checkpoint**, deliberately and in this order:
 
 1. **A build on a device.** The picker adapter is no longer deferred — it is implemented natively on Android and iOS, over `ACTION_OPEN_DOCUMENT` with `CATEGORY_OPENABLE` and over `UIDocumentPickerViewController` with `asCopy:false`, adding no platform permission. What is still deferred is running any of it on hardware: **no build has run on a device**, so the picker, the surface and the whole import path are verified by test and by inspection only.
-2. **Real merchant-rule matching on the live commit path.** The categorization pipeline is no longer deferred — it runs on both write paths. What no test exercises is the real `MerchantRuleEvaluator` deciding a category during a live CSV commit: the default wiring uses the real evaluator over an empty rule corpus, and the test that asserts a committed row's category configures a stub that always matches. The stub says so, and the seam is proven; the decision is not.
+2. **The remaining Phase 6 calculators**, which is the next phase and not a deferral of this one. Live merchant-rule matching is CLOSED: both write paths are now proved against real `merchant_rules` rows on live PostgreSQL, with six mutations failing.
 3. **Account deletion over HTTP**, which waits on a chosen contract for a non-atomic partial outcome rather than on more code.
 4. **`SuggestTransferMatch`, `RecordReportedBalance`, `CreateManualConnection` and every payment-instrument write.** Their routes are not in the contract, so their use cases are deliberately absent from the bundle the controllers can call — a bundle carrying a use case nothing calls invites the route to appear later without the contract review that should precede it.
 5. **The retention decision**, which is legal work and blocks any deployed environment.
 6. **Phase 5 evidence rows and risk rows**, written at the phase's compliance gate rather than at a mid-phase checkpoint. The four Phase 5 assurance-claim rows (AC-032 to AC-035) were added at this checkpoint and carry no `EV-` reference for the same reason.
-7. **Rate limiting on the financial routes.** Those controllers carry only `FinancialCapabilityGuard`; the Redis sliding-window limiter exists and is composed in `phase3-modules.ts` but is not applied to them. Raised by independent review. Deferred because it is a decision about the whole surface rather than a defect in one path — and because the finding that made its absence an outage rather than a single stall, the quadratic parser, is fixed.
-8. **Widening architecture test 7 to the boundary layers.** It scans the pure packages and every module `domain` and `application`, not the DB-to-domain and wire-to-domain mappers where a float would actually enter. Both were read by hand at this checkpoint and are correct; AC-001's claim has been narrowed to the scope its evidence covers rather than left overstated.
+7. **Nothing further on rate limiting.** CLOSED: all 27 mounted financial operations carry a policy from the central registry, enforced by a guard that runs after the capability gate and before any handler, with coverage proved structurally from route metadata and the distributed window proved against live Redis. What remains is not deferred work but a standing rule: a new financial operation must arrive with a policy, and the mounting test fails if it does not.
+8. **Nothing further on money discipline.** CLOSED: test 7 now scans the pure packages, EVERY module layer and the api/worker apps (360 files became 591), and the Dart guards cover all seven financial feature roots — 41 of the 87 financial `.dart` files were previously scanned by no money rule at all — and additionally forbid EXACT client-side totals, not only floats.
 
 The eleven active deferred items from the Phase 4 gate stand, item 8 having been discharged when the artifact lanes became required checks.
 ## Documentation updated
