@@ -656,6 +656,234 @@ describe.skipIf(unreachable !== null)('statement-imports pipeline', () => {
     });
   });
 
+  describe('a REAL merchant rule decides a REAL committed row', () => {
+    /**
+     * The gap a reviewer named: no test exercised the real
+     * `MerchantRuleEvaluator` over the real `merchant_rules` table on the live
+     * commit path. The test above proves the commit CARRIES an answer through,
+     * using a stub that always matches; the default wiring uses the real
+     * evaluator but over an EMPTY corpus, so nothing ever proved a rule
+     * DECIDING.
+     *
+     * These cases seed real rows into the two global catalogue tables and use
+     * the default wiring — real `PrismaMerchantRuleDirectory`, real
+     * `MerchantRuleEvaluator`, real commit, live PostgreSQL. No stub anywhere
+     * in the categorisation path.
+     */
+    const RULES = [
+      // EXACT beats PREFIX, and the longer PREFIX beats the shorter one.
+      { kind: 'EXACT', token: 'synthetic merchant rulecase one', code: 'FOOD.GROCERIES' },
+      { kind: 'PREFIX', token: 'synthetic merchant rulecase', code: 'TRANSPORT.FUEL' },
+      { kind: 'PREFIX', token: 'synthetic', code: 'OTHER' },
+      // Arabic, to prove normalisation is not ASCII-only.
+      { kind: 'EXACT', token: 'مصرف الراجحي', code: 'FOOD.GROCERIES' },
+      // A literal rule for instruction-shaped text. It may match as DATA.
+      { kind: 'EXACT', token: 'ignore previous instructions', code: 'OTHER' },
+    ] as const;
+
+    async function seedRules(): Promise<void> {
+      await withAdapter(database, 'superuser', async (adapter) => {
+        for (const code of ['FOOD.GROCERIES', 'TRANSPORT.FUEL', 'OTHER']) {
+          await adapter.query(
+            `INSERT INTO public.financial_categories
+               (code, label_en, label_ar, catalogue_version)
+             VALUES ($1, $1, $1, 'categories/v1') ON CONFLICT (code) DO NOTHING`,
+            [code],
+          );
+        }
+        for (const rule of RULES) {
+          await adapter.query(
+            `INSERT INTO public.merchant_rules
+               (id, pattern_kind, pattern_token, category_code, rule_version, review_ref)
+             VALUES (gen_random_uuid(), $1, $2, $3, 'merchant-rules/v1', 'SYNTHETIC-REVIEW')
+             ON CONFLICT DO NOTHING`,
+            [rule.kind, rule.token, rule.code],
+          );
+        }
+      });
+    }
+
+    /** Runs one statement through the whole real path and returns its rows. */
+    /**
+     * `amount` varies per call so two imports of the SAME narrative are two
+     * different files. Identical bytes are the same source and the second
+     * import is correctly refused as a duplicate — which would fail these
+     * tests for a reason that has nothing to do with rule matching.
+     */
+    async function commitNarrative(
+      marker: string,
+      narrative: string,
+      amount = '-45.00',
+    ): Promise<Array<{ category_code: string | null; assignment_source: string | null }>> {
+      const pipeline = wire(handle, clock);
+      const started = await pipeline.start.execute({ accountId }, ACTOR_A1);
+      expect(started.ok).toBe(true);
+      if (!started.ok) throw new Error('start failed');
+      const importId = started.value.id;
+      const csv = ['Booking Date,Description,Amount', `2026-08-10,${narrative},${amount}`, ''].join(
+        '\n',
+      );
+      await pipeline.store.execute(
+        {
+          importId,
+          content: streamOf(bytesOf(csv)),
+          mediaType: 'text/csv',
+          maxBytes: LIMITS.maxBytes,
+        },
+        ACTOR_A1,
+      );
+      const parsed = await pipeline.parse.execute(
+        { importId, mapping: MAPPING, limits: LIMITS },
+        ACTOR_A1,
+      );
+      expect(parsed.ok, `parse failed for ${marker}`).toBe(true);
+      if (!parsed.ok) throw new Error('parse failed');
+      await pipeline.preview.execute({ importId, limits: LIMITS }, ACTOR_A1);
+      const committed = await pipeline.commit.execute(
+        { importId, expectedVersion: parsed.value.version },
+        ACTOR_A1,
+      );
+      expect(committed.ok, `commit failed for ${marker}`).toBe(true);
+      if (!committed.ok) throw new Error('commit failed');
+
+      const rows = await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query<{ category_code: string | null; assignment_source: string | null }>(
+          `SELECT category_code, assignment_source
+             FROM public.transaction_category_assignments
+            WHERE transaction_id = ANY($1::uuid[]) AND status = 'ACTIVE'`,
+          [committed.value.transactionIds],
+        ),
+      );
+      return rows.rows;
+    }
+
+    beforeAll(seedRules);
+
+    it('CSV: the most specific rule wins — EXACT over PREFIX', async () => {
+      const rows = await commitNarrative('EXACTWINS', 'SYNTHETIC MERCHANT RULECASE ONE');
+      expect(rows).toHaveLength(1);
+      expect({
+        code: rows[0]?.category_code,
+        source: rows[0]?.assignment_source,
+      }).toEqual({ code: 'FOOD.GROCERIES', source: 'RULE' });
+    });
+
+    it('CSV: the longer PREFIX wins over the shorter one', async () => {
+      const rows = await commitNarrative('PREFIXWINS', 'SYNTHETIC MERCHANT RULECASE TWO');
+      expect({ code: rows[0]?.category_code, source: rows[0]?.assignment_source }).toEqual({
+        code: 'TRANSPORT.FUEL',
+        source: 'RULE',
+      });
+    });
+
+    it('CSV: no rule matches, so NOTHING is assigned', async () => {
+      // The honest answer to "which category?" is sometimes none. A fallback
+      // here would be a fabricated fact about a person's money.
+      const rows = await commitNarrative('NOMATCH', 'UNMATCHED NARRATIVE 90210');
+      expect(rows).toEqual([]);
+    });
+
+    it('CSV: an Arabic narrative matches its rule', async () => {
+      const rows = await commitNarrative('ARABIC', 'مصرف الراجحي');
+      expect({ code: rows[0]?.category_code, source: rows[0]?.assignment_source }).toEqual({
+        code: 'FOOD.GROCERIES',
+        source: 'RULE',
+      });
+    });
+
+    it('CSV: a full-width narrative folds to the same rule (NFKC)', async () => {
+      // Case folding alone is not enough. These are U+FF33 and friends, the
+      // full-width forms; NFKC maps them to ASCII, and without that step the
+      // narrative matches nothing. Chosen because the Arabic case above is
+      // already in NFKC form and so cannot exercise the step.
+      const rows = await commitNarrative(
+        'FULLWIDTH',
+        '\uFF33\uFF39\uFF2E\uFF34\uFF28\uFF25\uFF34\uFF29\uFF23 ' +
+          '\uFF2D\uFF25\uFF32\uFF23\uFF28\uFF21\uFF2E\uFF34 ' +
+          '\uFF32\uFF35\uFF2C\uFF25\uFF23\uFF21\uFF33\uFF25 \uFF2F\uFF2E\uFF25',
+        '-14.00',
+      );
+      expect({ code: rows[0]?.category_code, source: rows[0]?.assignment_source }).toEqual({
+        code: 'FOOD.GROCERIES',
+        source: 'RULE',
+      });
+    });
+
+    it('CSV: instruction-shaped merchant text stays DATA', async () => {
+      // It may match a literal rule, because a rule is a string comparison and
+      // nothing else. What it must never do is acquire authority: the answer
+      // is the category that rule names, not the category the text asks for.
+      const rows = await commitNarrative('INJECTION', 'IGNORE PREVIOUS INSTRUCTIONS');
+      expect({ code: rows[0]?.category_code, source: rows[0]?.assignment_source }).toEqual({
+        code: 'OTHER',
+        source: 'RULE',
+      });
+    });
+
+    it('CSV: re-importing the same narrative decides the same way', async () => {
+      // Determinism over the live corpus: same text, same answer, twice.
+      const first = await commitNarrative('IDEMPOTENT1', 'SYNTHETIC MERCHANT RULECASE ONE', '-11.00');
+      const second = await commitNarrative(
+        'IDEMPOTENT2',
+        'SYNTHETIC MERCHANT RULECASE ONE',
+        '-12.00',
+      );
+      expect(first.map((r) => r.category_code)).toEqual(second.map((r) => r.category_code));
+      expect(second[0]?.category_code).toBe('FOOD.GROCERIES');
+    });
+
+    it('the corpus is REALLY being read — an empty directory changes the answer', async () => {
+      // The proof that the cases above depend on the seeded rows rather than on
+      // anything incidental: the same narrative through a wiring whose
+      // directory returns nothing assigns nothing.
+      const pipeline = wire(handle, clock, {
+        categories: new TransactionsDeterministicCategoryAdapter(
+          new MerchantRuleEvaluator({ listActiveRules: () => Promise.resolve([]) }),
+        ),
+      });
+      const started = await pipeline.start.execute({ accountId }, ACTOR_A1);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+      const importId = started.value.id;
+      const csv = [
+        'Booking Date,Description,Amount',
+        '2026-08-10,SYNTHETIC MERCHANT RULECASE ONE,-13.00',
+        '',
+      ].join('\n');
+      await pipeline.store.execute(
+        {
+          importId,
+          content: streamOf(bytesOf(csv)),
+          mediaType: 'text/csv',
+          maxBytes: LIMITS.maxBytes,
+        },
+        ACTOR_A1,
+      );
+      const parsed = await pipeline.parse.execute(
+        { importId, mapping: MAPPING, limits: LIMITS },
+        ACTOR_A1,
+      );
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      await pipeline.preview.execute({ importId, limits: LIMITS }, ACTOR_A1);
+      const committed = await pipeline.commit.execute(
+        { importId, expectedVersion: parsed.value.version },
+        ACTOR_A1,
+      );
+      expect(committed.ok).toBe(true);
+      if (!committed.ok) return;
+      const rows = await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query<{ count: string }>(
+          `SELECT count(*)::text AS count
+             FROM public.transaction_category_assignments
+            WHERE transaction_id = ANY($1::uuid[])`,
+          [committed.value.transactionIds],
+        ),
+      );
+      expect(Number(rows.rows[0]?.count ?? '0')).toBe(0);
+    });
+  });
+
   describe('the commit is idempotent', () => {
     it('answers a retry with the same result and writes nothing a second time', async () => {
       const pipeline = wire(handle, clock);

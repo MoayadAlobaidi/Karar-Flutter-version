@@ -23,6 +23,9 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { MerchantRuleEvaluator } from '../application/merchant-rule-evaluator.js';
+import { PrismaMerchantRuleDirectory } from '../infrastructure/persistence/prisma-category-repositories.js';
+
 import {
   dropScratchDatabase,
   bootstrapRolesAndDatabase,
@@ -122,6 +125,7 @@ class RotatedFingerprintPort implements DedupFingerprintPort {
 describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', () => {
   let prismaHandle: PrismaHandle;
   let appAdapter: PostgresPersistenceAdapter;
+  let categorising: CreateManualTransaction;
   let migratorAdapter: PostgresPersistenceAdapter;
   let superuserAdapter: PostgresPersistenceAdapter;
 
@@ -225,6 +229,18 @@ describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', 
       accounts,
     );
     remove = new DeleteOwnTransaction(context, repository, ERASES_NO_TRANSFER_MATCHES);
+    // The manual write path with the REAL evaluator over the REAL
+    // merchant_rules table. Everything else is the same wiring as `create`.
+    categorising = new CreateManualTransaction(
+      context,
+      repository,
+      fingerprints,
+      ids,
+      clock,
+      retention,
+      accounts,
+      new MerchantRuleEvaluator(new PrismaMerchantRuleDirectory(prismaHandle)),
+    );
   }, 90_000);
 
   afterAll(async () => {
@@ -477,4 +493,94 @@ describe.skipIf(unreachable !== null)('dedup and occurrence (live PostgreSQL)', 
     // Identical content, different subjects, different digests.
     expect(Number(digests.rows[0]?.n)).toBeGreaterThan(1);
   });
+
+  describe('a REAL merchant rule decides a REAL manual transaction', () => {
+    /**
+     * The CSV commit path is proved against a live corpus in
+     * modules/statement-imports. This is the OTHER write path, and it reaches
+     * the same evaluator through its own constructor argument rather than
+     * through an adapter — so a defect in one is not a defect in both, and
+     * neither proves the other.
+     *
+     * Real `merchant_rules` rows, real `PrismaMerchantRuleDirectory`, real
+     * `MerchantRuleEvaluator`, real write. No double in the categorisation
+     * path at all.
+     */
+    const MATCHING = 'synthetic manual rulecase';
+
+    beforeAll(async () => {
+      // Earlier tests in this file switch the principal; these are alice's.
+      context.actAs(alice);
+      await superuserAdapter.query(
+        `INSERT INTO public.financial_categories (code, label_en, label_ar, catalogue_version)
+         VALUES ('FOOD.GROCERIES', 'Groceries', 'بقالة', 'categories/v1')
+         ON CONFLICT (code) DO NOTHING`,
+      );
+      await superuserAdapter.query(
+        `INSERT INTO public.merchant_rules
+           (id, pattern_kind, pattern_token, category_code, rule_version, review_ref)
+         VALUES (gen_random_uuid(), 'PREFIX', $1, 'FOOD.GROCERIES', 'merchant-rules/v1',
+                 'SYNTHETIC-REVIEW')
+         ON CONFLICT DO NOTHING`,
+        [MATCHING],
+      );
+    });
+
+    async function activeAssignments(
+      transactionId: string,
+    ): Promise<Array<{ category_code: string; assignment_source: string }>> {
+      const rows = await superuserAdapter.query<{
+        category_code: string;
+        assignment_source: string;
+      }>(
+        `SELECT category_code, assignment_source
+           FROM public.transaction_category_assignments
+          WHERE transaction_id = $1::uuid AND status = 'ACTIVE'`,
+        [transactionId],
+      );
+      return rows.rows;
+    }
+
+    it('writes the category the live corpus decided, sourced RULE', async () => {
+      const created = await categorising.execute({
+        ...coffee({
+          magnitude: qar(31),
+          description: `${MATCHING} branch one`,
+        }),
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      expect(await activeAssignments(created.value.id)).toEqual([
+        { category_code: 'FOOD.GROCERIES', assignment_source: 'RULE' },
+      ]);
+    });
+
+    it('writes NOTHING when the live corpus decides nothing', async () => {
+      const created = await categorising.execute({
+        ...coffee({
+          magnitude: qar(32),
+          description: 'unmatched manual narrative',
+        }),
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      expect(await activeAssignments(created.value.id)).toEqual([]);
+    });
+
+    it('the SAME wiring without the evaluator assigns nothing — the corpus is what decided', async () => {
+      // `create` is the identical use case with the default
+      // CATEGORISES_NOTHING evaluator. Same narrative, same account, same
+      // everything else: the only difference is whether the rules are read.
+      const created = await create.execute({
+        ...coffee({
+          magnitude: qar(33),
+          description: `${MATCHING} branch two`,
+        }),
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      expect(await activeAssignments(created.value.id)).toEqual([]);
+    });
+  });
+
 });
