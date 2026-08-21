@@ -3124,6 +3124,39 @@ const CHECKS = {
  *      a DEPLOYED environment or a declared jurisdiction. Being built grants
  *      nothing; deployment and declaration are separate reviewed acts.
  */
+/**
+ * The jurisdictions a descriptor literal declares, however it is written.
+ *
+ * Returns `[]` only when the list is DEMONSTRABLY empty. An unrecognised shape
+ * — a spread, a named constant, anything this cannot read — is reported as
+ * unknown rather than as empty, because "I could not parse it" and "it declares
+ * nothing" are different answers and only one of them is safe to assume.
+ */
+/**
+ * The environments a descriptor literal marks DEPLOYED, however it is written.
+ *
+ * Keyed on proximity rather than on one spelling: `{ ['production']:
+ * 'DEPLOYED' }` and `{ production: DEPLOYED }` are the same claim as
+ * `{ production: 'DEPLOYED' }`, and a check that only reads the third is a
+ * check somebody can format their way past.
+ */
+function deployedEnvironmentsIn(body) {
+  const found = new Set();
+  for (const match of body.matchAll(/\b(local|dev|staging|production)\b/g)) {
+    if (/DEPLOYED/.test(body.slice(match.index, match.index + 48))) found.add(match[1]);
+  }
+  return [...found];
+}
+
+function declaredJurisdictionsIn(body) {
+  const match = /declaredJurisdictions\s*:\s*([^\n]*)/.exec(body);
+  if (match === null) return [];
+  const value = match[1];
+  if (/(?:Object\.freeze\(\s*)?\[\s*\]\s*\)?\s*,?\s*$/.test(value.trim())) return [];
+  const literals = [...value.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  return literals.length > 0 ? literals : ['<unparseable>'];
+}
+
 export function checkCapabilityRegistryTruth(ctx) {
   const { root } = ctx;
   const violations = [];
@@ -3169,18 +3202,8 @@ export function checkCapabilityRegistryTruth(ctx) {
     descriptors.set(match[1], {
       implementation: /implementation:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
       lifecycle: /lifecycle:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
-      deployedKeys: [...body.matchAll(/(local|dev|staging|production)\s*:\s*'DEPLOYED'/g)].map(
-        (m) => m[1],
-      ),
-      declared: /declaredJurisdictions:\s*Object\.freeze\(\[\s*\]\)/.test(body)
-        ? []
-        : [...body.matchAll(/declaredJurisdictions:\s*Object\.freeze\(\[([^\]]*)\]/g)].flatMap(
-            (m) =>
-              m[1]
-                .split(',')
-                .map((piece) => piece.trim())
-                .filter(Boolean),
-          ),
+      deployedKeys: deployedEnvironmentsIn(body),
+      declared: declaredJurisdictionsIn(body),
     });
   }
 
@@ -3193,10 +3216,8 @@ export function checkCapabilityRegistryTruth(ctx) {
     const helperFacts = {
       implementation: /implementation:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
       lifecycle: /lifecycle:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
-      deployedKeys: [...body.matchAll(/(local|dev|staging|production)\s*:\s*'DEPLOYED'/g)].map(
-        (m) => m[1],
-      ),
-      declared: /declaredJurisdictions:\s*Object\.freeze\(\[\s*\]\)/.test(body) ? [] : ['<helper>'],
+      deployedKeys: deployedEnvironmentsIn(body),
+      declared: declaredJurisdictionsIn(body),
     };
     for (const built of source.matchAll(/([A-Z_]+):\s*descriptor\('([A-Z_]+)'\)/g)) {
       if (!descriptors.has(built[2]))

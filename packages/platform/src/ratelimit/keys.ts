@@ -49,7 +49,15 @@ export class RateLimitKeyHasher {
    * Neither is ever taken from a request body, query or header.
    */
   subjectKey(tenantId: string, userId: string): RateLimitSubjectKey {
-    return this.digest(`subject:${tenantId}:${userId}`);
+    // LENGTH-PREFIXED, not separator-joined. The keyed fingerprint provider
+    // in modules/statement-imports states the rule this follows: "a `|`
+    // separator alone is a canonicalisation bug waiting for an identifier that
+    // contains one". Both inputs are UUIDs today and no collision is
+    // reachable; the point is that it stays unreachable when an identifier
+    // type changes.
+    return this.digest(
+      `subject:${String(tenantId.length)}:${tenantId}:${String(userId.length)}:${userId}`,
+    );
   }
 
   private digest(material: string): string {

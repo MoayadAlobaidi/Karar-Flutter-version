@@ -190,6 +190,16 @@ export class PrismaFinancialCategoryCatalogue implements FinancialCategoryCatalo
  * that got in some other way should stop here loudly rather than sit in the
  * corpus looking like a working rule while matching nothing.
  */
+/**
+ * The most active rules the directory will read.
+ *
+ * A ceiling rather than a page: the evaluator needs the WHOLE corpus to decide
+ * (the most specific match wins), so a partial read is a wrong answer. The
+ * number is a reviewed catalogue's order of magnitude, and a corpus that
+ * outgrows it needs an indexed lookup rather than a bigger array.
+ */
+export const MAX_ACTIVE_MERCHANT_RULES = 10_000;
+
 export class PrismaMerchantRuleDirectory implements MerchantRuleDirectory {
   constructor(private readonly handle: PrismaHandle) {}
 
@@ -197,11 +207,26 @@ export class PrismaMerchantRuleDirectory implements MerchantRuleDirectory {
     // Retired rules are excluded here rather than filtered later: a withdrawn
     // rule must not reach the decision at all. Withdrawal is `retired_at`,
     // never a deleted row, so the corpus stays reviewable.
+    // BOUNDED. The evaluator re-reads the corpus on every call by design, and
+    // the CSV commit calls it once per committed row — so an unbounded
+    // `findMany` here is O(rows x corpus) per commit, with a statement able to
+    // carry `maxRows` = 50,000. The ordering is total and deterministic, so a
+    // corpus at the bound is truncated identically on every call rather than
+    // arbitrarily; exceeding it is a refusal below, not a silent short read,
+    // because a category decided from a partial corpus is a wrong answer that
+    // looks like a right one.
     const rows = await this.handle.client.merchantRule.findMany({
       where: { retiredAt: null },
       select: { patternKind: true, patternToken: true, categoryCode: true, ruleVersion: true },
       orderBy: [{ patternToken: 'asc' }, { patternKind: 'asc' }, { ruleVersion: 'asc' }],
+      take: MAX_ACTIVE_MERCHANT_RULES + 1,
     });
+    if (rows.length > MAX_ACTIVE_MERCHANT_RULES) {
+      throw new Error(
+        `the active merchant-rule corpus exceeds ${String(MAX_ACTIVE_MERCHANT_RULES)} rules; ` +
+          'categorisation is refused rather than decided from a truncated corpus',
+      );
+    }
     return rows.map((row) =>
       createMerchantRule({
         patternKind: row.patternKind,

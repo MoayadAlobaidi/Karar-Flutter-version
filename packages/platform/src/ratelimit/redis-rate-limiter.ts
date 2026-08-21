@@ -13,6 +13,7 @@
  * neither fails open nor closed by itself.
  */
 
+import { randomBytes } from 'node:crypto';
 import { Redis } from 'ioredis';
 
 import { storageKey } from './keys.js';
@@ -88,9 +89,16 @@ export class RedisSlidingWindowRateLimiter implements RateLimiter {
 
   async enforce(check: RateLimitCheck, now: Date = new Date()): Promise<RateLimitDecision> {
     const nowMs = now.getTime();
-    // Member uniqueness within the same millisecond, per process.
+    // Member uniqueness within the same millisecond, ACROSS processes.
+    //
+    // This was `${nowMs}:${process.pid}:${counter}`. Containerised pods
+    // routinely share low PIDs, and the counter is per-instance and starts at
+    // zero — so immediately after a rolling restart two pods admitting in the
+    // same millisecond produce the SAME member, which is one ZADD score update
+    // rather than two entries, and the window undercounts. Random bytes remove
+    // the coincidence rather than making it rarer.
     this.counter = (this.counter + 1) % 0xffff;
-    const member = `${nowMs}:${process.pid}:${this.counter}`;
+    const member = `${nowMs}:${randomBytes(8).toString('hex')}:${this.counter}`;
     let raw: unknown;
     try {
       raw = await this.redis.eval(
