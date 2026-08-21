@@ -1,6 +1,8 @@
 # Phase Compliance Gate
 
-**Status:** DRAFT · **Owner:** Compliance Owner · **Approver:** Platform Owner (pending) · **Version:** 0.8 · **Date:** 2026-08-18 · **Review:** Phase 5 gate
+**Status:** DRAFT · **Owner:** Compliance Owner · **Approver:** Platform Owner (pending) · **Version:** 0.9 · **Date:** 2026-08-22 · **Review:** Phase 6 gate
+
+**v0.9 (2026-08-22, Phase 5 gate):** **Phase 5 gate record written and executed at close — outcome `PASS_WITH_DOCUMENTED_DEFERRED_ITEMS`**, with **twelve deferred items**, each carrying all five required fields. §9 access review and §10 continual improvement performed. **No control status moved and no control row was added**, which is recorded as a finding about the phase rather than as an omission. **Four risks added (KAR-RSK-042–045), none closed. Five continual-improvement entries added (CI-016–CI-020); four due entries dispositioned rather than rolled forward.** The record is frozen **before** the pull request exists and says so; EV-506 and EV-507 are `PENDING` for that reason and the outcome is provisional on them. **The client was executed on a runtime for the first time and did not reach a screen** — recorded as evidence of a failure (EV-509), not withheld. Nothing became OPERATING or EVIDENCED; policies remain DRAFT; nothing is deployed.
 
 **v0.8 (2026-08-18, final PR reconciliation):** outcome unchanged at **PASS_WITH_DOCUMENTED_DEFERRED_ITEMS**. **Deferred item 8 is DISCHARGED** — `mobile-android`, `mobile-ios` and `mobile-supply-chain` are now required status checks on `main` — so the **active deferred count is eleven**, and the twelve/eleven wording throughout this record is reconciled to say so. **PR #7 is open and not merged**, head `de564066f9d39ff01c56fd2ce402a19c71d4b03f`, and the v0.7 statement that it was not yet open is retained below as the historical fact it was when that record was frozen, labelled as such. CI and Security evidence is the final executed pair at that head. **EV-427 remains overdue and PENDING.** Nothing became OPERATING or EVIDENCED; policies remain DRAFT; Phase 5 remains NOT STARTED.
 
@@ -465,3 +467,127 @@ Appended after the merge, because none of these facts existed when the gate was 
 **Branch cleanup.** `claude/karar-v2-phase-4-flutter-foundation` was deleted locally and remotely **after** confirming its head is an ancestor of `main`. The eleven required checks remain configured, with strict up-to-date enforcement on, admins bound, and force-push and deletion disabled.
 
 **What the merge did not change.** **EV-427 remains `PENDING` and overdue.** Its Phase 4 target arrived and passed; there is still no repository-verifiable evidence of any registrar or DNS setting, all seven hardening rows in the runbook remain `TO_VERIFY`, **no DNS record exists, and no Cloudflare proxy, WAF, Pages, Workers or Access configuration is set up**. It is the Security Owner's to discharge against the registrar account itself, and it must never be recorded against a self-written document. All fourteen policies remain **DRAFT and unapproved**. Nothing is deployed, signed, certified, or reviewed by counsel or a regulator, and **Phase 5 is NOT STARTED**.
+
+## Phase 5 gate record — executed 2026-08-22
+
+**Outcome: `PASS_WITH_DOCUMENTED_DEFERRED_ITEMS`.** Recorded before the pull request exists, and every claim in it about GitHub state was re-derived from the API in the session that froze it — which is CI-015's corrective action being applied to its own gate, one gate after CI-015 was raised for exactly the opposite.
+
+**This is the CURRENT gate record.** Everything above it describes an earlier phase and is scoped to the date in its heading.
+
+**Nothing became `OPERATING` or `EVIDENCED`. Nothing is deployed. All fourteen policies remain DRAFT and unapproved.** No capability is available in any environment.
+
+### 1. Control status deltas
+
+**None.** Phase 5 moved no control status and added no control row, and that is a finding about the phase rather than an omission in the gate: Phase 5's work is governed by controls that already existed — KAR-CTL-020 (architecture tests), 016 (CI), 051–052 (database), 101/107/110 (client and artifact), 045/046 (recoverability) — and inventing a row to mark a phase would make the matrix a record of phases instead of a record of controls.
+
+The matrix tally is re-derived by counting its own rows and is **17 DESIGNED / 83 IMPLEMENTED / 15 DEFERRED / 1 EXCEPTION = 116**, unchanged from the Phase 4 close. **KAR-CTL-116 does not move**; see §10.
+
+**One caveat discharged rather than moved.** The `[P4]` contingency marker is now **RESOLVED** — the Phase 4 gate executed, PR #7 merged, CI and Security ran green on the close-out head and again on the merge commit — so the 21 `IMPLEMENTED [P4]` controls are no longer contingent on a run that had not happened. Their statuses are unchanged; the caveat attached to them is gone. It had said the opposite on this branch until this gate.
+
+### 2. Evidence generated and missing
+
+**Generated and COLLECTED:** EV-501 (PostgreSQL 17 canonical proof, run twice from zero, once per server default timezone), EV-502 (workspace and readiness suites under both), EV-503 (architecture and documentation gate output, including the not-applicable row), EV-504 (mutation and non-vacuity probes), EV-509 (client runtime execution — which records a failure).
+
+**Missing, each with a reason, an owner and a closure trigger in its own row:** EV-505 (clean-clone at the frozen head), EV-506 and EV-507 (**no Phase 5 pull request exists when this record is written, so no required check has run against any Phase 5 head**), EV-508 (independent review against the frozen candidate), EV-510 (**physical-device execution — unperformable today, not merely uncollected**).
+
+**EV-427 remains `PENDING` and overdue**, with nothing to cite. **No row in this register is `REVIEWED`**, for the structural reason in §10.
+
+### 3. Risk register review and deltas
+
+Every row re-read (register v0.7). **Four added: KAR-RSK-042–045.** **No row closed.**
+
+- **042** — the client, executed on a runtime for the first time, does not reach a screen. 16 High.
+- **043** — the statement-import picker is unreachable end to end by anyone today, because the surface is gated on a capability nothing deploys. 15 High.
+- **044** — a verification control can pass without having verified anything; two did. 12 Moderate.
+- **045** — a CI lane can stay broken for an arbitrary number of commits when no pull request is open to run it. 12 Moderate.
+
+**031, 032 and 033 — the device gap — were re-examined and HELD, and Phase 5 sharpened them.** The phase produced a native picker on both platforms whose implementations have still never run against a real document provider, and this verification added a demonstrated startup failure on the one runtime tried. A gap that was an absence of proof now has a consequence attached to it.
+
+**KAR-RSK-011 is OVERDUE and is not re-dated.** See §10.
+
+### 4. Exceptions
+
+**All three OPEN. No exit trigger fired. None opened, closed, approved or re-approved** (register v0.6). **EXC-001 is load-bearing in a second place**: Phase 5 was again authored, reviewed and verified under one human owner, with the review passes performed by independent agent contexts rather than by a second person. That is the compensating discipline the exception already describes and it is not the separation the exception is about.
+
+**No new exception was opened for the Phase 5 findings.** An exception is a decision to deviate from a control statement; the client hang, the unreachable picker, the vacuous checks and the broken lane are risks and nonconformities. None of them was decided.
+
+### 5. SOC 2 and ISO mapping deltas
+
+**Swept, and the delta is that there is no delta** — recorded explicitly in both views (SOC 2 mapping v0.7, SoA v0.6), because a framework view with no entry for a phase reads exactly like one nobody re-read. Three Annex A applicability judgements whose subject matter Phase 5 touches were re-examined and held: 8.24 (cryptography — mechanisms exist, custody does not), 8.12 (data leakage — a bounded ingestion path is not egress monitoring), 5.34 (privacy — the erasure ports exist, the HTTP verb does not).
+
+### 6. Assurance-claim reconciliation
+
+Architecture test 26 passes over 35 parsed rows: every technical claim resolves to a mechanism, an existing path and a well-formed evidence id. **The four Phase 5 rows (AC-032–AC-035) still carry no `EV-` reference**, and that is correct rather than outstanding — the Phase 5 evidence family did not exist until this gate wrote it, and the rows are updated with EV-501–EV-504 as part of this record.
+
+**AC-009 is re-affirmed and is the claim this gate most needs to hold:** Karar holds no SOC 2 report, no ISO/IEC 27001 certificate and no regulatory approval, and claims none.
+
+### 7. Residual-risk statement
+
+**Karar has built a financial data platform that nothing runs and nobody has used.** Six modules, 53 migrations, 27 mounted operations and a Flutter surface exist, are tested against live PostgreSQL 17 and Redis, and are deployed nowhere. The residual risk at this gate is not that a control failed; it is the distance between what is built and what has been *exercised*, and Phase 5 narrowed that distance on the backend while widening what is known about the client.
+
+Concretely, and in the order a reader should weigh them:
+
+1. **The client has never been seen to work.** It does not reach a screen on the one runtime tried, and the financial surface it carries has therefore never been reached by anything (042).
+2. **No capability is available anywhere**, so every positive path above the platform is exercised against synthetic fixtures and a LOCAL-only seed (043).
+3. **The retention decision does not exist**, and failing closed is correct behaviour rather than a substitute for it.
+4. **All compliance evidence sits in one vendor account under one credential with no independent custodian**, twice past its deadline, which is why no evidence row is `REVIEWED` (CI-016).
+5. **No registrar or DNS evidence exists** (EV-427), overdue since Phase 4.
+
+None of these is accepted as closed. Each has an owner, a trigger and a written treatment.
+
+### 8. Next-phase entry criteria
+
+Phase 6 begins only after this phase's pull request merges and a new branch starts from the merge commit. In addition, and stated as gate conditions rather than aspirations:
+
+- **KAR-RSK-042 has a reproduction on a second runtime and a fix, with an automated check that launches the built artifact and asserts a terminal startup state.** Phase 6 builds a financial engine whose output the client renders; starting it while the client cannot start is building on something unverified.
+- **CI-019's process half is in force**: the Phase 6 pull request is open within the first working session of the phase, so required checks run against the branch as it develops. Phase 5 ran 101 commits without one and carried a broken required lane the whole way.
+- **CI-011 discharges or opens a nonconformity of its own** — KAR-CTL-116's merge-blocking register sweep has now missed two targets.
+- **CI-016's hard deadline stands**: the evidence-store decision exists before the Phase 6 gate report is written.
+
+### 9. Access review
+
+Performed at this gate, as KAR-CTL-014 requires.
+
+**The repository.** One human account, `MoayadAlobaidi`, is the sole owner and the only account with admin. No collaborator, no team, no deploy key, no machine account, no GitHub App with write scope. Branch protection on `main` is unchanged from the Phase 4 close: **eleven required status checks** (`workspace`, `architecture`, `mobile`, `mobile-android`, `mobile-ios`, `codeql`, `secrets`, `dependency-review`, `iac-and-containers`, `sbom`, `mobile-supply-chain`), strict up-to-date enforcement on, admins bound, force-push and deletion blocked. `dependency-audit` and `licenses` remain report-only by design.
+
+**Everything else.** No cloud account, no production environment, no database outside a developer's machine, no secret manager, no signing material, no Apple Team ID, no store account. There is nothing else to review, and saying so is the review.
+
+**The finding this review makes, for the second gate running:** the access surface is one credential, and the separation-of-duties exception (EXC-001) is the only thing standing where a second reviewer would. Its exit trigger — a second engineer — has not fired.
+
+### 10. Continual improvement and nonconformity review
+
+Log v0.5. **Four entries fell due at this gate and each is dispositioned rather than rolled forward.**
+
+- **CI-013 CLOSES** on its own stated verification: every count in the Phase 5 report is re-derived at its close-out head, and counts that legitimately differ between the local gate and CI carry both figures with the reason.
+- **CI-015 CLOSES** on its own stated verification: every GitHub-state claim in this record was re-derived from the API in the session that froze it, and the claims that cannot be made yet are written as what has **not** happened. **Its root cause is not closed with it** — CI-019 records a fourth recurrence.
+- **CI-011 does NOT close.** KAR-CTL-116's merge-blocking register sweep is still not in the architecture suite. Second missed target; re-recorded with a Phase 6 due gate rather than a third silent carry.
+- **CI-010 CLOSES one gate late**, and the lateness is stated rather than smoothed: the precondition it named was satisfied at the Phase 4 gate, and what did not happen was closing the entry.
+
+**Five entries added: CI-016 through CI-020.** CI-017 and CI-018 are the same defect in two files — a verification control reporting a result it had not produced — and both are CLOSED on delivered mechanisms with self-tests and mutation proofs. **CI-016 is the least comfortable**: a treatment missed a second named deadline, and nothing in the log's schema made the second miss louder than the first. It now carries a hard deadline, a named owner, a written risk acceptance, and the schema rule that would have surfaced it.
+
+**CI-019 is escalated to the Platform Owner under step 5** as a fourth recurrence of one root cause — a state asserted rather than exercised.
+
+**CI-005 remains OPEN and further overdue**: no vendor security review has been performed, and the supplier population grew again.
+
+### Deferred items — each with reason, owner, target, residual risk and closure condition
+
+Twelve, and the first four are Phase 5's own.
+
+1. **Physical-device execution (EV-510).** *Reason:* no device was attached, and separately the picker is unreachable on any build because nothing is deployed. *Owner:* Engineering Owner. *Target:* the first deployed environment with the capability available. *Residual:* the two native picker implementations have never run against a real document provider. *Closure:* an end-to-end import by a person on a real device against a deployed environment; a harness build that forced the gate open does not count.
+2. **The client startup failure (KAR-RSK-042).** *Reason:* found at this gate; the suspended read has not been isolated, and guessing at a fix without reproducing on a second runtime would be a change with no evidence behind it. *Owner:* Engineering Owner. *Target:* Phase 6 entry. *Residual:* every client-behaviour claim rests on fakes. *Closure:* reproduction on a second runtime, a fix, and an automated artifact-launch check.
+3. **The retention decision.** *Reason:* a legal act this repository cannot perform. *Owner:* **Legal + regulator**. *Target:* before any non-local environment holds financial data. *Residual:* no financial data may leave LOCAL and TEST; the only provider is `SYNTHETIC_NO_LEGAL_EFFECT` and fails closed. *Closure:* a retention period with an approval reference, distinguishing an original statement file from derived transactions. **No period is invented here.**
+4. **Account deletion over HTTP.** *Reason:* the cross-module cascade is not atomic and the contract for a partial outcome is unchosen. *Owner:* Platform Owner. *Target:* Phase 6. *Residual:* none engaged — no subject exists in any environment. *Closure:* a reviewed contract for the partial outcome, or an atomic design.
+5. **The protected evidence store (KAR-RSK-011, CI-016).** *Reason:* twice past its deadline; nothing was built. *Owner:* Compliance Owner. *Target:* **hard — before the Phase 6 gate report is written, and before any evidence row is proposed for `REVIEWED`**. *Residual, accepted in writing by the Platform Owner:* all compliance evidence remains in one vendor account under one credential with no independent custodian, and a loss or compromise of that account would leave the project unable to demonstrate any control it claims. *Closure:* a store decision recorded with its access design and an approval.
+6. **EV-427 registrar and DNS evidence.** *Reason:* external to the repository; no DNS record exists and no Cloudflare configuration is set up. *Owner:* **Security Owner**. *Target:* overdue since the Phase 4 gate. *Residual:* the one externally-held asset has no verified hardening posture, and all seven runbook rows remain `TO_VERIFY`. *Closure:* evidence read from the registrar account itself. **It may never be recorded against a self-written document.**
+7. **Policy approval.** *Reason:* Platform Owner review has not occurred. *Owner:* Platform Owner. *Target:* before the first non-local deployment. *Residual:* all fourteen policies are DRAFT. *Closure:* a recorded approval per policy.
+8. **Vendor security reviews (CI-005).** *Reason:* not performed; the supplier population grew again. *Owner:* Security Owner. *Target:* overdue. *Residual:* no supplier has been assessed. *Closure:* a review record per in-scope supplier.
+9. **Separation of duties (EXC-001).** *Reason:* one person. *Owner:* Platform Owner. *Target:* on hiring a second engineer. *Residual:* no independent human review of any change. *Closure:* the exception's own exit trigger.
+10. **KAR-CTL-116 register sweep (CI-011).** *Reason:* not built; second missed target. *Owner:* Engineering Owner. *Target:* Phase 6 gate. *Residual:* register integrity is checked by hand. *Closure:* the sweep in the architecture suite, failing a seeded fork.
+11. **KAR-CTL-115 release-signing governance.** *Reason:* no signing material, no Apple Team ID, no store account, no published build. *Owner:* Platform Owner. *Target:* Phase 20. *Residual:* none engaged; KAR-CTL-114's refusal holds meanwhile. *Closure:* the first signed build, with custody and approval.
+12. **Phase 5 PR CI and Security evidence (EV-506, EV-507).** *Reason:* **no Phase 5 pull request exists when this record is frozen.** *Owner:* Engineering Owner. *Target:* at PR open. *Residual:* no required check has run against any Phase 5 head, which is how CI-019's defect stayed invisible for 101 commits. *Closure:* the run URLs and every required job's conclusion, recorded against the exact PR head. **This record is amended after the PR runs, and its outcome is not final until it is.**
+
+### Post-record reconciliation — pull request and workflow evidence
+
+*(Written after the record above was frozen, because these facts did not exist when it was written. Every claim here is re-derived from the GitHub API in the session that writes it, per CI-015.)*
+
+**To be completed at PR open.** Until this section carries a pull-request number, a head SHA and two run URLs with their per-job conclusions, **EV-506 and EV-507 stay `PENDING` and this gate's outcome is provisional on them.**

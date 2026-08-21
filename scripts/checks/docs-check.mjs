@@ -597,6 +597,14 @@ function checkDerivedFacts() {
 // the block SAYS SO in its own text. The marker has to be inside the block a
 // reader is looking at: a caveat four paragraphs up is not attached to the
 // sentence being read, which is how every stale claim below survived review.
+//
+// ONE COST, ACCEPTED DELIBERATELY. A correction note that QUOTES the sentence
+// it is correcting trips these rules, because a quotation and an assertion are
+// the same characters. The alternative — exempting quoted spans — is a hole
+// wide enough to drive the whole problem back through: any stale claim could
+// be dressed in quotation marks. Corrections in this corpus therefore describe
+// the old text rather than reproducing it, which costs an author one sentence
+// and keeps the rule something a reader can rely on.
 // ---------------------------------------------------------------------------
 
 /** Markers that scope a block to a moment rather than to now. */
@@ -763,16 +771,41 @@ function readControlMatrix(root) {
   return { path: 'docs/compliance/control-matrix.md', ids, tallies, text };
 }
 
-/** Phases whose gate RECORD exists, from the gate document's own headings. */
+/**
+ * What the gate document records, per phase — and the two facts kept APART.
+ *
+ * A gate record existing and a pull request existing are different facts, and
+ * a rule that treats one as evidence of the other gets the Phase 5 case
+ * exactly backwards: its gate record is written and frozen BEFORE the pull
+ * request is opened, and the record says so in as many words. Deriving
+ * "therefore a PR exists" from "a gate record exists" would reject the one
+ * sentence in the corpus that is most carefully true.
+ *
+ * So: gate records come from headings, and pull requests come from a
+ * `pull/<n>` link appearing INSIDE that phase's section.
+ */
 function readGateRecordPhases(root) {
   const full = path.join(root, 'docs', 'compliance', 'phase-compliance-gate.md');
   if (!fs.existsSync(full)) return null;
   const text = fs.readFileSync(full, 'utf8');
-  const phases = new Set();
-  for (const m of text.matchAll(/^#{2,4}\s*Phase\s+([0-9.]+)[^\n]*gate record/gim)) {
-    phases.add(m[1]);
+  const gates = new Set();
+  const pullRequests = new Set();
+  const lines = text.split('\n');
+  let section = null;
+  for (const line of lines) {
+    const heading = /^(#{2,4})\s*Phase\s+([0-9.]+)[^\n]*gate record/i.exec(line);
+    if (heading !== null) {
+      gates.add(heading[2]);
+      section = heading[2];
+      continue;
+    }
+    // A later top-level heading that is not a phase gate record ends the
+    // section, so a pull request named under Phase 4 is not attributed to
+    // whatever section follows it.
+    if (/^##\s/.test(line) && heading === null) section = null;
+    if (section !== null && /\/pull\/\d+/.test(line)) pullRequests.add(section);
   }
-  return phases;
+  return { gates, pullRequests };
 }
 
 /** The README's declared phase and status — the same row `readme-current-phase` validates. */
@@ -974,7 +1007,10 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
         for (const block of blocks) {
           for (const line of block.text.split('\n')) {
             if (/Annex A|ISO\/IEC|ISO 27|Trust Services/i.test(line)) continue;
-            for (const m of line.matchAll(/\b(\d{2,3})\s+controls\b/g)) {
+            // Not preceded by a hyphen: `KAR-RSK-044 controls that pass
+            // without verifying` is a register id followed by an ordinary
+            // noun, not a count of anything.
+            for (const m of line.matchAll(/(?<![-\w])(\d{2,3})\s+controls\b/g)) {
               if (Number(m[1]) !== actual) {
                 report(
                   rel,
@@ -990,28 +1026,31 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
     }
   }
 
-  // --- Rule 4: a phase whose gate record exists did execute its gate.
-  if (gatePhases !== null && gatePhases.size > 0) {
-    for (const phase of gatePhases) {
+  // --- Rule 4: a phase whose gate record exists did execute its gate, and a
+  //     phase whose pull request the gate document names does have one. TWO
+  //     facts, derived separately — see `readGateRecordPhases`.
+  if (gatePhases !== null && gatePhases.gates.size > 0) {
+    for (const phase of gatePhases.gates) {
+      const escaped = phase.replace('.', '\\.');
       const executed = [
         new RegExp(
-          `\\bno Phase ${phase.replace('.', '\\.')}\\b[^.\\n]{0,60}?\\bgate\\b[^.\\n]{0,40}?\\b(?:has|had)\\s+(?:been\\s+)?executed`,
+          `\\bno Phase ${escaped}\\b[^.\\n]{0,60}?\\bgate\\b[^.\\n]{0,40}?\\b(?:has|had)\\s+(?:been\\s+)?executed`,
           'i',
         ),
         new RegExp(
-          `\\bNo Phase [0-9.]+ or Phase ${phase.replace('.', '\\.')}[^.\\n]{0,40}?GATE has been executed`,
+          `\\bNo Phase [0-9.]+ or Phase ${escaped}[^.\\n]{0,40}?GATE has been executed`,
           'i',
         ),
         new RegExp(
-          `\\bNo Phase ${phase.replace('.', '\\.')}[^.\\n]{0,40}?(?:or Phase [0-9.]+ )?(?:compliance )?GATE has been executed`,
+          `\\bNo Phase ${escaped}[^.\\n]{0,40}?(?:or Phase [0-9.]+ )?(?:compliance )?GATE has been executed`,
           'i',
         ),
-        new RegExp(`\\bPhase ${phase.replace('.', '\\.')} is NOT STARTED\\b`),
-        new RegExp(
-          `\\bno Phase ${phase.replace('.', '\\.')} (?:gate has executed|pull request exists)`,
-          'i',
-        ),
+        new RegExp(`\\bPhase ${escaped} is NOT STARTED\\b`),
+        new RegExp(`\\bno Phase ${escaped} gate has executed`, 'i'),
       ];
+      if (gatePhases.pullRequests.has(phase)) {
+        executed.push(new RegExp(`\\bno Phase ${escaped} pull request exists`, 'i'));
+      }
       for (const { rel, blocks } of blocksByFile) {
         for (const block of blocks) {
           for (const pattern of executed) {
@@ -1019,7 +1058,7 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
               report(
                 rel,
                 block,
-                `denies a Phase ${phase} gate or pull request, but ` +
+                `denies a Phase ${phase} gate, but ` +
                   `docs/compliance/phase-compliance-gate.md carries a Phase ${phase} gate record. ` +
                   'Mark the block HISTORICAL if it records an earlier moment, or correct it',
               );
@@ -1037,6 +1076,7 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
           // three false ones attached to phases whose notes say nothing of the
           // kind.
           if (
+            gatePhases.pullRequests.has(phase) &&
             new RegExp(`^\\*{0,2}\\[P${phase.replace('.', '\\.')}\\]`).test(
               block.text.trimStart(),
             ) &&
@@ -1726,11 +1766,17 @@ function buildComplianceFixture(options = {}) {
       '',
       '## Phase 4 gate record — executed 2026-08-18',
       '',
-      'The gate executed and its outcome is recorded here.',
+      'The gate executed. [PR #7](https://github.com/o/r/pull/7) merged into main.',
       '',
       '### Post-merge record — executed 2026-08-18',
       '',
       'Phase 5 is NOT STARTED, and no Phase 4 gate has been executed at the time of writing.',
+      '',
+      // A gate record with NO pull-request link: the Phase 5 shape, where the
+      // record is frozen before the PR is opened and says so.
+      '## Phase 5 gate record — executed 2026-08-22',
+      '',
+      'Outcome recorded before the pull request exists.',
       '',
     ].join('\n'),
   );
@@ -1753,11 +1799,23 @@ function buildComplianceFixture(options = {}) {
       '',
       'BUDGETS is IMPLEMENTED.',
       '',
+      // The PR fact, denied for the phase whose gate document names one. The
+      // marker must OPEN the block, which is what keeps a contingency note
+      // that merely MENTIONS other markers from being attributed to them.
+      '**[P4] contingency note:** this marker is unresolved — no pull request exists.',
+      '',
     ].join('\n'),
   );
   write(
     'docs/compliance/seed-count.md',
-    ['# Count', '', 'The core control set holds 93 controls with honest statuses.', ''].join('\n'),
+    [
+      '# Count',
+      '',
+      'The core control set holds 93 controls with honest statuses.',
+      '',
+      'KAR-RSK-044 controls that pass without verifying — a risk id, not a tally.',
+      '',
+    ].join('\n'),
   );
 
   // Legitimate shapes — none may be reported.
@@ -1779,6 +1837,12 @@ function buildComplianceFixture(options = {}) {
       'BUDGETS is NOT_IMPLEMENTED.',
       '',
       'Phase 5 is IN PROGRESS.',
+      '',
+      // A gate record exists for Phase 5 and no pull request does. Denying the
+      // pull request is therefore TRUE, and must not be reported — deriving it
+      // from the gate record would reject the one sentence in the corpus that
+      // is most carefully accurate.
+      'The gate is written first: no Phase 5 pull request exists.',
       '',
       'The baseline is ISO/IEC 27002:2022 with its 93 controls.',
       '',
@@ -1838,6 +1902,10 @@ const COMPLIANCE_SELF_TEST_CASES = [
     expect: /seed-section\.md:9 says TRANSACTIONS is NOT_IMPLEMENTED/,
     why: 'a dated record for the CURRENT phase is current state, not history',
   },
+  {
+    expect: /seed-stale\.md:15 carries the \[P4\] marker and says no pull request exists/,
+    why: 'the gate document names a Phase 4 pull request, so denying it is stale',
+  },
 ];
 
 const COMPLIANCE_NEGATIVE_CASES = [
@@ -1849,6 +1917,14 @@ const COMPLIANCE_NEGATIVE_CASES = [
   {
     forbid: /control-matrix\.md/,
     why: 'the fixture matrix tally matches its own rows, so the derived rule must stay silent',
+  },
+  {
+    forbid: /seed-count\.md:5/,
+    why: 'a register id followed by the word "controls" is an identifier and a noun, not a count',
+  },
+  {
+    forbid: /seed-clean\.md:1[0-9] denies a Phase 5 gate/,
+    why: 'a Phase 5 gate record exists and a Phase 5 pull request does not — the two facts are derived separately, and the sentence is true',
   },
 ];
 
