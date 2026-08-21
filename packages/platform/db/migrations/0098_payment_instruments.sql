@@ -273,9 +273,11 @@ COMMENT ON COLUMN public.payment_instruments.account_id IS
 
 COMMENT ON COLUMN public.payment_instruments.instrument_mask_ciphertext IS
   'The last few characters of the instrument, as the person would recognise '
-  'it — ciphertext only, bounded at EIGHT bytes. AES-256-GCM preserves '
-  'length, so eight bytes is eight characters: four masking characters and '
-  'four digits at most, and NO PAN, IBAN OR MSISDN FITS. That bound is one '
+  'it — ciphertext only, bounded at EIGHT bytes. AES-256-GCM preserves byte '
+  'length, so this bound and the domain rule are one number, measured in '
+  'BYTES because a masking glyph need not be one byte: at most four masking '
+  'characters and four digits at most, and NO PAN, IBAN OR MSISDN FITS. '
+  'That bound is one '
   'half of the guarantee; the other half is a DOMAIN rule applied before '
   'encryption, which refuses any run of eight or more consecutive digits and '
   'any 12-to-19-digit card-number shape, so a real card number never reaches '

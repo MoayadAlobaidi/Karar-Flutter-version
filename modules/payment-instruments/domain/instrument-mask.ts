@@ -61,12 +61,27 @@
  */
 
 /**
- * Longest plaintext a mask may be: four masking characters plus four digits.
- * Migration 0098's eight-byte ciphertext bound is this number — encryption
- * does not change length, so the column's byte bound and this character bound
- * are one statement said twice, and a test asserts they agree.
+ * Longest plaintext a mask may be, IN BYTES — the same eight as migration
+ * 0098's `payment_instruments_mask_bound_check`.
+ *
+ * Bytes, not characters. AES-256-GCM preserves byte length, and the column
+ * bounds `octet_length`, so a character bound is only the same statement while
+ * every accepted character is one byte. `MASK_SHAPE` permits `•` (U+2022,
+ * three bytes), and `••••1234` is eight characters and SIXTEEN bytes: the
+ * domain accepted it and the write then died on the CHECK as an unhandled
+ * constraint violation instead of a typed refusal. Measured before the fix:
+ * `•••12` 11 bytes, `##••1234` 12, `••••1234` 16 — all shape-legal, all over
+ * the column bound. The two bounds are now one statement said twice for real,
+ * and a test asserts they agree on multi-byte input rather than on ASCII,
+ * where they cannot disagree.
  */
-export const MAX_INSTRUMENT_MASK_LENGTH = 8;
+export const MAX_INSTRUMENT_MASK_BYTES = 8;
+
+/**
+ * Kept as the old name for callers that read it. It is the same number, and
+ * it is a BYTE count.
+ */
+export const MAX_INSTRUMENT_MASK_LENGTH = MAX_INSTRUMENT_MASK_BYTES;
 
 /**
  * A mask is at most four digits, optionally preceded by masking characters.
@@ -126,9 +141,20 @@ export function checkInstrumentMaskShape(value: string): InstrumentMaskRefusal |
   // formatting mistake.
   if (CARD_NUMBER_SHAPE.test(trimmed)) return 'looks_like_a_card_number';
   if (LONG_DIGIT_RUN.test(trimmed)) return 'looks_like_an_account_or_phone_number';
-  if (trimmed.length > MAX_INSTRUMENT_MASK_LENGTH) return 'too_long';
+  // Measured in bytes, as the column measures it.
+  if (utf8Bytes(trimmed) > MAX_INSTRUMENT_MASK_BYTES) return 'too_long';
   if (!MASK_SHAPE.test(trimmed)) return 'not_a_mask';
   return null;
+}
+
+/** UTF-8 byte length, which is what the column's `octet_length` bound counts. */
+function utf8Bytes(value: string): number {
+  let total = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    total += codePoint < 0x80 ? 1 : codePoint < 0x800 ? 2 : codePoint < 0x10000 ? 3 : 4;
+  }
+  return total;
 }
 
 /** True when a value may be stored as an instrument mask. */

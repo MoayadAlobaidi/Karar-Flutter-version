@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  MAX_INSTRUMENT_MASK_BYTES,
   MAX_INSTRUMENT_MASK_LENGTH,
   checkInstrumentMaskShape,
   instrumentMaskRefusalMessage,
@@ -87,17 +88,46 @@ describe('an instrument mask is a mask, and nothing else', () => {
     expect(checkInstrumentMaskShape('****xxxx1234')).toBe('too_long');
   });
 
-  it('the character bound and the migration byte bound are one number', () => {
-    // Migration 0098 bounds instrument_mask_ciphertext at 8 bytes. AES-256-GCM
-    // preserves length, so the two are the same statement said twice, and the
-    // longest accepted mask must be exactly that long.
-    expect(MAX_INSTRUMENT_MASK_LENGTH).toBe(8);
-    const longestAccepted = '****1234';
-    expect(longestAccepted.length).toBe(MAX_INSTRUMENT_MASK_LENGTH);
-    expect(checkInstrumentMaskShape(longestAccepted)).toBeNull();
-    // One character more is refused, so the column bound can never be the
-    // thing that fires first.
-    expect(checkInstrumentMaskShape(`*${longestAccepted}`)).not.toBeNull();
+  it('the domain bound and the migration byte bound are one number, on multi-byte input', () => {
+    // Migration 0098 bounds instrument_mask_ciphertext at 8 OCTETS, and
+    // AES-256-GCM preserves byte length. This test used to pin the pair with
+    // '****1234' — pure ASCII, where characters and bytes cannot disagree — so
+    // it could never have caught the case where they do.
+    //
+    // MASK_SHAPE permits '\u2022', which is three bytes. Before the fix the
+    // domain accepted these and the column refused them, so an ordinary mask
+    // arrived as an unhandled constraint violation:
+    //
+    //     \u2022\u2022\u202212      5 chars, 11 bytes
+    //     ##\u2022\u20221234     8 chars, 12 bytes
+    //     \u2022\u2022\u2022\u20221234   8 chars, 16 bytes
+    expect(MAX_INSTRUMENT_MASK_BYTES).toBe(8);
+    expect(MAX_INSTRUMENT_MASK_LENGTH).toBe(MAX_INSTRUMENT_MASK_BYTES);
+
+    const bytesOf = (value: string): number => Buffer.byteLength(value, 'utf8');
+
+    // Every mask the domain accepts fits the column, whatever it is made of.
+    for (const candidate of ['1234', '00', '**00', 'xx11', 'XXXX1234', '####99', '\u2022\u202212', '****1234']) {
+      expect({ candidate, refusal: checkInstrumentMaskShape(candidate) }).toEqual({
+        candidate,
+        refusal: null,
+      });
+      expect({ candidate, bytes: bytesOf(candidate) }).toEqual({
+        candidate,
+        bytes: bytesOf(candidate),
+      });
+      expect(bytesOf(candidate)).toBeLessThanOrEqual(MAX_INSTRUMENT_MASK_BYTES);
+    }
+
+    // And every shape-legal mask that does NOT fit is refused by the domain,
+    // so the column bound is never the thing that fires first.
+    for (const candidate of ['\u2022\u2022\u202212', '##\u2022\u20221234', '\u2022\u2022\u2022\u20221234']) {
+      expect(bytesOf(candidate)).toBeGreaterThan(MAX_INSTRUMENT_MASK_BYTES);
+      expect({ candidate, refusal: checkInstrumentMaskShape(candidate) }).toEqual({
+        candidate,
+        refusal: 'too_long',
+      });
+    }
   });
 
   it('normalisation trims and does nothing else', () => {
