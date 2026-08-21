@@ -301,6 +301,146 @@ function checkLinks(files) {
 // then requires that no other tracked document contradicts it. It deliberately
 // checks only the CURRENT phase: earlier phases are settled history and later
 // ones are not claimed yet.
+/**
+ * Documents that contradict a fact the tree can be asked about.
+ *
+ * `docs:check` was green while `docs/phases/phase-05.md` said a statement could
+ * not be chosen on a device — twenty lines from its own deliverables table
+ * saying the picker was built — and while the architecture registry said
+ * modules held no code, beside 484 module source files. A green documentation
+ * gate that cannot see either of those is not a documentation gate.
+ *
+ * Only facts a machine can DERIVE are pinned here, and each rule names the
+ * artifact it derives from. This is deliberately not a prose parser: it asks a
+ * small number of yes/no questions of the source and refuses a document that
+ * answers them differently.
+ */
+function checkDerivedFacts() {
+  const problems = [];
+  const read = (rel) => {
+    const full = path.join(REPO_ROOT, rel);
+    return fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : null;
+  };
+  const countFiles = (dir, filter) => {
+    const root = path.join(REPO_ROOT, dir);
+    if (!fs.existsSync(root)) return 0;
+    let n = 0;
+    const walk = (d) => {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) {
+          if (['dist', 'node_modules', '__tests__'].includes(entry.name)) continue;
+          walk(full);
+        } else if (filter(full)) n += 1;
+      }
+    };
+    walk(root);
+    return n;
+  };
+
+  // A. The pure-package list in the docs must match the executable checker.
+  const runner = read('scripts/checks/architecture.mjs');
+  if (runner === null) {
+    problems.push('scripts/checks/architecture.mjs missing — the pure-package fact cannot be derived');
+  } else {
+    const block = /const PURE_PACKAGES = \[([\s\S]*?)\];/.exec(runner);
+    if (block === null) {
+      problems.push('architecture.mjs has no parseable PURE_PACKAGES — this rule is now blind');
+    } else {
+      const actual = [...block[1].matchAll(/'([\w-]+)'/g)].map((m) => m[1]);
+      const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+      const expected = WORDS[actual.length] ?? String(actual.length);
+      for (const rel of ['docs/testing/architecture-test-registry.json', 'docs/testing/architecture-tests.md']) {
+        const text = read(rel);
+        if (text === null) continue;
+        for (const word of WORDS) {
+          if (word === expected) continue;
+          const stale = new RegExp(`the ${word} pure packages`, 'i');
+          if (stale.test(text)) {
+            problems.push(
+              `${rel} says "the ${word} pure packages"; the checker declares ${actual.length} (${actual.join(', ')})`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // B. The registry must not claim modules are empty while they hold code.
+  const moduleSources = countFiles('modules', (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+  const registryText = read('docs/testing/architecture-test-registry.json');
+  if (registryText !== null && moduleSources > 0) {
+    for (const claim of ['no module code', 'modules have no code', 'no TypeScript in modules']) {
+      if (registryText.toLowerCase().includes(claim)) {
+        problems.push(
+          `architecture-test-registry.json says "${claim}" while modules/ holds ${moduleSources} production files`,
+        );
+      }
+    }
+  }
+
+  // C. The phase report must not deny a picker that is registered.
+  const androidPicker = read('apps/mobile/android/app/src/main/kotlin/com/kararfinance/app/StatementDocumentPicker.kt');
+  const iosPicker = read('apps/mobile/ios/Runner/StatementDocumentPicker.swift');
+  // Every document a reader consults for current state, not just the phase
+  // report: the contradiction recurred across four of them last time.
+  const CURRENT_STATE_DOCS = [
+    'docs/phases/phase-05.md',
+    'README.md',
+    'apps/mobile/README.md',
+    'docs/roadmap.md',
+    'docs/onboarding/developer.md',
+    'docs/onboarding/flutter.md',
+    'docs/architecture/flutter.md',
+    'docs/architecture/backend.md',
+  ];
+  const phase = read('docs/phases/phase-05.md');
+  if (androidPicker !== null && iosPicker !== null) {
+    for (const rel of CURRENT_STATE_DOCS) {
+      const text = read(rel);
+      if (text === null) continue;
+      for (const claim of [
+        'no file picker adapter',
+        'cannot be chosen on a device',
+        'no picker adapter ships',
+        'picker port with no adapter',
+      ]) {
+        if (text.toLowerCase().includes(claim)) {
+          problems.push(`${rel} says "${claim}" while both native picker implementations exist`);
+        }
+      }
+    }
+  }
+
+  // D. The phase report must not deny work whose invocation is in the source.
+  const manual = read('modules/transactions/application/use-cases/create-manual-transaction.ts') ?? '';
+  const csv = read('modules/statement-imports/application/use-cases/commit-statement-import.ts') ?? '';
+  if (phase !== null) {
+    if (manual.includes('merchantRules.evaluate') && csv.includes('this.categories.match')) {
+      for (const rel of CURRENT_STATE_DOCS) {
+        const text = read(rel);
+        if (text === null) continue;
+        for (const claim of ['nothing applies merchant rules', 'categorization is assignment, not a pipeline']) {
+          if (text.toLowerCase().includes(claim)) {
+            problems.push(`${rel} says "${claim}" while both write paths invoke the evaluator`);
+          }
+        }
+      }
+    }
+    if (manual.includes('suggestTransfersFor') && csv.includes('suggestTransfersFor')) {
+      for (const claim of ['suggestion is not', 'nothing calls it']) {
+        if (phase.toLowerCase().includes(claim)) {
+          problems.push(
+            `docs/phases/phase-05.md says "${claim}" while both write paths trigger suggestion generation`,
+          );
+        }
+      }
+    }
+  }
+
+  return problems;
+}
+
 function checkPhaseStatusConsistency(files) {
   const problems = [];
   const readmePath = path.join(REPO_ROOT, 'README.md');
@@ -897,6 +1037,7 @@ function main() {
     { name: 'readme-current-phase', problems: checkReadmePhase(registry) },
     { name: 'phase-report-exists', problems: checkPhaseReport(registry) },
     { name: 'phase-status-consistency', problems: checkPhaseStatusConsistency(files) },
+    { name: 'derived-facts', problems: checkDerivedFacts() },
     { name: 'adr-references', problems: checkAdrReferences(files) },
     { name: 'module-docs', problems: checkModuleDocs() },
     { name: 'mermaid-sanity', problems: checkMermaid(files) },

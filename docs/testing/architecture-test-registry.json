@@ -13,7 +13,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkDomainPurity",
-      "notes": "Real target today: the four pure packages have source. modules/*/domain/ is scanned too and passes vacuously (no .ts yet); non-vacuousness is proven by the built-in self-test on every run."
+      "notes": "Real target: the FIVE pure packages, and `modules/*/domain/` — which held no TypeScript when this note was written and now holds 88 production files, so the module arm stopped being vacuous when Phase 3 landed and is emphatically not vacuous at Phase 5. The built-in self-test proves the check still bites on every run regardless."
     },
     {
       "id": 2,
@@ -21,7 +21,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkLayerDirection",
-      "notes": "Modules have no code yet; the scan runs against the real glob and passes vacuously today. The self-test seeds a domain->infrastructure import and asserts the check fails on it."
+      "notes": "Modules held no code when this was written; they now hold 484 production files across domain, application, infrastructure and presentation, so the scan runs against a real tree rather than an empty glob. The self-test seeds a domain->infrastructure import and asserts the check fails on it."
     },
     {
       "id": 3,
@@ -29,7 +29,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkModuleBoundary",
-      "notes": "Cross-module imports must target public-api.ts only. Vacuous today (no module code); self-test seeds a bypass and asserts failure."
+      "notes": "Cross-module imports must target public-api.ts only. NOT vacuous: 19 modules publish a public-api.ts and the financial modules import each other through it. The self-test seeds a bypass and asserts failure."
     },
     {
       "id": 4,
@@ -53,7 +53,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkControllerComplexity",
-      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) \u2014 domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
+      "notes": "Activated in Phase 2. Declared complexity budget for *controller* files in apps/*/src and modules/*/presentation: max 8 route-decorator handlers, max 250 lines, and no import of any module's domain/ (directly or via @karar/<module>/domain) — domain access goes through a use case. Self-test seeds a fat controller importing domain and asserts failure on both rules."
     },
     {
       "id": 7,
@@ -69,7 +69,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkEventCatalogue",
-      "notes": "The catalogue file exists with zero events, so the structural check can and does run: the catalogue must parse, every entry must be well-formed, every DomainEvent implementation in code must be catalogued, and publish call sites with an empty catalogue fail. Today it verifies the catalogue parses and no event definitions exist outside it. Consumer-side allowedConsumers enforcement deepens when the bus exists (Phase 2). Coordination note (Phase 2, workstreams D/F): the checker validates the minimal required shape and ignores unknown fields, so D's richer catalogue entries (envelope/version/retention additions) extend entries without changes here; payload-rule constraints (test 15) stay as specified."
+      "notes": "The catalogue carries 2 events, so the structural check runs against real entries: the catalogue must parse, every entry must be well-formed, every DomainEvent implementation in code must be catalogued, and a publish call site for an uncatalogued event fails. Consumer-side allowedConsumers enforcement deepens when the bus exists (Phase 2 onward)."
     },
     {
       "id": 9,
@@ -77,7 +77,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkTenantScoping",
-      "notes": "Activated in Phase 3 with the first tenant-scoped repositories. Principal-scoped tables are derived from the canonical migrations (ENABLE+FORCE and not on rls-allow-list.json) and mapped to Prisma delegates via the schema's @@map; every modules/*/infrastructure/persistence file querying such a delegate must have principal context in reach \u2014 withPrincipalContext/withTenant, a transaction-local set_config('app.*', \u2026, true) bind, or an import of a same-module persistence binder that has one (the IdentityPrismaScope pattern). The same check enforces SET LOCAL discipline everywhere: set_config('app.*', \u2026, false) and session-level SET app.* fail. Self-test seeds an unscoped principal-delegate query and a session-scoped bind (and asserts the transaction-local binder shape is NOT flagged). Runtime enforcement is layered: withPrincipalContext fails closed on missing keys, and the adversarial suites (modules/*/__tests__, tests/security) prove the RLS boundary on live PostgreSQL."
+      "notes": "Activated in Phase 3 with the first tenant-scoped repositories. Principal-scoped tables are derived from the canonical migrations (ENABLE+FORCE and not on rls-allow-list.json) and mapped to Prisma delegates via the schema's @@map; every modules/*/infrastructure/persistence file querying such a delegate must have principal context in reach — withPrincipalContext/withTenant, a transaction-local set_config('app.*', …, true) bind, or an import of a same-module persistence binder that has one (the IdentityPrismaScope pattern). The same check enforces SET LOCAL discipline everywhere: set_config('app.*', …, false) and session-level SET app.* fail. Self-test seeds an unscoped principal-delegate query and a session-scoped bind (and asserts the transaction-local binder shape is NOT flagged). Runtime enforcement is layered: withPrincipalContext fails closed on missing keys, and the adversarial suites (modules/*/__tests__, tests/security) prove the RLS boundary on live PostgreSQL."
     },
     {
       "id": 10,
@@ -93,7 +93,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkDeterministicDomain",
-      "notes": "Real target today: financial-engine and the other pure packages. Forbids system clock reads and random sources in modules/*/domain/ and the four pure packages."
+      "notes": "Real target: financial-engine and the other pure packages, plus `modules/*/domain/`. Forbids system clock reads and random sources in `modules/*/domain/` and the five pure packages."
     },
     {
       "id": 12,
@@ -101,7 +101,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkJurisdictionBranching",
-      "notes": "Lexical check: conditionals and switches on jurisdiction/country identifiers in modules/*/{domain,application,presentation}. Vacuous today; self-test proves it fails on a seeded countryCode comparison. Localization/reference-data exemptions live outside these layers by construction."
+      "notes": "Lexical check: conditionals and switches on jurisdiction/country identifiers in `modules/*/{domain,application,presentation}`. Those layers now hold real code, so the scan has a genuine subject and finds no branching rather than finding nothing to look at; the self-test proves it fails on a seeded countryCode comparison. Localization and reference-data exemptions live outside these layers by construction."
     },
     {
       "id": 13,
@@ -140,7 +140,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkPurePackages",
-      "notes": "Two tiers, both checked in the manifest AND in the source, because node:fs/node:http are builtins a package.json can never reveal. Tier one, the four pure packages: no runtime dependency except @karar/shared-kernel where documented, and shared-kernel itself none (their import shape is test 1s subject). Tier two, purity-constrained: packages/capability-registry may declare @karar/jurisdiction-policy (JurisdictionId) and nothing else, and every import in its source must be ./relative or one of those two \u2014 zero framework, ORM, HTTP, filesystem, or cloud dependency, so any layer can import the registry without dragging infrastructure behind it. devDependencies are allowed. Self-test seeds a framework dependency in the manifest and a node:fs import in the source."
+      "notes": "Two tiers, both checked in the manifest AND in the source, because node:fs/node:http are builtins a package.json can never reveal. Tier one, the five pure packages: no runtime dependency except @karar/shared-kernel where documented, and shared-kernel itself none (their import shape is test 1s subject). Tier two, purity-constrained: packages/capability-registry may declare @karar/jurisdiction-policy (JurisdictionId) and nothing else, and every import in its source must be ./relative or one of those two — zero framework, ORM, HTTP, filesystem, or cloud dependency, so any layer can import the registry without dragging infrastructure behind it. devDependencies are allowed. Self-test seeds a framework dependency in the manifest and a node:fs import in the source."
     },
     {
       "id": 18,
@@ -156,7 +156,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkApprovalPolicy",
-      "notes": "Activated in Phase 3.5 with PolicyPacks and the capability registry. A static repository-level check with three arms, because each alone can hold while the rule is dead: (1) every PolicyPack literal in non-test source is read directly \u2014 a pack that CLEARS a capability the capability registry declares disclosureBearing must carry a DECIDED approvalPolicies entry for it, and packs declared outside packages/jurisdiction-policy are inspected too; (2) the MISSING_APPROVAL_POLICY rule must still exist in packages/jurisdiction-policy/src/validation.ts; (3) every non-test caller of validatePack/validatePackSet must pass disclosureBearingCapabilityIds, since the rule only fires for the ids a caller supplies and an omitted option disarms it silently. Disclosure-bearing ids are read statically from packages/capability-registry/src, so a disclosureBearing value that is neither a boolean literal nor an expression naming its ids fails rather than being skipped. The real qa/v1 pack clears nothing, so the repository run is vacuous by design; the self-test seeds synthetic packs (one clearing a disclosure-bearing capability with no entry, one with a PENDING_LEGAL_REVIEW entry, one correct \u2014 the negative case), an unarmed call site, and an armed one."
+      "notes": "Activated in Phase 3.5 with PolicyPacks and the capability registry. A static repository-level check with three arms, because each alone can hold while the rule is dead: (1) every PolicyPack literal in non-test source is read directly — a pack that CLEARS a capability the capability registry declares disclosureBearing must carry a DECIDED approvalPolicies entry for it, and packs declared outside packages/jurisdiction-policy are inspected too; (2) the MISSING_APPROVAL_POLICY rule must still exist in packages/jurisdiction-policy/src/validation.ts; (3) every non-test caller of validatePack/validatePackSet must pass disclosureBearingCapabilityIds, since the rule only fires for the ids a caller supplies and an omitted option disarms it silently. Disclosure-bearing ids are read statically from packages/capability-registry/src, so a disclosureBearing value that is neither a boolean literal nor an expression naming its ids fails rather than being skipped. The real qa/v1 pack clears nothing, so the repository run is vacuous by design; the self-test seeds synthetic packs (one clearing a disclosure-bearing capability with no entry, one with a PENDING_LEGAL_REVIEW entry, one correct — the negative case), an unarmed call site, and an armed one."
     },
     {
       "id": 20,
@@ -172,7 +172,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkPinning",
-      "notes": "Activated in Phase 3 with the first legal-consequence tables; completed in Phase 3.5. All four canonical dimensions (data-model.md section 5) are enforced against the REAL canonical migrations, parsed across the WHOLE history \u2014 CREATE TABLE plus later ALTER TABLE additions, so a column or CHECK added by a later migration counts. NOTHING is deferred any more: Phase 3 deferred the policy-pack-version and subject-selection dimensions behind a gate that fired the moment Phase 3.5 arrived, migration 0086 resolved it, and the deferral machinery was removed rather than left as a branch nothing can exercise. Three pin shapes, all verified in the schema and never against prose in the checker: a classic pin (column exists and is NOT NULL); a state-paired pin (a nullable value column bought with a NOT NULL state column, plus the three CHECKs that make the pair honest \u2014 a closed vocabulary, a tie between the PINNED state and a non-null value, and a creation-cutoff clause so the historical state is not a permanent exemption); and an explicit non-applicability (a NOT NULL state column CHECK-bound to exactly one value, so no row can claim otherwise). Declared tables: consent_grants, data_protection_role_assignments, subject_policy_selections. A declared table may not leave one of its own pinning-signature columns unmapped, and an undeclared table carrying the signature (any *_at_creation column, operating_entity_id, policy_pack_version, subject_policy_selection_version) fails. Self-test seeds every failure shape plus two compliant shapes as negative cases."
+      "notes": "Activated in Phase 3 with the first legal-consequence tables; completed in Phase 3.5. All four canonical dimensions (data-model.md section 5) are enforced against the REAL canonical migrations, parsed across the WHOLE history — CREATE TABLE plus later ALTER TABLE additions, so a column or CHECK added by a later migration counts. NOTHING is deferred any more: Phase 3 deferred the policy-pack-version and subject-selection dimensions behind a gate that fired the moment Phase 3.5 arrived, migration 0086 resolved it, and the deferral machinery was removed rather than left as a branch nothing can exercise. Three pin shapes, all verified in the schema and never against prose in the checker: a classic pin (column exists and is NOT NULL); a state-paired pin (a nullable value column bought with a NOT NULL state column, plus the three CHECKs that make the pair honest — a closed vocabulary, a tie between the PINNED state and a non-null value, and a creation-cutoff clause so the historical state is not a permanent exemption); and an explicit non-applicability (a NOT NULL state column CHECK-bound to exactly one value, so no row can claim otherwise). Declared tables: consent_grants, data_protection_role_assignments, subject_policy_selections. A declared table may not leave one of its own pinning-signature columns unmapped, and an undeclared table carrying the signature (any *_at_creation column, operating_entity_id, policy_pack_version, subject_policy_selection_version) fails. Self-test seeds every failure shape plus two compliant shapes as negative cases."
     },
     {
       "id": 22,
@@ -180,7 +180,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkRlsCoverage",
-      "notes": "Activated in Phase 3 with the first tenant-scoped tables. Parses every canonical migration (packages/platform/db/migrations/*.sql \u2014 the schema of record): each created table is either ENABLE + FORCE ROW LEVEL SECURITY with at least one policy, or carried on packages/platform/db/rls-allow-list.json. All three failure shapes detect: no RLS, enabled-without-policy, and FORCEd-without-enabled (the legacy audit tables own anomaly, RLS-01/RLS-02/P14). A stale allow-list entry naming a table no migration creates also fails. Allow-list entries carry more than filled fields: the reason must state why no tenant or subject predicate fits the table (a category such as platform configuration is not a reason) and the compensating grants must describe actual controls rather than a label, both with minimum lengths \u2014 an exemption from the tenant boundary is argued, not declared. Live-database verification of the same facts is db:verify plus the adversarial suites (modules/*/__tests__, tests/security), which probe the policies as karar_app and the owner on real rows. Self-test seeds all three shapes, a stale entry, an empty reason, a reason with no scope clause, and compensating grants that are a label."
+      "notes": "Activated in Phase 3 with the first tenant-scoped tables. Parses every canonical migration (packages/platform/db/migrations/*.sql — the schema of record): each created table is either ENABLE + FORCE ROW LEVEL SECURITY with at least one policy, or carried on packages/platform/db/rls-allow-list.json. All three failure shapes detect: no RLS, enabled-without-policy, and FORCEd-without-enabled (the legacy audit tables own anomaly, RLS-01/RLS-02/P14). A stale allow-list entry naming a table no migration creates also fails. Allow-list entries carry more than filled fields: the reason must state why no tenant or subject predicate fits the table (a category such as platform configuration is not a reason) and the compensating grants must describe actual controls rather than a label, both with minimum lengths — an exemption from the tenant boundary is argued, not declared. Live-database verification of the same facts is db:verify plus the adversarial suites (modules/*/__tests__, tests/security), which probe the policies as karar_app and the owner on real rows. Self-test seeds all three shapes, a stale entry, an empty reason, a reason with no scope clause, and compensating grants that are a label."
     },
     {
       "id": 23,
@@ -196,7 +196,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkResourceLimits",
-      "notes": "Every real mounted ingestion path declares every bound in the CENTRAL policy (packages/platform/src/ingestion/limits.ts), and every central policy belongs to a real path. Fails in both directions, and fails when the tree contains no real path at all \u2014 a resource-limit test that scans nothing passes vacuously, and the phase marker moves only WITH a first real mounted ingestion path. Activated with the CSV upload and parse routes."
+      "notes": "Every real mounted ingestion path declares every bound in the CENTRAL policy (packages/platform/src/ingestion/limits.ts), and every central policy belongs to a real path. Fails in both directions, and fails when the tree contains no real path at all — a resource-limit test that scans nothing passes vacuously, and the phase marker moves only WITH a first real mounted ingestion path. Activated with the CSV upload and parse routes."
     },
     {
       "id": 25,
@@ -204,7 +204,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkLifecycleDeclarations",
-      "notes": "Deepened in Phase 2 with the first real schema (audit.audit_events): a module with implementation code must declare the full six-field table (subject relationship, purpose, classification, retention, export treatment, erasure strategy), and six-field tables are validated field by field \u2014 canonical subject/classification/erasure values, export treatment included|excluded (reason)|n/a with 'excluded' requiring a stated reason, and placeholders (TBD/TODO/empty) forbidden. Skeleton modules without code keep the erasure-only obligation. Also parses packages/platform/db/DATA_LIFECYCLE.md (platform-owned tables: schema_migrations now; workstream D appends outbox/jobs rows) with the same six-field rules. Self-test seeds a non-canonical strategy, a code-bearing module without the six-field table, and a placeholder row."
+      "notes": "Deepened in Phase 2 with the first real schema (audit.audit_events): a module with implementation code must declare the full six-field table (subject relationship, purpose, classification, retention, export treatment, erasure strategy), and six-field tables are validated field by field — canonical subject/classification/erasure values, export treatment included|excluded (reason)|n/a with 'excluded' requiring a stated reason, and placeholders (TBD/TODO/empty) forbidden. Skeleton modules without code keep the erasure-only obligation. Also parses packages/platform/db/DATA_LIFECYCLE.md (platform-owned tables: schema_migrations now; workstream D appends outbox/jobs rows) with the same six-field rules. Self-test seeds a non-canonical strategy, a code-bearing module without the six-field table, and a placeholder row."
     },
     {
       "id": 26,
@@ -212,7 +212,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkAssuranceClaims",
-      "notes": "Referential integrity of docs/security/assurance-claims.md: every AC-### row has non-empty evidence and owner; statuses limited to VERIFIED/PENDING/UNVERIFIED; every test N evidence reference exists in this registry; every backticked repository path in an evidence cell resolves on disk; every evidence id is well formed (EV-###, defined once in docs/compliance/evidence-register.md); and this registry contains all 26 canonical tests. Whether the evidence SUPPORTS the claim stays a human review, per section 1 of the registry \u2014 this asserts only that the pointer points somewhere real. Self-test seeds an empty evidence cell, a ghost test reference, a path that does not exist, and a malformed evidence id."
+      "notes": "Referential integrity of docs/security/assurance-claims.md: every AC-### row has non-empty evidence and owner; statuses limited to VERIFIED/PENDING/UNVERIFIED; every test N evidence reference exists in this registry; every backticked repository path in an evidence cell resolves on disk; every evidence id is well formed (EV-###, defined once in docs/compliance/evidence-register.md); and this registry contains all 26 canonical tests. Whether the evidence SUPPORTS the claim stays a human review, per section 1 of the registry — this asserts only that the pointer points somewhere real. Self-test seeds an empty evidence cell, a ghost test reference, a path that does not exist, and a malformed evidence id."
     },
     {
       "id": "canary-purity",
