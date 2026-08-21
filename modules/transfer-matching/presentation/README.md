@@ -6,4 +6,4 @@ Thin by design: validate, resolve context, call one use case, map the result. **
 
 ---
 
-_No transport exists for this module yet. The HTTP surface and its composition belong to the API application; nothing here assumes one. When one arrives, the rule it must carry is the module's own: a `SUGGESTED` match is a QUESTION and must be rendered as one — never as a fact, never folded into a figure, and never applied to what the person is shown they earned and spent until they have answered it._
+_This directory is empty. The HTTP surface and its composition belong to the API application, where three operations under `/financial/transfer-matches` are mounted in `apps/api/src/financial/transfer-matches.controller.ts`. The rule it carries is the module's own: a `SUGGESTED` match is a QUESTION and must be rendered as one — never as a fact, never folded into a figure, and never applied to what the person is shown they earned and spent until they have answered it._

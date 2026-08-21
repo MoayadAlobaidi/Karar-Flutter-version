@@ -27,14 +27,14 @@ Rules:
 
 ## 2. The registry
 
-At Phase 0.5 no code exists, so **every technical entry is `PENDING`** — the honest status for a claim whose enforcing mechanism is designed but unbuilt. Documentation-level claims are `VERIFIED` at the docs level only.
+At Phase 0.5 no code existed, so **every technical entry was `PENDING`** — the honest status for a claim whose enforcing mechanism is designed but unbuilt. Entries whose mechanism has since been built and is exercised by a named suite are `UNVERIFIED` instead: more than `PENDING` says, less than `VERIFIED` requires, because no human assurance review has been recorded against them. Documentation-level claims are `VERIFIED` at the docs level only.
 
 | id | claim | type | scope | evidence | owner | status |
 |---|---|---|---|---|---|---|
-| AC-001 | No floating point anywhere in the money path | TECHNICAL | platform | test 7 | Platform | PENDING |
+| AC-001 | No floating point in the money path across the pure packages and every module `domain` and `application` layer, which is the scope test 7 scans | TECHNICAL | platform | test 7 | Platform | UNVERIFIED |
 | AC-002 | `SEALED` never appears in projections, events, logs, analytics, or AI context | TECHNICAL | sealed-vault | test 13 | Platform | PENDING |
 | AC-003 | Sealed reads require a `SealAccessGrant` at the type level | TECHNICAL | sealed-vault | test 14 | Platform | PENDING |
-| AC-004 | Every table is RLS-enabled and FORCEd or explicitly allow-listed | TECHNICAL | platform | test 22 | Platform | PENDING |
+| AC-004 | Every table is RLS-enabled and FORCEd or explicitly allow-listed | TECHNICAL | platform | test 22 | Platform | UNVERIFIED |
 | AC-005 | A capability with no availability row is `DISABLED` | TECHNICAL | capability-registry | resolver test | Platform | PENDING |
 | AC-006 | Consent gates fail closed — no published disclosure ⇒ unavailable | TECHNICAL | consent | resolver gate-8 test | Platform | PENDING |
 | AC-007 | Existence non-disclosure — identical responses and timings whether records exist or not | TECHNICAL | amanat | Amanat test suite | Platform | PENDING |
@@ -63,6 +63,10 @@ At Phase 0.5 no code exists, so **every technical entry is `PENDING`** — the h
 | AC-029 | Real serialized server responses conform to the OpenAPI document across the mobile-consumed surface, with **zero media-type deviations and zero prose-only operations**, and the generated client cannot drift from the contract unnoticed | TECHNICAL | platform | `tests/conformance/__tests__/runtime-conformance.integration.test.ts`; `apps/mobile/test/security/generated_client_sync_test.dart`; EV-433, EV-435 | Platform | UNVERIFIED |
 | AC-030 | No synthetic legal-document fixture exists in any production dependency closure or build output, and the absence is proven by a scanner carrying a **positive control** | TECHNICAL | consent | `modules/consent/__tests__/production-closure.test.ts`; EV-445, EV-446 | Platform | UNVERIFIED |
 | AC-031 | No fabricated monetary value is rendered by the client in any state, including while loading, and a capability the server omits leaves **no trace** in the presentation layer — no destination, no count, and no collection of unrecognised ids | TECHNICAL | mobile-client | `apps/mobile/test/features/platform_bootstrap/no_fabricated_values_test.dart`; `apps/mobile/test/security/hidden_capability_test.dart`; EV-447 | Client | UNVERIFIED |
+| AC-032 | Holder-sensitive financial fields are encrypted at rest with AAD binding tenant, user, table, row and field, so a ciphertext moved to another row or column fails to open rather than decoding as another subject's data; no ciphertext, nonce, auth tag, algorithm or key version reaches the wire | TECHNICAL | platform | `modules/financial-accounts/__tests__/financial-accounts-hsf-encryption.test.ts`; `tests/conformance/__tests__/financial-runtime-conformance.integration.test.ts` | Security | UNVERIFIED |
+| AC-033 | Every subject-owned Phase 5 financial table is RLS `ENABLE` + `FORCE` with principal GUCs, and one subject's query cannot read or write another's rows | TECHNICAL | platform | test 22; `modules/financial-accounts/__tests__/financial-accounts-isolation.integration.test.ts`; `modules/transactions/__tests__/transactions.integration.test.ts`; `modules/statement-imports/__tests__/isolation.integration.test.ts`; `tests/security/__tests__/cross-tenant-isolation.integration.test.ts` | Security | UNVERIFIED |
+| AC-034 | Every transaction carries append-only revisions and provenance, so how a record came to hold its current values is recoverable and cannot be rewritten in place | TECHNICAL | transactions | `modules/transactions/__tests__/provenance.test.ts`; `modules/transactions/__tests__/revision-history.test.ts`; `modules/statement-imports/__tests__/connection-provenance.test.ts` | Platform | UNVERIFIED |
+| AC-035 | Every real mounted ingestion path declares every bound in the central policy, no path hardcodes one, and consuming a character is O(1) so a bounded input cannot buy unbounded work before a bound can refuse it | TECHNICAL | platform | test 24; `packages/platform/src/ingestion/limits.ts`; `modules/statement-imports/__tests__/parser-limits.test.ts` | Platform | UNVERIFIED |
 
 AC-016 to AC-021 are the Phase 3.5 claims. Each is `UNVERIFIED` rather than
 `PENDING`: the enforcing mechanism exists and is exercised by the suites named,
@@ -70,6 +74,8 @@ which is more than `PENDING` says, and no human assurance review has been
 recorded against it, which is less than `VERIFIED` requires. The `EV-4xx`
 references are placeholders the compliance workstream defines in the evidence
 register, one for one with the Phase 3.5 threat-model rows.
+
+AC-032 to AC-035 are the Phase 5 claims, and they are `UNVERIFIED` for the same reason. They were missing entirely until this checkpoint: the four security controls the phase report names had no row here, and test 26 checks only the referential integrity of rows that exist, so nothing noticed their absence. The `EV-` references the earlier ranges carry are not invented for these four — Phase 5 evidence rows are written at the phase's compliance gate, which this foundation has not reached.
 
 **AC-022 to AC-031 are the Phase 4 claims, and the scope word in each one is doing work.** Every entry is `UNVERIFIED` on the same reading as the Phase 3.5 block — the mechanism exists and the named suites exercise it, and no human assurance review has been recorded against any of it. Three qualifications belong here rather than in a reader's inference:
 

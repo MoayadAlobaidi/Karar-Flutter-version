@@ -125,7 +125,7 @@
       "status": "ACTIVE",
       "owner": "Engineering Owner",
       "implementedIn": "scripts/checks/architecture.mjs#checkEventCatalogue",
-      "notes": "Shares the catalogue checker with test 8. The payload-rule constraints (SEALED events identifier-only; HIGHLY_SENSITIVE_FINANCIAL payload requires a declared payloadExemption with owner, reason, reviewer) are enforced against every catalogue entry; with zero entries the constraint set runs against an empty list and the catalogue's shape is still verified."
+      "notes": "Shares the catalogue checker with test 8. The payload-rule constraints (SEALED events identifier-only; HIGHLY_SENSITIVE_FINANCIAL payload requires a declared payloadExemption with owner, reason, reviewer) are enforced against every catalogue entry; The catalogue holds two entries (`platform.diagnostic.ping`, `statement_import.committed`), so the payload rules run against real declarations rather than an empty list."
     },
     {
       "id": 16,

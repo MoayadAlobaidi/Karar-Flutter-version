@@ -6,4 +6,4 @@ Thin by design: validate, resolve context, call one use case, map the result. **
 
 ---
 
-_No transport exists for this module yet. The HTTP surface and its composition belong to the API application; nothing here assumes one._
+_This directory is empty; the module's two read operations are mounted in `apps/api/src/financial/financial-views.controller.ts`. The HTTP surface and its composition belong to the API application; nothing here assumes one._

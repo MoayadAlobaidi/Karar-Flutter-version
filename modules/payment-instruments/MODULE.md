@@ -14,7 +14,7 @@ A physical card, a virtual card, a prepaid card, a tokenized card or a QR paymen
 
 - **Business owner:** _unassigned — solo team, Phase 0_
 - **Technical owner:** _unassigned — solo team, Phase 0_
-- **Status:** ACTIVE — Phase 5 implemented the instrument core: the table (RLS ENABLEd and FORCEd on tenant and user), the closed type and status vocabularies, the encrypted mask with its domain shape rule, the many-instruments-to-one-account relationship, and the identity trigger that freezes which account an instrument spends from. The inward erasure port is **declared by `@karar/financial-accounts` and wired**, so deleting an account now takes its instruments with it — see 'The inward port financial-accounts declares'. **No transport layer exists yet**
+- **Status:** ACTIVE — Phase 5 implemented the instrument core: the table (RLS ENABLEd and FORCEd on tenant and user), the closed type and status vocabularies, the encrypted mask with its domain shape rule, the many-instruments-to-one-account relationship, and the identity trigger that freezes which account an instrument spends from. The inward erasure port is **declared by `@karar/financial-accounts` and wired**, so deleting an account now takes its instruments with it — see 'The inward port financial-accounts declares'. **No controller lives in this module**; `GET /financial/accounts/{accountId}/payment-instruments` is mounted in `apps/api/src/financial/financial-views.controller.ts`
 - **Phase:** 5
 - **Capability:** TRANSACTIONS — this module is an internal bounded context beneath that product capability, not a capability of its own. The reasoning `modules/financial-accounts` records applies unchanged: an instrument is not independently purchasable, entitleable or deployable, and a second capability id would add a dimension the product does not have
 - **Highest classification:** HIGHLY_SENSITIVE_FINANCIAL
@@ -151,7 +151,7 @@ Cross-module references carry a raw UUID plus a reference type declared **in thi
 
 ## Notes and known limitations
 
-**No transport.** There is no HTTP surface here. When one arrives, the rule it must carry is this module's own: a screen may list a person's instruments beside an account, and it may never render a figure against one — the balance belongs to the account, and two cards on one wallet share it.
+**No transport in this module.** The one mounted operation, `GET /financial/accounts/{accountId}/payment-instruments`, lives in `apps/api/src/financial/financial-views.controller.ts` with every other controller. The rule it carries is this module's own: a screen may list a person's instruments beside an account, and it may never render a figure against one — the balance belongs to the account, and two cards on one wallet share it.
 
 **No duplicate detection, deliberately.** Two virtual cards on one wallet may legitimately share a type and even a four-digit tail, and there is no value here that could tell a genuine second card from a re-entry — the mask is a fragment, not an identity. Guessing would merge two real cards into one row; a uniqueness constraint would refuse a real second card. So neither happens, and the person's own list is what tells them whether they already recorded it.
 

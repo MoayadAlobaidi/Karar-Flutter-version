@@ -10,4 +10,4 @@ May import this module's `application/`. **Never another module's `domain/`.**
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_This directory holds 10 production files. The rules above are enforced by the architecture tests, not by its emptiness._

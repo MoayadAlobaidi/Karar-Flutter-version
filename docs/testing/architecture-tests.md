@@ -6,7 +6,7 @@
 
 ## Current status, and why three tests are asleep
 
-`pnpm arch:test` over the tree at `ef1d155`: of the **27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred by activation phase**; registry errors 0; the self-test passes over 65 cases; and both supplementary checks (`admin-no-db-driver`, `phase5-ingestion-not-mounted-early`) pass. The registry's `currentPhase` is **5**.
+`pnpm arch:test`: of the **27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred by activation phase**; registry errors 0; the self-test passes over 70 cases; and all three supplementary checks (`admin-no-db-driver`, `phase5-ingestion-not-mounted-early`, `module-permissions-in-catalogue`) pass. `phase5-ingestion-not-mounted-early` scans zero files now that the marker has moved and cannot fail again; it is retained as the other half of a lock test 24 has taken over, and it is counted as a pass, which is why the headline reads 27. The registry's `currentPhase` is **5**.
 
 **The runner's own summary line prints `25 passed`, and the discrepancy is arithmetic rather than substance.** It adds `admin-no-db-driver` to the pass count and does not add `phase5-ingestion-not-mounted-early`, which increments the failure count on a violation and increments nothing on a pass. The registry-derived figure above is the one to quote; the asymmetry is recorded here rather than resolved by choosing whichever number reads better.
 

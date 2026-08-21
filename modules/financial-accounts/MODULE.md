@@ -18,7 +18,7 @@ Financial accounts and wallets, the source-reported balance snapshots attached t
 
 - **Business owner:** _unassigned — solo team, Phase 0_
 - **Technical owner:** _unassigned — solo team, Phase 0_
-- **Status:** ACTIVE — Phase 5 implemented the account core: `public.financial_accounts` and `public.financial_account_balance_snapshots` (both RLS ENABLEd and FORCEd on tenant and user), the reviewed `public.institutions` catalogue, and manual create, read, update and delete as first-class use cases. **No ingestion endpoint and no transport layer exist yet**, and no account can be created by any provider connection
+- **Status:** ACTIVE — Phase 5 implemented the account core: `public.financial_accounts` and `public.financial_account_balance_snapshots` (both RLS ENABLEd and FORCEd on tenant and user), the reviewed `public.institutions` catalogue, and manual create, read, update and delete as first-class use cases. **No controller lives in this module**; six operations over four `/financial/accounts` paths are mounted in `apps/api/src/financial/financial-accounts.controller.ts`, including `POST /financial/accounts`. No account can be created by any provider connection
 - **Phase:** 5
 - **Capability:** TRANSACTIONS — this module is an internal bounded context beneath that product capability, not a capability of its own
 

@@ -6,4 +6,4 @@ Thin by design: validate, resolve context, call one use case, map the result. **
 
 ---
 
-_No transport exists for this module yet, deliberately. Mounting an ingestion route is a separate, later commit: architecture test 24 (resource limits) activates at phase 5, and the `phase5-ingestion-not-mounted-early` control fails the build on a controller that appears while the registry still reads an earlier phase. The route, its limit-policy registration and the phase move belong in one commit._
+_This directory is empty, and the module's transport is not missing: controllers live in the API application, and seven operations over six `/financial/statement-imports` paths are mounted in `apps/api/src/financial`. Mounting them was one commit with architecture test 24's activation, its limit-policy registration and the phase move, because `phase5-ingestion-not-mounted-early` fails the build on a controller that appears while the registry still reads an earlier phase._

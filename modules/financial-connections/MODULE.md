@@ -14,7 +14,7 @@
 
 - **Business owner:** _unassigned — solo team, Phase 0_
 - **Technical owner:** _unassigned — solo team, Phase 0_
-- **Status:** ACTIVE — Phase 5 implemented the connection and source-link core: both tables (RLS ENABLEd and FORCEd on tenant and user), the rail vocabulary with its database-enforced implemented subset, the keyed per-subject source-account fingerprint, and the exact/probable linking decision. **No ingestion endpoint and no transport layer exist yet**, and no connection can be created on a rail nobody built
+- **Status:** ACTIVE — Phase 5 implemented the connection and source-link core: both tables (RLS ENABLEd and FORCEd on tenant and user), the rail vocabulary with its database-enforced implemented subset, the keyed per-subject source-account fingerprint, and the exact/probable linking decision. **No controller lives in this module**; `GET /financial/connections` and `GET /financial/accounts/{accountId}/source-links` are mounted in `apps/api/src/financial/financial-views.controller.ts`, and `PrismaSourceObservationWriter` runs inside the CSV commit's unit of work. No connection can be created on a rail nobody built
 - **Phase:** 5
 - **Capability:** TRANSACTIONS — this module is an internal bounded context beneath that product capability, not a capability of its own. The reasoning `modules/financial-accounts` records applies unchanged: a connection is not independently purchasable, entitleable or deployable, and a second capability id would add a dimension the product does not have
 - **Highest classification:** HIGHLY_SENSITIVE_FINANCIAL
@@ -222,7 +222,7 @@ Cross-module references carry a raw UUID plus a reference type declared **in thi
 
 ## Notes and known limitations
 
-**No transport, no ingestion.** There is no HTTP surface, no CSV parser and no import pipeline here. This module is the model those will write into.
+**No transport and no parser in this module.** The two read operations are mounted in `apps/api/src/financial/financial-views.controller.ts`, and the CSV parser and import pipeline live in `modules/statement-imports`, whose commit writes source observations through this module's writer. This module is the model those write into, which is why neither lives here.
 
 **Retention fixture constants are borrowed.** `LocalSyntheticRetentionDecisionProvider` resolves `ACCOUNT_SYNTHETIC_*` from `@karar/financial-retention-local-fixtures`, because there is one unresolved financial-retention decision and it governs these datasets too. Dedicated `CONNECTION_SYNTHETIC_*` constants would be tidier and belong to that package's owner; they are **not** created here, because the entire point of that package is that this module cannot hold such values.
 

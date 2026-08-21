@@ -400,6 +400,8 @@ function checkDerivedFacts() {
     'docs/onboarding/flutter.md',
     'docs/architecture/flutter.md',
     'docs/architecture/backend.md',
+    'docs/architecture/overview.md',
+    'docs/phases/README.md',
   ];
   const phase = read('docs/phases/phase-05.md');
   if (androidPicker !== null && iosPicker !== null) {
@@ -439,6 +441,108 @@ function checkDerivedFacts() {
         if (phase.toLowerCase().includes(claim)) {
           problems.push(
             `docs/phases/phase-05.md says "${claim}" while both write paths trigger suggestion generation`,
+          );
+        }
+      }
+    }
+  }
+
+  // E. A module whose use cases the API app wires, and which holds production
+  // code, may not have documentation saying it has neither.
+  //
+  // This is the shape the staleness actually took: six MODULE.md files and
+  // three layer READMEs said "no transport layer exists yet" long after the
+  // routes were mounted and driven by the conformance suite. Rules C and D
+  // could not see it -- they match fixed phrases in a fixed file list, and
+  // these were different words in different files.
+  //
+  // Both halves are derived per MODULE, never globally: the skeleton modules
+  // say "no application code exists yet" and are telling the truth, so a rule
+  // keyed on whether the FINANCIAL app has controllers would flag all of them.
+  const composition = read('apps/api/src/composition/phase5-modules.ts') ?? '';
+  const wired = new Set(
+    [...composition.matchAll(/@karar\/([a-z-]+)/g)]
+      .map((m) => m[1])
+      .filter((name) => fs.existsSync(path.join(REPO_ROOT, 'modules', name))),
+  );
+  const TRANSPORT_DENIALS = [
+    'no transport layer exists yet',
+    'no transport layer and no',
+    'no http surface and no controller exist',
+    'no ingestion endpoint and no transport layer exist',
+    'no transport exists for this module yet',
+    'there is no http surface here',
+    'no transport, no ingestion',
+    'neither is a running path',
+  ];
+  const EMPTINESS_DENIALS = ['no application code exists yet', 'this directory is a skeleton'];
+  for (const rel of walkFiles(path.join(REPO_ROOT, 'modules'), { exts: MD_EXTS })
+    .map((f) => path.relative(REPO_ROOT, f))) {
+    // modules/README.md sits directly under modules/ and names no module.
+    const moduleName = rel.split(path.sep)[1];
+    if (moduleName === undefined) continue;
+    if (!fs.existsSync(path.join(REPO_ROOT, 'modules', moduleName, 'MODULE.md'))) continue;
+    const text = read(rel);
+    if (text === null) continue;
+    const lower = text.toLowerCase();
+    if (wired.has(moduleName)) {
+      for (const denial of TRANSPORT_DENIALS) {
+        if (lower.includes(denial)) {
+          problems.push(
+            `${rel} says "${denial}" while apps/api/src/composition/phase5-modules.ts wires @karar/${moduleName} and mounts its routes`,
+          );
+        }
+      }
+    }
+    // An emptiness claim is judged against the directory the document sits in,
+    // not against its module: a layer README that says "this directory is a
+    // skeleton" is describing its own layer, and several modules have layers
+    // that are genuinely still empty next to layers that are not.
+    const ownDir = path.dirname(rel);
+    const ownSourceCount = countFiles(
+      ownDir,
+      (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'),
+    );
+    if (ownSourceCount > 0) {
+      for (const denial of EMPTINESS_DENIALS) {
+        if (lower.includes(denial)) {
+          problems.push(
+            `${rel} says "${denial}" while ${ownDir} holds ${ownSourceCount} production files`,
+          );
+        }
+      }
+    }
+  }
+
+  // F. No current-state document may deny a Flutter financial surface that
+  // exists. Three of them did, including one that contradicted itself ten
+  // lines later.
+  const featuresDir = path.join(REPO_ROOT, 'apps', 'mobile', 'lib', 'features');
+  const financialFeatures = fs.existsSync(featuresDir)
+    ? fs
+        .readdirSync(featuresDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .filter((n) => /^(financial_|payment_|statement_|transaction|transfer_)/.test(n))
+    : [];
+  if (financialFeatures.length > 0) {
+    for (const rel of CURRENT_STATE_DOCS) {
+      const text = read(rel);
+      if (text === null) continue;
+      const lower = text.toLowerCase();
+      for (const claim of [
+        'any flutter financial surface',
+        'not built: any flutter surface',
+        'no flutter financial surface',
+      ]) {
+        const at = lower.indexOf(claim);
+        if (at < 0) continue;
+        // Only a DENIAL is a problem. The same words appear in sentences that
+        // describe what was built, so the preceding clause decides.
+        const before = lower.slice(Math.max(0, at - 60), at);
+        if (/not built|does not exist|no |never/.test(before)) {
+          problems.push(
+            `${rel} denies a Flutter financial surface while apps/mobile/lib/features holds ${financialFeatures.length} of them (${financialFeatures.join(', ')})`,
           );
         }
       }
