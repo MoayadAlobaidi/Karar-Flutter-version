@@ -109,13 +109,21 @@ describe.skipIf(unreachable !== null)('audit.audit_events append-only (live Post
     }
   });
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('migrates a fresh database including 0010_audit_events', async () => {
     await bootstrapRolesAndDatabase({ database });
     await withAdapter('migrator', async (adapter) => {
       const { applied } = await migrateToLatest({ adapter });
       expect(applied.map((file) => file.filename)).toContain('0010_audit_events.sql');
     });
-  });
+  }, 30_000);
 
   it('appends as karar_app and stores trace ids and redacted HSF metadata', async () => {
     await withAdapter('app', async (adapter) => {
