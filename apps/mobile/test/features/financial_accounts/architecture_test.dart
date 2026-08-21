@@ -154,6 +154,10 @@ void main() {
           RegExp(r'\btoStringAsFixed\b'),
           RegExp(r'\btoDouble\(\)'),
           RegExp(r'\bnum\.parse\b'),
+          // tryParse too. `num.tryParse('12.50')` returns a double, and the
+          // rules above matched only `parse` -- three characters short of
+          // catching the codebase's own idiom.
+          RegExp(r'\bnum\.tryParse\b'),
         ]) {
           for (final match in pattern.allMatches(source.body)) {
             offenders.add('${source.path}:${source.lineOf(match.start)}');
@@ -182,13 +186,26 @@ void main() {
       const money = r'(?:minorUnits|amount|amounts|balance|balances|total|totals)';
       for (final source in _sources()) {
         for (final pattern in <RegExp>[
-          // int.parse over a money-named expression: the exact-integer total.
-          RegExp('int\\.parse\\([^)]*$money', caseSensitive: false),
+          // NOT a bare `int.tryParse(minorUnits)`: converting is not
+          // computing, and `Money.minorUnitsAsInt` is the documented exact
+          // accessor. What is forbidden is ARITHMETIC on the result, which the
+          // two patterns below catch however the operands are named — an
+          // intermediate variable defeats a money-name anchor, so these anchor
+          // on the parse instead.
           // Arithmetic where one side is money-named. The operator must be
           // SPACED: `import '../domain/balance_snapshot.dart'` contains a
           // slash next to a money word and is a path, not a division.
           RegExp('$money' r'[A-Za-z0-9_]*\s+[+\-*/]\s+[A-Za-z0-9_(]', caseSensitive: false),
           RegExp(r'[A-Za-z0-9_)]\s+[+\-*/]\s+[A-Za-z0-9_.]*' '$money', caseSensitive: false),
+          // Two parses added together, whatever the operands are called: the
+          // money name may sit one variable away.
+          // `(?:tryParse|parse)`, not `(?:try)?parse`: these are
+          // case-SENSITIVE, and `tryParse` has a capital P. The shorter form
+          // matched `int.parse` and silently missed `int.tryParse` — which is
+          // the codebase's own idiom, so the rule would have been blind to the
+          // most likely spelling of the thing it forbids.
+          RegExp(r'(?:int|num)\.(?:tryParse|parse)\([^)]*\)[!\s]*[+\-*/]'),
+          RegExp(r'[+\-*/][!\s]*(?:int|num)\.(?:tryParse|parse)\('),
           // Aggregation over a collection of them.
           RegExp(r'\.(?:fold|reduce)\s*[(<][^;]{0,120}' '$money', caseSensitive: false),
         ]) {

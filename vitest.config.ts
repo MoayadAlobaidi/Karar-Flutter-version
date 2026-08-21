@@ -40,6 +40,10 @@ export default defineConfig({
     // databases concurrently against the same PostgreSQL, and every published
     // test total becomes a function of who happened to have an agent running.
     exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**'],
+    // Fails the WHOLE run when KARAR_INTEGRATION=1 and a dependency is
+    // unreachable, so the property those three documents state is a property
+    // of the run rather than of the nine files that remembered to check.
+    globalSetup: ['./scripts/checks/integration-required-setup.mts'],
     maxWorkers: budget.workers,
     minWorkers: 1,
   },

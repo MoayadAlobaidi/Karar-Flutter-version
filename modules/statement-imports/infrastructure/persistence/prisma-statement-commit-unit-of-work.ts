@@ -115,6 +115,7 @@ import {
   withPrincipalContext,
   type PrismaTransactionClient,
 } from '@karar/platform/dist/db/principal-context.js';
+import { ingestionLimitPolicyFor } from '@karar/platform/dist/ingestion/limits.js';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
 import type { ImportsPrincipal } from '../../application/principal.js';
@@ -179,19 +180,48 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
     // Encryption runs OUTSIDE the transaction: it may call a key provider, and
     // holding the widest transaction in the module open across a network call
     // to a KMS is how a connection pool starves under load.
-    const narratives = await Promise.all(
-      plan.rows.map(async (row) => ({
-        row,
-        canonical: await this.canonicalEncryption.encrypt(actor, row.transactionId, {
-          description: row.description.reveal(),
-          merchant: row.merchant?.reveal() ?? null,
-        }),
-        revision: await this.canonicalEncryption.encrypt(actor, row.revisionId, {
-          description: row.description.reveal(),
-          merchant: row.merchant?.reveal() ?? null,
-        }),
-      })),
-    );
+    //
+    // BOUNDED FAN-OUT, in batches of the CENTRAL `maxBatchSize`. This was one
+    // unbounded `Promise.all` over `plan.rows`, which is two encryptions per
+    // row with no ceiling: a statement may carry `maxRows` = 50,000, so one
+    // HTTP request could put 100,000 simultaneous key-provider calls in
+    // flight. The READ path in prisma-statement-import-repository.ts already
+    // refuses to do that, in as many words -- "a key-management provider is
+    // rate-limited everywhere but local, and a statement can be thousands of
+    // rows" -- and went fully sequential. This path did the opposite, and
+    // LocalAesGcmFieldEncryptionProvider being in-process is why nothing local
+    // ever showed it.
+    //
+    // Batching rather than going sequential keeps the throughput the batch
+    // gives while making the ceiling a declared number instead of the row
+    // count. `maxBatchSize` was declared, validated as required, and cited as
+    // the rationale for the `financial_commit` rate-limit budget while being
+    // read by NO production code; this is the first thing that reads it.
+    const batchSize = ingestionLimitPolicyFor('csv-statement-import').maxBatchSize;
+    type EncryptedNarrative = Awaited<ReturnType<CanonicalNarrativeEncryptorPort['encrypt']>>;
+    const narratives: Array<{
+      row: (typeof plan.rows)[number];
+      canonical: EncryptedNarrative;
+      revision: EncryptedNarrative;
+    }> = [];
+    for (let offset = 0; offset < plan.rows.length; offset += batchSize) {
+      const batch = plan.rows.slice(offset, offset + batchSize);
+      narratives.push(
+        ...(await Promise.all(
+          batch.map(async (row) => ({
+            row,
+            canonical: await this.canonicalEncryption.encrypt(actor, row.transactionId, {
+              description: row.description.reveal(),
+              merchant: row.merchant?.reveal() ?? null,
+            }),
+            revision: await this.canonicalEncryption.encrypt(actor, row.revisionId, {
+              description: row.description.reveal(),
+              merchant: row.merchant?.reveal() ?? null,
+            }),
+          })),
+        )),
+      );
+    }
     // Built here too, for the same reason: every identifier is validated
     // before the transaction opens, so a malformed one is a refusal rather
     // than a rollback.

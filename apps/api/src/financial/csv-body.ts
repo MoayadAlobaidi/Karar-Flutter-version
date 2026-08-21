@@ -131,11 +131,28 @@ export async function* boundedBytes(source: AsyncIterable<Uint8Array>): AsyncGen
  * prevent. So the drain counts too, and destroys the stream once it has seen
  * enough to know the caller is not going to stop.
  */
+/**
+ * How much of an ALREADY-REFUSED body is read before the socket is dropped.
+ *
+ * This used to be `CSV_LIMITS.maxBytes` — 10 MiB. Content-type parsers run in
+ * the Fastify request lifecycle, which is BEFORE any Nest guard, so a request
+ * that the rate limiter or the principal check will refuse could still make the
+ * server ingest 10 MiB first. Nothing was ever stored and nothing was parsed,
+ * but "the guard refuses before any work" was not true of the bytes on the
+ * wire, and the upload budget's "100 MiB/hour per principal" counted only the
+ * bodies that got past it.
+ *
+ * A small allowance rather than zero: draining a short body lets the 415 be
+ * written cleanly on a keep-alive connection, which is the reason the drain
+ * exists. Anything larger is a body nobody asked for, and the socket is closed.
+ */
+const REFUSED_BODY_DRAIN_BYTES = 64 * 1024;
+
 function drainBounded(payload: ByteStream): void {
   let read = 0;
   const onData = (chunk: Uint8Array): void => {
     read += chunk.byteLength;
-    if (read > CSV_LIMITS.maxBytes) payload.destroy();
+    if (read > REFUSED_BODY_DRAIN_BYTES) payload.destroy();
   };
   (payload as unknown as { on(event: string, listener: (chunk: Uint8Array) => void): void }).on(
     'data',

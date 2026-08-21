@@ -434,10 +434,23 @@ describe('a pathological record cannot buy unbounded work', () => {
     // does not turn this into a flake: what is being tested is the shape of
     // the growth, not the speed of the host.
     const limits = policy({ maxFieldBytes: 4 * 1024 * 1024, maxBufferedBytes: 8 * 1024 * 1024 });
-    const timed = async (n: number): Promise<number> => {
+    const once = async (n: number): Promise<number> => {
       const started = process.hrtime.bigint();
       await refusalOf('a'.repeat(n), limits);
       return Number(process.hrtime.bigint() - started) / 1e6;
+    };
+    // The MINIMUM of several samples, not one sample. A single timing on a
+    // loaded machine measures the scheduler as much as the parser, and this
+    // test failed that way twice under deliberate CPU load. The minimum is the
+    // least noise-contaminated estimator available: noise only ever adds time,
+    // so the smallest observation is the closest to the real cost. The
+    // THRESHOLD is unchanged -- quadratic still shows ~16x per quadrupling and
+    // linear ~4x, and widening the threshold instead would have been the
+    // weakening this comment exists to refuse.
+    const timed = async (n: number): Promise<number> => {
+      const samples: number[] = [];
+      for (let i = 0; i < 5; i += 1) samples.push(await once(n));
+      return Math.min(...samples);
     };
     await timed(50_000); // warm, so JIT does not pay for the first measurement
     const small = await timed(100_000);

@@ -3007,7 +3007,13 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
         });
       const refused = await spend(RATE_LIMIT_POLICIES.financialRead.limit + 1, read);
       conforms('listOwnFinancialAccounts', 429, refused);
-    });
+      // 301 sequential round trips. Vitest's default per-test budget is 5s,
+      // which this clears alone and does not clear under full-suite worker
+      // load -- it failed 3 of 10 runs, and 2 of 2 for an independent
+      // reviewer. The BUDGET is what was wrong, not the assertion: exhausting
+      // a 300-request window costs 300 requests, and no limit was raised to
+      // make it fit.
+    }, 120_000);
 
     it('refuses an ordinary write past its budget', async () => {
       const write = () =>
@@ -3019,7 +3025,7 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
         });
       const refused = await spend(RATE_LIMIT_POLICIES.financialWrite.limit + 1, write);
       conforms('createOwnManualTransaction', 429, refused);
-    });
+    }, 120_000);
 
     it('refuses a statement upload past its budget', async () => {
       const upload = () =>
@@ -3032,7 +3038,7 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
         });
       const refused = await spend(RATE_LIMIT_POLICIES.financialStatementUpload.limit + 1, upload);
       conforms('uploadOwnStatementImportSource', 429, refused);
-    });
+    }, 120_000);
 
     it('refuses a parse past its budget', async () => {
       const parse = () =>
@@ -3044,7 +3050,7 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
         });
       const refused = await spend(RATE_LIMIT_POLICIES.financialStatementParse.limit + 1, parse);
       conforms('parseOwnStatementImportSource', 429, refused);
-    });
+    }, 120_000);
 
     it('refuses a commit past its budget', async () => {
       const commit = () =>
@@ -3056,7 +3062,7 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
         });
       const refused = await spend(RATE_LIMIT_POLICIES.financialCommit.limit + 1, commit);
       conforms('commitOwnStatementImport', 429, refused);
-    });
+    }, 120_000);
 
     it('refuses a transfer decision past its budget', async () => {
       const decide = () =>
@@ -3068,7 +3074,7 @@ describe.skipIf(unreachable !== null)('the financial surface conforms to its con
         });
       const refused = await spend(RATE_LIMIT_POLICIES.financialTransferDecision.limit + 1, decide);
       conforms('confirmOwnTransferMatch', 429, refused);
-    });
+    }, 120_000);
   });
 
   describe('the ledger', () => {
