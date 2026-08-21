@@ -630,6 +630,7 @@ export const FORBIDDEN_DIRECT_PAIRS: ReadonlyArray<readonly [ContentTrustClass, 
     // An identifier is not a fact about anybody.
     ['OPAQUE_IDENTIFIER', 'PRINCIPAL_IDENTITY'],
     ['OPAQUE_IDENTIFIER', 'AUTHORIZATION_DECISION'],
+    ['OPAQUE_IDENTIFIER', 'POLICY_STATE'],
     ['OPAQUE_IDENTIFIER', 'STORAGE_PATH'],
   ]);
 

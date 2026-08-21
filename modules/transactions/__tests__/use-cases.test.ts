@@ -45,6 +45,7 @@ import {
   syntheticMerchant,
 } from './fakes/synthetic-fixtures.js';
 import { TRANSACTION_SYNTHETIC_PERIOD } from '@karar/financial-retention-local-fixtures';
+import { hasUserDecision } from '../domain/category-assignment.js';
 
 const USE_CASE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -524,6 +525,40 @@ describe('AssignCategory', () => {
     const active = await assignments.findActive(alice, seed.id);
     expect(active?.assignmentSource).toBe('USER');
     expect(active?.categoryCode).toBe('TRANSPORT');
+  });
+
+  it('records that the chain guard is defence in depth, not a second gate', () => {
+    // `assign-category` refuses a RULE when EITHER `canSupersede` says no OR
+    // the chain holds any USER decision. I tried to test the second clause on
+    // its own and could not, because it is UNREACHABLE through this use case:
+    //
+    //   * `canSupersede` refuses a RULE against an ACTIVE USER assignment;
+    //   * only a USER may supersede a USER;
+    //   * so once a person decides, the ACTIVE row is a USER row forever.
+    //
+    // There is therefore no state where the chain holds a USER decision and
+    // the active assignment is not one. Removing the clause leaves every test
+    // in this module passing — not because the tests are weak, but because
+    // nothing can reach it.
+    //
+    // It stays, as depth against a future write path that supersedes an
+    // assignment some other way. What is asserted here is the PREDICATE, so
+    // the day such a path exists the helper it will rely on is known-good.
+    expect(hasUserDecision([])).toBe(false);
+    expect(
+      hasUserDecision([
+        { assignmentSource: 'RULE', status: 'ACTIVE' } as unknown as Parameters<
+          typeof hasUserDecision
+        >[0][number],
+      ]),
+    ).toBe(false);
+    expect(
+      hasUserDecision([
+        { assignmentSource: 'USER', status: 'SUPERSEDED' } as unknown as Parameters<
+          typeof hasUserDecision
+        >[0][number],
+      ]),
+    ).toBe(true);
   });
 
   it('refuses a rule even after the user choice was itself superseded by the user', async () => {

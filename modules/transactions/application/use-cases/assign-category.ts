@@ -126,7 +126,16 @@ export class AssignCategory {
 
       const chain = await this.assignments.listChain(principal, transactionId);
       const current = activeAssignment(chain);
-      if (!canSupersede(current, input.assignmentSource) || (input.assignmentSource === 'RULE' && hasUserDecision(chain))) {
+      // The second clause is DEFENCE IN DEPTH and is currently unreachable:
+      // `canSupersede` already refuses a RULE against an ACTIVE USER
+      // assignment, and only a USER may supersede a USER, so once a person
+      // decides the active row is a USER row forever. It stays for a future
+      // write path that supersedes an assignment some other way; see the test
+      // that records this rather than pretending to exercise it.
+      if (
+        !canSupersede(current, input.assignmentSource) ||
+        (input.assignmentSource === 'RULE' && hasUserDecision(chain))
+      ) {
         return Result.err({
           kind: 'USER_ASSIGNMENT_WINS',
           transactionId,

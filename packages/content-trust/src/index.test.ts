@@ -76,10 +76,34 @@ describe('the sink policy', () => {
     expect(() => platformInstruction(fromData)).toBeDefined();
   });
 
-  it('does not let an identifier become an identity', () => {
-    expect(mayReachDirectly('OPAQUE_IDENTIFIER', 'PRINCIPAL_IDENTITY')).toBe(false);
-    expect(mayReachDirectly('OPAQUE_IDENTIFIER', 'AUTHORIZATION_DECISION')).toBe(false);
-    expect(mayReachDirectly('OPAQUE_IDENTIFIER', 'STORAGE_PATH')).toBe(false);
+  it('gives an identifier exactly one destination', () => {
+    // Asserted as a TOTAL set rather than as a list of forbidden pairs. The
+    // list version named three sinks and missed `POLICY_STATE`, so permitting
+    // an identifier to decide capability state passed every test here — the
+    // failure mode of enumerating pairs by hand, found by trying it.
+    const reachable = SENSITIVE_SINKS.filter((sink: SensitiveSink) =>
+      mayReachDirectly('OPAQUE_IDENTIFIER', sink),
+    );
+    expect(reachable).toEqual(['DIAGNOSTIC_RECORD']);
+  });
+
+  it('gives a derived fact exactly the destinations it is allowed', () => {
+    // Total for the same reason: a fact may inform a decision and be recorded,
+    // but may never become syntax, a command, a path, markup, a destination, a
+    // platform instruction or a credential check.
+    const reachable = SENSITIVE_SINKS.filter((sink: SensitiveSink) =>
+      mayReachDirectly('TRUSTED_STRUCTURED_PLATFORM_FACT', sink),
+    );
+    expect([...reachable].sort()).toEqual(
+      [
+        'AI_RETRIEVAL_CORPUS',
+        'AI_TOOL_ARGUMENT',
+        'AUTHORIZATION_DECISION',
+        'DIAGNOSTIC_RECORD',
+        'POLICY_STATE',
+        'PRINCIPAL_IDENTITY',
+      ].sort(),
+    );
   });
 
   it('treats a person typing it and a file carrying it as the same authority', () => {

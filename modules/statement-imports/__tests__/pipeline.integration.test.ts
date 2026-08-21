@@ -79,6 +79,11 @@ import {
 // far as one written in source — which the retention closure test proves by
 // scanning every dist/ in the production closure.
 import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
+import type {
+  TransferSuggestionPassOutcome,
+  TransferSuggestionTriggerPort,
+} from '@karar/transactions';
+import type { DeterministicCategoryPort } from '../application/ports/statement-commit.js';
 
 const unreachable = await probePostgres();
 if (unreachable !== null) {
@@ -177,6 +182,7 @@ interface Wiring {
   readonly commit: CommitStatementImport;
   readonly erase: EraseStatementImport;
   readonly sourceStore: ReturnType<typeof testSourceStore>;
+  readonly transferTrigger: RecordingTransferTrigger;
 }
 
 /**
@@ -193,8 +199,11 @@ function wire(
     readonly retention?: StatementRetentionDecisionPort;
     readonly outbox?: StatementImportOutboxPort;
     readonly sourceStore?: ReturnType<typeof testSourceStore>;
+    readonly categories?: DeterministicCategoryPort;
   } = {},
 ): Wiring {
+  const { categories } = overrides;
+  const transferTrigger = new RecordingTransferTrigger();
   const encryption = testEncryption();
   const repository = new PrismaStatementImportRepository(handle, encryption);
   const sourceStore = overrides.sourceStore ?? testSourceStore();
@@ -257,17 +266,45 @@ function wire(
       accounts,
       sourceStore,
       dedup,
-      new TransactionsDeterministicCategoryAdapter(
-        new MerchantRuleEvaluator(new PrismaMerchantRuleDirectory(handle)),
-      ),
+      categories ??
+        new TransactionsDeterministicCategoryAdapter(
+          new MerchantRuleEvaluator(new PrismaMerchantRuleDirectory(handle)),
+        ),
       retention,
       ids,
       clock,
+      transferTrigger,
     ),
     erase: new EraseStatementImport(repository, sourceStore, clock),
     sourceStore,
+    transferTrigger,
   };
 }
+
+/**
+ * Records who the commit asked about, so the CSV path's transfer trigger is
+ * asserted rather than assumed.
+ *
+ * The default is `SUGGESTS_NO_TRANSFERS`, which does nothing observable — so a
+ * commit that stopped asking looked exactly like one that asked and found
+ * nothing, and deleting the call left all 328 tests in this module passing.
+ */
+class RecordingTransferTrigger implements TransferSuggestionTriggerPort {
+  readonly asked: string[][] = [];
+
+  suggestTransfersFor(
+    _actor: { readonly tenantId: string; readonly userId: string },
+    transactionIds: readonly string[],
+  ): Promise<TransferSuggestionPassOutcome> {
+    this.asked.push([...transactionIds]);
+    return Promise.resolve({ kind: 'considered', suggestionsWritten: 0 });
+  }
+}
+
+/** Always matches, so a committed row's category is a fact the test controls. */
+const ALWAYS_GROCERIES: DeterministicCategoryPort = {
+  match: () => Promise.resolve({ categoryCode: 'FOOD.GROCERIES', ruleVersion: 'rules/merchant/test-1' }),
+};
 
 /** A retention provider that refuses, with known provenance. */
 const REFUSING_RETENTION: StatementRetentionDecisionPort = {
@@ -517,6 +554,105 @@ describe.skipIf(unreachable !== null)('statement-imports pipeline', () => {
 
       // And the refusal names the field without quoting what was in it.
       expect(JSON.stringify(preview.value)).not.toContain('9999');
+    });
+  });
+
+  describe('what the commit does besides writing rows', () => {
+    // A DISTINCT FILE PER TEST. The same bytes are the same source, and the
+    // happy path above already imported STATEMENT — a second import of it is
+    // correctly refused as a duplicate, which would fail these tests for a
+    // reason that has nothing to do with what they assert.
+    const uniqueStatement = (marker: string): string =>
+      [
+        'Booking Date,Description,Amount',
+        `2026-08-10,SYNTHETIC MERCHANT ${marker} ONE,-45.00`,
+        `2026-08-11,SYNTHETIC MERCHANT ${marker} TWO,120.50`,
+        '',
+      ].join('\n');
+
+    it('asks about transfers, naming exactly the transactions it wrote', async () => {
+      // The trigger's default does nothing observable, so a commit that
+      // stopped asking looked identical to one that asked and found nothing:
+      // deleting the call left all 328 tests in this module green.
+      const pipeline = wire(handle, clock);
+      const started = await pipeline.start.execute({ accountId }, ACTOR_A1);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+      const importId = started.value.id;
+
+      await pipeline.store.execute(
+        {
+          importId,
+          content: streamOf(bytesOf(uniqueStatement('TRANSFER'))),
+          mediaType: 'text/csv',
+          maxBytes: LIMITS.maxBytes,
+        },
+        ACTOR_A1,
+      );
+      const parsed = await pipeline.parse.execute(
+        { importId, mapping: MAPPING, limits: LIMITS },
+        ACTOR_A1,
+      );
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      await pipeline.preview.execute({ importId, limits: LIMITS }, ACTOR_A1);
+      const committed = await pipeline.commit.execute(
+        { importId, expectedVersion: parsed.value.version },
+        ACTOR_A1,
+      );
+
+      expect(committed.ok).toBe(true);
+      if (!committed.ok) return;
+      expect(pipeline.transferTrigger.asked).toHaveLength(1);
+      expect(pipeline.transferTrigger.asked[0]).toEqual(committed.value.transactionIds);
+      expect(committed.value.transactionIds.length).toBeGreaterThan(0);
+    });
+
+    it('records the category a rule decided, on the rows it wrote', async () => {
+      // Nothing asserted a committed row's category, so returning `null`
+      // instead of the rule's answer was invisible. The port here always
+      // matches, which makes the assertion about the COMMIT carrying the
+      // answer through rather than about any particular rule corpus.
+      const pipeline = wire(handle, clock, { categories: ALWAYS_GROCERIES });
+      const started = await pipeline.start.execute({ accountId }, ACTOR_A1);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+      const importId = started.value.id;
+
+      await pipeline.store.execute(
+        {
+          importId,
+          content: streamOf(bytesOf(uniqueStatement('CATEGORY'))),
+          mediaType: 'text/csv',
+          maxBytes: LIMITS.maxBytes,
+        },
+        ACTOR_A1,
+      );
+      const parsed = await pipeline.parse.execute(
+        { importId, mapping: MAPPING, limits: LIMITS },
+        ACTOR_A1,
+      );
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      await pipeline.preview.execute({ importId, limits: LIMITS }, ACTOR_A1);
+      const committed = await pipeline.commit.execute(
+        { importId, expectedVersion: parsed.value.version },
+        ACTOR_A1,
+      );
+      expect(committed.ok).toBe(true);
+      if (!committed.ok) return;
+
+      const assigned = await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query<{ count: string }>(
+          `SELECT count(*)::text AS count
+             FROM public.transaction_category_assignments
+            WHERE transaction_id = ANY($1::uuid[])
+              AND category_code = 'FOOD.GROCERIES'
+              AND assignment_source = 'RULE'`,
+          [committed.value.transactionIds],
+        ),
+      );
+      expect(Number(assigned.rows[0]?.count ?? '0')).toBe(committed.value.transactionIds.length);
     });
   });
 
