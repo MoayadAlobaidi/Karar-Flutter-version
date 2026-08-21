@@ -218,7 +218,7 @@ describe('RateLimitService failure modes', () => {
   });
 
   it('pins the policy COUNT, so a new policy cannot arrive unpinned', () => {
-    expect(Object.keys(RATE_LIMIT_POLICIES)).toHaveLength(13);
+    expect(Object.keys(RATE_LIMIT_POLICIES)).toHaveLength(14);
   });
 
   it('charges a financial budget to one principal in one tenant', () => {

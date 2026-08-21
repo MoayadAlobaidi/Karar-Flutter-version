@@ -179,6 +179,22 @@ export const RATE_LIMIT_POLICIES = {
     onStoreFailure: 'fail_closed',
   },
   /**
+   * Subject-initiated erasure of an uploaded statement and its stored bytes.
+   *
+   * Its OWN budget, not the commit budget it used to share. Sharing meant
+   * twenty commits removed a person's ability to erase their own bank
+   * statements for the rest of the hour — deletion of the most sensitive
+   * artefact the platform holds, refused because of unrelated activity.
+   * Still `fail_closed`: erasure writes, and an unbounded erase during a
+   * limiter outage is unbounded deletion.
+   */
+  financialErase: {
+    name: 'financial_erase',
+    limit: 60,
+    windowMs: 60 * MINUTE_MS,
+    onStoreFailure: 'fail_closed',
+  },
+  /**
    * Transfer-match confirm and reject. Per-match state mutations a person taps
    * through a list whose page size is 50; 120 per hour clears two full pages
    * plus corrections, and bounds an enumeration that flips relationships in

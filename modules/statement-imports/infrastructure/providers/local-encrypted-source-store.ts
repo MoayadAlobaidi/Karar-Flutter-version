@@ -41,7 +41,13 @@
  * already has one.
  */
 
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 
 import {
   EncryptedSourceStoreError,
@@ -72,6 +78,39 @@ export class LocalSourceStoreEnvironmentError extends Error {
         `process memory, which is neither custody nor storage. Wire the deployment profile's ` +
         `key-management provider and object store (ADR-0017) for this environment`,
     );
+  }
+}
+
+/**
+ * The subject half of the associated data: everything before the import id.
+ *
+ * `open`, `verify` and `erase` receive a `StoredSource` descriptor that does
+ * NOT carry the import id or media type, so they cannot rebuild the whole AAD
+ * to authenticate against. They used the AAD stored beside the ciphertext
+ * instead — which authenticates the object against itself and therefore
+ * authenticates nothing about the CALLER. The header claims "an object moved
+ * between subjects or replayed under another import fails authentication
+ * instead of decrypting into a plausible wrong statement"; the import half of
+ * that held, and the subject half did not.
+ *
+ * Comparing this prefix restores the subject half without changing the port.
+ */
+function subjectAssociatedDataPrefix(principal: ImportsPrincipal): Buffer {
+  return Buffer.from(`${ASSOCIATED_DATA_LABEL}|${principal.tenantId}|${principal.userId}|`, 'utf8');
+}
+
+/**
+ * Refuses a descriptor whose stored object was bound to a different subject.
+ *
+ * Constant-time over the prefix, and it throws the SAME opaque kind a failed
+ * decryption throws, so "wrong subject" and "wrong key" are indistinguishable
+ * to a caller.
+ */
+function assertSubjectMatches(principal: ImportsPrincipal, aad: Buffer): void {
+  const expected = subjectAssociatedDataPrefix(principal);
+  const actual = aad.subarray(0, expected.length);
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    throw new EncryptedSourceStoreError('read_failed', 'authenticated decryption failed');
   }
 }
 
@@ -164,9 +203,15 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
    * indistinguishable from the store being down.
    */
   verify(actor: ImportsPrincipal, stored: StoredSource): Promise<boolean> {
-    void actor;
     const entry = this.#objects.get(stored.objectRef);
     if (entry === undefined) return Promise.resolve(false);
+    // Another subject's object answers exactly as an absent one does: false,
+    // not an exception, so verify stays free of an existence oracle.
+    try {
+      assertSubjectMatches(actor, entry.aad);
+    } catch {
+      return Promise.resolve(false);
+    }
     const digest = createHash('sha256').update(entry.ciphertext).digest();
     if (digest.length !== stored.integrityChecksum.length) return Promise.resolve(false);
     let difference = 0;
@@ -186,11 +231,12 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
    * over in bounded chunks so the consumer's own streaming stays honest.
    */
   async *open(actor: ImportsPrincipal, stored: StoredSource): AsyncIterable<Uint8Array> {
-    void actor;
     const entry = this.#objects.get(stored.objectRef);
     if (entry === undefined) {
       throw new EncryptedSourceStoreError('not_found', 'no stored object with that handle');
     }
+    // The subject the bytes were sealed for, checked BEFORE the key is used.
+    assertSubjectMatches(actor, entry.aad);
     if (stored.algorithm !== ALGORITHM) {
       throw new EncryptedSourceStoreError(
         'read_failed',
@@ -219,7 +265,15 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
 
   /** Idempotent by contract: a second call finds nothing and answers `false`. */
   erase(actor: ImportsPrincipal, stored: StoredSource): Promise<boolean> {
-    void actor;
+    const entry = this.#objects.get(stored.objectRef);
+    if (entry === undefined) return Promise.resolve(false);
+    // One subject must not erase another's bytes, and must not learn that they
+    // exist by being told so. Same answer as an absent object.
+    try {
+      assertSubjectMatches(actor, entry.aad);
+    } catch {
+      return Promise.resolve(false);
+    }
     return Promise.resolve(this.#objects.delete(stored.objectRef));
   }
 

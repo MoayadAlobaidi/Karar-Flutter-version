@@ -64,9 +64,10 @@ export class FinancialRateLimitGuard implements CanActivate {
         message: 'This financial operation declares no rate-limit policy and was not processed.',
         origin: 'application',
         retryable: false,
-        details: {
-          operation: `${context.getClass().name}.${context.getHandler().name}`,
-        },
+        // No `details`: PlatformError details are copied verbatim into the
+        // problem document, and the operation name is an internal class and
+        // method. The server log carries the cause; the caller gets a 500 that
+        // names nothing.
       });
     }
 

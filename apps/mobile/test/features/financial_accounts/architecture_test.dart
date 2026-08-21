@@ -144,6 +144,52 @@ void main() {
     });
   });
 
+  group('the guard scans what it says it scans', () {
+    test('every declared root exists and contributed files', () {
+      // financial_roots.dart says a hand-maintained list "fails silently, and
+      // in the direction of scanning less" -- and then the guard had no
+      // assertion that its roots exist. `_sources()` skips a missing directory,
+      // so renaming six of seven roots left every money rule passing over a
+      // quarter of the tree. This is the assertion that makes shrinking loud.
+      for (final root in financialRoots) {
+        expect(
+          Directory(root).existsSync(),
+          isTrue,
+          reason: '$root is declared in financial_roots.dart and does not exist',
+        );
+        expect(
+          _sources().where((source) => source.path.startsWith(root)),
+          isNotEmpty,
+          reason: '$root exists and contributed no file to the scan',
+        );
+      }
+    });
+
+    test('no financial feature folder is missing from the list', () {
+      // The other direction: an EIGHTH financial folder scanned by nothing.
+      // Derived from the tree rather than from the list it is checking.
+      final declared = financialRoots.map((root) => root.split('/').last).toSet();
+      final onDisk = Directory('lib/features')
+          .listSync()
+          .whereType<Directory>()
+          .map((entry) => entry.path.split('/').last)
+          .where(
+            (name) =>
+                name.startsWith('financial_') ||
+                name.startsWith('payment_') ||
+                name.startsWith('statement_') ||
+                name.startsWith('transaction') ||
+                name.startsWith('transfer_'),
+          )
+          .toSet();
+      expect(
+        onDisk.difference(declared),
+        isEmpty,
+        reason: 'these financial feature folders are scanned by NO money rule',
+      );
+    });
+  });
+
   group('money never becomes a float', () {
     test('no double, no parse to a float, no toStringAsFixed', () {
       final offenders = <String>[];

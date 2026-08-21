@@ -1489,7 +1489,49 @@ export function checkMoneyDiscipline(ctx) {
   ]);
   const monetaryNumber =
     /\b(minorUnits|basisPoints|amount|amounts|balance|balances|price|prices|fee|fees|monetaryValue)\s*\??\s*:\s*number\b/g;
-  const floatOps = [/\bparseFloat\s*\(/g, /\bNumber\.parseFloat\b/g, /\.toFixed\s*\(/g];
+  /**
+   * The ONE sanctioned shape, named exactly, with its reason.
+   *
+   * `Money.allocate` converts a remainder to a Number to use it as a count:
+   * the algorithm has already proved `0 <= leftover < weights.length`, and an
+   * array index is not a monetary value. It lives inside `Money` itself, which
+   * is the type that owns exact arithmetic — nowhere else gets this.
+   *
+   * Liveness is checked: an allowance that has stopped matching is a hole left
+   * open for the next violation, so a stale one FAILS the check rather than
+   * lingering. Same rule the documentation style allowances are held to.
+   */
+  const MONEY_ALLOWANCES = [
+    {
+      file: 'packages/shared-kernel/src/money.ts',
+      shape: /Number\(this\.minorUnits - assigned\)/,
+      why: 'a bounded remainder used as an array count, proved < weights.length by the lines above it',
+    },
+  ];
+  const allowanceUsed = new Set();
+
+  // Shapes, not only files. Widening the SCOPE added the layers where a float
+  // enters and left the DETECTION unchanged, so the commonest row-mapper
+  // mistake — `Number(row.amount_minor_units) / 100` — was in scope and
+  // invisible. Each pattern below is anchored on a money-named operand so an
+  // ordinary count, index or duration is not swept up.
+  const money =
+    '(?:minorUnits|minor_units|basisPoints|amount|amounts|balance|balances|price|prices|fee|fees|monetaryValue)';
+  const floatOps = [
+    /\bparseFloat\s*\(/g,
+    /\bNumber\.parseFloat\b/g,
+    /\.toFixed\s*\(/g,
+    // `Number(...)` over a money-named expression: the row-mapper float.
+    new RegExp(`\\bNumber\\s*\\([^)]*${money}`, 'gi'),
+    // `parseInt` over money: exact, but a base-10 parse of a minor-unit string
+    // is the client-side total in TypeScript clothing.
+    new RegExp(`\\bparseInt\\s*\\([^)]*${money}`, 'gi'),
+    // Division or multiplication of a money-named operand by a scale factor —
+    // major/minor conversion, which belongs in Money and nowhere else.
+    new RegExp(`${money}[A-Za-z0-9_]*\\s*[/*]\\s*[0-9]`, 'gi'),
+    // Rounding a money expression at all.
+    new RegExp(`Math\\.(?:round|floor|ceil|abs)\\s*\\([^)]*${money}`, 'gi'),
+  ];
   for (const file of files) {
     const src = loadStripped(file);
     for (const m of src.matchAll(monetaryNumber)) {
@@ -1501,6 +1543,15 @@ export function checkMoneyDiscipline(ctx) {
     }
     for (const re of floatOps) {
       for (const m of src.matchAll(re)) {
+        const allowance = MONEY_ALLOWANCES.find(
+          (candidate) =>
+            rel(root, file) === candidate.file &&
+            candidate.shape.test(m[0] + src.slice(m.index, m.index + 80)),
+        );
+        if (allowance !== undefined) {
+          allowanceUsed.add(allowance.file);
+          continue;
+        }
         violations.push({
           file: rel(root, file),
           line: lineOf(src, m.index),
@@ -1509,10 +1560,17 @@ export function checkMoneyDiscipline(ctx) {
       }
     }
   }
+  for (const allowance of MONEY_ALLOWANCES) {
+    if (allowanceUsed.has(allowance.file)) continue;
+    violations.push({
+      file: allowance.file,
+      detail: `money-discipline allowance no longer matches anything (${allowance.why}) — a stale allowance is a hole left open for the next violation; remove it`,
+    });
+  }
   return violationsResult(
     violations,
     files.length,
-    'lexical check; type-level enforcement deepens with the financial engine',
+    `lexical check over ${String(MONEY_ALLOWANCES.length)} sanctioned shape; type-level enforcement deepens with the financial engine`,
   );
 }
 

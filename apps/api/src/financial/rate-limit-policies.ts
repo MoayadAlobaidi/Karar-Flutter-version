@@ -59,7 +59,7 @@ export const FINANCIAL_RATE_LIMIT_POLICIES: ReadonlyMap<FinancialOperationKey, R
     ['StatementImportsController.create', RATE_LIMIT_POLICIES.financialWrite],
     ['StatementImportsController.read', RATE_LIMIT_POLICIES.financialRead],
     ['StatementImportsController.preview', RATE_LIMIT_POLICIES.financialStatementParse],
-    ['StatementImportsController.erase', RATE_LIMIT_POLICIES.financialCommit],
+    ['StatementImportsController.erase', RATE_LIMIT_POLICIES.financialErase],
     ['StatementImportSourceController.upload', RATE_LIMIT_POLICIES.financialStatementUpload],
     ['StatementImportSourceController.parse', RATE_LIMIT_POLICIES.financialStatementParse],
     ['StatementImportSourceController.commit', RATE_LIMIT_POLICIES.financialCommit],

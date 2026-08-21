@@ -63,6 +63,16 @@ export function judgeCanonicalPostgres(observed) {
         `A run against another major is supplemental evidence, not this gate`,
     );
   }
+  if (
+    observed.prismaTimeZone !== undefined &&
+    observed.prismaTimeZone !== REQUIRED_SESSION_TIME_ZONE
+  ) {
+    problems.push(
+      `the PRISMA session TimeZone is ${JSON.stringify(observed.prismaTimeZone)}, not ` +
+        `${REQUIRED_SESSION_TIME_ZONE} — this is the exact half fix F3 was about: the Prisma ` +
+        `factory setting none of the raw adapter's session defaults`,
+    );
+  }
   if (observed.sessionTimeZone !== REQUIRED_SESSION_TIME_ZONE) {
     problems.push(
       `application session TimeZone is ${JSON.stringify(observed.sessionTimeZone)}, not ${REQUIRED_SESSION_TIME_ZONE} — ` +
@@ -72,7 +82,16 @@ export function judgeCanonicalPostgres(observed) {
   return problems;
 }
 
-/** Asks the SERVER. Never `psql --version`, which reports the client. */
+/**
+ * Asks the SERVER. Never `psql --version`, which reports the client.
+ *
+ * BOTH pools are asked, not one. Fix F3 was not "a session was not UTC" in
+ * general — it was that the Prisma factory set none of the raw adapter's
+ * defaults, so Prisma returned `timestamptz` shifted by the server's offset
+ * while the `pg` driver returned it correctly, from the same row in the same
+ * transaction. A gate that asked only the raw adapter would verify the half
+ * that was never broken.
+ */
 async function observe() {
   const { LocalPostgresConnectionProfile, PostgresPersistenceAdapter } = await import(
     path.join(REPO_ROOT, 'packages', 'platform', 'dist', 'db', 'index.js')
@@ -86,10 +105,22 @@ async function observe() {
         "current_setting('TimeZone') AS session_time_zone",
     );
     const row = rows.rows[0] ?? {};
+    const { createPrismaClient } = await import(
+      path.join(REPO_ROOT, 'packages', 'platform', 'dist', 'db', 'prisma.js')
+    );
+    const handle = createPrismaClient(profile);
+    let prismaTimeZone;
+    try {
+      const prismaRows = await handle.client.$queryRaw`SELECT current_setting('TimeZone') AS tz`;
+      prismaTimeZone = prismaRows[0]?.tz;
+    } finally {
+      await handle.end?.();
+    }
     return {
       serverVersion: row.server_version,
       serverVersionNum: row.server_version_num,
       sessionTimeZone: row.session_time_zone,
+      prismaTimeZone,
       host: profile.host,
       port: profile.port,
     };
@@ -122,6 +153,26 @@ const SELF_TEST_CASES = [
     name: 'right server, session timezone not pinned',
     observed: { serverVersion: '17.11', serverVersionNum: '170011', sessionTimeZone: 'Asia/Qatar' },
     expectProblem: /session TimeZone/,
+  },
+  {
+    name: 'the raw session is UTC and the PRISMA session is not — fix F3 exactly',
+    observed: {
+      serverVersion: '17.11',
+      serverVersionNum: '170011',
+      sessionTimeZone: 'UTC',
+      prismaTimeZone: 'Asia/Qatar',
+    },
+    expectProblem: /PRISMA session/,
+  },
+  {
+    name: 'both pools UTC on a Qatar-default server is the SUCCESS case',
+    observed: {
+      serverVersion: '17.11',
+      serverVersionNum: '170011',
+      sessionTimeZone: 'UTC',
+      prismaTimeZone: 'UTC',
+    },
+    expectProblem: null,
   },
   {
     name: 'server did not answer at all',
@@ -188,7 +239,9 @@ async function main() {
   const problems = judgeCanonicalPostgres(observed);
   console.log(
     `canonical-postgres: ${observed.host}:${observed.port} — PostgreSQL ${observed.serverVersion} ` +
-      `(server_version_num ${observed.serverVersionNum}), session TimeZone ${observed.sessionTimeZone}`,
+      `(server_version_num ${observed.serverVersionNum}), raw session TimeZone ` +
+      `${observed.sessionTimeZone}, Prisma session TimeZone ` +
+      `${observed.prismaTimeZone ?? 'not asked'}`,
   );
   if (problems.length > 0) {
     console.error(`FAIL (${problems.length}):`);

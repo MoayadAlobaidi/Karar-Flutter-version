@@ -227,3 +227,72 @@ describe('failures carry a stable message and a non-enumerable cause', () => {
     }
   });
 });
+
+describe('the encrypted source store binds bytes to the SUBJECT, not just to the object', () => {
+  /**
+   * The header claims "an object moved between subjects or replayed under
+   * another import fails authentication instead of decrypting into a plausible
+   * wrong statement". Half of that was true. `open`, `verify` and `erase` each
+   * began `void actor` and then authenticated against the AAD stored beside the
+   * ciphertext — which authenticates the object against itself and says nothing
+   * about who is asking. Any caller holding the descriptor decrypted it.
+   *
+   * No test covered the property: a grep for `aad` across this module's tests
+   * returned nothing before this one.
+   */
+  const CONTEXT = { importId: '01J0000000000000000000000A', mediaType: 'text/csv' } as const;
+
+  async function sealedForA1(): Promise<{
+    store: LocalEncryptedSourceStore;
+    stored: Awaited<ReturnType<LocalEncryptedSourceStore['store']>>;
+  }> {
+    const store = new LocalEncryptedSourceStore({ env: 'local' });
+    const stored = await store.store(ACTOR_A1, CONTEXT, streamOf(bytesOf('date,amount\n')));
+    return { store, stored };
+  }
+
+  it('opens for the subject it was sealed for', async () => {
+    const { store, stored } = await sealedForA1();
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of store.open(ACTOR_A1, stored)) chunks.push(chunk);
+    expect(Buffer.concat(chunks).toString('utf8')).toBe('date,amount\n');
+  });
+
+  it('REFUSES another user in the same tenant', async () => {
+    const { store, stored } = await sealedForA1();
+    await expect(async () => {
+      for await (const chunk of store.open(ACTOR_A2, stored)) void chunk;
+    }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('REFUSES another tenant', async () => {
+    const { store, stored } = await sealedForA1();
+    await expect(async () => {
+      for await (const chunk of store.open(ACTOR_B1, stored)) void chunk;
+    }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('refuses with the SAME message a wrong key would produce — no oracle', async () => {
+    const { store, stored } = await sealedForA1();
+    let message = '';
+    try {
+      for await (const chunk of store.open(ACTOR_B1, stored)) void chunk;
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    // Identical to the failure the decrypt path throws, so "wrong subject" and
+    // "wrong key" are indistinguishable to a caller.
+    expect(message).toBe('authenticated decryption failed');
+  });
+
+  it('another subject cannot verify or erase, and is not told the object exists', async () => {
+    const { store, stored } = await sealedForA1();
+    expect(await store.verify(ACTOR_A1, stored)).toBe(true);
+    // Both answer exactly as an ABSENT object does.
+    expect(await store.verify(ACTOR_B1, stored)).toBe(false);
+    expect(await store.erase(ACTOR_B1, stored)).toBe(false);
+    // …and the bytes are still there for the subject they belong to.
+    expect(await store.verify(ACTOR_A1, stored)).toBe(true);
+    expect(await store.erase(ACTOR_A1, stored)).toBe(true);
+  });
+});
