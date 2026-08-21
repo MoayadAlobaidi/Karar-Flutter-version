@@ -197,20 +197,20 @@ All runs are against **PostgreSQL 17.10** with the server default timezone delib
 | Architecture (`pnpm arch:test`) | **27 passed, 0 failed, 3 deferred to phase 13**; registry errors 0; self-test PASS over 70 cases; all three supplementary checks pass | checkpoint |
 | Documentation (`pnpm docs:check`) | **14/14**, self-test ok over 16 cases, 293 markdown files scanned | checkpoint |
 | Prisma mapping (`node scripts/db/prisma-mapping-check.mjs`) | **61 mapped tables match the live database** | checkpoint |
-| Workspace (`pnpm test`) | **3079 passed / 12 skipped / 0 failed (3091 total)** across 218 files (217 passed, 1 skipped) | checkpoint |
+| Workspace (`pnpm test`) | **3085 passed / 12 skipped / 0 failed (3097 total)** across 218 files (217 passed, 1 skipped) | checkpoint |
 | — of which `modules/financial-accounts` | 206 passed across 11 files | checkpoint |
 | — of which `modules/transactions` | 381 passed across 17 files | checkpoint |
 | — of which `modules/financial-connections` | 147 passed across 12 files | checkpoint |
 | — of which `modules/payment-instruments` | 99 passed across 10 files | checkpoint |
 | — of which `modules/transfer-matching` | 131 passed across 10 files | checkpoint |
 | — of which `modules/statement-imports` | 341 passed across 14 files | checkpoint |
-| Flutter (`flutter test`) | **2069 passed / 1 skipped**; `flutter analyze` reports no issues | checkpoint |
+| Flutter (`flutter test`) | **2070 passed / 1 skipped**; `flutter analyze` reports no issues | checkpoint |
 
 **The architecture summary line and the registry-derived figure used to disagree by one, and no longer do.** `pnpm arch:test` prints **27 passed, 0 failed, 3 skipped**. The asymmetry that caused the old discrepancy — `phase5-ingestion-not-mounted-early` incrementing the failure count on a violation and nothing on a pass — is gone now that all three supplementary checks count on both arms. An earlier revision of this section claimed this paragraph had been removed while it was still here, saying `25 passed` and "two supplementary checks"; that claim was wrong in both figures and in the claim of its own removal, and this is what replaced it.
 
 **Three qualifications, stated rather than smoothed away.**
 
-**The workspace failure, the absent `transfer-matching` count and the six timeouts are all closed, and the cause of the last of them was not the one this report gave.** Every figure in the table above was taken on a settled tree with no concurrent workstream, and the suite is green: 3079 passed, 12 skipped, **0 failed**. The six timeouts previously recorded in database-provisioning suites were attributed here to "a machine under three concurrent suites". That was wrong. `pnpm test` scoped collection twice — in `vitest.config.ts` and again as `--exclude` flags in the script — and a CLI `--exclude` REPLACES the config list rather than adding to it. Neither listed `.claude`, which holds agent worktrees: checkouts of other commits whose test files were collected and run, duplicating the database-provisioning suites against one PostgreSQL. The scope now lives in one place, and the timeouts are gone.
+**The workspace failure, the absent `transfer-matching` count and the six timeouts are all closed, and the cause of the last of them was not the one this report gave.** Every figure in the table above was taken on a settled tree with no concurrent workstream, and the suite is green: 3085 passed, 12 skipped, **0 failed**. The six timeouts previously recorded in database-provisioning suites were attributed here to "a machine under three concurrent suites". That was wrong. `pnpm test` scoped collection twice — in `vitest.config.ts` and again as `--exclude` flags in the script — and a CLI `--exclude` REPLACES the config list rather than adding to it. Neither listed `.claude`, which holds agent worktrees: checkouts of other commits whose test files were collected and run, duplicating the database-provisioning suites against one PostgreSQL. The scope now lives in one place, and the timeouts are gone.
 
 The **one `modules/transactions` test that did not pass** in a shared local database at `66ad086` was `financial-record-lifecycle.integration.test.ts`, which asserts against the live catalogue that no table other than `transactions` carries the dedup identity's column names. It failed when the database also held statement-import staging tables created by a concurrent workstream — which was the assertion working, not failing: it is designed to notice exactly that, and the module that adds such a table owns the decision about whether its columns may share those names. Those tables are now committed as `0101`, and the question is settled the way the assertion intended: `statement_import_rows` names its columns `staged_row_fingerprint` and `staged_row_fingerprint_version`, deliberately not `dedup_fingerprint`, `fingerprint_version` or `occurrence_ordinal`, so a staged row cannot be mistaken for a canonical one by a reader scanning the catalogue.
 
@@ -220,9 +220,9 @@ The **one `modules/transactions` test that did not pass** in a shared local data
 
 The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, which requires Redis and deliberately stops and restarts its compose containers; CI runs it as a separate step that owns those containers, and running it against a Homebrew PostgreSQL would not have been the same test.
 
-**The Flutter numbers were inherited from Phase 4 and were badly stale**, on the reasoning that "this change touches no Dart or platform code" — which stopped being true when the client surface landed. Re-measured on the settled tree at this checkpoint: **Flutter 2069 passed / 1 skipped**. `flutter analyze` reports no issues, and `dart run tool/generate_api_client.dart --check` reports the client in sync (62 operations, 203 schemas). The goldens, localization and mobile-security splits recorded here previously — 4, 38 and 149/1 — are **HISTORICAL, measured at an earlier tree**, and are not re-derived above because the total is what the table carries.
+**The Flutter numbers were inherited from Phase 4 and were badly stale**, on the reasoning that "this change touches no Dart or platform code" — which stopped being true when the client surface landed. Re-measured on the settled tree at this checkpoint: **Flutter 2070 passed / 1 skipped**. `flutter analyze` reports no issues, and `dart run tool/generate_api_client.dart --check` reports the client in sync (62 operations, 203 schemas). The goldens, localization and mobile-security splits recorded here previously — 4, 38 and 149/1 — are **HISTORICAL, measured at an earlier tree**, and are not re-derived above because the total is what the table carries.
 
-**The workspace suite is 3079 passed / 12 skipped / 0 failed, over ten consecutive runs with identical counts and zero orphan scratch databases.** A previous revision of this section recorded **six** failures — five-second timeouts in the three suites that provision and drop whole databases — and explained them as a machine under concurrent load. That explanation was wrong, and the six were not a resource observation. `pnpm test` scoped collection in two places that could disagree, and neither excluded `.claude`, so the agent worktrees under it — checkouts of other commits — had their test files collected and run, duplicating exactly those database-provisioning suites against one PostgreSQL. With collection scoped in one place the suite is green and stays green: ten runs, 3079 / 12 / 0 each time. Nothing was re-run until green and no timeout was raised to hide a failure; the earlier six are recorded here because a report that quietly drops a number it has explained away is not evidence.
+**The workspace suite is 3085 passed / 12 skipped / 0 failed, over ten consecutive runs with identical counts and zero orphan scratch databases.** A previous revision of this section recorded **six** failures — five-second timeouts in the three suites that provision and drop whole databases — and explained them as a machine under concurrent load. That explanation was wrong, and the six were not a resource observation. `pnpm test` scoped collection in two places that could disagree, and neither excluded `.claude`, so the agent worktrees under it — checkouts of other commits — had their test files collected and run, duplicating exactly those database-provisioning suites against one PostgreSQL. With collection scoped in one place the suite is green and stays green: ten runs, identical counts each time. Nothing was re-run until green and no timeout was raised to hide a failure; the earlier six are recorded here because a report that quietly drops a number it has explained away is not evidence.
 
 **Architecture and documentation figures.** `pnpm arch:test` prints **27 passed, 0 failed, 3 skipped**, self-test **70 cases**, and test 24 scans **51** — 49 surface files plus the two central policies, which it did not read at all until the offset defect recorded under *Phase activation* was fixed. There are **three** supplementary checks, not two. `pnpm docs:check` prints **14/14**, self-test ok over **16** cases, **293** markdown files scanned. `pnpm typecheck`, `pnpm build` and `pnpm lint` all exit **0**.
 
@@ -243,7 +243,13 @@ The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, wh
 **Carried forward from Phase 4, unfixed by this work:** no build has run on a device, so the biometric prompt has never been shown to appear; no build is signed and no signing material exists; no Apple Team ID exists; the compound credential-abandonment guarantee is local-only; golden baselines are not CI-enforced; **EV-427 is `PENDING` and overdue**, with no DNS record and all seven registrar hardening rows still `TO_VERIFY`; and one maintainer holds every role. Runtime conformance still covers 82 of the 128 non-financial declared pairs — the Phase 5 surface brought its own suite covering 139 of its 172, so the merged contract's 300 pairs are 221 covered and 79 not.
 ## Review findings and their disposition
 
-An independent review pass was run over the remediated foundation. It implemented nothing; every fix below was made afterwards and re-verified.
+This section covers two passes, and they were not the same kind of thing.
+
+**The earlier pass (F1 onward) was NOT independent, and this document said it was.** It was performed by the same session that wrote the tree, after three attempts to launch separate reviewers failed. A pass that reviews its own work can find the defects it did not think of at the time, and the F-numbered findings below are real, but it cannot be the check that clears a checkpoint — the reviewer and the author share every blind spot. Calling it independent was the wrong word, and it is corrected here rather than quietly dropped.
+
+**The later pass WAS independent**, and is recorded under *Independent review* below: two fresh reviewers that had implemented none of this tree, running read-only with the write tools withheld rather than merely forbidden. Every finding was reproduced by the lead before anything was changed.
+
+Neither pass implemented anything; every fix below was made afterwards and re-verified.
 
 ### Fixed
 
@@ -290,6 +296,66 @@ Message: `occurrence_ordinal 1 is not the next occurrence of this content identi
 
 Both conditions below have since been closed in code; they are kept because they explain why earlier figures in this report differ from the current ones. First, the local PostgreSQL server ran with `TimeZone=Asia/Qatar`, which is F3 above. Second, on a 12-core machine the suite provisions enough concurrent databases and pools to exhaust a default `max_connections = 100`; when it does, whole suites SKIP rather than fail (the fixtures probe the server and skip when it is unreachable), and the skip count rises from 12 to 25. A run whose skip count is not 12 has not verified what it appears to have verified.
 
+## Independent review
+
+Two reviewers, neither of which had implemented any part of this tree, read it read-only in separate worktrees: one security and adversarial, one architecture and documentation honesty. Their write tools were withheld rather than forbidden, so read-only is a property of what they could do and not of what they were asked to do. Both were given the binding constraint list and told to falsify it rather than confirm it. Neither was told what the lead believed.
+
+They also exposed a defect in the arrangement itself: the worktrees were created from `main` rather than from the branch, so the first minutes of both reviews were spent reading a tree in which none of Phase 5 exists. Both were redirected, and their reported figures were re-taken afterwards. It is recorded because a review of the wrong tree that nobody noticed would have produced a confident, worthless clean bill.
+
+**Every BLOCKING, HIGH and MEDIUM finding was independently reproduced by the lead before any fix was written.** Two reproductions did not match the report exactly, and the difference mattered both times — recorded below rather than smoothed over.
+
+### R1 (BLOCKING) — a 200 KB upload stalled every tenant for 48 seconds
+
+`StreamingCsvParser` measured the in-progress record by re-encoding it on every character, which is O(n²) in record length. Because a record is not bounded until one of those byte counters trips, the whole quadratic cost was paid before any bound could refuse the input. Reproduced against the real parser, not a re-implementation: 12,500 characters 566 ms, 25,000 1,125 ms, 50,000 4,000 ms, 100,000 13,794 ms, 200,000 **48,713 ms** — for a body of 200 KB, 2% of the declared 10 MB ceiling, carrying no delimiter and no newline.
+
+Two reported details were wrong, and both understated the problem in one way and overstated it in another. `maxFieldBytes` **is** reached — at end-of-input, during finalisation — so the parse does refuse rather than run to the 8 MB buffer ceiling; the report's extrapolation to ~20 hours does not apply. But the deadline is worse than described: the 200,000-character parse ran **48.7 seconds against a 30-second deadline** and ended in `FIELD_TOO_LARGE`, not `DEADLINE_EXCEEDED`, because the deadline is checked only at chunk and record boundaries and a single-chunk unterminated record reaches neither. Node runs one thread and the parse route awaits the drain inline, so this was every tenant's requests stalled by one authenticated upload.
+
+Fixed: byte counters maintained incrementally, the field bounded as it grows, and time checked on a character stride. Same input, same refusal, **0 ms**. Three tests pin it, each run against the pre-fix parser to prove it fails there — they took 206 s, 287 s and 50 s and failed.
+
+### R2 (HIGH) — the lane that ran the database suites never required a database
+
+The main CI `Test` step did not set `KARAR_INTEGRATION`, so `skipUnlessDatabaseRequired` turned an unreachable database into a skip across 40+ integration suites and the lane passed having run none of them. `connection-budget.ts` records this exact regression happening before.
+
+Reproducing it found the reason it had been left that way: the flag was doing two incompatible jobs. It also enables `readiness.integration.test.ts`, which stops and restarts the compose containers and kills the other suites' connections mid-test — so the main lane could not declare the database required without also turning that suite loose on it. The readiness suite now gates on `KARAR_READINESS_SUITE`.
+
+### R3 (HIGH) — the published test totals were a function of who had an agent running
+
+`pnpm test` scoped collection twice, in `vitest.config.ts` and again as `--exclude` flags in the script, and a CLI `--exclude` REPLACES the config list rather than adding to it. Neither listed `.claude`, which holds agent worktrees — checkouts of other commits whose test files were collected and run. Verified directly: a test file placed under `.claude/` was collected and executed.
+
+This is also the real cause of the six timeouts this report previously recorded and attributed to concurrent workstreams. That attribution was wrong: the duplicated suites were provisioning databases against one PostgreSQL. With collection scoped in one place the suite is green over ten consecutive runs with identical counts.
+
+The same defect had already been found and fixed for `docs:check` during this checkpoint — 293 markdown files became 821 with two agents running — but the fix was not carried to the vitest invocation or to eslint, where nested checkouts made **every** file in the tree unparseable.
+
+### R4 (HIGH) — the documents denied code that had been running for weeks
+
+Six `MODULE.md` files and five layer READMEs denied an HTTP surface that is mounted and conformance-tested; three current-state documents denied a Flutter financial surface that exists in seven feature folders; one document contradicted itself ten lines apart; and this report asserted it had removed a paragraph that was still present, whose figures were also wrong. Eighteen further layer READMEs called themselves skeletons while holding between 1 and 20 production files. All corrected against measurement, and listed in *Documentation updated*.
+
+The reviewer's sharpest point was about the guard added earlier in this same checkpoint to prevent exactly this: `checkDerivedFacts` was a blacklist of six phrases over eight named files, and the commit adding it claimed it scanned every current-state document. It did not, which is why it missed all of the above. Two derived rules replace that claim — a module the API app wires may not carry a transport denial, and a directory holding code may not call itself a skeleton — both keyed per module and per directory, so the 42 genuinely empty ones stay legal.
+
+### R5 (MEDIUM) — eight characters is not eight bytes
+
+`MASK_SHAPE` permits U+2022, which is three bytes; `MAX_INSTRUMENT_MASK_LENGTH` counted characters; migration 0098 bounds the column at eight **octets**. An ordinary four-bullet mask was accepted by the domain at 16 bytes and refused by the column as an unhandled constraint violation. Latent — only the list operation is mounted and no create route exists in Phase 5 — and it would have fired the day a write route landed. The security direction was never wrong: the byte bound is the stricter of the two.
+
+The test that claimed to pin the two bounds used `****1234`, pure ASCII, where characters and bytes cannot disagree. It passed for the wrong reason and could never have caught this.
+
+### R6 (LOW) — a catch-all body parser answered for the whole service
+
+`registerCsvContentTypeParser` registers `/^.*$/` on the shared Fastify instance, so any request to any route carrying a media type Fastify has no exact parser for stopped getting Fastify's 415 and started getting the `UNSUPPORTED_BODY` sentinel as its body. No route was found that would proceed on such a body, so nothing was exploitable — but that is a property of every other route rather than of this file. Now scoped to the one upload route.
+
+### R7 (LOW) — two guards that agreed with themselves
+
+The Flutter route-derivation test never descended into `route.routes`, and asserted its length against a count using the same top-level-only filter, so a nested financial route would have been absent from both sides and the check would still have agreed. The non-financial conformance suite pinned only its covered list, with no partition, so a status added to a contract fragment landed in neither ledger silently. Both closed, and both proved on the real scenario rather than by adjusting a number.
+
+### Reported and not changed
+
+**No rate limiting on the financial routes.** Confirmed: those controllers carry only `FinancialCapabilityGuard`, and the Redis sliding-window limiter composed in `phase3-modules.ts` is not applied to them. It is not fixed here because it is a design decision about the whole surface rather than a defect in one path, and R1 — which is what made it a sustained outage rather than a single stall — is fixed. Recorded in *Deferred work*.
+
+**`phase5-ingestion-not-mounted-early` cannot fail again.** Correct: `currentPhase` is 5 and moves only forward, so the check scans zero files and its pass is counted in the headline 27. This was already disclosed here; it was NOT disclosed in `README.md` or `docs/testing/architecture-tests.md`, which presented the supplementary checks as passing controls. Both now say so.
+
+**Architecture test 7 does not scan the layers where a float would enter.** Correct: it covers the pure packages and every module `domain` and `application`, not `infrastructure/persistence/row-mappers.ts` or `apps/api/src/financial/transaction-input.ts`. The reviewer checked both by hand and found them correct today, so this is a scope gap rather than a violation. AC-001's claim has been narrowed to the scope its evidence actually covers, which is what was overstated.
+
+**Categorization is proven end-to-end through a stub the test configures.** Correct, and the test says so. The default wiring uses the real evaluator over an empty rule corpus, so no test exercises real rule matching on the live commit path. Recorded in *Deferred work* rather than papered over.
+
 ## Accepted risks
 
 None accepted by this phase yet; the register carries 41 rows at the Phase 4 close. Phase 5 risk rows are written at the phase's gate, once the surface they describe exists.
@@ -299,12 +365,14 @@ Four items deferred at the previous checkpoint have since landed: CSV statement 
 
 Still deferred **by this checkpoint**, deliberately and in this order:
 
-1. **A file picker adapter.** The Flutter surface itself is no longer deferred — it was built later in this phase — but the statement-import flow sits above a picker port with no implementation, so nobody can choose a file. A plugin would add a platform permission and a test pins a real build's permissions to the reviewed set; the intended implementation is a first-party channel over `ACTION_OPEN_DOCUMENT` and `UIDocumentPickerViewController`, which needs no permission and which nothing here has exercised on a device.
-2. **The categorization pipeline.** Merchant rules are schema and domain; nothing applies them.
+1. **A build on a device.** The picker adapter is no longer deferred — it is implemented natively on Android and iOS, over `ACTION_OPEN_DOCUMENT` with `CATEGORY_OPENABLE` and over `UIDocumentPickerViewController` with `asCopy:false`, adding no platform permission. What is still deferred is running any of it on hardware: **no build has run on a device**, so the picker, the surface and the whole import path are verified by test and by inspection only.
+2. **Real merchant-rule matching on the live commit path.** The categorization pipeline is no longer deferred — it runs on both write paths. What no test exercises is the real `MerchantRuleEvaluator` deciding a category during a live CSV commit: the default wiring uses the real evaluator over an empty rule corpus, and the test that asserts a committed row's category configures a stub that always matches. The stub says so, and the seam is proven; the decision is not.
 3. **Account deletion over HTTP**, which waits on a chosen contract for a non-atomic partial outcome rather than on more code.
 4. **`SuggestTransferMatch`, `RecordReportedBalance`, `CreateManualConnection` and every payment-instrument write.** Their routes are not in the contract, so their use cases are deliberately absent from the bundle the controllers can call — a bundle carrying a use case nothing calls invites the route to appear later without the contract review that should precede it.
 5. **The retention decision**, which is legal work and blocks any deployed environment.
-6. **Phase 5 evidence rows and risk rows**, written at the phase's compliance gate rather than at a mid-phase checkpoint.
+6. **Phase 5 evidence rows and risk rows**, written at the phase's compliance gate rather than at a mid-phase checkpoint. The four Phase 5 assurance-claim rows (AC-032 to AC-035) were added at this checkpoint and carry no `EV-` reference for the same reason.
+7. **Rate limiting on the financial routes.** Those controllers carry only `FinancialCapabilityGuard`; the Redis sliding-window limiter exists and is composed in `phase3-modules.ts` but is not applied to them. Raised by independent review. Deferred because it is a decision about the whole surface rather than a defect in one path — and because the finding that made its absence an outage rather than a single stall, the quadratic parser, is fixed.
+8. **Widening architecture test 7 to the boundary layers.** It scans the pure packages and every module `domain` and `application`, not the DB-to-domain and wire-to-domain mappers where a float would actually enter. Both were read by hand at this checkpoint and are correct; AC-001's claim has been narrowed to the scope its evidence covers rather than left overstated.
 
 The eleven active deferred items from the Phase 4 gate stand, item 8 having been discharged when the artifact lanes became required checks.
 ## Documentation updated

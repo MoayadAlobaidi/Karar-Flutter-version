@@ -413,6 +413,10 @@ function checkDerivedFacts() {
         'cannot be chosen on a device',
         'no picker adapter ships',
         'picker port with no adapter',
+        // The deferred-work list said this and rules C/D did not know the
+        // words. Every phrase here was found in the tree, not imagined.
+        'picker port with no implementation',
+        'nobody can choose a file',
       ]) {
         if (text.toLowerCase().includes(claim)) {
           problems.push(`${rel} says "${claim}" while both native picker implementations exist`);
@@ -429,7 +433,11 @@ function checkDerivedFacts() {
       for (const rel of CURRENT_STATE_DOCS) {
         const text = read(rel);
         if (text === null) continue;
-        for (const claim of ['nothing applies merchant rules', 'categorization is assignment, not a pipeline']) {
+        for (const claim of [
+          'nothing applies merchant rules',
+          'categorization is assignment, not a pipeline',
+          'merchant rules are schema and domain; nothing applies them',
+        ]) {
           if (text.toLowerCase().includes(claim)) {
             problems.push(`${rel} says "${claim}" while both write paths invoke the evaluator`);
           }
