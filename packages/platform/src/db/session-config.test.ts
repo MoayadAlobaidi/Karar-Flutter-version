@@ -21,6 +21,7 @@ import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { PostgresPersistenceAdapter } from './adapter.js';
+import { skipUnlessDatabaseRequired } from './connection-budget.js';
 import { LocalPostgresConnectionProfile, maintenanceDatabase } from './connection-profile.js';
 import { createPrismaClient } from './prisma.js';
 import {
@@ -35,7 +36,26 @@ const profile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
 });
 
-async function serverIsReachable(): Promise<boolean> {
+/**
+ * Reachability, ROUTED THROUGH THE GLOBAL REQUIREMENT.
+ *
+ * This probe used to swallow its exception and return `false`, and this file
+ * was named in `scripts/checks/integration-required-setup.mts` as the one
+ * test of the Prisma-session timezone pinning. The global setup closed the
+ * case where the port is shut: it opens a socket before collection and fails
+ * the run. It cannot close the case where the port ANSWERS and the connection
+ * still fails — a wrong role password, a missing maintenance database, an
+ * exhausted connection limit, an auth method the client cannot satisfy. Every
+ * one of those left this suite skipping green inside a run that had declared
+ * the database required.
+ *
+ * `skipUnlessDatabaseRequired` is the single decision the rest of the
+ * repository's fixtures already ask. It throws under `KARAR_INTEGRATION=1`
+ * with the suite named and the driver's own reason attached, and returns a
+ * skip otherwise — so a developer without a database still runs the pure
+ * assertions above, and a verification run cannot.
+ */
+async function unreachableReason(): Promise<string | null> {
   const client = new pg.Client({
     host: profile.host,
     port: profile.port,
@@ -46,13 +66,17 @@ async function serverIsReachable(): Promise<boolean> {
   try {
     await client.connect();
     await client.end();
-    return true;
-  } catch {
-    return false;
+    return null;
+  } catch (error) {
+    await client.end().catch(() => {});
+    return error instanceof Error ? error.message : String(error);
   }
 }
 
-const reachable = await serverIsReachable();
+const skipped = skipUnlessDatabaseRequired(
+  'platform session-config suite (live PostgreSQL)',
+  await unreachableReason(),
+);
 
 describe('pool configuration', () => {
   it('pins the session timezone as a startup parameter, not a statement', () => {
@@ -76,7 +100,7 @@ describe('pool configuration', () => {
   });
 });
 
-describe.skipIf(!reachable)('every session is UTC on a live server', () => {
+describe.skipIf(skipped)('every session is UTC on a live server', () => {
   const adapter = new PostgresPersistenceAdapter(profile);
   const prisma = createPrismaClient(profile);
 
