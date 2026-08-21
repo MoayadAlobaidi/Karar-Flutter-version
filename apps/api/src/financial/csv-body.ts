@@ -69,6 +69,8 @@ interface ByteStream extends AsyncIterable<Uint8Array> {
 
 interface ParserRequest {
   readonly headers: Record<string, string | string[] | undefined>;
+  /** Present on Fastify requests; the parser runs after routing. */
+  readonly url?: string;
 }
 
 type ParserDone = (error: Error | null, body?: unknown) => void;
@@ -157,6 +159,25 @@ function drainBounded(payload: ByteStream): void {
  * every other route in the service, and gives this route a body it can answer
  * 415 about instead of a framework error it cannot shape.
  */
+/**
+ * The one route that uploads bytes: `POST /financial/statement-imports/:id/source`.
+ *
+ * The catch-all matcher below is registered on the SHARED Fastify instance,
+ * because that is the only instance there is — so without this guard the
+ * parser answers for every route in the service, and any request carrying a
+ * media type Fastify has no exact parser for stops getting Fastify's own 415
+ * and starts getting the UNSUPPORTED_BODY symbol as its body. No route was
+ * found that would proceed on such a body, but "no route does this today" is a
+ * property of every other route rather than of this file, and it is not one
+ * this file can keep true.
+ */
+const SOURCE_UPLOAD_PATH = /^\/financial\/statement-imports\/[^/?#]+\/source(?:[?#]|$)/;
+
+/** True when this request targets the upload route this parser exists for. */
+function targetsSourceUpload(request: ParserRequest): boolean {
+  return typeof request.url === 'string' && SOURCE_UPLOAD_PATH.test(request.url);
+}
+
 export function registerCsvContentTypeParser(host: ContentTypeParserHost): void {
   // ANCHORED, and Fastify asks for that in a security warning rather than a
   // style note: an unanchored matcher leaves it unable to tell the essence
@@ -164,6 +185,11 @@ export function registerCsvContentTypeParser(host: ContentTypeParserHost): void 
   // `text/csv; boundary=…` gets routed by a parser that never looked past the
   // first character. The essence is compared inside the parser too.
   host.addContentTypeParser(/^.*$/, (request, payload, done) => {
+    // Every other route keeps the framework's behaviour, including its 415.
+    if (!targetsSourceUpload(request)) {
+      done(new UnsupportedMediaTypeError(), undefined);
+      return;
+    }
     if (essenceOf(headerValue(request, 'content-type')) !== CSV_MEDIA_TYPE) {
       drainBounded(payload);
       done(null, UNSUPPORTED_BODY);
@@ -174,6 +200,19 @@ export function registerCsvContentTypeParser(host: ContentTypeParserHost): void 
     // process never holds a whole statement.
     done(null, payload);
   });
+}
+
+/**
+ * What a route outside this parser's scope gets: the same 415 Fastify would
+ * have produced itself, carrying the status code it sets on the error.
+ */
+class UnsupportedMediaTypeError extends Error {
+  readonly statusCode = 415;
+
+  constructor() {
+    super('Unsupported Media Type');
+    this.name = 'UnsupportedMediaTypeError';
+  }
 }
 
 /** True when the parser handed the handler a body it must refuse. */

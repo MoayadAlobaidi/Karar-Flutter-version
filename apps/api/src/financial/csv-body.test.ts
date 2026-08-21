@@ -21,6 +21,7 @@ import {
   declaredLengthExceedsBound,
   isByteStream,
   isUnsupportedBody,
+  registerCsvContentTypeParser,
 } from './csv-body.js';
 import { CSV_STATEMENT_LIMITS } from './use-cases.js';
 
@@ -101,5 +102,110 @@ describe('the body the route accepts', () => {
     // service's own problem writer rather than by Fastify's error path.
     expect(isUnsupportedBody(Symbol.for('karar.api.financial.unsupported-body'))).toBe(true);
     expect(isUnsupportedBody({ some: 'json' })).toBe(false);
+  });
+});
+
+describe('the catch-all parser answers only for the route it exists for', () => {
+  // The matcher is `/^.*$/` on the SHARED Fastify instance, because that is the
+  // only instance there is. Registered without a scope guard it answered for
+  // every route in the service: any request carrying a media type Fastify has
+  // no exact parser for stopped getting Fastify's own 415 and started getting
+  // the UNSUPPORTED_BODY sentinel as its body. Nothing was found that would
+  // proceed on such a body, but that was a property of every other route rather
+  // than of this file, and not one this file could keep true.
+  interface Registered {
+    readonly parser: (
+      request: { headers: Record<string, string>; url?: string },
+      payload: unknown,
+      done: (error: Error | null, body?: unknown) => void,
+    ) => void;
+  }
+
+  function register(): Registered {
+    let captured: Registered['parser'] | null = null;
+    registerCsvContentTypeParser({
+      addContentTypeParser: (_matcher: RegExp, parser: Registered['parser']) => {
+        captured = parser;
+        return undefined;
+      },
+    } as never);
+    if (captured === null) throw new Error('no parser registered');
+    return { parser: captured };
+  }
+
+  /**
+   * A payload the parser can drain. `drainBounded` attaches Node stream
+   * listeners, so an async generator is not enough for the refusal paths.
+   */
+  function streamStub(): AsyncGenerator<Uint8Array> & {
+    on(event: string, listener: (chunk: Uint8Array) => void): unknown;
+    resume(): unknown;
+    destroy(): void;
+  } {
+    const stream = chunks([]) as AsyncGenerator<Uint8Array> & Record<string, unknown>;
+    stream['on'] = () => stream;
+    stream['resume'] = () => stream;
+    stream['destroy'] = () => undefined;
+    return stream as never;
+  }
+
+  function answer(url: string | undefined, contentType: string): { error: Error | null; body: unknown } {
+    const { parser } = register();
+    let outcome: { error: Error | null; body: unknown } = { error: null, body: undefined };
+    parser(
+      { headers: { 'content-type': contentType }, ...(url === undefined ? {} : { url }) },
+      streamStub(),
+      (error, body) => {
+        outcome = { error, body };
+      },
+    );
+    return outcome;
+  }
+
+  const UPLOAD = '/financial/statement-imports/01J0000000000000000000000A/source';
+
+  it('hands the upload route its stream', () => {
+    const { error, body } = answer(UPLOAD, 'text/csv');
+    expect(error).toBeNull();
+    expect(isByteStream(body)).toBe(true);
+  });
+
+  it('hands the upload route the sentinel for any other media type', () => {
+    const { error, body } = answer(UPLOAD, 'application/xml');
+    expect(error).toBeNull();
+    expect(isUnsupportedBody(body)).toBe(true);
+  });
+
+  it('refuses 415 for every other route rather than handing over a sentinel', () => {
+    for (const url of [
+      '/auth/login',
+      '/financial/transactions',
+      '/financial/statement-imports',
+      '/financial/statement-imports/01J0000000000000000000000A',
+      '/financial/statement-imports/01J0000000000000000000000A/parse',
+      undefined,
+    ]) {
+      const { error, body } = answer(url, 'application/xml');
+      expect({ url, unsupported: isUnsupportedBody(body) }).toEqual({ url, unsupported: false });
+      expect(error).not.toBeNull();
+      expect((error as { statusCode?: number } | null)?.statusCode).toBe(415);
+    }
+  });
+
+  it('does not treat a lookalike path as the upload route', () => {
+    for (const url of [
+      '/financial/statement-imports/x/source/extra',
+      '/other/financial/statement-imports/x/source',
+      '/financial/statement-imports//source',
+    ]) {
+      const { error } = answer(url, 'text/csv');
+      expect({ url, refused: error !== null }).toEqual({ url, refused: true });
+    }
+  });
+
+  it('accepts the upload route with a query string', () => {
+    const { error, body } = answer(`${UPLOAD}?x=1`, 'text/csv');
+    expect(error).toBeNull();
+    expect(isByteStream(body)).toBe(true);
   });
 });
