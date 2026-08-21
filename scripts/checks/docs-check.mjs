@@ -62,7 +62,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { childDirs, ensureOutDir, readJson, readText, walkFiles } from './lib/util.mjs';
+import {
+  childDirs,
+  ensureOutDir,
+  EXCLUDED_DIRS,
+  readJson,
+  readText,
+  walkFiles,
+} from './lib/util.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
@@ -329,7 +336,7 @@ function checkDerivedFacts() {
       for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
         const full = path.join(d, entry.name);
         if (entry.isDirectory()) {
-          if (['dist', 'node_modules', '__tests__'].includes(entry.name)) continue;
+          if (EXCLUDED_DIRS.has(entry.name) || entry.name === '__tests__') continue;
           walk(full);
         } else if (filter(full)) n += 1;
       }
@@ -881,6 +888,16 @@ function buildSelfTestFixture() {
   // STALE_FILE is deliberately never written, so the allowance that names it has
   // nothing to suppress and check 12 has something real to report.
 
+  // A nested checkout (a linked worktree's `.git` is a FILE, not a directory)
+  // and an agent scratch tree. Both carry a real violation, and neither may be
+  // scanned: otherwise every "scanned: N" figure this project publishes as
+  // evidence depends on who happens to have an agent running, and a check that
+  // requires a file to be PRESENT can be satisfied by a copy of some other
+  // commit rather than by this tree.
+  write('nested-checkout/.git', 'gitdir: /elsewhere/.git/worktrees/nested\n');
+  write('nested-checkout/docs/nested.md', '# Nested\n\nAs an AI, I cannot verify this.\n');
+  write('.claude/worktrees/agent-x/docs/agent.md', '# Agent\n\nAs an AI, I cannot verify this.\n');
+
   // Legitimate shapes, all in one file: none of them may raise a problem.
   write(
     'docs/clean.md',
@@ -955,6 +972,9 @@ const NEGATIVE_SELF_TEST_CASES = [
   { check: 'no-ai-attribution', forbid: /clean\.md/ },
   { check: 'no-generated-by-line', forbid: /clean\.md/ },
   { check: 'no-assistant-boilerplate', forbid: /clean\.md/ },
+  // The walk stops at the edge of this checkout.
+  { check: 'no-assistant-boilerplate', forbid: /nested-checkout/ },
+  { check: 'no-assistant-boilerplate', forbid: /(^|[/\\])\.claude[/\\]/ },
   // The allowance does its job on the file it names…
   ...(ALLOWED_ENTRY
     ? [
