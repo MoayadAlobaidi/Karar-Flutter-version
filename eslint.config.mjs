@@ -13,6 +13,10 @@ export default [
       '**/build/**',
       '**/coverage/**',
       'apps/mobile/**',
+      // Agent worktrees are nested checkouts. Left in, they make every file in
+      // this tree fail to parse: tseslint sees several candidate tsconfig roots
+      // and refuses to guess.
+      '.claude/**',
     ],
   },
   js.configs.recommended,
