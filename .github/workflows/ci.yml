@@ -88,19 +88,27 @@ jobs:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
           REDIS_PORT: '6379'
+          # The compose services above came up with --wait, so the database IS
+          # reachable and every suite that needs one must RUN. Without this,
+          # `skipUnlessDatabaseRequired` turns an unreachable database into a
+          # skip and the lane exits green having verified none of it -- which
+          # is what happened before, and what connection-budget.ts records.
+          KARAR_INTEGRATION: '1'
         run: pnpm test
 
       # The readiness suite STOPS AND RESTARTS the compose postgres and redis
       # containers to prove recovery (EV-216). It must own them alone: run
       # concurrently with the other 80+ database suites it kills their
       # connections mid-test (observed on the Phase 3 PR), so it runs as its
-      # own step after the main suite, gated by KARAR_INTEGRATION as before.
+      # own step after the main suite, gated by KARAR_READINESS_SUITE so the main lane
+      # can declare the database required without also restarting its containers.
       - name: Readiness recovery suite (restarts postgres and redis)
         env:
           KARAR_ENV: local
           POSTGRES_PORT: '5432'
           REDIS_PORT: '6379'
           KARAR_INTEGRATION: '1'
+          KARAR_READINESS_SUITE: '1'
         run: pnpm --filter @karar/api exec vitest run src/readiness.integration.test.ts
 
       - name: Stop local PostgreSQL and Redis

@@ -31,7 +31,15 @@ const budget = connectionBudget(process.env, os.cpus().length);
 
 export default defineConfig({
   test: {
-    exclude: ['**/node_modules/**', '**/dist/**'],
+    // The ONE place collection is scoped. It used to be stated here and again
+    // as --exclude flags in the `test` script, and a CLI --exclude REPLACES
+    // this list rather than adding to it — so the two could drift, and did.
+    //
+    // `.claude` holds agent worktrees, which are checkouts of OTHER commits.
+    // Collected, they double the suite with duplicates that provision
+    // databases concurrently against the same PostgreSQL, and every published
+    // test total becomes a function of who happened to have an agent running.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**'],
     maxWorkers: budget.workers,
     minWorkers: 1,
   },

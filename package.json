@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build",
-    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\"",
+    "test": "vitest run",
     "arch:test": "node scripts/checks/architecture.mjs",
     "docs:check": "node scripts/checks/docs-check.mjs"
   },
