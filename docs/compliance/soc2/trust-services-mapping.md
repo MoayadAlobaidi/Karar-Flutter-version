@@ -1,6 +1,10 @@
 # Trust Services Mapping
 
-**Status:** ACTIVE mapping view · **Owner:** Compliance Owner · **Version:** 0.6 · **Date:** 2026-08-18 · **Review:** every phase gate (mapping deltas per gate report §5)
+**Status:** ACTIVE mapping view · **Owner:** Compliance Owner · **Version:** 0.7 · **Date:** 2026-08-22 · **Review:** every phase gate (mapping deltas per gate report §5)
+
+**v0.7 (2026-08-22, Phase 5 gate): swept against matrix v0.7, and the delta is that there is no delta.** Phase 5 added **no control row** and moved **no control status**, so no criterion gains or loses a mapped control and no quoted status changes. That is recorded here explicitly rather than left as an absent version entry: a framework view with no entry for a phase is indistinguishable from one nobody re-read.
+
+**What the sweep did change is one thing outside the table.** The Phase 4 `[P4]` contingency marker was **resolved** — the gate executed, PR #7 merged, and CI and Security ran green on the close-out head and the merge commit — so the 21 `IMPLEMENTED [P4]` controls mapped into CC6.1, CC7.1, CC8.1 and the rest are no longer contingent on a run that had not happened. Their status is unchanged; what changed is that the caveat attached to it is discharged. **Nothing became OPERATING or EVIDENCED**, no examination is scheduled, and the tally the criteria are counted against is the matrix's own 116 rows.
 
 **v0.6 (2026-08-18, Phase 4):** re-swept against **matrix v0.6**, which adds **KAR-CTL-094–116** (20 IMPLEMENTED [P4], 2 DESIGNED, 1 DEFERRED). The Phase 4 controls are mapped into CC6.1, CC6.2, CC6.3, CC6.6, CC6.7, CC6.8, CC7.1, CC8.1, A1.1, PI1.1–PI1.2, C1.1, P2, P3 and CC2.3, and the gaps section gains three entries. **No existing status was re-quoted and no fork was found** — every pre-Phase-4 pair below was re-read against the matrix and the sweep reported zero disagreements.
 
