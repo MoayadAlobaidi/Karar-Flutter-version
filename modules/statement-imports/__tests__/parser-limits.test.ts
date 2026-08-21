@@ -409,3 +409,86 @@ describe('cancellation', () => {
     ).toBe('CANCELLED');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cost of consuming a character
+// ---------------------------------------------------------------------------
+
+/**
+ * The parser used to measure the in-progress record by RE-ENCODING it on every
+ * character, which made a parse quadratic in record length. Because a record
+ * carries no bound until one of the byte counters trips, the entire cost was
+ * paid before the bound could refuse anything: a 200 KB body with no delimiter
+ * and no newline held the event loop for 48.7 seconds and then answered
+ * FIELD_TOO_LARGE. Node runs one thread, and `POST /financial/statement-
+ * imports/:importId/parse` awaits this parse inline, so that was every tenant's
+ * request stalled by one authenticated upload well inside every declared limit.
+ *
+ * These tests pin the two properties that fix depends on, so the quadratic form
+ * cannot come back unnoticed.
+ */
+describe('a pathological record cannot buy unbounded work', () => {
+  it('refuses a field with no delimiter and no newline in time that stays flat', async () => {
+    // Quadratic cost would show as ~4x per doubling. The assertion is on the
+    // RATIO rather than on any absolute duration, so a slow or loaded machine
+    // does not turn this into a flake: what is being tested is the shape of
+    // the growth, not the speed of the host.
+    const limits = policy({ maxFieldBytes: 4 * 1024 * 1024, maxBufferedBytes: 8 * 1024 * 1024 });
+    const timed = async (n: number): Promise<number> => {
+      const started = process.hrtime.bigint();
+      await refusalOf('a'.repeat(n), limits);
+      return Number(process.hrtime.bigint() - started) / 1e6;
+    };
+    await timed(50_000); // warm, so JIT does not pay for the first measurement
+    const small = await timed(100_000);
+    const large = await timed(400_000);
+    // Four times the input. Linear predicts ~4x, quadratic predicts ~16x.
+    // A generous ceiling still separates them decisively.
+    expect(large / Math.max(small, 0.5)).toBeLessThan(8);
+  });
+
+  it('bounds the field AS IT GROWS, not only where it ends', async () => {
+    // No delimiter and no newline anywhere: under the old code the field bound
+    // was reached only at end-of-input, so the whole body was consumed first.
+    const limits = policy({ maxFieldBytes: 64, maxBufferedBytes: 8 * 1024 * 1024 });
+    expect(await refusalOf('a'.repeat(500_000), limits)).toBe('FIELD_TOO_LARGE');
+  });
+
+  it('reaches its DEADLINE inside a single record, where there is no boundary to check at', async () => {
+    // The deadline used to be checked only at chunk and record boundaries. An
+    // input that is one chunk and one unterminated record reaches neither, so
+    // the declared wall-clock budget could not stop it — which is exactly how
+    // a 48-second parse survived a 30-second deadline.
+    const START = Date.parse('2026-08-12T09:00:00.000Z');
+    let calls = 0;
+    const clock = (): Date => {
+      calls += 1;
+      // Still inside the budget for the first few reads, then past it.
+      return new Date(START + (calls > 2 ? 10_000 : 0));
+    };
+    const limits = policy({ maxFieldBytes: 4 * 1024 * 1024, maxBufferedBytes: 8 * 1024 * 1024 });
+    expect(
+      await refusalOf('a'.repeat(200_000), limits, {
+        now: clock,
+        deadlineAt: new Date(START + 1_000),
+      }),
+    ).toBe('DEADLINE_EXCEEDED');
+  });
+});
+
+describe('the byte counters agree with the encoder', () => {
+  // The counters are maintained incrementally, so a wrong width silently moves
+  // every byte bound. They are checked against TextEncoder over content that
+  // uses all four UTF-8 widths, including an astral code point.
+  const SAMPLES = ['plain', 'Ω', 'ß', 'رصيد', 'مصرف الراجحي', '𝄞', '👨‍👩‍👧‍👦', 'a٤b'];
+
+  for (const sample of SAMPLES) {
+    it(`bounds ${JSON.stringify(sample)} at exactly its encoded length`, async () => {
+      const exact = bytesOf(sample).byteLength;
+      // At the bound: accepted. One byte under it: refused. That pair pins the
+      // count exactly — an over- or under-count moves one of the two.
+      expect(await refusalOf(sample, policy({ maxFieldBytes: exact }))).toBe('ACCEPTED');
+      expect(await refusalOf(sample, policy({ maxFieldBytes: exact - 1 }))).toBe('FIELD_TOO_LARGE');
+    });
+  }
+});

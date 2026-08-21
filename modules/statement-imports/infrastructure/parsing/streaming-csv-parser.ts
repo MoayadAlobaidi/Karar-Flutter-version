@@ -74,6 +74,9 @@ import { CsvParseRefusedError } from '../../application/ports/csv-parser.js';
 import { UPLOADED_FILE_CONTENT, UntrustedSourceText } from '../../domain/content-trust.js';
 
 /** Stored on every committed transaction's provenance. */
+/** Characters consumed between wall-clock and cancellation checks. */
+const TIME_CHECK_STRIDE = 4096;
+
 export const CSV_PARSER_VERSION = 'statement-csv/rfc4180-streaming/v1';
 
 /**
@@ -152,6 +155,19 @@ class ParseState {
   /** The record being read: completed fields plus the field in progress. */
   #fields: string[] = [];
   #current = '';
+  /**
+   * Bytes held by `#current`, and by the completed `#fields`, maintained
+   * incrementally.
+   *
+   * These exist because the sizes MUST be O(1) to read. Re-encoding the record
+   * to measure it — which is what this parser used to do, on every character —
+   * makes a parse quadratic in record length, and a record is not bounded
+   * until one of these counters trips. So the whole cost was paid before the
+   * bound could refuse it: a 200 KB field with no delimiter and no newline
+   * blocked the event loop for 48 seconds and still ended in FIELD_TOO_LARGE.
+   */
+  #currentBytes = 0;
+  #fieldsBytes = 0;
   #inQuotes = false;
   /** True immediately after a closing quote, to detect `""` escapes. */
   #quoteJustClosed = false;
@@ -211,7 +227,20 @@ class ParseState {
         );
       }
 
+      let sinceTimeCheck = 0;
       for (const character of text) {
+        // A record carrying neither a delimiter nor a newline reaches no
+        // record boundary, and a body arriving as one chunk reaches no chunk
+        // boundary — so a deadline checked only at those two places cannot
+        // stop it. It is checked on a character stride as well. The stride is
+        // large enough that the check is not itself a cost now that consuming
+        // a character is O(1).
+        sinceTimeCheck += 1;
+        if (sinceTimeCheck >= TIME_CHECK_STRIDE) {
+          sinceTimeCheck = 0;
+          this.#checkCancelled();
+          this.#checkDeadline();
+        }
         const row = this.#consume(character, limits);
         if (row !== null) {
           pending.push(row);
@@ -325,6 +354,12 @@ class ParseState {
 
   #appendToField(character: string, limits: CsvParseRequest['limits']): void {
     this.#current += character;
+    this.#currentBytes += utf8Width(character.codePointAt(0) ?? 0);
+    // The field is bounded AS IT GROWS, not only where it ends. Checking only
+    // at the delimiter means an input carrying neither a delimiter nor a
+    // newline is unbounded until end-of-input, which is the same defect from
+    // the other side.
+    this.#guardFieldBytes(limits);
     // The in-progress RECORD is what is bounded, not just the field: an
     // unterminated quote grows the field, and a row with ten thousand tiny
     // fields grows the record. Both are the same memory.
@@ -339,9 +374,8 @@ class ParseState {
     }
   }
 
-  #pushField(limits: CsvParseRequest['limits']): void {
-    const bytes = byteLengthOf(this.#current);
-    if (bytes > limits.maxFieldBytes) {
+  #guardFieldBytes(limits: CsvParseRequest['limits']): void {
+    if (this.#currentBytes > limits.maxFieldBytes) {
       throw new CsvParseRefusedError(
         'FIELD_TOO_LARGE',
         `one field exceeds the declared ceiling of ${limits.maxFieldBytes} bytes. It is refused ` +
@@ -350,8 +384,14 @@ class ParseState {
         this.#dataRows + 1,
       );
     }
+  }
+
+  #pushField(limits: CsvParseRequest['limits']): void {
+    this.#guardFieldBytes(limits);
     this.#fields.push(this.#current);
+    this.#fieldsBytes += this.#currentBytes;
     this.#current = '';
+    this.#currentBytes = 0;
     if (this.#fields.length > limits.maxColumns) {
       throw new CsvParseRefusedError(
         'TOO_MANY_COLUMNS',
@@ -365,7 +405,9 @@ class ParseState {
     this.#pushField(limits);
     const fields = this.#fields;
     this.#fields = [];
+    this.#fieldsBytes = 0;
     this.#current = '';
+    this.#currentBytes = 0;
     this.#inQuotes = false;
     this.#quoteJustClosed = false;
     this.#recordStarted = false;
@@ -408,9 +450,7 @@ class ParseState {
   }
 
   #recordByteLength(): number {
-    let total = byteLengthOf(this.#current);
-    for (const field of this.#fields) total += byteLengthOf(field);
-    return total;
+    return this.#currentBytes + this.#fieldsBytes;
   }
 
   #checkDeadline(): void {
@@ -459,7 +499,14 @@ class ParseState {
 }
 
 /** UTF-8 byte length without allocating an encoder per call. */
-const ENCODER = new TextEncoder();
-function byteLengthOf(value: string): number {
-  return ENCODER.encode(value).byteLength;
+/**
+ * UTF-8 width of one code point. `for...of` over a string yields whole code
+ * points, so this is exact for every character the parser sees, including
+ * astral ones — asserted against TextEncoder over the corpus in the tests.
+ */
+function utf8Width(codePoint: number): number {
+  if (codePoint < 0x80) return 1;
+  if (codePoint < 0x800) return 2;
+  if (codePoint < 0x10000) return 3;
+  return 4;
 }
