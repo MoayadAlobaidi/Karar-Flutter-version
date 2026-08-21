@@ -175,10 +175,16 @@ export const RED_TEAM_CORPUS: readonly RedTeamCase[] = Object.freeze([
   },
   {
     id: 'template/expression',
-    value: '${process.env.POSTGRES_PASSWORD}',
+    value: '${settings.databasePassword}',
     targets: 'CODE_OR_TEMPLATE_EVALUATION',
     reachableToday: true,
-    note: 'No template engine evaluates stored financial text.',
+    note:
+      'No template engine evaluates stored financial text. The identifier is ' +
+      'deliberately not the runtime environment object: the attack class is a ' +
+      'template expression, which any identifier exercises, and naming that ' +
+      'object collided with the architectural scan forbidding direct ' +
+      'environment reads. A corpus string is data, not a dereference — but a ' +
+      'guard that must special-case one file is a guard with a hole in it.',
   },
   {
     id: 'markup/script',
