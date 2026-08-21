@@ -567,6 +567,529 @@ function checkDerivedFacts() {
   return problems;
 }
 
+// ---------------------------------------------------------------------------
+// Compliance current-state consistency
+// ---------------------------------------------------------------------------
+//
+// WHY A SEPARATE CHECK, AND WHY IT MAY NOT BE A PROSE UNDERSTANDER.
+//
+// `phase-status-consistency` carried one line — `if
+// (relative.startsWith('docs/compliance/')) continue;` — justified as "the
+// compliance corpus is a dated gate snapshot; it scopes its own claims". It
+// did not. With the whole directory exempt, the compliance README could say
+// "No Phase 4 or Phase 5 compliance GATE has been executed" while
+// `phase-compliance-gate.md` two files away carried a Phase 4 gate record AND
+// a post-merge record; the control matrix's `[P4]` note could say "no Phase 4
+// gate has executed, no pull request exists" after PR #7 merged; and the
+// documentation gate reported 14/14. A green docs check that cannot see the
+// canonical compliance documents is not evidence that they are current.
+//
+// The replacement is NOT general contradiction detection. Every rule below
+// derives ONE fact mechanically — from the capability registry, from the
+// control matrix's own rows, from the gate document's own headings, from the
+// README's phase row — and then refuses a small set of exact phrasings that
+// contradict it. A rule that cannot name the fact it derives does not belong
+// here.
+//
+// HISTORY IS NOT A CONTRADICTION, and the corpus is mostly history. A block
+// that says what was true at a stated moment is legitimate and must not be
+// rewritten into fiction, so `isHistoricalBlock` exempts one — but only when
+// the block SAYS SO in its own text. The marker has to be inside the block a
+// reader is looking at: a caveat four paragraphs up is not attached to the
+// sentence being read, which is how every stale claim below survived review.
+// ---------------------------------------------------------------------------
+
+/** Markers that scope a block to a moment rather than to now. */
+const HISTORICAL_MARKERS = [
+  /\[HISTORICAL\]/,
+  /\bHISTORICAL\b/,
+  /\bSUPERSEDED\b/,
+  /\bsuperseded (?:by|at|on)\b/i,
+  /retained as (?:the )?what was true/i,
+  /retained as what was true/i,
+  /State when this section was written/i,
+  /\bwas true when\b/i,
+  /\bas (?:it|they) stood at\b/i,
+];
+
+/** A version-history entry opens with its own version and date: `**v0.8 (2026-08-18…`. */
+const VERSION_HISTORY_OPENER = /^\*\*v\d+\.\d+\s*\(/;
+
+/**
+ * Splits markdown into blocks (blank-line separated), dropping fenced code.
+ *
+ * Blocks rather than lines because a marker applies to the paragraph it is in:
+ * line scope would force every sentence of a dated record to repeat the date,
+ * and document scope would let one `HISTORICAL` at the top launder the whole
+ * file — which is the failure mode the blanket directory exemption WAS.
+ */
+function markdownBlocks(text, currentPhase = null) {
+  const lines = text.split('\n');
+  const blocks = [];
+  let current = null;
+  let fenced = false;
+  // Heading level -> whether that heading scopes its section to a moment. A
+  // deeper heading INHERITS from its ancestors: `### Post-merge record` under
+  // `## Phase 4 gate record — executed 2026-08-18` is part of that record.
+  const headingStack = [];
+  const inHistoricalSection = () => headingStack.some((h) => h.historical);
+  lines.forEach((line, index) => {
+    if (/^\s*```/.test(line)) {
+      fenced = !fenced;
+      if (current) {
+        blocks.push(current);
+        current = null;
+      }
+      return;
+    }
+    if (fenced) return;
+    const heading = /^(#{1,6})\s/.exec(line);
+    if (heading !== null) {
+      if (current) {
+        blocks.push(current);
+        current = null;
+      }
+      const level = heading[1].length;
+      while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
+        headingStack.pop();
+      }
+      headingStack.push({ level, historical: isHistoricalHeading(line, currentPhase) });
+      return;
+    }
+    if (line.trim() === '') {
+      if (current) {
+        blocks.push(current);
+        current = null;
+      }
+      return;
+    }
+    if (current === null) {
+      current = { line: index + 1, text: line, historicalSection: inHistoricalSection() };
+    } else current.text += `\n${line}`;
+  });
+  if (current) blocks.push(current);
+  return blocks;
+}
+
+function isHistoricalBlock(block) {
+  if (block.historicalSection === true) return true;
+  if (VERSION_HISTORY_OPENER.test(block.text.trimStart())) return true;
+  return HISTORICAL_MARKERS.some((m) => m.test(block.text));
+}
+
+/**
+ * A heading that scopes its whole section to a moment.
+ *
+ * Gate records are section-shaped, not paragraph-shaped: `## Phase 3.5 gate
+ * record — executed 2026-08-16` is forty paragraphs of what was true on one
+ * day. Requiring each of them to repeat the date would make the documents
+ * worse to read and no more honest, so a heading may carry the scope for the
+ * section beneath it — but ONLY when the heading itself is explicitly marked
+ * or explicitly dated, which is the same standard a paragraph has to meet.
+ *
+ * A DATED PHASE RECORD IS HISTORICAL ONLY IF ITS PHASE HAS PASSED. This is the
+ * line that keeps the rule from laundering the thing it most needs to check: a
+ * record for the CURRENT phase is the newest current-state statement in the
+ * corpus, and it stays in scope no matter how it is dated. Phase 3.5's record
+ * is history at phase 5; Phase 5's record is not.
+ */
+function isHistoricalHeading(line, currentPhase) {
+  if (/\[HISTORICAL\]|\bHISTORICAL\b|\bSUPERSEDED\b/.test(line)) return true;
+  const phaseRecord = /^#{1,6}\s*Phase\s+([0-9.]+)\b[^\n]*\b(?:gate record|specifics)\b/i.exec(
+    line,
+  );
+  if (phaseRecord !== null && currentPhase !== null) {
+    return Number(phaseRecord[1]) < Number(currentPhase);
+  }
+  return false;
+}
+
+/** Capability descriptors, parsed from the registry source rather than imported. */
+function readCapabilityRegistry(root) {
+  const full = path.join(root, 'packages', 'capability-registry', 'src', 'index.ts');
+  if (!fs.existsSync(full)) return null;
+  const source = fs.readFileSync(full, 'utf8');
+  const body =
+    /export const CAPABILITY_REGISTRY[^=]*=\s*Object\.freeze\(\{([\s\S]*?)\n {2}\}\);/.exec(source);
+  if (body === null) return null;
+  const entries = new Map();
+  // Explicit descriptors: `ID: Object.freeze({ … })`.
+  for (const m of body[1].matchAll(/(\w+):\s*Object\.freeze\(\{([\s\S]*?)\n {4}\}\)/g)) {
+    const [, id, fields] = m;
+    entries.set(id, {
+      implementation: /implementation:\s*'(\w+)'/.exec(fields)?.[1] ?? null,
+      lifecycle: /lifecycle:\s*'(\w+)'/.exec(fields)?.[1] ?? null,
+      deployed: !/deployment:\s*Object\.freeze\(\{\}\)/.test(fields),
+      declaresJurisdiction: !/declaredJurisdictions:\s*Object\.freeze\(\[\]\)/.test(fields),
+    });
+  }
+  // `ID: descriptor('ID')` — the honest-unbuilt default, read from the factory.
+  const factory =
+    /function descriptor\(id: CapabilityId\): CapabilityDescriptor \{[\s\S]*?\n\}/.exec(source);
+  const defaults = {
+    implementation: factory ? (/implementation:\s*'(\w+)'/.exec(factory[0])?.[1] ?? null) : null,
+    lifecycle: factory ? (/lifecycle:\s*'(\w+)'/.exec(factory[0])?.[1] ?? null) : null,
+    deployed: factory ? !/deployment:\s*Object\.freeze\(\{\}\)/.test(factory[0]) : true,
+    declaresJurisdiction: factory
+      ? !/declaredJurisdictions:\s*Object\.freeze\(\[\]\)/.test(factory[0])
+      : true,
+  };
+  for (const m of body[1].matchAll(/(\w+):\s*descriptor\('(\w+)'\)/g)) {
+    entries.set(m[1], { ...defaults });
+  }
+  return entries;
+}
+
+/** Unique `KAR-CTL-NNN` row ids in the control matrix — the actual control set. */
+function readControlMatrix(root) {
+  const full = path.join(root, 'docs', 'compliance', 'control-matrix.md');
+  if (!fs.existsSync(full)) return null;
+  const text = fs.readFileSync(full, 'utf8');
+  const ids = new Set([...text.matchAll(/^\|\s*(KAR-CTL-\d+)\s*\|/gm)].map((m) => m[1]));
+  // The newest declared tally, in the form the matrix writes it:
+  // `17 DESIGNED / 83 IMPLEMENTED / 15 DEFERRED / 1 EXCEPTION = 116`.
+  const tallies = [
+    ...text.matchAll(
+      /(\d+)\s+DESIGNED\s*\/\s*(\d+)\s+IMPLEMENTED\s*\/\s*(\d+)\s+DEFERRED\s*\/\s*(\d+)\s+EXCEPTION(?:\s*=\s*(\d+))?/g,
+    ),
+  ].map((m) => ({
+    designed: Number(m[1]),
+    implemented: Number(m[2]),
+    deferred: Number(m[3]),
+    exception: Number(m[4]),
+    total: m[5] === undefined ? null : Number(m[5]),
+    index: m.index,
+  }));
+  return { path: 'docs/compliance/control-matrix.md', ids, tallies, text };
+}
+
+/** Phases whose gate RECORD exists, from the gate document's own headings. */
+function readGateRecordPhases(root) {
+  const full = path.join(root, 'docs', 'compliance', 'phase-compliance-gate.md');
+  if (!fs.existsSync(full)) return null;
+  const text = fs.readFileSync(full, 'utf8');
+  const phases = new Set();
+  for (const m of text.matchAll(/^#{2,4}\s*Phase\s+([0-9.]+)[^\n]*gate record/gim)) {
+    phases.add(m[1]);
+  }
+  return phases;
+}
+
+/** The README's declared phase and status — the same row `readme-current-phase` validates. */
+function readDeclaredPhase(root) {
+  const full = path.join(root, 'README.md');
+  if (!fs.existsSync(full)) return null;
+  const m = /\|\s*Current phase\s*\|\s*\*\*([0-9.]+)\s*[—-]\s*([A-Z ]+?)\*\*/.exec(
+    fs.readFileSync(full, 'utf8'),
+  );
+  return m === null ? null : { phase: m[1], status: m[2].trim() };
+}
+
+/**
+ * A phase report for a phase that has already closed.
+ *
+ * `docs/phases/phase-03-5.md` describes Phase 3.5 as it was at Phase 3.5 —
+ * that is what a phase report IS, and the corpus already treats them this way
+ * in `phase-status-consistency`. The exemption is derived, never assumed: the
+ * phase number comes from the filename and is compared to the README's
+ * current phase, so the CURRENT phase's report is never exempt. That report is
+ * the single most-read current-state document in the repository.
+ */
+function isEarlierPhaseReport(root, file, currentPhase) {
+  if (currentPhase === null) return false;
+  const relative = path.relative(root, file);
+  const m = /^docs[\\/]phases[\\/]phase-(\d{2})(?:-(\d))?\.md$/.exec(relative);
+  if (m === null) return false;
+  const phase = Number(m[2] === undefined ? m[1] : `${Number(m[1])}.${m[2]}`);
+  return phase < Number(currentPhase);
+}
+
+/** Every markdown file a reader consults for CURRENT state. */
+function currentStateFiles(root) {
+  const out = [];
+  for (const dir of ['docs']) {
+    const full = path.join(root, dir);
+    if (fs.existsSync(full)) out.push(...walkFiles(full, { exts: MD_EXTS }));
+  }
+  const readme = path.join(root, 'README.md');
+  if (fs.existsSync(readme)) out.push(readme);
+  return out;
+}
+
+function checkComplianceCurrentState(root = REPO_ROOT) {
+  const problems = [];
+  const capabilities = readCapabilityRegistry(root);
+  const matrix = readControlMatrix(root);
+  const gatePhases = readGateRecordPhases(root);
+  const declared = readDeclaredPhase(root);
+
+  // A blind rule is worse than no rule: it reports PASS forever. Each input
+  // that cannot be derived is a problem in its own right.
+  if (capabilities === null || capabilities.size === 0) {
+    problems.push(
+      'packages/capability-registry/src/index.ts: CAPABILITY_REGISTRY could not be parsed — ' +
+        'every capability-truth rule below is blind without it',
+    );
+  }
+  if (matrix === null) {
+    problems.push(
+      'docs/compliance/control-matrix.md is missing — the control tally is underivable',
+    );
+  }
+  if (gatePhases === null) {
+    problems.push(
+      'docs/compliance/phase-compliance-gate.md is missing — gate state is underivable',
+    );
+  }
+  if (declared === null) {
+    problems.push('README.md has no parseable "Current phase" row — phase state is underivable');
+  }
+
+  const currentPhase = declared === null ? null : declared.phase;
+  const files = currentStateFiles(root).filter(
+    (file) => !isEarlierPhaseReport(root, file, currentPhase),
+  );
+  const blocksByFile = files.map((file) => ({
+    rel: path.relative(root, file),
+    blocks: markdownBlocks(fs.readFileSync(file, 'utf8'), currentPhase).filter(
+      (b) => !isHistoricalBlock(b),
+    ),
+  }));
+  const report = (rel, block, detail) => problems.push(`${rel}:${block.line} ${detail}`);
+
+  // --- Rule 1: a capability's implementation state, as the registry holds it.
+  if (capabilities !== null) {
+    const built = [...capabilities.entries()].filter(([, d]) => d.implementation === 'IMPLEMENTED');
+    const unbuilt = [...capabilities.entries()].filter(
+      ([, d]) => d.implementation === 'NOT_IMPLEMENTED',
+    );
+    for (const { rel, blocks } of blocksByFile) {
+      for (const block of blocks) {
+        for (const [id] of built) {
+          const denies = new RegExp(
+            '`?' +
+              id +
+              '`?\\s+(?:is|was|remains|stays|still\\s+reads)\\s+(?:still\\s+)?`?NOT_IMPLEMENTED`?',
+          );
+          if (denies.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says ${id} is NOT_IMPLEMENTED; the capability registry declares it IMPLEMENTED. ` +
+                'Mark the block HISTORICAL if it describes an earlier moment, or correct it',
+            );
+          }
+        }
+        for (const [id] of unbuilt) {
+          const claims = new RegExp(
+            '`?' + id + '`?\\s+(?:is|was|becomes)\\s+(?:now\\s+)?`?IMPLEMENTED`?',
+          );
+          if (claims.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says ${id} is IMPLEMENTED; the capability registry declares it NOT_IMPLEMENTED`,
+            );
+          }
+        }
+        // The universal form, which no per-id rule catches: "every capability
+        // is NOT_IMPLEMENTED" was true for four phases and stopped being true
+        // without the sentences that said it being revisited.
+        if (
+          built.length > 0 &&
+          /\b(?:every|all(?: seven)?|each)\s+capabilit(?:y|ies)\s+(?:is|are|remains?|stays?)\s+(?:still\s+)?`?NOT_IMPLEMENTED`?/i.test(
+            block.text,
+          )
+        ) {
+          report(
+            rel,
+            block,
+            `says every capability is NOT_IMPLEMENTED; the registry declares ` +
+              `${built.map(([id]) => id).join(', ')} IMPLEMENTED`,
+          );
+        }
+      }
+    }
+  }
+
+  // --- Rule 2: IMPLEMENTED is not DEPLOYED and is not AVAILABLE.
+  if (capabilities !== null) {
+    for (const [id, descriptor] of capabilities) {
+      if (descriptor.deployed) continue;
+      const conflates = new RegExp(
+        '`?' +
+          id +
+          '`?\\s+(?:is|was|has been)\\s+(?:now\\s+)?(?:DEPLOYED|deployed|AVAILABLE|available|live)\\b(?!\\s*(?:nowhere|in no\\b))',
+      );
+      for (const { rel, blocks } of blocksByFile) {
+        for (const block of blocks) {
+          if (conflates.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says ${id} is deployed or available; the registry's deployment map for it is ` +
+                'empty, and IMPLEMENTED means the code exists — never that anything runs',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 3: the control tally is derived from the matrix's own rows.
+  if (matrix !== null) {
+    const actual = matrix.ids.size;
+    if (actual === 0) {
+      problems.push(
+        `${matrix.path}: no KAR-CTL rows could be parsed — the control count rule is blind`,
+      );
+    } else {
+      // The matrix's newest declared tally must equal its own rows. A tally is
+      // the one number every framework view copies, so a wrong one propagates.
+      const newest = matrix.tallies.length > 0 ? matrix.tallies[0] : null;
+      if (newest === null) {
+        problems.push(
+          `${matrix.path}: no "N DESIGNED / N IMPLEMENTED / N DEFERRED / N EXCEPTION" tally found`,
+        );
+      } else {
+        const summed = newest.designed + newest.implemented + newest.deferred + newest.exception;
+        if (summed !== actual) {
+          problems.push(
+            `${matrix.path}: the newest declared tally sums to ${summed} but the file holds ` +
+              `${actual} KAR-CTL rows`,
+          );
+        }
+        if (newest.total !== null && newest.total !== actual) {
+          problems.push(
+            `${matrix.path}: the newest declared tally states a total of ${newest.total} but the ` +
+              `file holds ${actual} KAR-CTL rows`,
+          );
+        }
+      }
+      // Any other compliance document naming a control count must name THIS
+      // one. `Annex A` and `ISO` numbers are a different, external control set
+      // and are excluded by the line that carries them saying so.
+      for (const { rel, blocks } of blocksByFile) {
+        if (!rel.startsWith(path.join('docs', 'compliance'))) continue;
+        for (const block of blocks) {
+          for (const line of block.text.split('\n')) {
+            if (/Annex A|ISO\/IEC|ISO 27|Trust Services/i.test(line)) continue;
+            for (const m of line.matchAll(/\b(\d{2,3})\s+controls\b/g)) {
+              if (Number(m[1]) !== actual) {
+                report(
+                  rel,
+                  block,
+                  `states "${m[1]} controls"; the control matrix holds ${actual} KAR-CTL rows. ` +
+                    'A count stated outside the matrix must be the matrix’s own',
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 4: a phase whose gate record exists did execute its gate.
+  if (gatePhases !== null && gatePhases.size > 0) {
+    for (const phase of gatePhases) {
+      const executed = [
+        new RegExp(
+          `\\bno Phase ${phase.replace('.', '\\.')}\\b[^.\\n]{0,60}?\\bgate\\b[^.\\n]{0,40}?\\b(?:has|had)\\s+(?:been\\s+)?executed`,
+          'i',
+        ),
+        new RegExp(
+          `\\bNo Phase [0-9.]+ or Phase ${phase.replace('.', '\\.')}[^.\\n]{0,40}?GATE has been executed`,
+          'i',
+        ),
+        new RegExp(
+          `\\bNo Phase ${phase.replace('.', '\\.')}[^.\\n]{0,40}?(?:or Phase [0-9.]+ )?(?:compliance )?GATE has been executed`,
+          'i',
+        ),
+        new RegExp(`\\bPhase ${phase.replace('.', '\\.')} is NOT STARTED\\b`),
+        new RegExp(
+          `\\bno Phase ${phase.replace('.', '\\.')} (?:gate has executed|pull request exists)`,
+          'i',
+        ),
+      ];
+      for (const { rel, blocks } of blocksByFile) {
+        for (const block of blocks) {
+          for (const pattern of executed) {
+            if (pattern.test(block.text)) {
+              report(
+                rel,
+                block,
+                `denies a Phase ${phase} gate or pull request, but ` +
+                  `docs/compliance/phase-compliance-gate.md carries a Phase ${phase} gate record. ` +
+                  'Mark the block HISTORICAL if it records an earlier moment, or correct it',
+              );
+              break;
+            }
+          }
+          // The `[P4]`-shaped denial: a block whose SUBJECT is the phase
+          // marker and which then says no pull request exists. Written as two
+          // conditions rather than one regex because the two facts sit in
+          // different sentences.
+          //
+          // The marker must OPEN the block. A contingency note routinely names
+          // its predecessors mid-sentence — "unlike [C1], [P2], [P3], and
+          // [P3.5]" — and matching those made one true finding arrive with
+          // three false ones attached to phases whose notes say nothing of the
+          // kind.
+          if (
+            new RegExp(`^\\*{0,2}\\[P${phase.replace('.', '\\.')}\\]`).test(
+              block.text.trimStart(),
+            ) &&
+            /\bno pull request exists\b/i.test(block.text)
+          ) {
+            report(
+              rel,
+              block,
+              `carries the [P${phase}] marker and says no pull request exists, but the gate ` +
+                `document records the Phase ${phase} pull request`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 5: the current phase's status, as the README declares it.
+  if (declared !== null) {
+    const p = declared.phase.replace('.', '\\.');
+    const wrong = [];
+    if (declared.status !== 'NOT STARTED') {
+      wrong.push({
+        pattern: new RegExp(`\\bPhase ${p}\\b[^.\\n]{0,40}?\\b(?:is|remains|stays)\\s+NOT STARTED`),
+        said: 'NOT STARTED',
+      });
+    }
+    if (declared.status !== 'COMPLETE') {
+      wrong.push({
+        pattern: new RegExp(`\\bPhase ${p}\\b[^.\\n]{0,40}?\\b(?:is|was)\\s+COMPLETE\\b`),
+        said: 'COMPLETE',
+      });
+    }
+    for (const { rel, blocks } of blocksByFile) {
+      for (const block of blocks) {
+        for (const { pattern, said } of wrong) {
+          if (pattern.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says Phase ${declared.phase} is ${said}, but README declares it ` +
+                `${declared.status}. A status stated in more than one place has to agree in ` +
+                'all of them',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return problems;
+}
+
 function checkPhaseStatusConsistency(files) {
   const problems = [];
   const readmePath = path.join(REPO_ROOT, 'README.md');
@@ -595,11 +1118,25 @@ function checkPhaseStatusConsistency(files) {
     // Phase reports for EARLIER phases are historical records and correctly
     // describe their own phase as complete.
     if (/docs\/phases\/phase-0(?!4)/.test(relative)) continue;
-    // The compliance corpus is a dated gate snapshot; it scopes its own claims.
-    if (relative.startsWith('docs/compliance/')) continue;
 
     const text = fs.readFileSync(file, 'utf8');
+    // `docs/compliance/` was exempt WHOLESALE here, on the reasoning that the
+    // corpus is a dated gate snapshot that scopes its own claims. Some of it
+    // does and some of it did not, and the exemption could not tell them
+    // apart — so the canonical compliance documents were the one place a stale
+    // phase status could sit while this check reported PASS. The exemption is
+    // now per BLOCK and earned by the block's own text: a paragraph marked
+    // HISTORICAL or SUPERSEDED, or a dated version-history entry, is exempt
+    // wherever it appears; a paragraph that is not is checked wherever it
+    // appears.
+    const historicalLines = new Set();
+    for (const block of markdownBlocks(text, phase)) {
+      if (!isHistoricalBlock(block)) continue;
+      const span = block.text.split('\n').length;
+      for (let i = 0; i < span; i += 1) historicalLines.add(block.line + i);
+    }
     text.split('\n').forEach((line, index) => {
+      if (historicalLines.has(index + 1)) return;
       // A line that states what COMPLETE would mean, or denies completion, is
       // not a claim of it.
       if (/does not mean|will mean|not complete|NOT a closeout|is NOT complete/i.test(line)) return;
@@ -1107,6 +1644,227 @@ const NEGATIVE_SELF_TEST_CASES = [
     : []),
 ];
 
+// ---------------------------------------------------------------------------
+// Self-test fixture for compliance-current-state
+// ---------------------------------------------------------------------------
+//
+// A SECOND fixture, deliberately not the style one. These rules derive facts
+// from four specific files — the capability registry, the control matrix, the
+// gate document, the README phase row — and a fixture that carried those files
+// would change what every style case sees. Keeping them apart also keeps each
+// arm legible: everything written below is either a seeded contradiction that
+// MUST be reported, or a legitimate shape that must NOT be.
+// ---------------------------------------------------------------------------
+function buildComplianceFixture(options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'karar-compliance-selftest-'));
+  const write = (relPath, content) => {
+    const full = path.join(root, relPath);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
+  };
+  const implementation = options.transactionsImplementation ?? 'IMPLEMENTED';
+
+  write(
+    'packages/capability-registry/src/index.ts',
+    [
+      'export const CAPABILITY_REGISTRY: Readonly<Record<CapabilityId, CapabilityDescriptor>> =',
+      '  Object.freeze({',
+      '    TRANSACTIONS: Object.freeze({',
+      "      id: 'TRANSACTIONS',",
+      "      lifecycle: 'ALPHA',",
+      `      implementation: '${implementation}',`,
+      '      deployment: Object.freeze({}),',
+      '      declaredJurisdictions: Object.freeze([]),',
+      '    }),',
+      "    BUDGETS: descriptor('BUDGETS'),",
+      '  });',
+      '',
+      'function descriptor(id: CapabilityId): CapabilityDescriptor {',
+      '  return Object.freeze({',
+      '    id,',
+      "    lifecycle: 'PLANNED',",
+      "    implementation: 'NOT_IMPLEMENTED',",
+      '    deployment: Object.freeze({}),',
+      '    declaredJurisdictions: Object.freeze([]),',
+      '  });',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  write(
+    'README.md',
+    [
+      '# Fixture',
+      '',
+      '| Field | Value |',
+      '|---|---|',
+      '| Current phase | **5 — IN PROGRESS** |',
+      '',
+    ].join('\n'),
+  );
+
+  write(
+    'docs/compliance/control-matrix.md',
+    [
+      '# Control Matrix',
+      '',
+      'Tally re-derived by counting rows: **1 DESIGNED / 1 IMPLEMENTED / 0 DEFERRED / 0 EXCEPTION = 2**.',
+      '',
+      '| id | statement | status |',
+      '|---|---|---|',
+      '| KAR-CTL-001 | first | DESIGNED |',
+      '| KAR-CTL-002 | second | IMPLEMENTED |',
+      '',
+    ].join('\n'),
+  );
+
+  write(
+    'docs/compliance/phase-compliance-gate.md',
+    [
+      '# Phase Compliance Gate',
+      '',
+      '## Phase 4 gate record — executed 2026-08-18',
+      '',
+      'The gate executed and its outcome is recorded here.',
+      '',
+      '### Post-merge record — executed 2026-08-18',
+      '',
+      'Phase 5 is NOT STARTED, and no Phase 4 gate has been executed at the time of writing.',
+      '',
+    ].join('\n'),
+  );
+
+  // Seeded contradictions — every one must be reported.
+  write(
+    'docs/seed-stale.md',
+    [
+      '# Stale',
+      '',
+      'TRANSACTIONS remains NOT_IMPLEMENTED in the capability registry.',
+      '',
+      'Every capability is NOT_IMPLEMENTED and deployed nowhere.',
+      '',
+      'TRANSACTIONS is deployed to production and available to callers.',
+      '',
+      'No Phase 4 compliance GATE has been executed.',
+      '',
+      'Phase 5 is NOT STARTED.',
+      '',
+      'BUDGETS is IMPLEMENTED.',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'docs/compliance/seed-count.md',
+    ['# Count', '', 'The core control set holds 93 controls with honest statuses.', ''].join('\n'),
+  );
+
+  // Legitimate shapes — none may be reported.
+  write(
+    'docs/seed-clean.md',
+    [
+      '# Clean',
+      '',
+      '[HISTORICAL] TRANSACTIONS remains NOT_IMPLEMENTED in the capability registry, as it stood at Phase 4.',
+      '',
+      'At the Phase 4 close this section was SUPERSEDED: every capability is NOT_IMPLEMENTED.',
+      '',
+      '**v0.6 (2026-08-16, Phase 3.5 close):** No Phase 4 compliance GATE has been executed.',
+      '',
+      'TRANSACTIONS is IMPLEMENTED, and is deployed nowhere.',
+      '',
+      'TRANSACTIONS is available nowhere: the deployment map is empty.',
+      '',
+      'BUDGETS is NOT_IMPLEMENTED.',
+      '',
+      'Phase 5 is IN PROGRESS.',
+      '',
+      'The baseline is ISO/IEC 27002:2022 with its 93 controls.',
+      '',
+    ].join('\n'),
+  );
+  // A section-scoped historical record: the heading carries the date and the
+  // phase has passed, so its paragraphs are history and must not be reported.
+  write(
+    'docs/compliance/seed-section.md',
+    [
+      '# Records',
+      '',
+      '## Phase 4 gate record — executed 2026-08-18',
+      '',
+      'Phase 5 is NOT STARTED and every capability is NOT_IMPLEMENTED.',
+      '',
+      '## Phase 5 gate record — executed 2026-08-22',
+      '',
+      'This section is the CURRENT phase and is therefore still checked: TRANSACTIONS remains NOT_IMPLEMENTED.',
+      '',
+    ].join('\n'),
+  );
+
+  return root;
+}
+
+const COMPLIANCE_SELF_TEST_CASES = [
+  {
+    expect: /seed-stale\.md:3 says TRANSACTIONS is NOT_IMPLEMENTED/,
+    why: 'the exact stale sentence found in the Phase 5 report',
+  },
+  {
+    expect: /seed-stale\.md:5 says every capability is NOT_IMPLEMENTED/,
+    why: 'the universal form, which the per-capability rule cannot see',
+  },
+  {
+    expect: /seed-stale\.md:7 says TRANSACTIONS is deployed or available/,
+    why: 'IMPLEMENTED conflated with DEPLOYED — the misreading the registry exists to prevent',
+  },
+  {
+    expect: /seed-stale\.md:9 denies a Phase 4 gate/,
+    why: 'the exact stale sentence found in the compliance README',
+  },
+  {
+    expect: /seed-stale\.md:11 says Phase 5 is NOT STARTED/,
+    why: 'a phase status contradicting the README row',
+  },
+  {
+    expect: /seed-stale\.md:13 says BUDGETS is IMPLEMENTED/,
+    why: 'the OTHER direction: prose claiming more than the registry holds',
+  },
+  {
+    expect: /seed-count\.md:3 states "93 controls"/,
+    why: 'the exact stale count found in the compliance README',
+  },
+  {
+    expect: /seed-section\.md:9 says TRANSACTIONS is NOT_IMPLEMENTED/,
+    why: 'a dated record for the CURRENT phase is current state, not history',
+  },
+];
+
+const COMPLIANCE_NEGATIVE_CASES = [
+  { forbid: /seed-clean\.md/, why: 'every shape in it is explicitly marked or actually true' },
+  {
+    forbid: /seed-section\.md:5/,
+    why: 'a dated gate-record heading for a PASSED phase scopes its section to that moment',
+  },
+  {
+    forbid: /control-matrix\.md/,
+    why: 'the fixture matrix tally matches its own rows, so the derived rule must stay silent',
+  },
+];
+
+// Mutation cases: the derived fact is changed and the SAME prose must flip
+// from reported to unreported, or the rule is reading something other than the
+// registry it claims to read.
+const COMPLIANCE_MUTATION_CASES = [
+  {
+    name: 'registry flipped to NOT_IMPLEMENTED',
+    options: { transactionsImplementation: 'NOT_IMPLEMENTED' },
+    forbid: /seed-stale\.md:3 says TRANSACTIONS is NOT_IMPLEMENTED/,
+    expect: /seed-clean\.md:\d+ says TRANSACTIONS is IMPLEMENTED/,
+    why: 'with the registry unbuilt, the denial becomes true and the claim becomes false — both must move',
+  },
+];
+
 function runSelfTest() {
   const fixtureRoot = buildSelfTestFixture();
   const failures = [];
@@ -1145,7 +1903,66 @@ function runSelfTest() {
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
-  return { cases: SELF_TEST_CASES.length + NEGATIVE_SELF_TEST_CASES.length, failures };
+
+  // compliance-current-state, on its own fixture.
+  const complianceRoot = buildComplianceFixture();
+  try {
+    const problems = checkComplianceCurrentState(complianceRoot);
+    if (problems.length === 0) {
+      failures.push(
+        'compliance-current-state: reported nothing on a fixture seeded with eight ' +
+          'contradictions — the check is vacuous',
+      );
+    }
+    for (const { expect, why } of COMPLIANCE_SELF_TEST_CASES) {
+      if (!problems.some((p) => expect.test(p))) {
+        failures.push(
+          `compliance-current-state: missed the seeded contradiction ${expect} (${why}); got: ${problems.join(' | ')}`,
+        );
+      }
+    }
+    for (const { forbid, why } of COMPLIANCE_NEGATIVE_CASES) {
+      const wrong = problems.find((p) => forbid.test(p));
+      if (wrong) {
+        failures.push(
+          `compliance-current-state: flagged a legitimate shape (${forbid}) — ${why}: ${wrong}`,
+        );
+      }
+    }
+  } finally {
+    fs.rmSync(complianceRoot, { recursive: true, force: true });
+  }
+
+  for (const { name, options, forbid, expect, why } of COMPLIANCE_MUTATION_CASES) {
+    const mutatedRoot = buildComplianceFixture(options);
+    try {
+      const problems = checkComplianceCurrentState(mutatedRoot);
+      if (forbid && problems.some((p) => forbid.test(p))) {
+        failures.push(
+          `compliance-current-state mutation "${name}": still reported ${forbid} after the ` +
+            `derived fact changed — the rule is not reading the registry (${why})`,
+        );
+      }
+      if (expect && !problems.some((p) => expect.test(p))) {
+        failures.push(
+          `compliance-current-state mutation "${name}": did not report ${expect} after the ` +
+            `derived fact changed (${why}); got: ${problems.join(' | ')}`,
+        );
+      }
+    } finally {
+      fs.rmSync(mutatedRoot, { recursive: true, force: true });
+    }
+  }
+
+  return {
+    cases:
+      SELF_TEST_CASES.length +
+      NEGATIVE_SELF_TEST_CASES.length +
+      COMPLIANCE_SELF_TEST_CASES.length +
+      COMPLIANCE_NEGATIVE_CASES.length +
+      COMPLIANCE_MUTATION_CASES.length,
+    failures,
+  };
 }
 
 function main() {
@@ -1177,6 +1994,7 @@ function main() {
     { name: 'phase-report-exists', problems: checkPhaseReport(registry) },
     { name: 'phase-status-consistency', problems: checkPhaseStatusConsistency(files) },
     { name: 'derived-facts', problems: checkDerivedFacts() },
+    { name: 'compliance-current-state', problems: checkComplianceCurrentState() },
     { name: 'adr-references', problems: checkAdrReferences(files) },
     { name: 'module-docs', problems: checkModuleDocs() },
     { name: 'mermaid-sanity', problems: checkMermaid(files) },

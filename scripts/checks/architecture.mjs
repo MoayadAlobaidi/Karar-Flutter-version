@@ -124,7 +124,28 @@ function loadStripped(file) {
 }
 
 function violationsResult(violations, scanned, note) {
-  return { violations, scanned, ...(note ? { note } : {}) };
+  return { violations, scanned, applicable: true, ...(note ? { note } : {}) };
+}
+
+/**
+ * The result a control returns when it no longer has anything to say.
+ *
+ * A historical guard that has outlived its window used to return
+ * `violationsResult([], 0)` — zero files scanned, zero violations — and the
+ * runner, which decides PASS by asking whether the violation list is empty,
+ * counted it among the passes. A row reading `PASS ... (files scanned: 0)`
+ * therefore appeared in the headline beside twenty-eight checks that had
+ * actually looked at something, and the summary total included it. That is a
+ * pass that proves nothing: the control could not have failed, because it
+ * never ran.
+ *
+ * `NOT_APPLICABLE` is the honest answer, and it is a THIRD status rather than
+ * a quiet pass: it is printed as `N/A`, counted in its own tally, and excluded
+ * from `passed`. The reason travels with it so a reader never has to guess why
+ * a control went quiet.
+ */
+function notApplicableResult(reason, note) {
+  return { violations: [], scanned: 0, applicable: false, reason, ...(note ? { note } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -2710,17 +2731,7 @@ export function checkResourceLimits(ctx) {
   // Real paths: a mounted write route, or a composition that wires an
   // ingestion use case. Same definition the pre-phase-5 guard uses, so the two
   // controls cannot disagree about what counts.
-  const candidates = [];
-  for (const moduleName of PHASE5_INGESTION_MODULES) {
-    const dir = path.join(root, 'modules', moduleName, 'presentation');
-    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
-  }
-  for (const dir of [
-    path.join(root, 'apps', 'api', 'src', 'composition'),
-    path.join(root, 'apps', 'api', 'src', 'financial'),
-  ]) {
-    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
-  }
+  const candidates = ingestionSurfaceFiles(root);
 
   const realPaths = [];
   // The inline-bound scan covers the WHOLE ingestion surface, not only the
@@ -2827,33 +2838,84 @@ const INGESTION_WRITE_ROUTE = /@(Post|Put|Patch)\s*\(/;
 const INGESTION_USE_CASE =
   /\b(CreateManual\w*|StartStatementImport|CommitStatementImport|UploadStatementSource|ParseStatement\w*)\b/;
 
-export function checkIngestionNotMountedBeforePhase5(ctx) {
-  const { root } = ctx;
-  const violations = [];
-  let scanned = 0;
-
-  let currentPhase = null;
-  const registryPath = path.join(root, REGISTRY_REL);
-  if (fs.existsSync(registryPath)) {
-    try {
-      currentPhase = readJson(registryPath).currentPhase ?? null;
-    } catch {
-      currentPhase = null;
-    }
-  }
-  // No registry, or a registry already at phase 5: this control has nothing to
-  // say. Test 24 owns the tree from phase 5 onward.
-  if (typeof currentPhase !== 'number' || currentPhase >= 5) {
-    return violationsResult(violations, 0);
-  }
-
+/**
+ * Every directory an ingestion path can be mounted or wired from.
+ *
+ * ONE function, used by the historical pre-phase-5 guard AND by test 24, so
+ * the two controls cannot disagree about what counts as the surface. They
+ * used to carry two copies of this list, and the copies had drifted: the
+ * guard scanned `modules/<name>/presentation` and the composition root, test
+ * 24 scanned those PLUS `apps/api/src/financial`. Every financial controller
+ * in this repository lives in the directory only test 24 knew about, so the
+ * guard's controller arm reached nothing real — it caught the composition
+ * file and would have missed a controller mounted straight into
+ * `apps/api/src/financial` at phase 4, which is the exact thing it exists to
+ * refuse.
+ */
+function ingestionSurfaceFiles(root) {
   const candidates = [];
   for (const moduleName of PHASE5_INGESTION_MODULES) {
     const dir = path.join(root, 'modules', moduleName, 'presentation');
     if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
   }
-  const compositionDir = path.join(root, 'apps', 'api', 'src', 'composition');
-  if (fs.existsSync(compositionDir)) candidates.push(...codeFiles([compositionDir]));
+  for (const dir of [
+    path.join(root, 'apps', 'api', 'src', 'composition'),
+    path.join(root, 'apps', 'api', 'src', 'financial'),
+  ]) {
+    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
+  }
+  return candidates;
+}
+
+/**
+ * A HISTORICAL guard, and the runner is told so rather than left to infer it.
+ *
+ * Its window is `currentPhase < 5`. From phase 5 onward the tree it was
+ * written to protect is the tree architecture test 24 owns, and this control
+ * has nothing left to check — so it returns `NOT_APPLICABLE` with a reason,
+ * NOT an empty violation list. The difference is the whole point: an empty
+ * violation list is indistinguishable from a control that looked and found
+ * nothing, and the runner used to print it as `PASS (files scanned: 0)` and
+ * add it to the pass total. A control that cannot fail must not be able to
+ * inflate the headline that says how many controls held.
+ *
+ * `ctx.currentPhase` overrides the registry, so a self-test can exercise BOTH
+ * arms — the live window and the retired one — without rewriting the fixture
+ * registry underneath other checkers that read it.
+ */
+export function checkIngestionNotMountedBeforePhase5(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  let scanned = 0;
+
+  let currentPhase = ctx.currentPhase;
+  if (typeof currentPhase !== 'number') {
+    currentPhase = null;
+    const registryPath = path.join(root, REGISTRY_REL);
+    if (fs.existsSync(registryPath)) {
+      try {
+        currentPhase = readJson(registryPath).currentPhase ?? null;
+      } catch {
+        currentPhase = null;
+      }
+    }
+  }
+  if (typeof currentPhase !== 'number') {
+    return notApplicableResult(
+      `${REGISTRY_REL} declares no numeric currentPhase, so the window this guard applies to ` +
+        `cannot be determined`,
+    );
+  }
+  if (currentPhase >= 5) {
+    return notApplicableResult(
+      `RETIRED at phase 5. This guard's window is currentPhase < 5; the registry reads ` +
+        `${currentPhase}. Architecture test 24 (resource limits) is ACTIVE and owns the ingestion ` +
+        `surface from here on — it is the control that must fail if a path is mounted without a ` +
+        `declared bound, and it scans that surface on every run`,
+    );
+  }
+
+  const candidates = ingestionSurfaceFiles(root);
 
   for (const file of candidates) {
     if (file.endsWith('.test.ts') || file.endsWith('.d.ts')) continue;
@@ -2873,6 +2935,26 @@ export function checkIngestionNotMountedBeforePhase5(ctx) {
           `policy in the SAME commit that mounts it`,
       });
     }
+  }
+
+  // INSIDE its window, a scan that reached nothing is a FAILURE, not a pass.
+  //
+  // Every candidate comes from two lists in this file — the six module names
+  // above and the composition directory. Rename a module, move the composition
+  // root, or narrow either list, and the loop finds no files: the check then
+  // reports zero violations having examined nothing, which is the same vacuous
+  // green this control was rewritten to stop producing. The guard against that
+  // has to live INSIDE the check, because nothing outside it knows how many
+  // files it should have seen.
+  if (scanned === 0) {
+    violations.push({
+      file: REGISTRY_REL,
+      detail:
+        `this guard is INSIDE its window (currentPhase ${currentPhase} < 5) and its discovery rule ` +
+        `reached zero files. Either the six ingestion modules and the composition root have all ` +
+        `moved, or PHASE5_INGESTION_MODULES no longer names them — a guard that scans nothing ` +
+        `cannot catch anything, and reporting that as a pass is how the control silently dies`,
+    });
   }
 
   return violationsResult(violations, scanned);
@@ -3307,6 +3389,74 @@ const SUPPLEMENTARY_CHECKS = {
   checkCapabilityRegistryTruth,
 };
 
+/**
+ * The supplementary checks the runner executes, in printed order.
+ *
+ * A table rather than four hand-written blocks, so the status decision and the
+ * tally arithmetic live in exactly one place (`tallySupplementary`) and a
+ * self-test can drive that place directly.
+ */
+const SUPPLEMENTARY_RUNS = [
+  {
+    name: 'admin-no-db-driver',
+    fn: checkAdminNoDbDriver,
+    describe: (r) => `deps checked: ${r.scanned}`,
+  },
+  {
+    name: 'phase5-ingestion-not-mounted-early',
+    fn: checkIngestionNotMountedBeforePhase5,
+    describe: (r) => (r.applicable ? `files scanned: ${r.scanned}` : 'historical guard, retired'),
+  },
+  {
+    name: 'module-permissions-in-catalogue',
+    fn: checkModulePermissionsInCatalogue,
+    describe: (r) => `declarations checked: ${r.scanned}; ${r.note}`,
+  },
+  {
+    name: 'capability-registry-truth',
+    fn: checkCapabilityRegistryTruth,
+    describe: (r) => `${r.note}`,
+  },
+];
+
+/**
+ * Turns supplementary results into statuses and counts — the ONE place that
+ * decides what a supplementary row contributes to the headline.
+ *
+ * Three statuses, and the third exists because two were not enough:
+ *
+ *   PASS  the control ran and found nothing wrong
+ *   FAIL  the control ran and found something wrong
+ *   N/A   the control had nothing to check, and says why
+ *
+ * `N/A` is counted in `notApplicable` and NOWHERE else. It is deliberately not
+ * folded into `passed`: the pass total is a reader's shorthand for "how many
+ * controls held", and a control that could not have failed did not hold
+ * anything. Folding it back in is precisely the defect this function was
+ * extracted to make un-reintroducible without a self-test failing — see
+ * `RUNNER_TALLY_CASES`.
+ */
+function tallySupplementary(runs) {
+  let passed = 0;
+  let failed = 0;
+  let notApplicable = 0;
+  const rows = runs.map(({ name, result, detail }) => {
+    let status;
+    if (result.applicable === false) {
+      status = 'N/A';
+      notApplicable += 1;
+    } else if (result.violations.length === 0) {
+      status = 'PASS';
+      passed += 1;
+    } else {
+      status = 'FAIL';
+      failed += 1;
+    }
+    return { name, status, detail, result };
+  });
+  return { rows, passed, failed, notApplicable };
+}
+
 // ---------------------------------------------------------------------------
 // Registry loading, validation, activation gate
 // ---------------------------------------------------------------------------
@@ -3540,6 +3690,18 @@ function buildSelfTestFixture() {
       '    return null;',
       '  }',
       '}',
+    ].join('\n'),
+  );
+  // The guard's SECOND discovery arm: a composition file wires an ingestion
+  // use case without mounting a route of its own. Seeded separately from the
+  // controller above so narrowing either the `@Controller` arm or the
+  // use-case arm leaves the other case failing, instead of both arms going
+  // quiet together and the guard reporting a clean scan.
+  write(
+    'apps/api/src/composition/fixture-early-wiring.ts',
+    [
+      "import { CreateManualTransaction } from '@karar/transactions';",
+      'export const wired = new CreateManualTransaction();',
     ].join('\n'),
   );
 
@@ -4008,9 +4170,42 @@ function buildSelfTestFixture() {
 }
 
 const SELF_TEST_CASES = [
-  // The pre-activation guard: an ingestion controller mounted while the
+  // ---- The historical pre-activation guard, all of its arms ----------------
+  //
+  // INSIDE its window (phase 4): an ingestion controller mounted while the
   // registry still reads phase 4 must be caught, or the guard is decorative.
-  { fn: 'checkIngestionNotMountedBeforePhase5', expect: /fixture-import\.controller/ },
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expect: /fixture-import\.controller/,
+  },
+  // …and the SECOND discovery arm, which is not the controller arm: a
+  // composition file that wires an ingestion use case mounts nothing itself
+  // and must still be caught. Seeded separately so a narrowing of either
+  // regex leaves the other case failing rather than both going quiet at once.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expect: /fixture-early-wiring\.ts/,
+  },
+  // …and the guard's own blindness: inside the window, a discovery rule that
+  // reaches zero files is a FAILURE. Without this, narrowing
+  // PHASE5_INGESTION_MODULES or moving the composition root would restore
+  // exactly the vacuous green this whole rework exists to remove — the check
+  // would report "no violations" having examined nothing.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4, emptyTree: true },
+    expect: /discovery rule reached zero files/,
+  },
+  // …and the directory every real financial controller in this repository
+  // actually lives in. The guard's list did not include it, so its controller
+  // arm reached nothing real; this case fails if that regression returns.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expect: /unbounded-import\.controller/,
+  },
   { fn: 'checkDomainPurity', expect: /express/ },
   { fn: 'checkLayerDirection', expect: /infrastructure/ },
   { fn: 'checkModuleBoundary', expect: /beta/ },
@@ -4188,8 +4383,101 @@ const NEGATIVE_SELF_TEST_CASES = [
   { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.future\.read/ },
 ];
 
+/**
+ * Applicability cases — the arm no violation-based case can express.
+ *
+ * A violation case asserts "this check FAILED on the seeded shape". There is
+ * no seeded shape that makes a retired guard say `NOT_APPLICABLE`; the phase
+ * does. So this category asserts the STATUS a check reports rather than its
+ * violations, which is the only way to hold the line that a retired control
+ * must not report PASS.
+ */
+const APPLICABILITY_CASES = [
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 5 },
+    expectApplicable: false,
+    reason: /RETIRED at phase 5/,
+    why: 'at phase 5 the guard has no window left; reporting PASS there is the vacuous green this rework removed',
+  },
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 6 },
+    expectApplicable: false,
+    reason: /RETIRED at phase 5/,
+    why: 'the retirement holds for every later phase too, not only the one it was written at',
+  },
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expectApplicable: true,
+    why: 'inside its window the guard must be a real, running control',
+  },
+  // The active control that OWNS the ingestion surface from phase 5 onward is
+  // applicable at phase 5 — the retirement above hands its duty to something
+  // that actually runs, rather than to nothing.
+  {
+    fn: 'checkResourceLimits',
+    ctx: {},
+    expectApplicable: true,
+    why: 'test 24 is the successor control and must be live at every phase the guard is retired at',
+  },
+];
+
+/**
+ * Runner-tally cases — the accounting itself, driven directly.
+ *
+ * The defect this rework closed was never inside a checker. It was in the
+ * runner: it decided PASS by asking whether a violation list was empty, which
+ * is true both of a control that held and of a control that never ran. These
+ * cases feed `tallySupplementary` synthetic results and assert where each one
+ * lands, so restoring the old arithmetic — counting a not-applicable row as a
+ * pass — fails the self-test instead of quietly inflating the headline.
+ */
+const RUNNER_TALLY_CASES = [
+  {
+    name: 'a not-applicable row is N/A and is NOT counted as a pass',
+    runs: [
+      { name: 'retired', result: notApplicableResult('retired'), detail: '' },
+      { name: 'real', result: violationsResult([], 12), detail: '' },
+    ],
+    assert: (t) =>
+      t.passed === 1 &&
+      t.notApplicable === 1 &&
+      t.failed === 0 &&
+      t.rows[0].status === 'N/A' &&
+      t.rows[1].status === 'PASS',
+  },
+  {
+    name: 'a failing row is FAIL and is counted once',
+    runs: [
+      { name: 'broken', result: violationsResult([{ file: 'f', detail: 'd' }], 3), detail: '' },
+    ],
+    assert: (t) => t.failed === 1 && t.passed === 0 && t.notApplicable === 0,
+  },
+  {
+    name: 'the live guard at phase 4 is tallied as a real control, not as N/A',
+    runs: null,
+    assertLive: (fixtureRoot) => {
+      const result = checkIngestionNotMountedBeforePhase5({ root: fixtureRoot, currentPhase: 4 });
+      const t = tallySupplementary([{ name: 'guard', result, detail: '' }]);
+      return t.notApplicable === 0 && t.failed === 1;
+    },
+  },
+  {
+    name: 'the retired guard at phase 5 lands in N/A and adds nothing to passed',
+    runs: null,
+    assertLive: (fixtureRoot) => {
+      const result = checkIngestionNotMountedBeforePhase5({ root: fixtureRoot, currentPhase: 5 });
+      const t = tallySupplementary([{ name: 'guard', result, detail: '' }]);
+      return t.notApplicable === 1 && t.passed === 0 && t.failed === 0;
+    },
+  },
+];
+
 function runSelfTest() {
   const fixtureRoot = buildSelfTestFixture();
+  const emptyTreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'karar-arch-empty-'));
   const failures = [];
   try {
     const results = new Map();
@@ -4200,7 +4488,12 @@ function runSelfTest() {
       const key = `${fn}|${extra === undefined ? '' : JSON.stringify(extra)}`;
       if (!results.has(key)) {
         const check = CHECKS[fn] ?? SUPPLEMENTARY_CHECKS[fn] ?? null;
-        results.set(key, check === null ? null : check({ root: fixtureRoot, ...(extra ?? {}) }));
+        // `emptyTree` points a case at a directory with nothing in it, which is
+        // how a "your discovery rule found nothing" arm is seeded without
+        // deleting the fixture every other case reads.
+        const { emptyTree, ...rest } = extra ?? {};
+        const root = emptyTree === true ? emptyTreeRoot : fixtureRoot;
+        results.set(key, check === null ? null : check({ root, ...rest }));
       }
       return results.get(key);
     };
@@ -4236,10 +4529,57 @@ function runSelfTest() {
         );
       }
     }
+    for (const { fn, ctx, expectApplicable, reason, why } of APPLICABILITY_CASES) {
+      const result = resultFor(fn, ctx);
+      if (!result) {
+        failures.push(`${fn}: unknown check (applicability case)`);
+        continue;
+      }
+      const applicable = result.applicable !== false;
+      if (applicable !== expectApplicable) {
+        failures.push(
+          `${fn}: reported applicable=${applicable}, expected ${expectApplicable} — ${why}`,
+        );
+        continue;
+      }
+      if (!expectApplicable) {
+        if (typeof result.reason !== 'string' || result.reason.trim() === '') {
+          failures.push(`${fn}: reported NOT_APPLICABLE with no reason — ${why}`);
+        } else if (reason && !reason.test(result.reason)) {
+          failures.push(
+            `${fn}: NOT_APPLICABLE for the wrong reason (${reason}); got: ${result.reason}`,
+          );
+        }
+        if (result.violations.length > 0) {
+          failures.push(`${fn}: reported NOT_APPLICABLE yet carried violations`);
+        }
+      }
+    }
+    for (const testCase of RUNNER_TALLY_CASES) {
+      try {
+        const held =
+          testCase.runs === null
+            ? testCase.assertLive(fixtureRoot)
+            : testCase.assert(tallySupplementary(testCase.runs));
+        if (!held) {
+          failures.push(`runner tally: ${testCase.name} — the accounting does not hold`);
+        }
+      } catch (err) {
+        failures.push(`runner tally: ${testCase.name} — threw: ${err.message}`);
+      }
+    }
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    fs.rmSync(emptyTreeRoot, { recursive: true, force: true });
   }
-  return { cases: SELF_TEST_CASES.length + NEGATIVE_SELF_TEST_CASES.length, failures };
+  return {
+    cases:
+      SELF_TEST_CASES.length +
+      NEGATIVE_SELF_TEST_CASES.length +
+      APPLICABILITY_CASES.length +
+      RUNNER_TALLY_CASES.length,
+    failures,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -4267,6 +4607,9 @@ function main() {
   let failCount = 0;
   let passCount = 0;
   let skipCount = 0;
+  // Not-applicable rows: controls that had nothing to check. Kept apart from
+  // `passCount` on purpose — see `tallySupplementary`.
+  let naCount = 0;
 
   console.log(
     `Architecture tests — ${REGISTRY_REL} (currentPhase ${registry?.currentPhase ?? '?'})`,
@@ -4332,51 +4675,28 @@ function main() {
   }
 
   // Supplementary structural checks not numbered in the canonical 26.
+  //
+  // Table-driven, and that is the repair rather than a tidy-up. Each of these
+  // used to be four hand-written blocks with their own tally arithmetic, and
+  // one of them — `phase5-ingestion-not-mounted-early` — returned an empty
+  // violation list at phase 5 because it had nothing left to check. The
+  // arithmetic could not tell that apart from a control that looked and found
+  // nothing, so it printed `PASS (files scanned: 0)` and added it to the
+  // headline. `tallySupplementary` below is the single place that decides, it
+  // reads `applicable`, and the self-test drives it directly.
   console.log('');
-  const adminResult = checkAdminNoDbDriver({ root: REPO_ROOT });
-  const adminStatus = adminResult.violations.length === 0 ? 'PASS' : 'FAIL';
-  if (adminStatus === 'FAIL') failCount += 1;
-  else passCount += 1;
-  console.log(
-    `${adminStatus.padEnd(7)} supplementary     admin-no-db-driver (deps checked: ${adminResult.scanned})`,
-  );
-  for (const v of adminResult.violations) console.log(`          ${v.file} — ${v.detail}`);
-
-  const preActivation = checkIngestionNotMountedBeforePhase5({ root: REPO_ROOT });
-  const preActivationStatus = preActivation.violations.length === 0 ? 'PASS' : 'FAIL';
-  // Counted on BOTH arms, like the check above it. Incrementing only on failure
-  // made the summary undercount by one whenever this passed, so the printed
-  // total disagreed with the rows above it — and a summary that does not match
-  // its own detail is the first thing a reader stops trusting.
-  if (preActivationStatus === 'FAIL') failCount += 1;
-  else passCount += 1;
-  console.log(
-    `${preActivationStatus.padEnd(7)} supplementary     phase5-ingestion-not-mounted-early (files scanned: ${preActivation.scanned})`,
-  );
-  for (const v of preActivation.violations) console.log(`          ${v.file} — ${v.detail}`);
-
-  const declaredPermissions = checkModulePermissionsInCatalogue({ root: REPO_ROOT });
-  const declaredPermissionsStatus = declaredPermissions.violations.length === 0 ? 'PASS' : 'FAIL';
-  // Counted on both arms, for the reason given above.
-  if (declaredPermissionsStatus === 'FAIL') failCount += 1;
-  else passCount += 1;
-  console.log(
-    `${declaredPermissionsStatus.padEnd(7)} supplementary     module-permissions-in-catalogue (declarations checked: ${declaredPermissions.scanned}; ${declaredPermissions.note})`,
-  );
-  for (const v of declaredPermissions.violations) {
-    console.log(`          ${v.file} — ${v.detail}`);
-  }
-
-  const registryTruth = checkCapabilityRegistryTruth({ root: REPO_ROOT });
-  const registryTruthStatus = registryTruth.violations.length === 0 ? 'PASS' : 'FAIL';
-  // Counted on both arms, for the reason given above.
-  if (registryTruthStatus === 'FAIL') failCount += 1;
-  else passCount += 1;
-  console.log(
-    `${registryTruthStatus.padEnd(7)} supplementary     capability-registry-truth (${registryTruth.note})`,
-  );
-  for (const v of registryTruth.violations) {
-    console.log(`          ${v.file} — ${v.detail}`);
+  const supplementaryRuns = SUPPLEMENTARY_RUNS.map(({ name, fn, describe }) => {
+    const result = fn({ root: REPO_ROOT });
+    return { name, result, detail: describe(result) };
+  });
+  const supplementaryTally = tallySupplementary(supplementaryRuns);
+  passCount += supplementaryTally.passed;
+  failCount += supplementaryTally.failed;
+  naCount += supplementaryTally.notApplicable;
+  for (const row of supplementaryTally.rows) {
+    console.log(`${row.status.padEnd(7)} supplementary     ${row.name} (${row.detail})`);
+    for (const v of row.result.violations) console.log(`          ${v.file} — ${v.detail}`);
+    if (row.status === 'N/A') console.log(`          not applicable: ${row.result.reason}`);
   }
 
   // Self-test at the end of every normal run: prove the passes above are not
@@ -4395,7 +4715,9 @@ function main() {
   const ok = failCount === 0 && registryErrors.length === 0 && selfTestFailures.length === 0;
   console.log('');
   console.log(
-    `Summary: ${passCount} passed, ${failCount} failed, ${skipCount} skipped (deferred by activation phase); registry errors: ${registryErrors.length}; self-test: ${selfTestFailures.length === 0 ? 'ok' : 'FAILED'}`,
+    `Summary: ${passCount} passed, ${failCount} failed, ${skipCount} skipped (deferred by activation phase), ` +
+      `${naCount} not applicable (retired guards, excluded from the pass count); ` +
+      `registry errors: ${registryErrors.length}; self-test: ${selfTestFailures.length === 0 ? 'ok' : 'FAILED'}`,
   );
 
   const outDir = ensureOutDir(REPO_ROOT);
@@ -4403,27 +4725,28 @@ function main() {
     generatedAt: new Date().toISOString(),
     currentPhase: registry?.currentPhase ?? null,
     ok,
-    summary: { passed: passCount, failed: failCount, skipped: skipCount },
+    summary: {
+      passed: passCount,
+      failed: failCount,
+      skipped: skipCount,
+      notApplicable: naCount,
+    },
     registryErrors,
     selfTest: { cases, failures: selfTestFailures },
     results,
-    supplementary: [
-      { name: 'admin-no-db-driver', status: adminStatus, violations: adminResult.violations },
-      {
-        name: 'phase5-ingestion-not-mounted-early',
-        status: preActivationStatus,
-        violations: preActivation.violations,
-        scanned: preActivation.scanned,
-      },
-      {
-        name: 'module-permissions-in-catalogue',
-        status: declaredPermissionsStatus,
-        violations: declaredPermissions.violations,
-        scanned: declaredPermissions.scanned,
-        note: declaredPermissions.note,
-        exemptions: declaredPermissions.exemptions,
-      },
-    ],
+    // Every supplementary row, derived from the same tally the console printed.
+    // The hand-written array this replaced listed three of the four and omitted
+    // `capability-registry-truth` entirely, so the machine-readable evidence
+    // disagreed with the run it was evidence of.
+    supplementary: supplementaryTally.rows.map((row) => ({
+      name: row.name,
+      status: row.status,
+      violations: row.result.violations,
+      scanned: row.result.scanned,
+      ...(row.result.note ? { note: row.result.note } : {}),
+      ...(row.result.reason ? { notApplicableReason: row.result.reason } : {}),
+      ...(row.result.exemptions ? { exemptions: row.result.exemptions } : {}),
+    })),
   };
   fs.writeFileSync(
     path.join(outDir, 'architecture-report.json'),
