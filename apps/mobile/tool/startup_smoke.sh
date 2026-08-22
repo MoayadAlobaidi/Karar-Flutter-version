@@ -39,6 +39,9 @@ DEVICE="${2:-}"
 BUDGET="${3:-45}"
 BUNDLE_ID="com.kararfinance.app.local"
 SHOTS="$(mktemp -d)"
+# Set at launch; declared here so `set -u` cannot kill a run that reaches the
+# fallback by some path that did not launch.
+LAUNCHED_AT=$(date +%s)
 trap 'rm -rf "$SHOTS"' EXIT
 
 command -v sips >/dev/null 2>&1 || {
@@ -84,14 +87,19 @@ case "$RUNTIME" in
       xcrun simctl spawn "$DEVICE" log stream --style syslog \
         --predicate 'eventMessage CONTAINS "Dart VM service"' > "$SHOTS/app.log" 2>/dev/null &
       APP_LOG_PID=$!
-      # Wait for the stream to say it has attached — it prints a filter banner
-      # first — rather than assuming it has. Bounded, so a stream that never
-      # attaches falls through to the archive instead of hanging.
-      local waited=0
-      while (( waited < 20 )) && [[ ! -s "$SHOTS/app.log" ]]; do
-        sleep 1
-        waited=$(( waited + 1 ))
-      done
+      # THE BANNER IS NOT ATTACHMENT, and waiting for it was worse than the
+      # sleep it replaced. `log stream` prints its filter banner within about
+      # twenty milliseconds — when it PARSES the predicate, not when it
+      # subscribes — so a loop conditioned on the file being non-empty exits
+      # after zero or one seconds. A fifth reviewer measured it: the "bounded
+      # twenty-second wait" was in practice shorter than the two-second sleep,
+      # on the exact failure it was written for.
+      #
+      # There is no signal on this channel that means "subscribed". So the
+      # wait is unconditional and generous, and the archive fallback below is
+      # what actually makes the check reliable rather than a decoration on it.
+      sleep 6
+      LAUNCHED_AT=$(date +%s)
       start_app
     }
     stop_app_logged() { [[ -n "${APP_LOG_PID:-}" ]] && kill "$APP_LOG_PID" 2>/dev/null || true; }
@@ -102,9 +110,24 @@ case "$RUNTIME" in
         printf '%s' "$uri"
         return 0
       fi
-      xcrun simctl spawn "$DEVICE" log show --last 5m --style syslog \
+      # THE NEWEST ANNOUNCEMENT, AND ONLY FROM THIS RUN.
+      #
+      # `log show` emits chronologically ascending, so `grep -m1` took the
+      # OLDEST — the one most likely to belong to a previous launch. A fifth
+      # reviewer showed what that costs: on a developer's own simulator, which
+      # is this script's documented usage, the probe could query a dead isolate
+      # from an earlier run and report a tree the app under test never drew.
+      # It also defeated this check's own refusal to guess, because a RELEASE
+      # build on a device that ran a debug build minutes earlier would find
+      # that older announcement and proceed.
+      #
+      # The window is now the time since THIS run launched the app, and the
+      # last match wins.
+      local since
+      since="$(( $(date +%s) - LAUNCHED_AT + 5 ))"
+      xcrun simctl spawn "$DEVICE" log show --last "${since}s" --style syslog \
         --predicate 'eventMessage CONTAINS "Dart VM service"' 2>/dev/null \
-        | grep -m1 -o 'http://127.0.0.1:[0-9]*/[A-Za-z0-9_=-]*=*/' || true
+        | grep -o 'http://127.0.0.1:[0-9]*/[A-Za-z0-9_=-]*=*/' | tail -1 || true
     }
     ;;
   android)

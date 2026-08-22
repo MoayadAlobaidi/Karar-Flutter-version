@@ -1044,12 +1044,23 @@ function checkRegisterTraceability(root = REPO_ROOT) {
     {
       id: 'CI',
       pattern: 'CI-\\d{3}',
+      // THE VOCABULARY COMES FROM THE SCHEMA, NOT FROM TODAY'S ROWS.
+      //
+      // This shipped as ['OPEN','CLOSED'] — the two values the table happened
+      // to hold — while the log's own schema defines four. A fifth reviewer
+      // showed the cost: a row whose status is IN_PROGRESS or ACCEPTED parses
+      // as null, and `actual === null` then exempts EVERY citation of that row
+      // silently, with the non-vacuity guard blind to it because the map is
+      // still full. That is this entry's own comment about building for the
+      // instance, committed in the entry that says it is the class.
       rows: readRegisterRows(root, 'iso27001/continual-improvement.md', 'CI-\\d{3}', [
         'OPEN',
+        'IN_PROGRESS',
         'CLOSED',
+        'ACCEPTED',
       ]),
       file: 'docs/compliance/iso27001/continual-improvement.md',
-      statuses: ['OPEN', 'CLOSED'],
+      statuses: ['OPEN', 'IN_PROGRESS', 'CLOSED', 'ACCEPTED'],
     },
   ];
   for (const register of registers) {
@@ -1127,7 +1138,27 @@ function checkRegisterTraceability(root = REPO_ROOT) {
         // `was` is deliberately absent: past tense is how this corpus writes
         // history, and "KAR-CTL-113 was DESIGNED … it moved to IMPLEMENTED" is
         // a correct sentence that a rule matching `was` would report.
-        const verbs = 'is|stays|remains|reads|records|holds at|is still';
+        // THE VERB IS SOMETIMES ABSENT, AND SOMETIMES PLURAL.
+        //
+        // A fifth reviewer recovered the exact bytes of cycle 4's blocker and
+        // ran this pattern against them: it matched 0 of 5. The blocker took
+        // two shapes — `KAR-RSK-042 and CI-020 are CLOSED` (plural copula) and
+        // `KAR-RSK-042 CLOSED, CI-020 CLOSED` (no verb at all) — and this rule
+        // fired only on the sentence the FIX rewrote them into. Three spots
+        // were corrected because a human could read them; the two nobody could
+        // read as prose survived another cycle, and the rule built to catch
+        // them was blind to both.
+        //
+        // `are` is in the set now, and a bare `id STATUS` adjacency counts when
+        // nothing but whitespace or punctuation separates them — which is the
+        // shape a table cell uses and the shape that survived.
+        // `are` is the addition; `was`/`were` are deliberately NOT. The
+        // blocker's plural form was present tense — "KAR-RSK-042 and CI-020
+        // are CLOSED" — and adding the past tense with it reported four
+        // sentences that correctly describe history, which is the same
+        // mistake in the other direction. Past tense is how this corpus
+        // writes what a thing USED to be.
+        const verbs = 'is|are|stays|remains|reads|records|holds at|is still';
         // THE SENTENCE BOUNDARY WENT MISSING WHEN THE SEPARATION WAS WIDENED.
         //
         // The original pattern used `[^.|\n]`, which could not cross a full
@@ -1156,7 +1187,41 @@ function checkRegisterTraceability(root = REPO_ROOT) {
             `\\b(?:${verbs})\\s+\\**\`?(${register.statuses.join('|')})\\b`,
           'g',
         );
-        for (const m of block.text.matchAll(quoted)) {
+        // The VERBLESS form — `CI-020 CLOSED` — and it is scoped to TABLE
+        // ROWS, which is where it survived two review cycles.
+        //
+        // Narrowing by punctuation was not enough. `as **KAR-CTL-113
+        // DESIGNED**, because the control's own statement…` is the same bytes
+        // in a sentence about the past, and a rule that cannot tell them apart
+        // either misses the defect or reports the narrative. What separates
+        // them is the container: a cell that lists an id beside a status IS a
+        // status claim, and a sentence that mentions one is not. So the
+        // verbless form applies only to lines beginning with `|`.
+        //
+        // The prose form above still applies everywhere, cell or not.
+        // A TRANSITION IS NOT A STATUS. `KAR-CTL-014 DESIGNED → IMPLEMENTED`
+        // inside a cell is a record of a move, and the status on the left of
+        // the arrow is the one it moved FROM. Excluded by lookahead rather
+        // than by narrowing the separator, because the separator is what makes
+        // this form findable at all.
+        const adjacent = new RegExp(
+          `\\b(${register.pattern}) \\**\`?(${register.statuses.join('|')})\\b(?!\\**\`?\\s*(?:→|->|to\\b))`,
+          'g',
+        );
+        // SHORT CELLS ONLY. A status column is a few words by nature — the
+        // cell that survived two cycles was `KAR-RSK-042 CLOSED, CI-020
+        // CLOSED`. A cell holding a paragraph is prose that happens to sit in
+        // a table, and this report is full of paragraphs ABOUT status forks,
+        // which contain the bytes of the thing they describe. Without this,
+        // the rule reports the sentence explaining the defect it just caught.
+        const cellText = block.text
+          .split('\n')
+          .filter((l) => l.trimStart().startsWith('|'))
+          .flatMap((l) => l.split('|'))
+          .map((cell) => cell.trim())
+          .filter((cell) => cell.length > 0 && cell.length <= 80)
+          .join('\n');
+        for (const m of [...block.text.matchAll(quoted), ...cellText.matchAll(adjacent)]) {
           const actual = register.rows.get(m[1]);
           // COMPARED CASE-INSENSITIVELY, because the verb set is matched that
           // way and "EV-216 is collected" is agreement, not a fork. Widening
@@ -2726,6 +2791,34 @@ const TRACEABILITY_CASES = [
     expect: [],
     forbid: /./,
     why: 'every id resolves, the path exists, the quoted status matches, and the dated block is history',
+  },
+  {
+    // SEEDED FROM THE PRE-FIX BYTES, not from the sentence the fix wrote.
+    //
+    // A fifth reviewer recovered cycle 4's blocker verbatim and ran the rule
+    // against it: 0 of 5 shapes matched. Every case in this list had been
+    // written from the CORRECTED corpus, so the self-test proved the rule
+    // accepts a repaired document rather than that it rejects a broken one —
+    // and the two spots nobody could read as prose survived another cycle.
+    //
+    // These are the literal shapes the blocker took.
+    name: 'the blocker VERBATIM — the plural copula, as it was written',
+    options: { extraLine: '| KAR-RSK-001 and CI-001 are CLOSED |' },
+    expect: [/says CI-001 is CLOSED, but .*continual-improvement\.md records OPEN/],
+    why: 'three of the blocker’s five spots took this shape and the rule that replaced it could not see any of them',
+  },
+  {
+    name: 'the blocker VERBATIM — bare adjacency in a table cell, as it survived',
+    options: { extraLine: '| N5 | a finding | KAR-RSK-001 CLOSED, CI-001 CLOSED | — |' },
+    expect: [/says CI-001 is CLOSED, but .*continual-improvement\.md records OPEN/],
+    why: 'the two spots that survived cycle 4 took this shape: no verb at all, inside a status cell',
+  },
+  {
+    name: 'a TRANSITION in a cell is not a status claim',
+    options: { extraLine: '| CI-001 OPEN → CLOSED at the gate | — |' },
+    expect: [],
+    forbid: /says CI-001 is OPEN/,
+    why: 'the status left of an arrow is the one it moved FROM, and reporting it would flag every record of a move',
   },
   {
     name: 'the FOURTH register — an improvement entry quoted against its log',
