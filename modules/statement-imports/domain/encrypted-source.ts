@@ -109,6 +109,17 @@ export type IntegrityChecksumAlgorithm = (typeof INTEGRITY_CHECKSUM_ALGORITHMS)[
 export interface StoredSourceDescriptor {
   readonly storeKind: SourceStoreKind;
   readonly objectRef: SourceObjectRef;
+  /**
+   * The media type the object was SEALED under, carried so a reader can rebuild
+   * the AEAD binding rather than trusting metadata stored beside the
+   * ciphertext.
+   *
+   * The column has always existed; this field did not, and its absence was the
+   * reason `open`, `verify` and `erase` could not authenticate an object
+   * against the import and media type the writer bound it to. See
+   * `SourceBindingContext`.
+   */
+  readonly mediaType: string;
   readonly byteLength: number;
   readonly algorithm: string;
   readonly keyVersion: string;

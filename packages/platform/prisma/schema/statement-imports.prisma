@@ -139,7 +139,7 @@ model StatementImportSource {
   // separator, so no provider address reaches a subject-owned row and moving
   // the store is a composition change rather than a rewrite of history.
   storeKind                String   @map("store_kind")
-  objectRef                String   @map("object_ref")
+  objectRef                String   @unique @map("object_ref")
 
   encryptionAlgorithm      String   @map("encryption_algorithm")
   encryptionKeyVersion     String   @map("encryption_key_version")

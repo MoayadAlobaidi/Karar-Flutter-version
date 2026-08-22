@@ -68,13 +68,46 @@ import type {
 } from '../../domain/encrypted-source.js';
 import type { ImportsPrincipal } from '../principal.js';
 
-/** What a caller must say about an object before it is stored. */
-export interface SourceStoreContext {
+/**
+ * The binding every operation on a stored object must present.
+ *
+ * WHY THIS IS NOW ON THE READ SIDE TOO, and why the port had to change rather
+ * than the adapter.
+ *
+ * `store` has always bound tenant, user, import id and media type into the AEAD
+ * associated data. `open`, `verify` and `erase` received only a `StoredSource`
+ * descriptor, which carried none of that — so the only thing an implementation
+ * could authenticate against was **the associated data it had stored beside the
+ * ciphertext**, which authenticates an object against itself and proves nothing
+ * about the caller. The subject half was recovered by comparing a prefix; the
+ * import and media-type halves could not be recovered at all, because the port
+ * never handed an implementation one.
+ *
+ * That is not a local-adapter shortcoming. An S3-plus-KMS implementation would
+ * have been in exactly the same position, which is why widening the port is the
+ * fix and hardening the adapter is not. Verified before the change: an object
+ * replayed under a DIFFERENT import of the SAME subject decrypted successfully.
+ * Cross-user and cross-tenant were correctly refused.
+ *
+ * The exploit precondition is row-level write — a tamper, a restore, a merge, a
+ * future bug that swaps an `object_ref` between two of one person's imports.
+ * Surviving exactly that is what an AEAD binding is for.
+ */
+export interface SourceBindingContext {
   /** Bound as AEAD associated data, so an object cannot be replayed under another import. */
   readonly importId: string;
   /** `text/csv`, always. Recorded so a later media type cannot arrive silently. */
   readonly mediaType: string;
 }
+
+/**
+ * What a caller must say about an object before it is stored.
+ *
+ * Identical to the binding a reader must present, and deliberately the same
+ * type: if writing and reading could describe an object differently, the
+ * binding would be decorative.
+ */
+export type SourceStoreContext = SourceBindingContext;
 
 /** What the store recorded about one written object. */
 export interface StoredSource {
@@ -134,16 +167,28 @@ export interface EncryptedSourceStorePort {
    * a decrypt would mean the check and the read were the same act, and a
    * caller could not verify without also holding the plaintext.
    */
-  verify(actor: ImportsPrincipal, stored: StoredSource): Promise<boolean>;
+  verify(
+    actor: ImportsPrincipal,
+    context: SourceBindingContext,
+    stored: StoredSource,
+  ): Promise<boolean>;
 
   /**
    * Decrypts and streams the object.
    *
-   * Rejects on any authentication failure — wrong key, wrong import, or
-   * tampering — with one opaque kind, because distinguishing them for a
-   * caller would leak an oracle.
+   * Rejects on any authentication failure — wrong subject, wrong import, wrong
+   * media type, wrong key, or tampering — with one opaque kind, because
+   * distinguishing them for a caller would leak an oracle.
+   *
+   * The expected associated data is computed from [context] and [actor]. An
+   * implementation may NOT authenticate against associated data it stored
+   * beside the ciphertext: that authenticates the object against itself.
    */
-  open(actor: ImportsPrincipal, stored: StoredSource): AsyncIterable<Uint8Array>;
+  open(
+    actor: ImportsPrincipal,
+    context: SourceBindingContext,
+    stored: StoredSource,
+  ): AsyncIterable<Uint8Array>;
 
   /**
    * Deletes the object. Idempotent by contract: a second call finds nothing
@@ -154,7 +199,11 @@ export interface EncryptedSourceStorePort {
    * ciphertext nobody can name is still a subject's bank statement sitting in
    * a store.
    */
-  erase(actor: ImportsPrincipal, stored: StoredSource): Promise<boolean>;
+  erase(
+    actor: ImportsPrincipal,
+    context: SourceBindingContext,
+    stored: StoredSource,
+  ): Promise<boolean>;
 }
 
 /**

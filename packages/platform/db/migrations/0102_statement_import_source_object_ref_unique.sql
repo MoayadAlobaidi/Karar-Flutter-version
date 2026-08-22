@@ -1,0 +1,45 @@
+-- One stored object belongs to one import, and the database now says so.
+--
+-- WHY THIS EXISTS, AND WHY IT IS NOT THE CONTROL.
+--
+-- `statement_import_sources` already carried `UNIQUE (import_id)` — one source
+-- per import — and nothing the other way. Two rows could name the same
+-- `object_ref`, which is the state a row-level tamper, a partial restore or a
+-- botched merge would produce, and the state an attacker would want: one
+-- person's stored statement addressed by a second import.
+--
+-- THE ACTUAL CONTROL IS THE AEAD BINDING, and it landed with this migration.
+-- `open`, `verify` and `erase` now rebuild the expected associated data from
+-- the CALLER'S context — tenant, user, import id, media type — instead of
+-- authenticating the object against the associated data stored beside it. An
+-- object sealed under one import cannot be opened, verified or erased under
+-- another even if both rows name it, and that holds in every implementation
+-- because the port hands each one the binding. This constraint prevents the
+-- state; the binding is what makes the state harmless.
+--
+-- WHY IT IS SAFE TO ASSERT, which is the question worth asking before adding a
+-- uniqueness constraint to a table a future store will write. The handle is
+-- minted by the store, one per `store()` call, and the store is forbidden from
+-- deriving it from the content — a content-derived handle is a confirmation
+-- oracle, which the local adapter's own header states in as many words. Every
+-- store design permitted here therefore mints a distinct handle per write,
+-- including a content-addressed one: the ciphertext differs per call because
+-- the nonce does. A design that DID address by plaintext content would collide
+-- here, and it is already prohibited for a stronger reason than this
+-- constraint.
+--
+-- Adding it as a plain UNIQUE rather than an index-with-predicate: the column
+-- is NOT NULL, so there is no partial case to express.
+
+ALTER TABLE public.statement_import_sources
+  ADD CONSTRAINT statement_import_sources_object_ref_unique UNIQUE (object_ref);
+
+-- rollback: forward-only (README.md). A failed apply leaves nothing — one
+-- statement, one transaction, and it fails outright if any two rows already
+-- share a handle, which is the corruption this exists to make impossible
+-- rather than something to reconcile silently. Deliberate reversal would be
+-- ALTER TABLE public.statement_import_sources DROP CONSTRAINT
+-- statement_import_sources_object_ref_unique — which restores only the
+-- possibility of the state, not any data. The AEAD binding in
+-- `modules/statement-imports` is the control that makes the state harmless and
+-- is unaffected either way.

@@ -48,6 +48,7 @@ import { ACTOR_A1, ACTOR_A2, ACTOR_B1, bytesOf, streamOf } from './fixtures.js';
 // far as one written in source — which the retention closure test proves by
 // scanning every dist/ in the production closure.
 import { SYNTHETIC_RETENTION_MARKER } from '@karar/financial-retention-local-fixtures';
+import type { ImportsPrincipal } from '../application/principal.js';
 
 const NON_LOCAL = ['dev', 'staging', 'production', 'prod', 'test', ''] as const;
 
@@ -251,48 +252,152 @@ describe('the encrypted source store binds bytes to the SUBJECT, not just to the
     return { store, stored };
   }
 
-  it('opens for the subject it was sealed for', async () => {
+  const OTHER_IMPORT = { importId: '01J0000000000000000000000B', mediaType: 'text/csv' } as const;
+  const OTHER_MEDIA = { importId: CONTEXT.importId, mediaType: 'text/plain' } as const;
+
+  it('opens for the subject, import and media type it was sealed for', async () => {
     const { store, stored } = await sealedForA1();
     const chunks: Uint8Array[] = [];
-    for await (const chunk of store.open(ACTOR_A1, stored)) chunks.push(chunk);
+    for await (const chunk of store.open(ACTOR_A1, CONTEXT, stored)) chunks.push(chunk);
     expect(Buffer.concat(chunks).toString('utf8')).toBe('date,amount\n');
   });
 
   it('REFUSES another user in the same tenant', async () => {
     const { store, stored } = await sealedForA1();
     await expect(async () => {
-      for await (const chunk of store.open(ACTOR_A2, stored)) void chunk;
+      for await (const chunk of store.open(ACTOR_A2, CONTEXT, stored)) void chunk;
     }).rejects.toThrow(EncryptedSourceStoreError);
   });
 
   it('REFUSES another tenant', async () => {
     const { store, stored } = await sealedForA1();
     await expect(async () => {
-      for await (const chunk of store.open(ACTOR_B1, stored)) void chunk;
+      for await (const chunk of store.open(ACTOR_B1, CONTEXT, stored)) void chunk;
     }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('REFUSES the same subject presenting a DIFFERENT import', async () => {
+    // THE CASE THAT USED TO DECRYPT. `open` received only a descriptor, so no
+    // implementation could rebuild the import half of the binding — it
+    // authenticated the object against the associated data stored beside it,
+    // which is the object authenticating itself. An object replayed under
+    // another of the same person's imports opened successfully.
+    const { store, stored } = await sealedForA1();
+    await expect(async () => {
+      for await (const chunk of store.open(ACTOR_A1, OTHER_IMPORT, stored)) void chunk;
+    }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('REFUSES the same subject and import presenting a DIFFERENT media type', async () => {
+    const { store, stored } = await sealedForA1();
+    await expect(async () => {
+      for await (const chunk of store.open(ACTOR_A1, OTHER_MEDIA, stored)) void chunk;
+    }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('REFUSES a tampered authentication tag', async () => {
+    const { store, stored } = await sealedForA1();
+    const tag = Uint8Array.from(stored.authTag);
+    tag[0] = (tag[0] ?? 0) ^ 0xff;
+    await expect(async () => {
+      for await (const chunk of store.open(ACTOR_A1, CONTEXT, { ...stored, authTag: tag })) {
+        void chunk;
+      }
+    }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('REFUSES a tampered nonce, which is the other half of the same seal', async () => {
+    const { store, stored } = await sealedForA1();
+    const nonce = Uint8Array.from(stored.nonce);
+    nonce[0] = (nonce[0] ?? 0) ^ 0xff;
+    await expect(async () => {
+      for await (const chunk of store.open(ACTOR_A1, CONTEXT, { ...stored, nonce })) void chunk;
+    }).rejects.toThrow(EncryptedSourceStoreError);
+  });
+
+  it('detects tampered CIPHERTEXT through verify, without decrypting', async () => {
+    const store = new LocalEncryptedSourceStore({ env: 'local' });
+    const stored = await store.store(ACTOR_A1, CONTEXT, streamOf(bytesOf('date,amount\n')));
+    expect(await store.verify(ACTOR_A1, CONTEXT, stored)).toBe(true);
+    // A checksum that no longer describes the bytes is the tamper signal the
+    // commit path revalidates on, and it is answered without a decrypt.
+    const wrong = Uint8Array.from(stored.integrityChecksum);
+    wrong[0] = (wrong[0] ?? 0) ^ 0xff;
+    expect(await store.verify(ACTOR_A1, CONTEXT, { ...stored, integrityChecksum: wrong })).toBe(
+      false,
+    );
   });
 
   it('refuses with the SAME message a wrong key would produce — no oracle', async () => {
     const { store, stored } = await sealedForA1();
-    let message = '';
-    try {
-      for await (const chunk of store.open(ACTOR_B1, stored)) void chunk;
-    } catch (error) {
-      message = (error as Error).message;
+    const messages: string[] = [];
+    for (const [actor, context] of [
+      [ACTOR_B1, CONTEXT],
+      [ACTOR_A1, OTHER_IMPORT],
+      [ACTOR_A1, OTHER_MEDIA],
+    ] as const) {
+      try {
+        for await (const chunk of store.open(actor, context, stored)) void chunk;
+      } catch (error) {
+        messages.push((error as Error).message);
+      }
     }
-    // Identical to the failure the decrypt path throws, so "wrong subject" and
-    // "wrong key" are indistinguishable to a caller.
-    expect(message).toBe('authenticated decryption failed');
+    // Wrong subject, wrong import and wrong media type are indistinguishable
+    // from each other AND from a wrong key: one opaque failure, no oracle.
+    expect(messages).toEqual([
+      'authenticated decryption failed',
+      'authenticated decryption failed',
+      'authenticated decryption failed',
+    ]);
   });
 
-  it('another subject cannot verify or erase, and is not told the object exists', async () => {
+  it('verify REJECTS a substituted context exactly as it answers for an absent object', async () => {
     const { store, stored } = await sealedForA1();
-    expect(await store.verify(ACTOR_A1, stored)).toBe(true);
-    // Both answer exactly as an ABSENT object does.
-    expect(await store.verify(ACTOR_B1, stored)).toBe(false);
-    expect(await store.erase(ACTOR_B1, stored)).toBe(false);
-    // …and the bytes are still there for the subject they belong to.
-    expect(await store.verify(ACTOR_A1, stored)).toBe(true);
-    expect(await store.erase(ACTOR_A1, stored)).toBe(true);
+    expect(await store.verify(ACTOR_A1, CONTEXT, stored)).toBe(true);
+    expect(await store.verify(ACTOR_B1, CONTEXT, stored)).toBe(false);
+    expect(await store.verify(ACTOR_A1, OTHER_IMPORT, stored)).toBe(false);
+    expect(await store.verify(ACTOR_A1, OTHER_MEDIA, stored)).toBe(false);
+  });
+
+  it('erase CANNOT erase through a substituted context, and says nothing about existence', async () => {
+    const { store, stored } = await sealedForA1();
+    expect(await store.erase(ACTOR_B1, CONTEXT, stored)).toBe(false);
+    expect(await store.erase(ACTOR_A1, OTHER_IMPORT, stored)).toBe(false);
+    expect(await store.erase(ACTOR_A1, OTHER_MEDIA, stored)).toBe(false);
+    // …and the bytes are still there for the binding they belong to.
+    expect(await store.verify(ACTOR_A1, CONTEXT, stored)).toBe(true);
+  });
+
+  it('legitimate erase succeeds and stays idempotent', async () => {
+    const { store, stored } = await sealedForA1();
+    expect(await store.erase(ACTOR_A1, CONTEXT, stored)).toBe(true);
+    // A second call finds nothing and answers false rather than throwing —
+    // the same answer a wrong binding gets, which is what keeps the store from
+    // being an existence oracle in either direction.
+    expect(await store.erase(ACTOR_A1, CONTEXT, stored)).toBe(false);
+    expect(await store.verify(ACTOR_A1, CONTEXT, stored)).toBe(false);
+  });
+
+  it('the binding is length-prefixed, so no two contexts can join to one', async () => {
+    // `|`-joining makes `tenant "a|b" + user "c"` and `tenant "a" + user "b|c"`
+    // the same bytes. Neither identifier can contain a pipe today; the point is
+    // that the guard does not depend on nobody having noticed.
+    const store = new LocalEncryptedSourceStore({ env: 'local' });
+    // Cast, because the branded types cannot express an identifier containing a
+    // pipe — which is the point: the guard protects a shape the type system
+    // currently forbids, so that a later widening of the type is not a silent
+    // widening of the binding.
+    const odd = {
+      tenantId: `${ACTOR_A1.tenantId}|x`,
+      userId: ACTOR_A1.userId,
+    } as unknown as ImportsPrincipal;
+    const stored = await store.store(odd, CONTEXT, streamOf(bytesOf('a,b\n')));
+    const shifted = {
+      tenantId: ACTOR_A1.tenantId,
+      userId: `x|${ACTOR_A1.userId}`,
+    } as unknown as ImportsPrincipal;
+    await expect(async () => {
+      for await (const chunk of store.open(shifted, CONTEXT, stored)) void chunk;
+    }).rejects.toThrow(EncryptedSourceStoreError);
   });
 });

@@ -213,7 +213,11 @@ export class ParseStatementSource {
 
     try {
       const parsed = await this.parser.parse({
-        source: this.sources.open(acting, descriptor),
+        source: this.sources.open(
+          acting,
+          { importId, mediaType: descriptor.mediaType },
+          descriptor,
+        ),
         limits: input.limits,
         hasHeaderRow: input.mapping.hasHeaderRow,
         ...(input.signal !== undefined ? { signal: input.signal } : {}),

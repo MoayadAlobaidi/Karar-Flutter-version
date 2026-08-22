@@ -133,7 +133,10 @@ export class EraseStatementImport {
     try {
       const descriptor = await this.imports.findSource(acting, importId);
       if (descriptor !== null) {
-        storedObjectDeleted = await this.sources.erase(acting, {
+        storedObjectDeleted = await this.sources.erase(
+          acting,
+          { importId, mediaType: descriptor.mediaType },
+          {
           storeKind: descriptor.storeKind,
           objectRef: descriptor.objectRef,
           byteLength: descriptor.byteLength,
@@ -143,7 +146,8 @@ export class EraseStatementImport {
           authTag: descriptor.authTag,
           integrityChecksumAlgorithm: descriptor.integrityChecksumAlgorithm,
           integrityChecksum: descriptor.integrityChecksum,
-        });
+          },
+        );
       }
     } catch (error) {
       // Nothing else is attempted. An import row that still names an object is

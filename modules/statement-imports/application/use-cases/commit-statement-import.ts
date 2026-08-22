@@ -287,7 +287,14 @@ export class CommitStatementImport {
     }
     let intact: boolean;
     try {
-      intact = await this.sources.verify(acting, {
+      intact = await this.sources.verify(
+        acting,
+        // The binding this import expects the object to carry, from THIS
+        // import's own identity rather than from anything stored beside the
+        // ciphertext. An object belonging to another of this person's imports
+        // answers exactly as an absent one does.
+        { importId, mediaType: descriptor.mediaType },
+        {
         storeKind: descriptor.storeKind,
         objectRef: descriptor.objectRef,
         byteLength: descriptor.byteLength,
@@ -297,7 +304,8 @@ export class CommitStatementImport {
         authTag: descriptor.authTag,
         integrityChecksumAlgorithm: descriptor.integrityChecksumAlgorithm,
         integrityChecksum: descriptor.integrityChecksum,
-      });
+        },
+      );
     } catch {
       intact = false;
     }

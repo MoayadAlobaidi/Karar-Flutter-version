@@ -195,6 +195,10 @@ export class StoreImportSource {
     const descriptor: StoredSourceDescriptor = {
       storeKind: written.storeKind,
       objectRef: SourceObjectRef.of(written.objectRef),
+      // The media type the object was SEALED under, carried on the descriptor
+      // so every later read rebuilds the same binding rather than trusting
+      // what sits beside the ciphertext.
+      mediaType: input.mediaType,
       byteLength: written.byteLength,
       algorithm: written.algorithm,
       keyVersion: written.keyVersion,

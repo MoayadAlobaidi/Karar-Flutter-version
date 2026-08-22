@@ -265,6 +265,7 @@ export function statementImportUpdateData(imported: StatementImport) {
 export interface StatementImportSourceRow {
   readonly storeKind: string;
   readonly objectRef: string;
+  readonly mediaType: string;
   readonly byteLength: bigint;
   readonly encryptionAlgorithm: string;
   readonly encryptionKeyVersion: string;
@@ -284,6 +285,7 @@ export function toStoredSourceDescriptor(row: StatementImportSourceRow): StoredS
       row.storeKind,
     ),
     objectRef: SourceObjectRef.of(row.objectRef),
+    mediaType: row.mediaType,
     byteLength: Number(row.byteLength),
     algorithm: row.encryptionAlgorithm,
     keyVersion: row.encryptionKeyVersion,

@@ -52,6 +52,7 @@ import {
 import {
   EncryptedSourceStoreError,
   type EncryptedSourceStorePort,
+  type SourceBindingContext,
   type SourceStoreContext,
   type StoredSource,
 } from '../../application/ports/encrypted-source-store.js';
@@ -82,59 +83,53 @@ export class LocalSourceStoreEnvironmentError extends Error {
 }
 
 /**
- * The subject half of the associated data: everything before the import id.
+ * The associated data, computed from the CALLER'S context every time.
  *
- * `open`, `verify` and `erase` receive a `StoredSource` descriptor that does
- * NOT carry the import id or media type, so they cannot rebuild the whole AAD
- * to authenticate against. They used the AAD stored beside the ciphertext
- * instead — which authenticates the object against itself and therefore
- * authenticates nothing about the CALLER. The header claims "an object moved
- * between subjects or replayed under another import fails authentication
- * instead of decrypting into a plausible wrong statement"; the import half of
- * that held, and the subject half did not.
+ * This is the whole of KAR-RSK-048's fix and it lives in one function on
+ * purpose: there is exactly one expression of what an object is bound to, and
+ * both the write and every read call it.
  *
- * Comparing this prefix restores the subject half without changing the port.
+ * WHAT IT REPLACED. `open`, `verify` and `erase` used to receive only a
+ * `StoredSource` descriptor, which carried neither the import id nor the media
+ * type, so they authenticated against the associated data STORED BESIDE THE
+ * CIPHERTEXT — which authenticates an object against itself and proves nothing
+ * about the caller. A later repair recovered the subject half by comparing a
+ * prefix; the import and media-type halves stayed unbound, because no
+ * implementation could rebuild what the port never handed it. Verified before
+ * the port changed: an object replayed under a DIFFERENT import of the SAME
+ * subject decrypted successfully.
  *
- * THE IMPORT HALF IS STILL NOT BOUND, AND NO ADAPTER CAN BIND IT. The port
- * hands `open`, `verify` and `erase` a descriptor with neither the import id
- * nor the media type, so an object replayed under a DIFFERENT import of the
- * SAME subject decrypts — verified. Cross-user and cross-tenant are refused.
- * The header's claim that "an object moved between subjects or replayed under
- * another import fails authentication" is therefore half true, and the half
- * that fails is structural rather than local to this adapter: an S3-plus-KMS
- * implementation would be no better, because the port never hands it the
- * import. Recorded as KAR-RSK-048 with a treatment that widens the port.
+ * LENGTH-PREFIXED, not `|`-joined. A separator alone is a canonicalisation bug
+ * waiting for an identifier that contains one: `tenant "a|b" + user "c"` and
+ * `tenant "a" + user "b|c"` join to the same bytes. Both are UUIDs today and
+ * neither can contain a pipe, which is exactly why the guard is cheap — the
+ * question is what happens when an identifier type changes, and the answer
+ * should not depend on nobody having noticed.
  */
-function subjectAssociatedDataPrefix(principal: ImportsPrincipal): Buffer {
-  return Buffer.from(`${ASSOCIATED_DATA_LABEL}|${principal.tenantId}|${principal.userId}|`, 'utf8');
+function associatedData(principal: ImportsPrincipal, context: SourceBindingContext): Buffer {
+  const parts = [
+    ASSOCIATED_DATA_LABEL,
+    principal.tenantId,
+    principal.userId,
+    context.importId,
+    context.mediaType,
+  ];
+  return Buffer.from(parts.map((part) => `${String(part.length)}:${part}`).join(''), 'utf8');
 }
 
 /**
- * Refuses a descriptor whose stored object was bound to a different subject.
+ * Refuses an object whose binding is not the one the caller presented.
  *
- * Constant-time over the prefix, and it throws the SAME opaque kind a failed
- * decryption throws, so "wrong subject" and "wrong key" are indistinguishable
- * to a caller.
+ * Constant-time, and it throws the SAME opaque kind a failed decryption throws,
+ * so "wrong subject", "wrong import", "wrong media type" and "wrong key" are
+ * indistinguishable to a caller. `verify` and `erase` convert it to `false` for
+ * the same reason: an object bound to something else must answer exactly as an
+ * absent one does, or the store is an existence oracle.
  */
-function assertSubjectMatches(principal: ImportsPrincipal, aad: Buffer): void {
-  const expected = subjectAssociatedDataPrefix(principal);
-  const actual = aad.subarray(0, expected.length);
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+function assertBindingMatches(expected: Buffer, actual: Buffer): void {
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
     throw new EncryptedSourceStoreError('read_failed', 'authenticated decryption failed');
   }
-}
-
-function associatedData(principal: ImportsPrincipal, context: SourceStoreContext): Buffer {
-  return Buffer.from(
-    [
-      ASSOCIATED_DATA_LABEL,
-      principal.tenantId,
-      principal.userId,
-      context.importId,
-      context.mediaType,
-    ].join('|'),
-    'utf8',
-  );
 }
 
 /** The associated data a stored object must be opened under. */
@@ -212,13 +207,18 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
    * expected outcome the commit path handles, and an exception would make it
    * indistinguishable from the store being down.
    */
-  verify(actor: ImportsPrincipal, stored: StoredSource): Promise<boolean> {
+  verify(
+    actor: ImportsPrincipal,
+    context: SourceBindingContext,
+    stored: StoredSource,
+  ): Promise<boolean> {
     const entry = this.#objects.get(stored.objectRef);
     if (entry === undefined) return Promise.resolve(false);
-    // Another subject's object answers exactly as an absent one does: false,
-    // not an exception, so verify stays free of an existence oracle.
+    // An object bound to ANY other subject, import or media type answers
+    // exactly as an absent one does: false, not an exception, so verify stays
+    // free of an existence oracle.
     try {
-      assertSubjectMatches(actor, entry.aad);
+      assertBindingMatches(associatedData(actor, context), entry.aad);
     } catch {
       return Promise.resolve(false);
     }
@@ -240,13 +240,20 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
    * which is the failure mode the tag exists to prevent. It is then handed
    * over in bounded chunks so the consumer's own streaming stays honest.
    */
-  async *open(actor: ImportsPrincipal, stored: StoredSource): AsyncIterable<Uint8Array> {
+  async *open(
+    actor: ImportsPrincipal,
+    context: SourceBindingContext,
+    stored: StoredSource,
+  ): AsyncIterable<Uint8Array> {
     const entry = this.#objects.get(stored.objectRef);
     if (entry === undefined) {
       throw new EncryptedSourceStoreError('not_found', 'no stored object with that handle');
     }
-    // The subject the bytes were sealed for, checked BEFORE the key is used.
-    assertSubjectMatches(actor, entry.aad);
+    // THE WHOLE BINDING THE CALLER PRESENTS, checked BEFORE the key is used —
+    // subject, import and media type, rebuilt from the caller's own context
+    // rather than read back from beside the ciphertext.
+    const expected = associatedData(actor, context);
+    assertBindingMatches(expected, entry.aad);
     if (stored.algorithm !== ALGORITHM) {
       throw new EncryptedSourceStoreError(
         'read_failed',
@@ -259,7 +266,11 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
     let plaintext: Buffer;
     try {
       const decipher = createDecipheriv(NODE_CIPHER, this.#key, Buffer.from(stored.nonce));
-      decipher.setAAD(entry.aad);
+      // The CALLER'S associated data, not the stored copy. Passing `entry.aad`
+      // here would authenticate the object against itself, which is the defect
+      // this whole change exists to remove — and the equality check above
+      // would be the only thing standing between them.
+      decipher.setAAD(expected);
       decipher.setAuthTag(Buffer.from(stored.authTag));
       plaintext = Buffer.concat([decipher.update(entry.ciphertext), decipher.final()]);
     } catch {
@@ -274,13 +285,18 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
   }
 
   /** Idempotent by contract: a second call finds nothing and answers `false`. */
-  erase(actor: ImportsPrincipal, stored: StoredSource): Promise<boolean> {
+  erase(
+    actor: ImportsPrincipal,
+    context: SourceBindingContext,
+    stored: StoredSource,
+  ): Promise<boolean> {
     const entry = this.#objects.get(stored.objectRef);
     if (entry === undefined) return Promise.resolve(false);
-    // One subject must not erase another's bytes, and must not learn that they
-    // exist by being told so. Same answer as an absent object.
+    // One caller must not erase bytes bound to a different subject, import or
+    // media type, and must not learn that they exist by being told so. Same
+    // answer as an absent object.
     try {
-      assertSubjectMatches(actor, entry.aad);
+      assertBindingMatches(associatedData(actor, context), entry.aad);
     } catch {
       return Promise.resolve(false);
     }
