@@ -3420,6 +3420,22 @@ const SUPPLEMENTARY_RUNS = [
 ];
 
 /**
+ * The status of ONE check result, and the only place that decision is made.
+ *
+ * Extracted so the zero-scan rule cannot be removed without a self-test
+ * failing, which is the property KAR-RSK-044 claims for the whole runner and
+ * had for exactly one check. A control that examined nothing did not hold
+ * anything: it is a FAIL, not a PASS. A control whose window is legitimately
+ * empty says so by returning `applicable: false` and is reported N/A, which is
+ * a third status excluded from the pass count.
+ */
+function statusForResult(result) {
+  if (result.applicable === false) return 'N/A';
+  if (result.scanned === 0) return 'FAIL';
+  return result.violations.length === 0 ? 'PASS' : 'FAIL';
+}
+
+/**
  * Turns supplementary results into statuses and counts — the ONE place that
  * decides what a supplementary row contributes to the headline.
  *
@@ -3441,17 +3457,10 @@ function tallySupplementary(runs) {
   let failed = 0;
   let notApplicable = 0;
   const rows = runs.map(({ name, result, detail }) => {
-    let status;
-    if (result.applicable === false) {
-      status = 'N/A';
-      notApplicable += 1;
-    } else if (result.violations.length === 0) {
-      status = 'PASS';
-      passed += 1;
-    } else {
-      status = 'FAIL';
-      failed += 1;
-    }
+    const status = statusForResult(result);
+    if (status === 'N/A') notApplicable += 1;
+    else if (status === 'PASS') passed += 1;
+    else failed += 1;
     return { name, status, detail, result };
   });
   return { rows, passed, failed, notApplicable };
@@ -4449,6 +4458,16 @@ const RUNNER_TALLY_CASES = [
       t.rows[1].status === 'PASS',
   },
   {
+    name: 'a check that scanned NOTHING is FAIL, not PASS',
+    runs: [{ name: 'quiet', result: violationsResult([], 0), detail: '' }],
+    assert: (t) => t.failed === 1 && t.passed === 0 && t.notApplicable === 0,
+  },
+  {
+    name: 'a check whose window is legitimately empty is N/A, not a zero-scan FAIL',
+    runs: [{ name: 'retired', result: notApplicableResult('retired'), detail: '' }],
+    assert: (t) => t.notApplicable === 1 && t.failed === 0 && t.passed === 0,
+  },
+  {
     name: 'a failing row is FAIL and is counted once',
     runs: [
       { name: 'broken', result: violationsResult([{ file: 'f', detail: 'd' }], 3), detail: '' },
@@ -4642,7 +4661,32 @@ function main() {
         }
         if (!fnCache.has(fnName)) fnCache.set(fnName, CHECKS[fnName]({ root: REPO_ROOT }));
         const result = fnCache.get(fnName);
-        const status = result.violations.length === 0 ? 'PASS' : 'FAIL';
+        // A CHECK THAT EXAMINED NOTHING DID NOT PASS.
+        //
+        // KAR-RSK-044 and CI-017 both record the class as fixed — "every
+        // checker that can go quiet now fails on a zero-scan inside its own
+        // window" — and an independent review measured what that meant: ONE
+        // `scanned === 0` guard, inside one retired historical guard, in 4760
+        // lines. The reviewer reproduced the original defect on a different
+        // check by making `modules/` read as empty and got
+        // `PASS test 16 Module ownership (scanned: 0)` counted in the headline
+        // with the self-test green. The instance was fixed; the class was not,
+        // and the register stated the class.
+        //
+        // It is structural now, at the ONE place every numbered check's status
+        // is decided, so it cannot be forgotten by a check written later. A
+        // check with a genuinely empty window declares that by returning
+        // `applicable: false` and is reported N/A — which is a third status
+        // excluded from the pass count, not a pass.
+        const scannedNothing = result.applicable !== false && result.scanned === 0;
+        const status = result.violations.length === 0 && !scannedNothing ? 'PASS' : 'FAIL';
+        if (scannedNothing) {
+          console.log(
+            `          scanned 0 files inside its own window — a control that ` +
+              `examined nothing did not hold anything. If the window is legitimately ` +
+              `empty, the check must say so with applicable:false and be reported N/A.`,
+          );
+        }
         if (status === 'PASS') passCount += 1;
         else failCount += 1;
         const scanNote = `scanned: ${result.scanned}${result.note ? `; ${result.note}` : ''}`;

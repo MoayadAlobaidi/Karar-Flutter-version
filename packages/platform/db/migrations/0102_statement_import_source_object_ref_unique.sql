@@ -12,10 +12,20 @@
 -- `open`, `verify` and `erase` now rebuild the expected associated data from
 -- the CALLER'S context — tenant, user, import id, media type — instead of
 -- authenticating the object against the associated data stored beside it. An
--- object sealed under one import cannot be opened, verified or erased under
--- another even if both rows name it, and that holds in every implementation
--- because the port hands each one the binding. This constraint prevents the
--- state; the binding is what makes the state harmless.
+-- object sealed under one import cannot be OPENED under another even if both
+-- rows name it, because `open` feeds the caller's associated data to the
+-- decryption itself and GCM refuses.
+--
+-- `verify` and `erase` are weaker than that sentence originally claimed, and
+-- an independent review at the closeout said so. They compare the caller's
+-- expected binding against the associated data STORED beside the ciphertext,
+-- and perform no cryptographic operation. For this adapter that is safe — the
+-- map is process memory, out of reach of the row-level write this constraint
+-- is about — but it is a property of the adapter, not of the port, and a store
+-- keeping its associated data in object metadata would hand the same attacker
+-- both halves. The port now states the rule for all three operations; this
+-- constraint prevents the state either way, and the binding is what makes the
+-- state harmless where the binding is authenticated.
 --
 -- WHY IT IS SAFE TO ASSERT, which is the question worth asking before adding a
 -- uniqueness constraint to a table a future store will write. The handle is

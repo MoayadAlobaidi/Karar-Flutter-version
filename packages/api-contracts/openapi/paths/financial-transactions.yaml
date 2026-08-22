@@ -200,6 +200,7 @@
               occurrenceOrdinal:
                 type: integer
                 minimum: 1
+                maximum: 2147483647
                 description: >-
                   Which occurrence of an otherwise identical movement this is,
                   so a person who genuinely bought the same coffee twice can

@@ -135,10 +135,20 @@ export function readCreateTransactionInput(body: unknown): Read<CreateManualTran
   }
   if (source['occurrenceOrdinal'] !== undefined) {
     const ordinal = source['occurrenceOrdinal'];
-    if (typeof ordinal !== 'number' || !Number.isInteger(ordinal) || ordinal < 1) {
+    // BOUNDED ABOVE AS WELL AS BELOW. The column is a PostgreSQL `integer`;
+    // `3000000000` satisfied `minimum: 1` in the contract, reached the driver
+    // and came back as a store failure — a 5xx for a body the schema declared
+    // valid, when the caller's request is the thing that is wrong. Found by an
+    // independent review at the closeout.
+    if (
+      typeof ordinal !== 'number' ||
+      !Number.isInteger(ordinal) ||
+      ordinal < 1 ||
+      ordinal > 2_147_483_647
+    ) {
       // Validated here because the use case THROWS on a non-positive ordinal
       // rather than returning an error arm.
-      return refusal('occurrenceOrdinal', 'must be a positive integer');
+      return refusal('occurrenceOrdinal', 'must be a positive 32-bit integer');
     }
     optional['occurrenceOrdinal'] = ordinal;
   }

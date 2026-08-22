@@ -245,14 +245,24 @@ export class LocalEncryptedSourceStore implements EncryptedSourceStorePort {
     context: SourceBindingContext,
     stored: StoredSource,
   ): AsyncIterable<Uint8Array> {
+    // ABSENT AND UNAUTHORISED ANSWER THE SAME WAY, as `verify` and `erase`
+    // already do. This method used to throw `not_found` for a handle it did
+    // not hold and `read_failed` for one bound to another subject, import or
+    // media type — an existence oracle in the one operation of the three that
+    // did not have the symmetry the file's own header promises. Found by an
+    // independent review at the closeout. The distinction was not observable
+    // outside the process, because both codes collapse to
+    // `source_store_unavailable` before the HTTP boundary; it is removed
+    // anyway, because a reader of this class should not have to trace two
+    // layers to find out that the asymmetry is harmless.
     const entry = this.#objects.get(stored.objectRef);
+    const expected = associatedData(actor, context);
     if (entry === undefined) {
-      throw new EncryptedSourceStoreError('not_found', 'no stored object with that handle');
+      throw new EncryptedSourceStoreError('read_failed', 'authenticated decryption failed');
     }
     // THE WHOLE BINDING THE CALLER PRESENTS, checked BEFORE the key is used —
     // subject, import and media type, rebuilt from the caller's own context
     // rather than read back from beside the ciphertext.
-    const expected = associatedData(actor, context);
     assertBindingMatches(expected, entry.aad);
     if (stored.algorithm !== ALGORITHM) {
       throw new EncryptedSourceStoreError(

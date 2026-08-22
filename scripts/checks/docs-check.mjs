@@ -810,6 +810,13 @@ function readGateRecordPhases(root) {
   const text = fs.readFileSync(full, 'utf8');
   const gates = new Set();
   const pullRequests = new Set();
+  // THE OUTCOME, per phase. Parsed because an independent review found the
+  // compliance corpus's own index reporting a PASS for a gate whose record
+  // says FAIL — in the favourable direction, in a paragraph boasting that this
+  // defect class had been fixed. Nothing could see it: this function derived
+  // which gates EXIST and never what any of them DECIDED, so the one number a
+  // reader takes away from a gate was the one number no rule compared.
+  const outcomes = new Map();
   const lines = text.split('\n');
   let section = null;
   for (const line of lines) {
@@ -819,13 +826,17 @@ function readGateRecordPhases(root) {
       section = heading[2];
       continue;
     }
+    if (section !== null && !outcomes.has(section)) {
+      const outcome = /^\*\*Outcome:\s*`?([A-Z_]+)`?\.?\*\*/.exec(line.trim());
+      if (outcome !== null) outcomes.set(section, outcome[1]);
+    }
     // A later top-level heading that is not a phase gate record ends the
     // section, so a pull request named under Phase 4 is not attributed to
     // whatever section follows it.
     if (/^##\s/.test(line) && heading === null) section = null;
     if (section !== null && /\/pull\/\d+/.test(line)) pullRequests.add(section);
   }
-  return { gates, pullRequests };
+  return { gates, pullRequests, outcomes };
 }
 
 /** The README's declared phase and status — the same row `readme-current-phase` validates. */
@@ -1037,16 +1048,64 @@ function checkRegisterTraceability(root = REPO_ROOT) {
     }
 
     // --- 3. every quoted status matches. Scoped per block, so a dated record
-    // quoting what it saw stays history rather than becoming a fork.
+    // quoting what it saw stays history rather than becoming a fork — and an
+    // EARLIER phase's report is a dated record in its entirety, on the same
+    // derived-from-the-registry rule `compliance-current-state` uses. Phase 2's
+    // report saying EV-216 was collected at Phase 2 is history, not a claim
+    // about now.
+    if (isEarlierPhaseReport(root, file, currentPhase)) continue;
     for (const block of markdownBlocks(text, currentPhase).filter((b) => !isHistoricalBlock(b))) {
       for (const register of registers) {
+        // THE VERB IS NOT ALWAYS "IS", AND WIDENING IT ALONE MAKES IT WORSE.
+        //
+        // This pattern was `\bis\s+<STATUS>`, and an independent review
+        // measured what that reaches: 16 of 42 status assertions in the
+        // corpus, 10 after the historical filter. The other 26 said "stays",
+        // "remains", "is still", or no verb at all — and four live documents
+        // went on calling KAR-CTL-116 DESIGNED after it moved, in a check
+        // whose control row claims it compares every quoted status.
+        //
+        // Widening the verb set alone reported nine problems of which SEVEN
+        // were false: the id and the status belonged to different clauses.
+        // "…landed at Phase 2 (KAR-CTL-056); this row stays DEFERRED" is about
+        // the row the cell belongs to; "response-timing equivalence is
+        // deferred" beside a citation of KAR-CTL-089 is about the timing work.
+        //
+        // So the verb is dropped and the SEPARATION is constrained instead:
+        //   * the status must be UPPERCASE — the corpus writes statuses that
+        //     way, and lowercase "deferred"/"open" are ordinary English;
+        //   * no `;` may intervene, because a semicolon is where the subject
+        //     changes;
+        //   * no OTHER register id may intervene, because the nearer id owns
+        //     the status;
+        //   * `|` and newline still stop it, so a row's own status COLUMN is
+        //     never read as prose about the row.
+        //
+        // Known limitation, stated rather than discovered later: the framework
+        // views' `(D)`/`(I)` shorthand is not a status word and is not matched.
+        // A PREDICATION, not mere adjacency. Dropping the verb entirely and
+        // keeping only the separation constraints went the other way — 20
+        // reports, most of them narrative that merely mentions a status near
+        // an id. The verb is what makes the sentence a claim ABOUT the id.
+        //
+        // `was` is deliberately absent: past tense is how this corpus writes
+        // history, and "KAR-CTL-113 was DESIGNED … it moved to IMPLEMENTED" is
+        // a correct sentence that a rule matching `was` would report.
+        const verbs = 'is|stays|remains|reads|records|holds at|is still';
+        const anyId = registers.map((r) => r.pattern).join('|');
         const quoted = new RegExp(
-          `\\b(${register.pattern})\\b[^.|\\n]{0,80}?\\bis\\s+\\**\`?(${register.statuses.join('|')})\`?\\**`,
+          `\\b(${register.pattern})\\b(?:(?!;|\\||\\n|${anyId}).){0,90}?` +
+            `\\b(?:${verbs})\\s+\\**\`?(${register.statuses.join('|')})\\b`,
           'g',
         );
         for (const m of block.text.matchAll(quoted)) {
           const actual = register.rows.get(m[1]);
-          if (actual === undefined || actual === null || actual === m[2]) continue;
+          // COMPARED CASE-INSENSITIVELY, because the verb set is matched that
+          // way and "EV-216 is collected" is agreement, not a fork. Widening
+          // the verbs without widening this reported nine problems of which
+          // two were the same status in a different case.
+          if (actual === undefined || actual === null) continue;
+          if (actual.toUpperCase() === m[2].toUpperCase()) continue;
           problems.push(
             `${rel}:${block.line} says ${m[1]} is ${m[2]}, but ${register.file} records ${actual}`,
           );
@@ -1319,6 +1378,28 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
       if (gatePhases.pullRequests.has(phase)) {
         executed.push(new RegExp(`\\bno Phase ${escaped} pull request exists`, 'i'));
       }
+      // --- the OUTCOME a block attributes to this phase's gate must be the
+      // outcome that gate recorded. Scoped per block like everything else, so
+      // a dated record quoting the outcome it saw stays history.
+      const recorded = gatePhases.outcomes.get(phase);
+      if (recorded !== undefined) {
+        const quoted = new RegExp(
+          `Phase ${escaped}\\s+gate\\b[^.\\n]{0,120}?\\boutcome\\s+\`?([A-Z_]{4,})\`?`,
+          'i',
+        );
+        for (const { rel, blocks } of blocksByFile) {
+          for (const block of blocks) {
+            const m = quoted.exec(block.text);
+            if (m === null || m[1] === recorded) continue;
+            report(
+              rel,
+              block,
+              `attributes outcome ${m[1]} to the Phase ${phase} gate, but its record in ` +
+                `docs/compliance/phase-compliance-gate.md says ${recorded}`,
+            );
+          }
+        }
+      }
       for (const { rel, blocks } of blocksByFile) {
         for (const block of blocks) {
           for (const pattern of executed) {
@@ -1510,8 +1591,18 @@ function checkPhaseStatusConsistency(files) {
   for (const file of files) {
     const relative = path.relative(REPO_ROOT, file);
     // Phase reports for EARLIER phases are historical records and correctly
-    // describe their own phase as complete.
-    if (/docs\/phases\/phase-0(?!4)/.test(relative)) continue;
+    // describe their own phase as complete. The CURRENT phase's report is
+    // never exempt: it is the single most-read current-state document in the
+    // repository, and a claim that it has completed is exactly the claim this
+    // check exists to catch.
+    //
+    // THIS LINE READ `/docs\/phases\/phase-0(?!4)/` AND WAS A PHASE-4 CONSTANT.
+    // At phase 5 it skipped `phase-05.md` — the current report — and checked
+    // `phase-04.md`, whose phase had closed. So the one blanket exemption
+    // CI-018 did not remove covered the one file that matters most, while the
+    // register recorded the whole class as fixed. Derived from the registry
+    // now, like everything else here.
+    if (isEarlierPhaseReport(REPO_ROOT, file, phase)) continue;
 
     const text = fs.readFileSync(file, 'utf8');
     // `docs/compliance/` was exempt WHOLESALE here, on the reasoning that the

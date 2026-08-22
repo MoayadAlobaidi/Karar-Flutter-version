@@ -76,8 +76,23 @@ Future<void> main(List<String> args) async {
         .callServiceExtension('ext.flutter.debugDumpApp', isolateId: ui.id)
         .timeout(timeout);
 
+    // AN EMPTY ANSWER IS NOT AN ANSWER. `debugDumpApp` returns the tree under
+    // `data`; if that key is missing the isolate replied to the transport
+    // without describing anything, and printing '' would let the caller grep a
+    // blank string for the transient marker, find nothing, and report that the
+    // tree holds no transient screen. The liveness half would be true and the
+    // content half would be invented. Found by an independent review at the
+    // closeout, in a probe written to stop exactly that kind of claim.
     final Object? tree = answer.json?['data'];
-    stdout.writeln(tree ?? '');
+    final String rendered = tree?.toString() ?? '';
+    if (rendered.trim().isEmpty) {
+      stderr.writeln(
+        'the UI isolate answered but returned no widget tree, so the screen it is '
+        'showing cannot be determined',
+      );
+      exit(1);
+    }
+    stdout.writeln(rendered);
     exit(0);
   } on TimeoutException {
     stderr.writeln(

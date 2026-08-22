@@ -701,6 +701,32 @@ jobs:
           flutter build ios --simulator --debug \
             --dart-define=KARAR_ENV=LOCAL
 
+      # THE ARTIFACT IS LAUNCHED, NOT ONLY INSPECTED.
+      #
+      # CI-020 closed on `tool/startup_smoke.sh` existing, and an independent
+      # review pointed out that nothing ran it: this lane built the bundle and
+      # read its Info.plist and never started it. That is CI-006's pattern
+      # exactly — closing on the correction while the corrective action stays a
+      # thing a person types — and the improvement loop now forbids it. So the
+      # check runs here.
+      #
+      # It boots a simulator, installs the debug bundle, watches until the
+      # screen settles, then asks the UI isolate for its widget tree over the
+      # VM service. An isolate whose event loop has stopped cannot answer, and
+      # the answer says which screen. `continue-on-error` is deliberately NOT
+      # set: a client that does not start is the defect this phase spent its
+      # closeout on, and a lane that reports it as a warning is a lane that
+      # would have let the original defect through.
+      - name: Launch the built artifact and require it to reach a screen
+        run: |
+          set -euo pipefail
+          udid="$(xcrun simctl create karar-ci-smoke 'iPhone 16')"
+          echo "simulator: $udid"
+          xcrun simctl bootstatus "$udid" -b
+          tool/startup_smoke.sh ios "$udid" 45
+          xcrun simctl shutdown "$udid" || true
+          xcrun simctl delete "$udid" || true
+
       # Asserts against the Info.plist inside the BUILT app bundle, which is
       # the one that would ship. plutil reads the binary plist the build
       # produced, not the source XML.

@@ -14,9 +14,18 @@
 // That third outcome is not hypothetical here. The client was executed on an
 // iOS 26.5 simulator against a live local API answering `/readyz` 200 and stayed
 // on the transient startup indicator for over three minutes across three
-// launches, issuing no HTTP request at all. The startup sequence awaits two
-// platform storage reads before it ever reaches the network, and neither of
-// them was bounded.
+// launches, issuing no HTTP request at all. The startup sequence awaits THREE
+// platform storage reads before it ever reaches the network, and none of them
+// was bounded.
+//
+// THIS COMMENT SAID TWO, AND THE RISK ROW CLOSED ON "BOTH ARE NOW BOUNDED".
+// The third is `PreferencesKeyValueStore.open`, and it is the earliest: the
+// bootstrap awaits it BEFORE the security-state open and before `runApp`, so a
+// host that accepts it and never answers leaves no widget tree at all — not
+// the transient indicator, not the fail-closed configuration screen the
+// bootstrap promises the application always reaches. The mechanism in this
+// file sat downstream of a call that could hold startup for ever. Found by an
+// independent review reading the call order, after the row was closed.
 //
 // A TIMEOUT IS NOT A DEFAULT. This is the property the rest of the file exists
 // to protect. "The store did not answer in time" is the same epistemic state as
@@ -107,6 +116,7 @@ Future<T> boundedPlatformCall<T>({
 }) {
   return run().timeout(
     timeout,
-    onTimeout: () => throw PlatformCallTimedOut(operation: operation, timeout: timeout),
+    onTimeout: () =>
+        throw PlatformCallTimedOut(operation: operation, timeout: timeout),
   );
 }

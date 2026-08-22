@@ -183,6 +183,23 @@ export interface EncryptedSourceStorePort {
    * The expected associated data is computed from [context] and [actor]. An
    * implementation may NOT authenticate against associated data it stored
    * beside the ciphertext: that authenticates the object against itself.
+   *
+   * THIS PROHIBITION BINDS `verify` AND `erase` TOO, and it was written here
+   * for `open` alone. An independent review pointed out what that leaves: a
+   * store whose associated data lives in object metadata — which is where the
+   * S3-and-KMS adapter this port exists for would keep it — hands the same
+   * attacker who can substitute the object the ability to substitute the
+   * metadata beside it. `verify` would then answer `true` for a substituted
+   * object and `erase` would delete another import's ciphertext, and neither
+   * performs a cryptographic operation that would notice.
+   *
+   * The reference adapter is unaffected because its map is process memory,
+   * unreachable by the row-level write the threat model describes. That is a
+   * property of the adapter and not of the port, so the rule is stated here
+   * rather than left to be rediscovered by whoever writes the second one:
+   * **every operation that authenticates, opens, verifies or erases a source
+   * must reconstruct the expected binding from caller-owned context, and must
+   * not treat anything stored beside the ciphertext as authoritative.**
    */
   open(
     actor: ImportsPrincipal,

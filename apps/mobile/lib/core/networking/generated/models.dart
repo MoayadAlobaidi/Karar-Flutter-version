@@ -4,7 +4,7 @@
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
 // Contract:   Karar API 0.6.0
-// Digest:     7ba53557
+// Digest:     9157dde5
 // Generator:  tool/generate_api_client.dart 1.2.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart

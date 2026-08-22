@@ -7,14 +7,21 @@
  * instances share one window with no admit race (two concurrent requests at
  * limit-1 cannot both pass).
  *
- * THAT IS TRUE OF CONCURRENCY AND NOT OF TIME. The prune uses the timestamp the
- * CALLING PROCESS supplies (`Date.now()`), never Redis's own `TIME`, so an
- * instance whose clock has drifted prunes the shared window by its own reckoning
- * — destructively, since the pruned entries are gone for every instance. At a
- * drift of one window the ceiling collapses. Recorded as KAR-RSK-047 with its
- * treatment; not changed here because it alters the script every limiter on the
- * surface shares. Refused attempts are not recorded — symmetric
- * with the in-process limiter.
+ * IT IS ALSO TRUE OF TIME, AND THIS PARAGRAPH USED TO SAY THE OPPOSITE. The
+ * prune once used the timestamp the CALLING PROCESS supplied (`Date.now()`), so
+ * an instance whose clock had drifted pruned the shared window by its own
+ * reckoning — destructively, since `ZREMRANGEBYSCORE` deletes for every
+ * instance, and at a drift of one window the ceiling collapsed. That was
+ * KAR-RSK-047, reproduced against live Redis and fixed sixty lines below: the
+ * script calls `TIME` and no caller can send an instant.
+ *
+ * The header went on describing the defect as current — "not changed here" —
+ * after the code changed, and an independent review found it at the closeout.
+ * A comment that misdescribes the code it heads is worse than no comment, and
+ * worst of all in a file whose reviewers read the header first. `Date.now()`
+ * survives in this file only as a uniqueness salt in the member string, where
+ * a wrong clock cannot admit or prune anything. Refused attempts are still not
+ * recorded — symmetric with the in-process limiter.
  *
  * Store failures are surfaced as `RateLimitStoreError` and DECIDED ABOUT in
  * RateLimitService per the policy's declared failure mode — this class
