@@ -154,9 +154,13 @@ export const RATE_LIMIT_POLICIES = {
     onStoreFailure: 'fail_closed',
   },
   /**
-   * Statement parse and preview. A parse is bounded by `maxRows` 50,000 and
-   * `deadlineMs` 30,000, so up to 30 seconds of CPU each; 30 per hour caps one
-   * principal at 15 minutes of parser time per hour. Higher than the upload
+   * Statement parse and preview. A parse is bounded by `maxRows` 2,000 and
+   * `deadlineMs` 30,000, so up to 30 seconds each; 30 per hour caps one
+   * principal at 15 minutes of parser time per hour. *(This said `maxRows`
+   * 50,000 until the Phase 5 closeout measured the real ceiling — see the
+   * policy's own comment in `../ingestion/limits.ts`. The budget is unchanged,
+   * because it was always bounded by the deadline rather than by the row
+   * count; what changed is that the sentence is now true.)* Higher than the upload
    * budget because the column-mapping screen legitimately re-parses the same
    * stored source after a mapping correction.
    */
@@ -168,8 +172,11 @@ export const RATE_LIMIT_POLICIES = {
   },
   /**
    * Statement commit and erase. Each opens one transaction writing up to
-   * `maxBatchSize` 500 rows across two bounded contexts, or deletes stored
-   * source bytes. The client issues exactly one per import, so 20 per hour is
+   * `maxRows` 2,000 records across two bounded contexts — encrypting them in
+   * batches of `maxBatchSize` 500 beforehand — or deletes stored source bytes.
+   * *(This said the transaction writes up to 500 rows, conflating the
+   * encryption batch size with the commit's own ceiling; the two are different
+   * numbers and only the second bounds the transaction.)* The client issues exactly one per import, so 20 per hour is
    * twice the upload budget and covers idempotent retries.
    */
   financialCommit: {

@@ -50,7 +50,12 @@ describe('the declared policies are usable', () => {
   });
 
   it('resolves a declared path and refuses an undeclared one', () => {
-    expect(ingestionLimitPolicyFor('csv-statement-import').maxRows).toBe(50_000);
+    // MEASURED, not chosen. See the policy's own comment: the parse and the
+    // commit each run inside one interactive transaction, and 50,000 rows —
+    // the number this asserted until the Phase 5 closeout — could not be
+    // reached by an order of magnitude. The failure was a RETRYABLE 503 for a
+    // file that would never import.
+    expect(ingestionLimitPolicyFor('csv-statement-import').maxRows).toBe(2_000);
     expect(() => ingestionLimitPolicyFor('no-such-path')).toThrow(InvalidIngestionLimitPolicyError);
   });
 

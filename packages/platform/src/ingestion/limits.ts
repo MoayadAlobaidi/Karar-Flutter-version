@@ -171,11 +171,49 @@ export const INGESTION_LIMIT_POLICIES = {
     maxReportedErrors: 100,
     maxBatchSize: 1,
   },
-  /** A CSV statement upload and its bounded parse. */
+  /**
+   * A CSV statement upload and its bounded parse.
+   *
+   * `maxRows` IS MEASURED, NOT CHOSEN. It read `50_000` — a number picked as a
+   * conservative engineering default — and the system could not reach it by an
+   * order of magnitude, because the parse stages rows one at a time inside a
+   * single interactive transaction and the commit writes four rows plus an
+   * update per record inside another. Measured end to end against PostgreSQL
+   * 17 with the transaction bound set to this policy's own `deadlineMs`:
+   *
+   * ```
+   *    500 rows   parse  1.2s   commit  4.5s
+   *  1,000 rows   parse  2.4s   commit  4.2s
+   *  2,000 rows   parse  4.6s   commit  8.5s
+   *  5,000 rows   parse 11.4s   commit 24.6s   (commit within 5.4s of the bound)
+   * 10,000 rows   parse 22.4s   commit FAILS
+   * 20,000 rows   parse FAILS
+   * 50,000 rows   parse FAILS
+   * ```
+   *
+   * Two things follow, and the second is the reason the number moved rather
+   * than the bound. A declared ceiling nobody can reach is not a bound, it is
+   * a promise the code breaks — and it broke it as a RETRYABLE 503, telling a
+   * person their database was unavailable for a file that would never import.
+   * And raising the transaction bound until 50,000 fits would mean holding a
+   * write transaction on a financial ledger open for minutes, which is worse
+   * than a smaller statement.
+   *
+   * So the ceiling is **2,000 rows**, which on the measurement above completes
+   * in 4.6s and 8.5s — roughly a 3.5x margin against `deadlineMs` on this
+   * machine, which is the headroom a slower database needs. A row count over
+   * the ceiling is refused by the parser with `TOO_MANY_ROWS` before anything
+   * is staged, which is a refusal a person can act on rather than an outage.
+   *
+   * **This is a real product limitation and it is recorded as one.** A month of
+   * an ordinary current account is well inside 2,000 lines; a multi-year export
+   * is not. Raising it needs batched staging and a chunked commit, not a larger
+   * number here.
+   */
   csvStatementImport: {
     pathId: 'csv-statement-import',
     maxBytes: 10 * 1024 * 1024,
-    maxRows: 50_000,
+    maxRows: 2_000,
     maxColumns: 64,
     maxFieldBytes: 8 * 1024,
     maxPageSize: 200,

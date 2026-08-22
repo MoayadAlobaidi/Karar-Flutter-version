@@ -247,7 +247,18 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
         this.handle,
         { tenantId: actor.tenantId, userId: actor.userId },
         async (tx) => this.write(tx, actor, plan, batch, delivery),
-        { require: ['tenantId', 'userId'] },
+        {
+          require: ['tenantId', 'userId'],
+          // A COMMIT writes four rows plus an update per record inside one
+          // transaction, so it needs the bound this path is already declared
+          // to obey rather than Prisma's 5,000 ms default. Under that default
+          // a commit expired at roughly 700 rows against a declared ceiling of
+          // 50,000, and the caller was answered a RETRYABLE 503 for a
+          // condition no retry could resolve. The rollback was clean — nothing
+          // partial was ever written — which is why it read as an outage
+          // rather than as a limit.
+          timeoutMs: ingestionLimitPolicyFor('csv-statement-import').deadlineMs,
+        },
       );
     } catch (error) {
       // The two rules the database enforces on the canonical rows, arriving as

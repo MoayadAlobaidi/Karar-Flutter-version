@@ -126,6 +126,7 @@ export class PrismaStatementImportRepository implements StatementImportRepositor
   private inContext<T>(
     actor: ImportsPrincipal,
     fn: (tx: PrismaTransactionClient) => Promise<T>,
+    options: { readonly bulk?: boolean } = {},
   ): Promise<T> {
     return withPrincipalContext(
       this.handle,
@@ -136,7 +137,17 @@ export class PrismaStatementImportRepository implements StatementImportRepositor
         ...(actor.requestId !== undefined ? { requestId: actor.requestId } : {}),
       },
       fn,
-      { require: ['tenantId', 'userId'] },
+      {
+        require: ['tenantId', 'userId'],
+        // A BULK write declares the bound it is already held to, so the number
+        // in the limit policy is the number the database enforces. Without
+        // this the transaction inherited Prisma's 5,000 ms default and staging
+        // expired at roughly 3,000 rows against a declared ceiling of 50,000 —
+        // answering a retryable 503 for a condition no retry could resolve.
+        ...(options.bulk === true
+          ? { timeoutMs: ingestionLimitPolicyFor('csv-statement-import').deadlineMs }
+          : {}),
+      },
     );
   }
 
@@ -308,8 +319,10 @@ export class PrismaStatementImportRepository implements StatementImportRepositor
       );
     }
 
-    await this.inContext(actor, async (tx) => {
-      // REPLACE, not append. The errors go first: they reference rows.
+    await this.inContext(
+      actor,
+      async (tx) => {
+        // REPLACE, not append. The errors go first: they reference rows.
       await tx.statementImportRowError.deleteMany({
         where: { importId, tenantId: actor.tenantId, userId: actor.userId },
       });
@@ -366,10 +379,12 @@ export class PrismaStatementImportRepository implements StatementImportRepositor
         });
       }
 
-      // LAST, so every row above was written while the import was PARSING —
-      // which is exactly what `statement_import_rows_guard` (KAR57) requires.
-      await this.applyUpdate(tx, actor, staging.parsedImport, staging.expectedVersion);
-    });
+        // LAST, so every row above was written while the import was PARSING —
+        // which is exactly what `statement_import_rows_guard` (KAR57) requires.
+        await this.applyUpdate(tx, actor, staging.parsedImport, staging.expectedVersion);
+      },
+      { bulk: true },
+    );
   }
 
   async listRows(
