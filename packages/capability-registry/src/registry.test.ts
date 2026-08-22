@@ -38,13 +38,42 @@ describe('production registry facts', () => {
     expect(Object.keys(CAPABILITY_REGISTRY).sort()).toEqual([...CAPABILITY_IDS].sort());
   });
 
-  it('declares every real capability honestly unbuilt: NOT_IMPLEMENTED and deployed nowhere', () => {
+  it('deploys NOTHING, whatever a capability claims about its own code', () => {
+    // The load-bearing half, and it is asserted over EVERY id without
+    // exception: `implementation` is a fact about this repository, and
+    // `deployment` is the field that decides anything. One capability is now
+    // built; none is deployed.
     for (const id of CAPABILITY_IDS) {
       const descriptor = CAPABILITY_REGISTRY[id];
       expect(descriptor.id).toBe(id);
-      expect(descriptor.implementation).toBe('NOT_IMPLEMENTED');
       expect(Object.keys(descriptor.deployment)).toEqual([]);
+      expect(descriptor.declaredJurisdictions).toEqual([]);
       expect(descriptor.providerPendingExplainable).toBeUndefined();
+    }
+  });
+
+  it('says TRANSACTIONS is built, because its code exists', () => {
+    // Seven bounded contexts behind migrations 0087-0101, 27 mounted
+    // operations, seven Flutter feature folders calling them. `implementation`
+    // asks whether the code exists and nothing else, so NOT_IMPLEMENTED here
+    // was a false answer rather than a conservative one.
+    const transactions = CAPABILITY_REGISTRY.TRANSACTIONS;
+    expect(transactions.implementation).toBe('IMPLEMENTED');
+    expect(transactions.lifecycle).toBe('ALPHA');
+    // …and being built buys it nothing. Both of these are what actually deny.
+    expect(Object.keys(transactions.deployment)).toEqual([]);
+    expect(transactions.declaredJurisdictions).toEqual([]);
+    // The registry is still structurally valid with a built capability in it.
+    expect(validateRegistry(CAPABILITY_IDS, CAPABILITY_REGISTRY)).toEqual([]);
+  });
+
+  it('keeps every OTHER capability honestly unbuilt', () => {
+    for (const id of CAPABILITY_IDS.filter((candidate) => candidate !== 'TRANSACTIONS')) {
+      expect({ id, implementation: CAPABILITY_REGISTRY[id].implementation }).toEqual({
+        id,
+        implementation: 'NOT_IMPLEMENTED',
+      });
+      expect(CAPABILITY_REGISTRY[id].lifecycle).toBe('PLANNED');
     }
   });
 

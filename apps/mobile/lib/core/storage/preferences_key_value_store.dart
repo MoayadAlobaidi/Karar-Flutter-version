@@ -5,6 +5,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logging/app_logger.dart';
+import '../platform/bounded_platform_call.dart';
 import 'key_value_store.dart';
 
 /// Namespace applied to every key so the application's preferences are
@@ -28,12 +29,28 @@ final class PreferencesKeyValueStore implements KeyValueStore {
   /// missing choice as "off", and a device whose preference storage failed
   /// skipped the lock. `LocalSecurityStateStore` exists so the two cases can
   /// have opposite policies, and it has no fallback at all.
+  /// BOUNDED, and it is the FIRST platform call the application makes.
+  ///
+  /// This one was missed when the two reads named in KAR-RSK-042 were bounded,
+  /// and an independent review found it afterwards. It is the worse of the
+  /// three: `bootstrapKararApp` awaits it BEFORE the bounded security-state
+  /// open and before `runApp`, so a host that accepts `getAll` and never
+  /// answers leaves no widget tree at all — not the transient indicator, not
+  /// the fail-closed configuration screen this bootstrap promises always to
+  /// reach. The mechanism built to stop an indefinite startup sat downstream
+  /// of a call that could hold startup indefinitely.
+  ///
+  /// The bound degrades to the in-memory store, which is the policy this store
+  /// already had for every other platform failure and is safe here for the
+  /// reason stated above: no security decision lives in it.
   static Future<KeyValueStore> open({required AppLogger logger}) async {
     final log = logger.forCategory('storage');
     try {
       final preferences = SharedPreferencesAsync();
-      final snapshot = await preferences.getAll(
-        allowList: null,
+      final snapshot = await boundedPlatformCall<Map<String, Object?>>(
+        operation: 'preferences.open',
+        timeout: PlatformCallTimeouts.storeOpen,
+        run: () => preferences.getAll(allowList: null),
       );
       final namespaced = <String, Object?>{
         for (final entry in snapshot.entries)
@@ -46,7 +63,11 @@ final class PreferencesKeyValueStore implements KeyValueStore {
         error: error,
       );
       // The stack trace is attached at error level only, and carries no value.
-      log.error('Preference store open failed.', error: error, stackTrace: stackTrace);
+      log.error(
+        'Preference store open failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return InMemoryKeyValueStore();
     }
   }
@@ -101,10 +122,18 @@ final class PreferencesKeyValueStore implements KeyValueStore {
 
   Future<void> _guard(Future<void> Function() operation, String label) async {
     try {
-      await operation();
+      await boundedPlatformCall<void>(
+        operation: 'preferences.$label',
+        timeout: PlatformCallTimeouts.storage,
+        run: operation,
+      );
     } on Object catch (error) {
-      // A failed preference write is logged and swallowed. The in-memory
-      // snapshot already reflects the caller's intent for this session.
+      // A failed preference write is logged and swallowed, and a write that
+      // TIMED OUT is reported the same way rather than as durability. The
+      // in-memory snapshot already reflects the caller's intent for this
+      // session; what the platform did with it is unknown, and unknown is not
+      // "written". No caller of this port may read a returned Future as proof
+      // that anything reached the device.
       _logger.warning(
         'Preference operation failed.',
         fields: <String, Object?>{'operation': label},

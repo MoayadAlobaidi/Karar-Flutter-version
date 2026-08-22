@@ -14,6 +14,7 @@
  */
 import { verifyMigrations } from '@karar/platform/dist/db/index.js';
 import type { PostgresPersistenceAdapter } from '@karar/platform/dist/db/index.js';
+import { assertSessionTimeZoneIsUtc } from '@karar/platform/dist/db/session-config.js';
 
 export type MigrationsStatus = 'ok' | 'behind' | 'unknown';
 
@@ -65,7 +66,14 @@ export function createDbReadinessProbes(
 ): ReadinessProbes {
   return {
     async pingDatabase(budgetMs) {
-      await withBudget(budgetMs, adapter.query('SELECT 1'));
+      // `SHOW TimeZone` rather than `SELECT 1`: it is the same minimal round
+      // trip (a GUC read, no table touched) and it proves one thing more.
+      // A session that is not in UTC reports `timestamptz` values shifted by
+      // its offset, so a ledger read on it is wrong by whole hours in both
+      // directions — grants not yet effective, windows still open after they
+      // closed. That is not a usable database for this system, so it reads as
+      // `postgres: down` rather than being reported as healthy.
+      await withBudget(budgetMs, assertSessionTimeZoneIsUtc(adapter));
     },
     async migrationsStatus(budgetMs) {
       // Read-only comparison of the database against db/migrations. 'clean'

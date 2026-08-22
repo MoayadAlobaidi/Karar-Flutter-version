@@ -97,8 +97,33 @@ describe('SetCapabilityAvailability', () => {
       });
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.error.kind).toBe('ABOVE_CEILING');
-      expect(CAPABILITY_REGISTRY[id].implementation).toBe('NOT_IMPLEMENTED');
+      // The refusal holds for every capability, but NOT for the same reason.
+      // TRANSACTIONS is built, so its ceiling breach comes from the deployment
+      // arm rather than the implementation arm — and that is the point: being
+      // built buys nothing. Asserting the ARM proves the refusal; restating the
+      // registry would only prove the registry.
+      expect({ id, deployed: Object.keys(CAPABILITY_REGISTRY[id].deployment) }).toEqual({
+        id,
+        deployed: [],
+      });
     }
+  });
+
+  it('refuses TRANSACTIONS on the DEPLOYMENT arm, now that it is built', async () => {
+    const { useCase } = availabilityHarness();
+    const result = await useCase.execute({
+      principal: operator,
+      environment: 'local',
+      jurisdictionRef: null,
+      capabilityId: 'TRANSACTIONS',
+      state: 'AVAILABLE',
+      reason: 'attempted expansion',
+      now: NOW,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.kind).toBe('ABOVE_CEILING');
+    expect(CAPABILITY_REGISTRY.TRANSACTIONS.implementation).toBe('IMPLEMENTED');
+    expect(CAPABILITY_REGISTRY.TRANSACTIONS.deployment).toEqual({});
   });
 
   it('refuses an allowing state for an undeclared jurisdiction even when code is built', async () => {

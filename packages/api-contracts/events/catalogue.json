@@ -14,10 +14,38 @@
       "payloadSchema": {
         "type": "object",
         "properties": {
-          "pingId": { "type": "string" },
-          "note": { "type": "string" }
+          "pingId": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
         },
         "required": ["pingId"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "statement_import.committed",
+      "schemaVersion": 1,
+      "ownerModule": "statement-imports",
+      "classification": "HIGHLY_SENSITIVE_FINANCIAL",
+      "piiFlag": true,
+      "allowedConsumers": ["statement-imports-tests"],
+      "retention": "P30D",
+      "payloadRule": "identifier-only",
+      "payloadExemption": null,
+      "payloadSchema": {
+        "type": "object",
+        "properties": {
+          "importId": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          }
+        },
+        "required": ["importId", "accountId"],
         "additionalProperties": false
       }
     }

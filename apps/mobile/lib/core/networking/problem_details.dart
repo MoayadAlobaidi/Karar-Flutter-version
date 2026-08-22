@@ -23,6 +23,7 @@ final class ProblemDetails {
     this.retryable,
     this.fields = const <String>[],
     this.retryAfter,
+    this.nextOrdinal,
   });
 
   /// Parses a decoded JSON body. Returns null when the body is not a problem
@@ -48,7 +49,9 @@ final class ProblemDetails {
       code: code is String ? code : null,
       detail: body['detail'] is String ? body['detail']! as String : null,
       reason: body['reason'] is String ? body['reason']! as String : null,
-      requestId: body['requestId'] is String ? body['requestId']! as String : null,
+      requestId: body['requestId'] is String
+          ? body['requestId']! as String
+          : null,
       retryable: retryable is bool ? retryable : null,
       fields: rawFields is List
           ? <String>[
@@ -56,6 +59,12 @@ final class ProblemDetails {
                 if (entry is String) entry,
             ]
           : const <String>[],
+      // The one fact a caller must ACT on when an occurrence ordinal is
+      // refused. It is in the body as a structured integer precisely so that
+      // this line is not a regex over a translated sentence.
+      nextOrdinal: body['nextOrdinal'] is int
+          ? body['nextOrdinal']! as int
+          : null,
     );
   }
 
@@ -67,6 +76,14 @@ final class ProblemDetails {
 
   /// The machine-readable reason. This is the only field behaviour keys on.
   final String? code;
+
+  /// On `OCCURRENCE_ORDINAL_NOT_NEXT`, the ordinal the server WOULD accept.
+  ///
+  /// Read from the structured field and never from [detail]: the detail is
+  /// translated, and a client that parsed an integer out of it would break the
+  /// first time it was — which is how a person who genuinely bought the same
+  /// thing twice ended up unable to record the second one.
+  final int? nextOrdinal;
 
   /// Server-authored. Do not log; do not branch on.
   final String? detail;
@@ -92,17 +109,17 @@ final class ProblemDetails {
   final Duration? retryAfter;
 
   ProblemDetails withRetryAfter(Duration? value) => ProblemDetails(
-        status: status,
-        type: type,
-        title: title,
-        code: code,
-        detail: detail,
-        reason: reason,
-        requestId: requestId,
-        retryable: retryable,
-        fields: fields,
-        retryAfter: value,
-      );
+    status: status,
+    type: type,
+    title: title,
+    code: code,
+    detail: detail,
+    reason: reason,
+    requestId: requestId,
+    retryable: retryable,
+    fields: fields,
+    retryAfter: value,
+  );
 
   /// Safe to log: identifiers only, no server prose.
   @override
@@ -125,11 +142,13 @@ abstract final class ApiErrorCode {
   static const String reConsentRequired = 'RECONSENT_REQUIRED';
   static const String tenantSelectionRequired = 'TENANT_SELECTION_REQUIRED';
   static const String bootstrapUnavailable = 'BOOTSTRAP_UNAVAILABLE';
-  static const String capabilityResolutionUnavailable = 'CAPABILITY_RESOLUTION_UNAVAILABLE';
+  static const String capabilityResolutionUnavailable =
+      'CAPABILITY_RESOLUTION_UNAVAILABLE';
   static const String dependencyUnavailable = 'DEPENDENCY_UNAVAILABLE';
   static const String rateLimited = 'RATE_LIMITED';
   static const String bindingConflict = 'BINDING_CONFLICT';
-  static const String membershipRevokedConcurrently = 'MEMBERSHIP_REVOKED_CONCURRENTLY';
+  static const String membershipRevokedConcurrently =
+      'MEMBERSHIP_REVOKED_CONCURRENTLY';
   static const String invalidTenantSelection = 'INVALID_TENANT_SELECTION';
   static const String invalidProfileField = 'INVALID_PROFILE_FIELD';
   static const String noApprovedFieldChanges = 'NO_APPROVED_FIELD_CHANGES';
@@ -142,7 +161,8 @@ abstract final class ApiErrorCode {
   static const String tenantNotFound = 'TENANT_NOT_FOUND';
 
   // Jurisdiction self-declaration.
-  static const String invalidJurisdictionDeclaration = 'INVALID_JURISDICTION_DECLARATION';
+  static const String invalidJurisdictionDeclaration =
+      'INVALID_JURISDICTION_DECLARATION';
   static const String tenantBindingRequired = 'TENANT_BINDING_REQUIRED';
   static const String declarationNotPermitted = 'DECLARATION_NOT_PERMITTED';
   static const String jurisdictionDeclarationUnavailable =

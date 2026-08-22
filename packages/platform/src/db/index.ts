@@ -13,6 +13,22 @@ export {
   type SslConfig,
 } from './connection-profile.js';
 export { PgError, mapPgError, type PgErrorCode } from './errors.js';
+export {
+  CONNECTIONS_PER_WORKER,
+  CONNECTION_HEADROOM,
+  DatabaseUnavailableError,
+  connectionBudget,
+  databaseIsRequired,
+  skipUnlessDatabaseRequired,
+  type ConnectionBudget,
+} from './connection-budget.js';
+export {
+  REQUIRED_SESSION_TIME_ZONE,
+  SESSION_STARTUP_OPTIONS,
+  SessionTimeZoneError,
+  assertSessionTimeZoneIsUtc,
+  poolConfigFor,
+} from './session-config.js';
 export { PostgresPersistenceAdapter, type TransactionClient } from './adapter.js';
 export {
   BootstrapError,
@@ -37,3 +53,4 @@ export {
   type MigrationRunnerOptions,
   type VerifyReport,
 } from './migrations.js';
+export { dropScratchDatabase } from './scratch-database.js';

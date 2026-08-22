@@ -5,6 +5,8 @@
 //   * regenerating the client cannot disturb the interceptor stack;
 //   * a test can drive the generated client with an in-memory transport and no
 //     HTTP at all.
+import 'dart:typed_data';
+
 import 'package:meta/meta.dart';
 
 import '../errors/failure.dart';
@@ -23,13 +25,18 @@ final class ApiRequest {
     required this.path,
     this.query = const <String, Object?>{},
     this.body,
+    this.rawBody,
     this.headers = const <String, String>{},
     this.requiresAuthentication = true,
     this.idempotencyKey,
     this.cancellation,
     this.timeouts = TimeoutProfile.standard,
     this.correlationId,
-  });
+  }) : assert(
+          body == null || rawBody == null,
+          'a request carries a JSON body or a raw body, never both — the two '
+          'are encoded differently and sent under different media types',
+        );
 
   final HttpMethod method;
 
@@ -40,7 +47,21 @@ final class ApiRequest {
   final Map<String, Object?> query;
 
   /// JSON-encodable request body, or null.
+  ///
+  /// For a body that is NOT JSON — an uploaded statement file, say — use
+  /// [rawBody] instead. This field is always sent as `application/json`.
   final Object? body;
+
+  /// Raw bytes under a declared media type, or null.
+  ///
+  /// Kept separate from [body] rather than widening it. Every non-null [body]
+  /// is sent as `application/json`, which is right for 61 of the contract's
+  /// operations and wrong for the statement-import upload, whose contract
+  /// declares `text/csv`. Sending bytes through [body] would have encoded
+  /// them as a JSON string under the wrong media type, and the server would
+  /// have refused it as unsupported — a failure that looks like a bad file
+  /// rather than a bad client.
+  final RawRequestBody? rawBody;
 
   final Map<String, String> headers;
 
@@ -76,6 +97,7 @@ final class ApiRequest {
         path: path,
         query: query,
         body: body,
+        rawBody: rawBody,
         headers: headers ?? this.headers,
         requiresAuthentication: requiresAuthentication,
         idempotencyKey: idempotencyKey,
@@ -87,6 +109,30 @@ final class ApiRequest {
   /// Safe to log: no body, no headers, no query values.
   @override
   String toString() => 'ApiRequest(${method.wireName} $path)';
+}
+
+/// A request body that is raw bytes rather than JSON, with its media type.
+///
+/// The bytes are carried, never inspected. An uploaded statement is content
+/// written by someone other than the person uploading it (ADR-0029): the
+/// client's job is to deliver it unaltered and let the platform parse it.
+@immutable
+final class RawRequestBody {
+  const RawRequestBody({required this.bytes, required this.mediaType});
+
+  final Uint8List bytes;
+
+  /// The media type to send, e.g. `text/csv; charset=utf-8`. Required rather
+  /// than defaulted: a body whose type nobody stated is a body the server
+  /// guesses at.
+  final String mediaType;
+
+  int get byteLength => bytes.length;
+
+  /// Safe to log: the media type and the SIZE, never the content. A statement
+  /// file is the most sensitive thing this client ever sends.
+  @override
+  String toString() => 'RawRequestBody($mediaType, $byteLength bytes)';
 }
 
 /// A successful (2xx) response.

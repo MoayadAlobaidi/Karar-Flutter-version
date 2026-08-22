@@ -10,4 +10,4 @@ May import this module's `application/` ports and `domain/`, plus frameworks. **
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_This directory holds 2 production files. The rules above are enforced by the architecture tests, not by its emptiness._

@@ -1,11 +1,9 @@
 {
   "@@locale": "en",
-
   "appName": "Karar",
   "@appName": {
     "description": "Product name shown in the task switcher and the about screen."
   },
-
   "actionContinue": "Continue",
   "@actionContinue": {
     "description": "Primary action that advances a multi-step flow."
@@ -70,7 +68,6 @@
   "@actionSelectAll": {
     "description": "Action that selects every item in a list."
   },
-
   "fieldOptionalSuffix": "{label} (optional)",
   "@fieldOptionalSuffix": {
     "description": "Field label marked as not required. Composed with a placeholder so the parenthetical can move or change form per language.",
@@ -147,7 +144,6 @@
       }
     }
   },
-
   "statusSuccess": "Success",
   "@statusSuccess": {
     "description": "Text label for a successful status. Status is never conveyed by colour alone."
@@ -172,7 +168,6 @@
   "@statusNeutral": {
     "description": "Text label for an inactive or not-yet-begun status."
   },
-
   "stateLoading": "Loading",
   "@stateLoading": {
     "description": "Accessible label announced while content is being fetched."
@@ -221,7 +216,6 @@
       }
     }
   },
-
   "a11yDialog": "Dialog",
   "@a11yDialog": {
     "description": "Role announced when a modal dialog opens."
@@ -312,7 +306,6 @@
       }
     }
   },
-
   "selectionCount": "{count, plural, =0{No items selected} =1{1 item selected} other{{count} items selected}}",
   "@selectionCount": {
     "description": "Count of selected list items. Uses a plural so no language has to concatenate a number onto a noun.",
@@ -358,7 +351,6 @@
       }
     }
   },
-
   "languageSettingTitle": "Language",
   "@languageSettingTitle": {
     "description": "Title of the app language setting."
@@ -375,7 +367,6 @@
   "@languageArabic": {
     "description": "Name of the Arabic language, always written in Arabic."
   },
-
   "legalDocumentLanguageNotice": "This document is provided by Karar in {language}.",
   "@legalDocumentLanguageNotice": {
     "description": "Shown above a legal document that the server supplied in a language other than the current interface language. Legal documents are never translated on the device.",
@@ -390,7 +381,6 @@
   "@legalDocumentUnavailable": {
     "description": "Shown when a legal document could not be fetched. No cached or substituted text is displayed."
   },
-
   "signInTitle": "Sign in",
   "@signInTitle": {
     "description": "Heading of the sign-in screen."
@@ -443,7 +433,6 @@
   "@signOutIncompleteNotice": {
     "description": "Shown after a local sign-out that could not reach the platform, so other devices may still hold a session."
   },
-
   "registerTitle": "Create an account",
   "@registerTitle": {
     "description": "Heading of the registration screen."
@@ -476,7 +465,6 @@
   "@registerBackToSignIn": {
     "description": "Link back to sign-in from the registration acknowledgement."
   },
-
   "verifyEmailTitle": "Verify your email",
   "@verifyEmailTitle": {
     "description": "Heading of the email verification screen."
@@ -513,7 +501,6 @@
   "@verifyEmailSuccess": {
     "description": "Shown once the email address has been verified."
   },
-
   "forgotPasswordTitle": "Reset your password",
   "@forgotPasswordTitle": {
     "description": "Heading of the password recovery request screen."
@@ -534,7 +521,6 @@
   "@forgotPasswordAcknowledgementMessage": {
     "description": "The only message shown after a password recovery request. It is identical for a known address, an unknown one, a disabled account and one still cooling down. Wording that distinguishes them would confirm which addresses are registered."
   },
-
   "resetPasswordTitle": "Set a new password",
   "@resetPasswordTitle": {
     "description": "Heading of the screen that consumes a reset token."
@@ -571,7 +557,6 @@
   "@resetPasswordSuccessMessage": {
     "description": "Body shown after a password reset succeeded. States that every session was ended."
   },
-
   "changePasswordTitle": "Change password",
   "@changePasswordTitle": {
     "description": "Heading of the change-password screen."
@@ -604,7 +589,6 @@
   "@changePasswordSuccessMessage": {
     "description": "Body shown after a password change succeeded."
   },
-
   "confirmPasswordMismatch": "The two passwords do not match.",
   "@confirmPasswordMismatch": {
     "description": "Field error when the two password fields differ."
@@ -649,7 +633,6 @@
   "@tokenEmpty": {
     "description": "Field error when the reset token field was left empty."
   },
-
   "mfaSecurityTitle": "Two-step verification",
   "@mfaSecurityTitle": {
     "description": "Name of the two-step verification feature, used as a section heading."
@@ -706,7 +689,6 @@
   "@mfaNoPendingEnrolment": {
     "description": "Shown when the enrolment being confirmed is no longer pending."
   },
-
   "mfaRecoveryCodesTitle": "Your recovery codes",
   "@mfaRecoveryCodesTitle": {
     "description": "Heading of the screen that shows the one-time recovery codes."
@@ -719,7 +701,6 @@
   "@mfaRecoveryCodesAcknowledge": {
     "description": "Checkbox the reader ticks to confirm the recovery codes have been stored."
   },
-
   "mfaChallengeTitle": "Enter your code",
   "@mfaChallengeTitle": {
     "description": "Heading of the screen that asks for a code during sign-in."
@@ -756,7 +737,6 @@
   "@mfaRecoveryCodeSubtitle": {
     "description": "Supporting line shown when a recovery code is being asked for."
   },
-
   "mfaDisableTitle": "Turn off two-step verification",
   "@mfaDisableTitle": {
     "description": "Heading of the screen that turns two-step verification off."
@@ -781,7 +761,6 @@
   "@mfaNotEnrolled": {
     "description": "Shown when two-step verification is not set up on the account."
   },
-
   "sessionsTitle": "Active sessions",
   "@sessionsTitle": {
     "description": "Heading of the active sessions screen."
@@ -878,7 +857,6 @@
   "@sessionsRevokeUnavailable": {
     "description": "Shown when the session to sign out was already inactive."
   },
-
   "appLockTitle": "App lock",
   "@appLockTitle": {
     "description": "Name of the app lock feature, used as a screen and section heading."
@@ -967,7 +945,6 @@
   "@securityRecoveryBlockedMessage": {
     "description": "Body for the blocked security-recovery screen. It says why an ordinary sign-in is not offered, and points at server-side session revocation from another device, which is the only real remedy."
   },
-
   "sessionEndedTitle": "You have been signed out",
   "@sessionEndedTitle": {
     "description": "Heading of the screen shown after a session ended without the reader asking."
@@ -996,7 +973,6 @@
   "@sessionEndedAction": {
     "description": "Button that returns to sign-in after a session ended."
   },
-
   "failureOffline": "You appear to be offline. Check your connection and try again.",
   "@failureOffline": {
     "description": "Failure message when the device has no usable connection."
@@ -1065,7 +1041,6 @@
   "@failureUnexpected": {
     "description": "Failure message for anything else. It carries no diagnostic, status code or field value."
   },
-
   "a11yPasswordRules": "Password. At least {count} characters.",
   "@a11yPasswordRules": {
     "description": "Spoken name of the password field, including the length rule, so the rule is announced rather than only shown.",
@@ -1094,7 +1069,6 @@
   "@a11ySensitiveScreen": {
     "description": "Announced on a screen whose contents are hidden while the application is in the background."
   },
-
   "consentScreenTitle": "Privacy and consent",
   "@consentScreenTitle": {
     "description": "Heading of the privacy and consent screen."
@@ -1103,7 +1077,6 @@
   "@consentScreenDescription": {
     "description": "Supporting line under the consent heading. States that the documents are published by the operating entity, not written by the application."
   },
-
   "consentStateNotRequired": "No agreement is needed",
   "@consentStateNotRequired": {
     "description": "Consent state: no published document covers the purpose."
@@ -1136,7 +1109,6 @@
   "@consentStatePolicyNotApproved": {
     "description": "Consent state: the platform cannot record an agreement yet."
   },
-
   "consentDescribeNotRequired": "No published document covers this purpose, so nothing is being asked of you here.",
   "@consentDescribeNotRequired": {
     "description": "Explains the consent state where no published document applies."
@@ -1169,7 +1141,6 @@
   "@consentDescribePolicyNotApproved": {
     "description": "Explains the consent state where no agreement can be recorded yet, so no control is offered."
   },
-
   "consentNothingToAgreeTitle": "Nothing is waiting for your agreement",
   "@consentNothingToAgreeTitle": {
     "description": "Heading shown when no document is waiting for agreement."
@@ -1178,7 +1149,6 @@
   "@consentNothingToAgreeDescription": {
     "description": "Body shown when no document is waiting for agreement."
   },
-
   "consentPurposeLabel": "Purpose",
   "@consentPurposeLabel": {
     "description": "Label of the purpose a consent record covers."
@@ -1223,7 +1193,6 @@
   "@consentActionUnstated": {
     "description": "Required action: the platform stated none."
   },
-
   "consentAcceptAction": "Agree to this version",
   "@consentAcceptAction": {
     "description": "Button that records agreement to the version shown."
@@ -1252,7 +1221,6 @@
   "@consentNoticeRequiredNote": {
     "description": "States that a newer version is published for information only and the existing agreement stands."
   },
-
   "consentBlockerJurisdiction": "No jurisdiction is assigned to your account, so no policy resolves for you yet.",
   "@consentBlockerJurisdiction": {
     "description": "Explains that no policy resolves because no jurisdiction is assigned."
@@ -1285,7 +1253,6 @@
   "@consentGrantReferenceLabel": {
     "description": "Label of the reference identifying a recorded consent."
   },
-
   "platformHomeTitle": "Your account",
   "@platformHomeTitle": {
     "description": "Heading of the signed-in home screen."
@@ -1322,7 +1289,6 @@
   "@platformSectionSettings": {
     "description": "Home section heading for the settings row."
   },
-
   "platformNoServicesTitle": "No services are available to you",
   "@platformNoServicesTitle": {
     "description": "Heading shown when the platform confirmed no service is enabled."
@@ -1355,7 +1321,6 @@
   "@platformActionStartOver": {
     "description": "Action that restarts the loading of the platform context."
   },
-
   "platformProfileRowTitle": "Profile",
   "@platformProfileRowTitle": {
     "description": "Title of the profile row on the home screen."
@@ -1388,7 +1353,6 @@
   "@platformRoleHintLabel": {
     "description": "Label of the role the platform reports for the session, on the home screen."
   },
-
   "platformJurisdictionNone": "Not assigned",
   "@platformJurisdictionNone": {
     "description": "Jurisdiction state: none is assigned to the account."
@@ -1445,7 +1409,6 @@
   "@platformJurisdictionRemainsUnverified": {
     "description": "States that a recorded declaration is still unverified."
   },
-
   "platformLegalScreenTitle": "Legal",
   "@platformLegalScreenTitle": {
     "description": "Heading of the legal and operating entity screen."
@@ -1522,7 +1485,6 @@
   "@platformSettingsRowSubtitle": {
     "description": "Supporting line of the settings row on the home screen."
   },
-
   "profileScreenTitle": "Profile",
   "@profileScreenTitle": {
     "description": "Heading of the profile screen."
@@ -1563,7 +1525,6 @@
   "@profileLastUpdatedLabel": {
     "description": "Label of the date the profile was last changed."
   },
-
   "profileStatusActive": "Active",
   "@profileStatusActive": {
     "description": "Account status: active."
@@ -1588,7 +1549,6 @@
   "@profileStatusDisableRequestedNote": {
     "description": "States that a recorded disable request has by itself disabled and removed nothing."
   },
-
   "profileSaveConfirmation": "Your profile was updated.",
   "@profileSaveConfirmation": {
     "description": "Shown after the profile was updated."
@@ -1621,7 +1581,6 @@
   "@profileNotStated": {
     "description": "Stands in for a profile value the platform did not state."
   },
-
   "settingsScreenTitle": "Settings",
   "@settingsScreenTitle": {
     "description": "Heading of the settings screen."
@@ -1666,7 +1625,6 @@
   "@settingsConsentRow": {
     "description": "Settings row leading to the privacy and consent screen."
   },
-
   "settingsDangerTitle": "Closing your account",
   "@settingsDangerTitle": {
     "description": "Settings section heading for the account closure request."
@@ -1711,7 +1669,6 @@
   "@settingsDisableFailedMessage": {
     "description": "Body shown when the platform refused the disable request."
   },
-
   "tenantSelectionTitle": "Choose an organisation",
   "@tenantSelectionTitle": {
     "description": "Heading of the organisation selection screen."
@@ -1762,7 +1719,6 @@
   "@tenantUnboundDescription": {
     "description": "Body shown when the session is bound to no organisation."
   },
-
   "tenantSwitchHeading": "Switch organisation",
   "@tenantSwitchHeading": {
     "description": "Section heading for switching to another organisation."
@@ -1819,7 +1775,6 @@
   "@tenantSelectSemanticPrefix": {
     "description": "Spoken name of the control that selects one organisation from the list."
   },
-
   "tenantInvitationHeading": "Redeem an invitation",
   "@tenantInvitationHeading": {
     "description": "Section heading for redeeming an organisation invitation."
@@ -1847,5 +1802,2694 @@
   "tenantInvitationFailedDescription": "The code was not accepted. It may have been used already, withdrawn, or issued for a different account.",
   "@tenantInvitationFailedDescription": {
     "description": "Body shown when an invitation could not be redeemed. It lists the possible reasons without stating which one applied."
+  },
+  "financialHomeTabHome": "Home",
+  "@financialHomeTabHome": {
+    "description": "Bottom navigation destination for the platform home surface."
+  },
+  "financialHomeTabAccounts": "Accounts",
+  "@financialHomeTabAccounts": {
+    "description": "Bottom navigation destination for the accounts and wallets surface."
+  },
+  "financialUnavailableTitle": "Not available",
+  "@financialUnavailableTitle": {
+    "description": "Title shown when the financial surface is not part of this account."
+  },
+  "financialUnavailableDescription": "This part of Karar is not available for your account.",
+  "@financialUnavailableDescription": {
+    "description": "Explains that the financial surface is not enabled, without naming what it would contain."
+  },
+  "financialUnavailableAction": "Go back",
+  "@financialUnavailableAction": {
+    "description": "Action that leaves the refusal screen and returns to the home surface."
+  },
+  "accountsScreenTitle": "Accounts & Wallets",
+  "@accountsScreenTitle": {
+    "description": "Title of the surface listing every account and wallet the person holds."
+  },
+  "accountsEmptyTitle": "No accounts yet",
+  "@accountsEmptyTitle": {
+    "description": "Empty state title when the person holds no accounts at all."
+  },
+  "accountsEmptyDescription": "Add an account by hand to start keeping track of it.",
+  "@accountsEmptyDescription": {
+    "description": "Empty state body when the person holds no accounts at all."
+  },
+  "accountsFilteredEmptyTitle": "Nothing matches these filters",
+  "@accountsFilteredEmptyTitle": {
+    "description": "Empty state title when filters removed every account."
+  },
+  "accountsFilteredEmptyDescription": "Clear the filters to see everything you hold.",
+  "@accountsFilteredEmptyDescription": {
+    "description": "Empty state body when filters removed every account."
+  },
+  "accountsUnavailableTitle": "Accounts could not be loaded",
+  "@accountsUnavailableTitle": {
+    "description": "Error state title when the accounts listing failed."
+  },
+  "accountsUnavailableDescription": "Karar could not read your accounts just now.",
+  "@accountsUnavailableDescription": {
+    "description": "Error state body when the accounts listing failed."
+  },
+  "accountsGroupByLabel": "Group by",
+  "@accountsGroupByLabel": {
+    "description": "Label for the control that chooses how accounts are grouped."
+  },
+  "accountsFiltersLabel": "Filters",
+  "@accountsFiltersLabel": {
+    "description": "Label for the group of controls that narrow the accounts listing."
+  },
+  "accountsFiltersClear": "Clear filters",
+  "@accountsFiltersClear": {
+    "description": "Action that removes every active filter."
+  },
+  "financialFiltersActiveCount": "{count, plural, =0{No filters applied} =1{1 filter applied} other{{count} filters applied}}",
+  "@financialFiltersActiveCount": {
+    "description": "Says how many filters are currently narrowing a listing.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "accountsAddManualAction": "Add an account by hand",
+  "@accountsAddManualAction": {
+    "description": "Action that opens the form for creating an account the person enters themselves."
+  },
+  "accountsPerCurrencyNoticeTitle": "Shown per currency",
+  "@accountsPerCurrencyNoticeTitle": {
+    "description": "Title of the notice explaining that amounts in different currencies are kept apart."
+  },
+  "accountsPerCurrencyNoticeDescription": "Karar keeps each currency separate. It does not convert between currencies and does not add them together.",
+  "@accountsPerCurrencyNoticeDescription": {
+    "description": "Explains that no cross-currency total or conversion is performed anywhere."
+  },
+  "accountsFilterAllOption": "All",
+  "@accountsFilterAllOption": {
+    "description": "Filter option that applies no narrowing on an axis."
+  },
+  "groupByIssuer": "Issuer",
+  "@groupByIssuer": {
+    "description": "Grouping option: by the issuer of the account."
+  },
+  "groupByIssuerKind": "Issuer kind",
+  "@groupByIssuerKind": {
+    "description": "Grouping option: by what kind of institution the issuer is."
+  },
+  "groupByAccountType": "Account type",
+  "@groupByAccountType": {
+    "description": "Grouping option: by the type of account."
+  },
+  "groupByWalletKind": "Wallet kind",
+  "@groupByWalletKind": {
+    "description": "Grouping option: by the kind of wallet."
+  },
+  "groupByNature": "Nature",
+  "@groupByNature": {
+    "description": "Grouping option: by whether the balance is owed to or by the person."
+  },
+  "groupByCurrency": "Currency",
+  "@groupByCurrency": {
+    "description": "Grouping option: by currency."
+  },
+  "groupByLifecycle": "Status",
+  "@groupByLifecycle": {
+    "description": "Grouping option: by the account lifecycle status."
+  },
+  "groupByOrigin": "Source",
+  "@groupByOrigin": {
+    "description": "Grouping option: by how the account record came to exist."
+  },
+  "accountTypeCurrent": "Current account",
+  "@accountTypeCurrent": {
+    "description": "Account type: a current account."
+  },
+  "accountTypeSavings": "Savings account",
+  "@accountTypeSavings": {
+    "description": "Account type: a savings account."
+  },
+  "accountTypeCreditCard": "Credit card account",
+  "@accountTypeCreditCard": {
+    "description": "Account type: a credit card account."
+  },
+  "accountTypeCash": "Cash",
+  "@accountTypeCash": {
+    "description": "Account type: cash the person holds themselves."
+  },
+  "accountTypeWallet": "Wallet",
+  "@accountTypeWallet": {
+    "description": "Account type: a wallet."
+  },
+  "accountTypeOther": "Other",
+  "@accountTypeOther": {
+    "description": "Account type: something the vocabulary does not name."
+  },
+  "accountTypeUnrecognised": "Type not recognised",
+  "@accountTypeUnrecognised": {
+    "description": "Account type this build of the app does not know; never softened into a known type."
+  },
+  "walletKindMobileMoney": "Mobile money",
+  "@walletKindMobileMoney": {
+    "description": "Wallet kind: mobile money."
+  },
+  "walletKindEMoney": "Electronic money",
+  "@walletKindEMoney": {
+    "description": "Wallet kind: electronic money."
+  },
+  "walletKindPrepaid": "Prepaid",
+  "@walletKindPrepaid": {
+    "description": "Wallet kind: prepaid."
+  },
+  "walletKindPayroll": "Payroll",
+  "@walletKindPayroll": {
+    "description": "Wallet kind: payroll."
+  },
+  "walletKindSuperApp": "Super app",
+  "@walletKindSuperApp": {
+    "description": "Wallet kind: a wallet inside a super app."
+  },
+  "walletKindOther": "Other wallet",
+  "@walletKindOther": {
+    "description": "Wallet kind: something the vocabulary does not name."
+  },
+  "walletKindUnrecognised": "Wallet kind not recognised",
+  "@walletKindUnrecognised": {
+    "description": "Wallet kind this build of the app does not know."
+  },
+  "walletKindNone": "Not a wallet",
+  "@walletKindNone": {
+    "description": "Shown when an account carries no wallet kind because it is not a wallet."
+  },
+  "accountNatureAsset": "Asset",
+  "@accountNatureAsset": {
+    "description": "Account nature: money owed to the person."
+  },
+  "accountNatureLiability": "Liability",
+  "@accountNatureLiability": {
+    "description": "Account nature: money the person owes."
+  },
+  "accountNatureNotStated": "Not stated",
+  "@accountNatureNotStated": {
+    "description": "Account nature the platform itself reported as unknown."
+  },
+  "accountNatureUnrecognised": "Nature not recognised",
+  "@accountNatureUnrecognised": {
+    "description": "Account nature this build of the app does not know."
+  },
+  "accountLifecycleActive": "Active",
+  "@accountLifecycleActive": {
+    "description": "Account status: in use."
+  },
+  "accountLifecycleArchived": "Archived",
+  "@accountLifecycleArchived": {
+    "description": "Account status: archived by the person."
+  },
+  "accountLifecycleClosed": "Closed",
+  "@accountLifecycleClosed": {
+    "description": "Account status: closed."
+  },
+  "accountLifecycleUnrecognised": "Status not recognised",
+  "@accountLifecycleUnrecognised": {
+    "description": "Account status this build of the app does not know."
+  },
+  "issuerKindBank": "Bank",
+  "@issuerKindBank": {
+    "description": "Issuer kind: a bank."
+  },
+  "issuerKindEMoneyIssuer": "Electronic money issuer",
+  "@issuerKindEMoneyIssuer": {
+    "description": "Issuer kind: an electronic money issuer."
+  },
+  "issuerKindMobileMoneyOperator": "Mobile money operator",
+  "@issuerKindMobileMoneyOperator": {
+    "description": "Issuer kind: a mobile money operator."
+  },
+  "issuerKindTelcoFinancialServices": "Telecom financial services",
+  "@issuerKindTelcoFinancialServices": {
+    "description": "Issuer kind: financial services run by a telecom operator."
+  },
+  "issuerKindPaymentInstitution": "Payment institution",
+  "@issuerKindPaymentInstitution": {
+    "description": "Issuer kind: a payment institution."
+  },
+  "issuerKindFintechWallet": "Fintech wallet",
+  "@issuerKindFintechWallet": {
+    "description": "Issuer kind: a fintech wallet provider."
+  },
+  "issuerKindCardIssuer": "Card issuer",
+  "@issuerKindCardIssuer": {
+    "description": "Issuer kind: a card issuer."
+  },
+  "issuerKindExchangeHouse": "Exchange house",
+  "@issuerKindExchangeHouse": {
+    "description": "Issuer kind: an exchange house."
+  },
+  "issuerKindOther": "Other institution",
+  "@issuerKindOther": {
+    "description": "Issuer kind: something the vocabulary does not name."
+  },
+  "issuerKindUnrecognised": "Issuer kind not recognised",
+  "@issuerKindUnrecognised": {
+    "description": "Issuer kind this build of the app does not know."
+  },
+  "issuerKindNone": "No issuer named",
+  "@issuerKindNone": {
+    "description": "Shown when an account names no institution at all."
+  },
+  "issuerNotStated": "No issuer named",
+  "@issuerNotStated": {
+    "description": "Issuer heading when the person named no institution for the account."
+  },
+  "issuerUnlistedHint": "Named by you",
+  "@issuerUnlistedHint": {
+    "description": "Marks an issuer the person typed themselves rather than choosing from the reviewed list."
+  },
+  "issuerRetiredHint": "No longer offered",
+  "@issuerRetiredHint": {
+    "description": "Marks a reviewed issuer that can no longer be chosen for a new account."
+  },
+  "accountMaskLabel": "Reference",
+  "@accountMaskLabel": {
+    "description": "Label for the short masked tail an account carries."
+  },
+  "accountMaskAbsent": "Not provided",
+  "@accountMaskAbsent": {
+    "description": "Shown when no masked reference was reported for an account."
+  },
+  "accountMaskWithheld": "Withheld",
+  "@accountMaskWithheld": {
+    "description": "Shown when a reported reference was refused by the app because it could be a full number."
+  },
+  "accountMaskNeverFullNumber": "Karar never shows a full account, card or IBAN number.",
+  "@accountMaskNeverFullNumber": {
+    "description": "States plainly that full identifiers are never displayed."
+  },
+  "balancesSectionTitle": "Balances reported by sources",
+  "@balancesSectionTitle": {
+    "description": "Section heading above the figures sources reported for an account."
+  },
+  "balancesEmptyTitle": "No balance reported",
+  "@balancesEmptyTitle": {
+    "description": "Empty state when no source has reported a figure for this account."
+  },
+  "balancesEmptyDescription": "No source has reported a figure for this account yet.",
+  "@balancesEmptyDescription": {
+    "description": "Empty state body when no balance figure exists."
+  },
+  "balancesNoTotalNotice": "Each figure is what one source reported, for the kind it reported. Karar does not add them together.",
+  "@balancesNoTotalNotice": {
+    "description": "States that balances are shown per kind and are never summed."
+  },
+  "balanceKindBooked": "Booked",
+  "@balanceKindBooked": {
+    "description": "Balance kind: the booked figure."
+  },
+  "balanceKindAvailable": "Available",
+  "@balanceKindAvailable": {
+    "description": "Balance kind: the available figure."
+  },
+  "balanceKindCurrent": "Current",
+  "@balanceKindCurrent": {
+    "description": "Balance kind: the current figure."
+  },
+  "balanceKindOutstanding": "Outstanding",
+  "@balanceKindOutstanding": {
+    "description": "Balance kind: the outstanding figure."
+  },
+  "balanceKindCreditLimit": "Credit limit",
+  "@balanceKindCreditLimit": {
+    "description": "Balance kind: the credit limit."
+  },
+  "balanceKindOtherSourceReported": "Other kind reported",
+  "@balanceKindOtherSourceReported": {
+    "description": "Balance kind: a kind the source named that this vocabulary does not."
+  },
+  "balanceKindUnrecognised": "Kind not recognised",
+  "@balanceKindUnrecognised": {
+    "description": "Balance kind this build of the app does not know."
+  },
+  "balanceAsOfLabel": "True as of {when}",
+  "@balanceAsOfLabel": {
+    "description": "Says the moment a reported figure was true, as the source stated it.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "balanceCapturedLabel": "Recorded by Karar on {when}",
+  "@balanceCapturedLabel": {
+    "description": "Says the moment this platform recorded a reported figure.",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "balanceOlderReportsLabel": "Earlier reports",
+  "@balanceOlderReportsLabel": {
+    "description": "Heading for the older figures a source reported for the same balance kind."
+  },
+  "dataOriginManuallyAdded": "Manually added",
+  "@dataOriginManuallyAdded": {
+    "description": "Source label: a person typed this record in themselves."
+  },
+  "dataOriginImportedFromStatement": "Imported from statement",
+  "@dataOriginImportedFromStatement": {
+    "description": "Source label: this record came out of a statement file the person uploaded."
+  },
+  "dataOriginFileImportOnly": "File import only",
+  "@dataOriginFileImportOnly": {
+    "description": "Source label: the only automatic route is a file the person uploads."
+  },
+  "dataOriginNotStated": "Source not stated",
+  "@dataOriginNotStated": {
+    "description": "Source label used when the platform did not say where data came from. Never softened into a connection."
+  },
+  "sourceSectionTitle": "Where this data comes from",
+  "@sourceSectionTitle": {
+    "description": "Section heading for the source and freshness summary of an account."
+  },
+  "sourceLastSynchronisedLabel": "Data last arrived",
+  "@sourceLastSynchronisedLabel": {
+    "description": "Label for the moment an import last finished successfully. It must not read as the platform having checked with an institution: this platform contacts none, and the moment is a record of what the person supplied."
+  },
+  "sourceNeverImportedTitle": "No import has completed yet",
+  "@sourceNeverImportedTitle": {
+    "description": "Shown when a source is attached but has never delivered anything."
+  },
+  "sourceNoneObservedTitle": "No source feeds this account",
+  "@sourceNoneObservedTitle": {
+    "description": "Shown when nothing at all supplies data for an account."
+  },
+  "sourceNoLiveLinkNotice": "Karar has no live link to any bank, wallet or card issuer. Data arrives only when you enter it or import a file.",
+  "@sourceNoLiveLinkNotice": {
+    "description": "States plainly that no institution connection exists anywhere in the product."
+  },
+  "sourceStatusPendingConfirmation": "Awaiting your confirmation",
+  "@sourceStatusPendingConfirmation": {
+    "description": "Source link status: the person has not yet confirmed it."
+  },
+  "sourceStatusAttached": "Attached to this account",
+  "@sourceStatusAttached": {
+    "description": "Source link status: the stored source is attached to this account inside Karar. Deliberately not phrased as a connection to an institution."
+  },
+  "sourceStatusDeclined": "Declined",
+  "@sourceStatusDeclined": {
+    "description": "Source link status: the person declined it."
+  },
+  "sourceStatusDormant": "Dormant",
+  "@sourceStatusDormant": {
+    "description": "Source link status: dormant."
+  },
+  "sourceStatusUnrecognised": "Status not recognised",
+  "@sourceStatusUnrecognised": {
+    "description": "Source link status this build of the app does not know."
+  },
+  "sourceAuthorityAuthoritative": "Authoritative",
+  "@sourceAuthorityAuthoritative": {
+    "description": "How much weight this source carries: authoritative."
+  },
+  "sourceAuthoritySupplemental": "Supplemental",
+  "@sourceAuthoritySupplemental": {
+    "description": "How much weight this source carries: supplemental."
+  },
+  "sourceAuthorityUnverified": "Unverified",
+  "@sourceAuthorityUnverified": {
+    "description": "How much weight this source carries: unverified."
+  },
+  "sourceAuthorityUnrecognised": "Weight not recognised",
+  "@sourceAuthorityUnrecognised": {
+    "description": "Source weight this build of the app does not know."
+  },
+  "sourceCoverageLabel": "Days covered",
+  "@sourceCoverageLabel": {
+    "description": "Label for the calendar range a source has supplied."
+  },
+  "sourceCoverageRange": "{start} to {end}",
+  "@sourceCoverageRange": {
+    "description": "A closed range of calendar days, both rendered as days rather than moments. The placeholders are declared START FIRST because gen-l10n orders the generated positional parameters by this map, not by the order they appear in the message: declared end-first, every caller passing (start, end) silently rendered the range backwards.",
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "sourceCoverageNone": "Nothing supplied yet",
+  "@sourceCoverageNone": {
+    "description": "Shown when a source has supplied no days at all."
+  },
+  "sourceBalanceObservationLabel": "Balances seen",
+  "@sourceBalanceObservationLabel": {
+    "description": "Label for whether balances have been observed from this source."
+  },
+  "sourcePendingObservationLabel": "Pending transactions seen",
+  "@sourcePendingObservationLabel": {
+    "description": "Label for whether pending transactions have been observed from this source."
+  },
+  "sourceObservationObserved": "Seen",
+  "@sourceObservationObserved": {
+    "description": "Observation: this platform has seen it."
+  },
+  "sourceObservationNotObserved": "Not seen",
+  "@sourceObservationNotObserved": {
+    "description": "Observation: this platform has not seen it."
+  },
+  "sourceObservationNotProvided": "Never offered",
+  "@sourceObservationNotProvided": {
+    "description": "Observation: the source never offered it."
+  },
+  "sourceObservationUnrecognised": "Not recognised",
+  "@sourceObservationUnrecognised": {
+    "description": "Observation this build of the app does not know."
+  },
+  "instrumentsSectionTitle": "What spends from this account",
+  "@instrumentsSectionTitle": {
+    "description": "Section heading for the cards and payment identities nested under an account."
+  },
+  "instrumentsEmptyTitle": "No cards or payment identities",
+  "@instrumentsEmptyTitle": {
+    "description": "Empty state when an account has no payment instruments."
+  },
+  "instrumentsNoBalanceNotice": "A card holds no balance of its own. The balance belongs to the account above.",
+  "@instrumentsNoBalanceNotice": {
+    "description": "States that an instrument never carries a balance, however many instruments an account has."
+  },
+  "instrumentsCountLabel": "{count, plural, =0{No instruments} =1{1 instrument} other{{count} instruments}}",
+  "@instrumentsCountLabel": {
+    "description": "Says how many payment instruments spend from one account.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "instrumentTypePhysicalCard": "Physical card",
+  "@instrumentTypePhysicalCard": {
+    "description": "Instrument type: a physical card."
+  },
+  "instrumentTypeVirtualCard": "Virtual card",
+  "@instrumentTypeVirtualCard": {
+    "description": "Instrument type: a virtual card."
+  },
+  "instrumentTypePrepaidCard": "Prepaid card",
+  "@instrumentTypePrepaidCard": {
+    "description": "Instrument type: a prepaid card."
+  },
+  "instrumentTypeTokenizedCard": "Tokenized card",
+  "@instrumentTypeTokenizedCard": {
+    "description": "Instrument type: a tokenized card. A type, never a live provisioning state."
+  },
+  "instrumentTypeQrPaymentIdentity": "QR payment identity",
+  "@instrumentTypeQrPaymentIdentity": {
+    "description": "Instrument type: a QR payment identity."
+  },
+  "instrumentTypeOther": "Other instrument",
+  "@instrumentTypeOther": {
+    "description": "Instrument type: something the vocabulary does not name."
+  },
+  "instrumentTypeUnrecognised": "Type not recognised",
+  "@instrumentTypeUnrecognised": {
+    "description": "Instrument type this build of the app does not know."
+  },
+  "instrumentStatusActive": "Active",
+  "@instrumentStatusActive": {
+    "description": "Instrument status: active."
+  },
+  "instrumentStatusSuspended": "Suspended",
+  "@instrumentStatusSuspended": {
+    "description": "Instrument status: suspended."
+  },
+  "instrumentStatusExpired": "Expired",
+  "@instrumentStatusExpired": {
+    "description": "Instrument status: expired."
+  },
+  "instrumentStatusCancelled": "Cancelled",
+  "@instrumentStatusCancelled": {
+    "description": "Instrument status: cancelled."
+  },
+  "instrumentStatusUnrecognised": "Status not recognised",
+  "@instrumentStatusUnrecognised": {
+    "description": "Instrument status this build of the app does not know."
+  },
+  "instrumentSpendable": "Can be used to spend",
+  "@instrumentSpendable": {
+    "description": "Says the platform reported this instrument as usable for spending."
+  },
+  "instrumentNotSpendable": "Cannot be used to spend",
+  "@instrumentNotSpendable": {
+    "description": "Says the platform reported this instrument as not usable for spending."
+  },
+  "accountDetailTitle": "Account",
+  "@accountDetailTitle": {
+    "description": "Title of the screen showing one account or wallet."
+  },
+  "accountDetailIdentitySection": "Details",
+  "@accountDetailIdentitySection": {
+    "description": "Section heading for the identifying details of an account."
+  },
+  "accountDetailEditAction": "Edit account",
+  "@accountDetailEditAction": {
+    "description": "Action that opens the edit form for an account."
+  },
+  "accountDetailRecentTransactions": "Recent transactions",
+  "@accountDetailRecentTransactions": {
+    "description": "Section heading for the most recent transactions on an account."
+  },
+  "accountDetailSeeAllTransactions": "See all transactions",
+  "@accountDetailSeeAllTransactions": {
+    "description": "Action that opens the full transaction list filtered to this account."
+  },
+  "accountDetailUnavailableTitle": "Account could not be loaded",
+  "@accountDetailUnavailableTitle": {
+    "description": "Error state title when one account could not be read."
+  },
+  "accountDetailUnavailableDescription": "Karar could not read this account just now.",
+  "@accountDetailUnavailableDescription": {
+    "description": "Error state body when one account could not be read."
+  },
+  "accountCurrencyLabel": "Currency",
+  "@accountCurrencyLabel": {
+    "description": "Label for the currency an account is held in."
+  },
+  "accountTypeFieldLabel": "Type",
+  "@accountTypeFieldLabel": {
+    "description": "Label for the type of an account."
+  },
+  "accountWalletKindFieldLabel": "Wallet kind",
+  "@accountWalletKindFieldLabel": {
+    "description": "Label for the kind of wallet."
+  },
+  "accountNatureFieldLabel": "Nature",
+  "@accountNatureFieldLabel": {
+    "description": "Label for whether the balance is owed to or by the person."
+  },
+  "accountLifecycleFieldLabel": "Status",
+  "@accountLifecycleFieldLabel": {
+    "description": "Label for the lifecycle status of an account."
+  },
+  "accountIssuerFieldLabel": "Issuer",
+  "@accountIssuerFieldLabel": {
+    "description": "Label for the institution an account is held at."
+  },
+  "accountSourceFieldLabel": "Source",
+  "@accountSourceFieldLabel": {
+    "description": "Label for how an account record came to exist."
+  },
+  "accountCreatedLabel": "Added",
+  "@accountCreatedLabel": {
+    "description": "Label for when an account record was created."
+  },
+  "accountUpdatedLabel": "Last changed",
+  "@accountUpdatedLabel": {
+    "description": "Label for when an account record last changed."
+  },
+  "accountFormCreateTitle": "Add an account",
+  "@accountFormCreateTitle": {
+    "description": "Title of the form that creates an account the person enters by hand."
+  },
+  "accountFormEditTitle": "Edit account",
+  "@accountFormEditTitle": {
+    "description": "Title of the form that edits an existing account."
+  },
+  "accountFormDisplayNameLabel": "Name",
+  "@accountFormDisplayNameLabel": {
+    "description": "Label for the name the person gives an account."
+  },
+  "accountFormDisplayNameHelper": "Only you see this name.",
+  "@accountFormDisplayNameHelper": {
+    "description": "Helper text explaining that the account name is private to the person."
+  },
+  "accountFormTypeLabel": "Type",
+  "@accountFormTypeLabel": {
+    "description": "Label for choosing the type of account."
+  },
+  "accountFormWalletKindLabel": "Wallet kind",
+  "@accountFormWalletKindLabel": {
+    "description": "Label for choosing the kind of wallet."
+  },
+  "accountFormWalletKindHelper": "Only a wallet has a wallet kind.",
+  "@accountFormWalletKindHelper": {
+    "description": "Helper text explaining when a wallet kind applies."
+  },
+  "accountFormNatureLabel": "Nature",
+  "@accountFormNatureLabel": {
+    "description": "Label for choosing whether the balance is owed to or by the person."
+  },
+  "accountFormCurrencyLabel": "Currency",
+  "@accountFormCurrencyLabel": {
+    "description": "Label for the currency code of a new account."
+  },
+  "accountFormCurrencyHelper": "A three-letter code, such as QAR.",
+  "@accountFormCurrencyHelper": {
+    "description": "Helper text describing the shape of an ISO 4217 currency code."
+  },
+  "accountFormMaskLabel": "Reference",
+  "@accountFormMaskLabel": {
+    "description": "Label for the short masked tail of an account."
+  },
+  "accountFormMaskHelper": "A short masked tail only. Never a full account, card or IBAN number.",
+  "@accountFormMaskHelper": {
+    "description": "Helper text that forbids entering a full identifier."
+  },
+  "accountFormIssuerLabel": "Issuer",
+  "@accountFormIssuerLabel": {
+    "description": "Label for choosing the institution an account is held at."
+  },
+  "accountFormIssuerCatalogueOption": "Choose a reviewed issuer",
+  "@accountFormIssuerCatalogueOption": {
+    "description": "Option that picks an institution from the reviewed catalogue."
+  },
+  "accountFormIssuerUnlistedOption": "Name an issuer yourself",
+  "@accountFormIssuerUnlistedOption": {
+    "description": "Option that lets the person type an institution the catalogue does not hold."
+  },
+  "accountFormIssuerNoneOption": "No issuer",
+  "@accountFormIssuerNoneOption": {
+    "description": "Option that names no institution at all."
+  },
+  "accountFormIssuerUnlistedLabel": "Issuer name",
+  "@accountFormIssuerUnlistedLabel": {
+    "description": "Label for the institution name the person types themselves."
+  },
+  "accountFormIssuersUnavailable": "The reviewed issuer list could not be loaded. You can still name an issuer yourself.",
+  "@accountFormIssuersUnavailable": {
+    "description": "Explains that the catalogue failed to load and offers the remaining path."
+  },
+  "accountFormValidationSummaryTitle": "Check these fields",
+  "@accountFormValidationSummaryTitle": {
+    "description": "Heading of the list summarising which fields must be corrected."
+  },
+  "accountFormErrorDisplayName": "Enter a name for this account.",
+  "@accountFormErrorDisplayName": {
+    "description": "Validation message: the account name is missing."
+  },
+  "accountFormErrorCurrency": "Enter a three-letter currency code.",
+  "@accountFormErrorCurrency": {
+    "description": "Validation message: the currency code is missing or malformed."
+  },
+  "accountFormErrorWalletKindRequired": "Choose a wallet kind.",
+  "@accountFormErrorWalletKindRequired": {
+    "description": "Validation message: a wallet must state its kind."
+  },
+  "accountFormErrorWalletKindNotAllowed": "Only a wallet has a wallet kind.",
+  "@accountFormErrorWalletKindNotAllowed": {
+    "description": "Validation message: a non-wallet cannot carry a wallet kind."
+  },
+  "accountFormErrorIssuerNamedTwice": "Choose a reviewed issuer or type one, not both.",
+  "@accountFormErrorIssuerNamedTwice": {
+    "description": "Validation message: an issuer was named twice."
+  },
+  "accountFormSaved": "Saved.",
+  "@accountFormSaved": {
+    "description": "Confirmation shown after the platform stored an account."
+  },
+  "accountFormVersionConflict": "This account changed while you were editing it. Reload it and try again.",
+  "@accountFormVersionConflict": {
+    "description": "Explains an optimistic-concurrency refusal on an account edit."
+  },
+  "accountFormNoChange": "Nothing has changed yet.",
+  "@accountFormNoChange": {
+    "description": "Explains that a save was declined because the form matches what is stored."
+  },
+  "accountFormRejected": "Karar could not save this account.",
+  "@accountFormRejected": {
+    "description": "Generic failure message when an account could not be stored."
+  },
+  "accountFormCurrencyImmutable": "The currency cannot be changed once an account holds records.",
+  "@accountFormCurrencyImmutable": {
+    "description": "Explains why the currency field is not editable on an existing account."
+  },
+  "transactionsScreenTitle": "Transactions",
+  "@transactionsScreenTitle": {
+    "description": "Title of the surface listing transactions."
+  },
+  "transactionsEmptyTitle": "No transactions yet",
+  "@transactionsEmptyTitle": {
+    "description": "Empty state title when no transactions exist at all."
+  },
+  "transactionsEmptyDescription": "Record a transaction to start keeping track.",
+  "@transactionsEmptyDescription": {
+    "description": "Empty state body when no transactions exist at all."
+  },
+  "transactionsFilteredEmptyTitle": "Nothing matches these filters",
+  "@transactionsFilteredEmptyTitle": {
+    "description": "Empty state title when filters removed every transaction."
+  },
+  "transactionsFilteredEmptyDescription": "Clear the filters to see everything recorded.",
+  "@transactionsFilteredEmptyDescription": {
+    "description": "Empty state body when filters removed every transaction."
+  },
+  "transactionsUnavailableTitle": "Transactions could not be loaded",
+  "@transactionsUnavailableTitle": {
+    "description": "Error state title when the transaction listing failed."
+  },
+  "transactionsUnavailableDescription": "Karar could not read your transactions just now.",
+  "@transactionsUnavailableDescription": {
+    "description": "Error state body when the transaction listing failed."
+  },
+  "transactionsLoadMoreAction": "Load more",
+  "@transactionsLoadMoreAction": {
+    "description": "Action that fetches the next page of transactions."
+  },
+  "transactionsAddManualAction": "Record a transaction",
+  "@transactionsAddManualAction": {
+    "description": "Action that opens the form for recording a transaction by hand."
+  },
+  "transactionDetailTitle": "Transaction",
+  "@transactionDetailTitle": {
+    "description": "Title of the screen showing one transaction."
+  },
+  "transactionDetailUnavailableTitle": "Transaction could not be loaded",
+  "@transactionDetailUnavailableTitle": {
+    "description": "Error state title when one transaction could not be read."
+  },
+  "transactionDetailUnavailableDescription": "Karar could not read this transaction just now.",
+  "@transactionDetailUnavailableDescription": {
+    "description": "Error state body when one transaction could not be read."
+  },
+  "transactionAmountLabel": "Amount",
+  "@transactionAmountLabel": {
+    "description": "Label for the booked amount of a transaction."
+  },
+  "transactionOriginalAmountLabel": "As the source stated it",
+  "@transactionOriginalAmountLabel": {
+    "description": "Label for the amount in the currency the source used."
+  },
+  "transactionOriginalAmountNotice": "The source used a different currency. Karar shows both and converts neither.",
+  "@transactionOriginalAmountNotice": {
+    "description": "Explains that a second currency is displayed without any conversion."
+  },
+  "transactionBookedOnLabel": "Booked on",
+  "@transactionBookedOnLabel": {
+    "description": "Label for the calendar day an institution booked a transaction."
+  },
+  "transactionValueDateLabel": "Value date",
+  "@transactionValueDateLabel": {
+    "description": "Label for the value date of a transaction, a calendar day."
+  },
+  "transactionEventOccurredLabel": "Source timestamp",
+  "@transactionEventOccurredLabel": {
+    "description": "Label for the true instant a source stated, when it stated one."
+  },
+  "transactionSourceTimezoneLabel": "Source time zone",
+  "@transactionSourceTimezoneLabel": {
+    "description": "Label for the time zone the source instant is meaningful in."
+  },
+  "transactionDescriptionLabel": "Description",
+  "@transactionDescriptionLabel": {
+    "description": "Label for the description of a transaction."
+  },
+  "transactionMerchantLabel": "Merchant",
+  "@transactionMerchantLabel": {
+    "description": "Label for the merchant of a transaction."
+  },
+  "transactionNoteLabel": "Note",
+  "@transactionNoteLabel": {
+    "description": "Label for the note on a transaction."
+  },
+  "transactionAccountLabel": "Account",
+  "@transactionAccountLabel": {
+    "description": "Label for the account a transaction belongs to."
+  },
+  "transactionStatusPosted": "Posted",
+  "@transactionStatusPosted": {
+    "description": "Transaction status: posted."
+  },
+  "transactionStatusVoided": "Voided",
+  "@transactionStatusVoided": {
+    "description": "Transaction status: voided."
+  },
+  "transactionStatusUnrecognised": "Status not recognised",
+  "@transactionStatusUnrecognised": {
+    "description": "Transaction status this build of the app does not know."
+  },
+  "directionMoneyIn": "Money in",
+  "@directionMoneyIn": {
+    "description": "Direction: money arriving in the account."
+  },
+  "directionMoneyOut": "Money out",
+  "@directionMoneyOut": {
+    "description": "Direction: money leaving the account."
+  },
+  "directionUnrecognised": "Direction not recognised",
+  "@directionUnrecognised": {
+    "description": "Direction this build of the app does not know."
+  },
+  "transactionCategoryLabel": "Category",
+  "@transactionCategoryLabel": {
+    "description": "Label for the category on a transaction."
+  },
+  "transactionCategoryNone": "No category",
+  "@transactionCategoryNone": {
+    "description": "Shown when no category has been assigned to a transaction."
+  },
+  "transactionCategoryChangeAction": "Choose a category",
+  "@transactionCategoryChangeAction": {
+    "description": "Action that opens the category catalogue for a transaction."
+  },
+  "transactionCategoryByUser": "Chosen by you",
+  "@transactionCategoryByUser": {
+    "description": "Says a person chose this category themselves."
+  },
+  "transactionCategoryByRule": "Set by a rule",
+  "@transactionCategoryByRule": {
+    "description": "Says a deterministic rule set this category."
+  },
+  "transactionCategoryBySourceUnrecognised": "Source not recognised",
+  "@transactionCategoryBySourceUnrecognised": {
+    "description": "Category assignment source this build of the app does not know."
+  },
+  "transactionCategoryRuleVersionLabel": "Rule version",
+  "@transactionCategoryRuleVersionLabel": {
+    "description": "Label for the version of the rule that set a category."
+  },
+  "transactionRevisionsTitle": "History",
+  "@transactionRevisionsTitle": {
+    "description": "Section heading for the append-only revision history of a transaction."
+  },
+  "transactionRevisionNumber": "Revision {number}",
+  "@transactionRevisionNumber": {
+    "description": "Names one entry of the revision history by its number.",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "transactionRevisionSourceImport": "From an imported statement",
+  "@transactionRevisionSourceImport": {
+    "description": "Revision attribution: the value came from a statement import."
+  },
+  "transactionRevisionManualEntry": "Entered by hand",
+  "@transactionRevisionManualEntry": {
+    "description": "Revision attribution: the value was entered by hand."
+  },
+  "transactionRevisionUserInput": "Corrected by you",
+  "@transactionRevisionUserInput": {
+    "description": "Revision attribution: the person corrected the value."
+  },
+  "transactionRevisionUnrecognised": "Origin not recognised",
+  "@transactionRevisionUnrecognised": {
+    "description": "Revision attribution this build of the app does not know."
+  },
+  "transactionRevisionChangedFields": "Changed: {fields}",
+  "@transactionRevisionChangedFields": {
+    "description": "Lists which fields one revision changed.",
+    "placeholders": {
+      "fields": {
+        "type": "String"
+      }
+    }
+  },
+  "transactionRevisionNoChangedFields": "Originally recorded",
+  "@transactionRevisionNoChangedFields": {
+    "description": "Shown for the first revision, which changed nothing because it is the original."
+  },
+  "transactionDivergesFromSource": "You have corrected a value the source supplied. The values from the source are kept in the history.",
+  "@transactionDivergesFromSource": {
+    "description": "States that current values differ from what the source supplied, as the platform reported."
+  },
+  "revisableFieldAmount": "amount",
+  "@revisableFieldAmount": {
+    "description": "Name of the amount field in a revision summary."
+  },
+  "revisableFieldBookingDate": "booking date",
+  "@revisableFieldBookingDate": {
+    "description": "Name of the booking date field in a revision summary."
+  },
+  "revisableFieldValueDate": "value date",
+  "@revisableFieldValueDate": {
+    "description": "Name of the value date field in a revision summary."
+  },
+  "revisableFieldMerchant": "merchant",
+  "@revisableFieldMerchant": {
+    "description": "Name of the merchant field in a revision summary."
+  },
+  "revisableFieldDescription": "description",
+  "@revisableFieldDescription": {
+    "description": "Name of the description field in a revision summary."
+  },
+  "revisableFieldNote": "note",
+  "@revisableFieldNote": {
+    "description": "Name of the note field in a revision summary."
+  },
+  "revisableFieldStatus": "status",
+  "@revisableFieldStatus": {
+    "description": "Name of the status field in a revision summary."
+  },
+  "revisableFieldUnrecognised": "a field not recognised",
+  "@revisableFieldUnrecognised": {
+    "description": "Name used for a revision field this build of the app does not know."
+  },
+  "transactionProvenanceTitle": "Provenance",
+  "@transactionProvenanceTitle": {
+    "description": "Section heading for where each revision of a transaction came from."
+  },
+  "transactionProvenanceUnavailable": "Provenance could not be loaded",
+  "@transactionProvenanceUnavailable": {
+    "description": "Error state when the provenance listing failed."
+  },
+  "provenanceImportedFromStatement": "Came from a statement file",
+  "@provenanceImportedFromStatement": {
+    "description": "Provenance: this revision originated in an uploaded statement."
+  },
+  "provenanceNotImportedFromStatement": "Did not come from a statement file",
+  "@provenanceNotImportedFromStatement": {
+    "description": "Provenance: this revision did not originate in an uploaded statement."
+  },
+  "provenanceSourceDirectionLabel": "Direction the source stated",
+  "@provenanceSourceDirectionLabel": {
+    "description": "Label for what the source itself said before any mapping."
+  },
+  "sourceDirectionDebit": "Debit",
+  "@sourceDirectionDebit": {
+    "description": "Source direction: debit."
+  },
+  "sourceDirectionCredit": "Credit",
+  "@sourceDirectionCredit": {
+    "description": "Source direction: credit."
+  },
+  "sourceDirectionNotStated": "Not stated",
+  "@sourceDirectionNotStated": {
+    "description": "Source direction: the source said nothing."
+  },
+  "sourceDirectionUnrecognised": "Not recognised",
+  "@sourceDirectionUnrecognised": {
+    "description": "Source direction this build of the app does not know."
+  },
+  "provenanceDirectionMappingLabel": "How the direction was decided",
+  "@provenanceDirectionMappingLabel": {
+    "description": "Label for how the source statement became the canonical sign."
+  },
+  "directionMappingManualEntry": "Entered by hand",
+  "@directionMappingManualEntry": {
+    "description": "Direction mapping: a person entered it."
+  },
+  "directionMappingSourceDirectionWord": "From the wording used by the source",
+  "@directionMappingSourceDirectionWord": {
+    "description": "Direction mapping: taken from a debit or credit word in the source."
+  },
+  "directionMappingSourceSignedAmount": "From the sign used by the source",
+  "@directionMappingSourceSignedAmount": {
+    "description": "Direction mapping: taken from the sign of the source amount."
+  },
+  "directionMappingSourceSignedAmountInverted": "From the sign used by the source, inverted",
+  "@directionMappingSourceSignedAmountInverted": {
+    "description": "Direction mapping: taken from the source sign under the opposite convention."
+  },
+  "directionMappingUnrecognised": "Not recognised",
+  "@directionMappingUnrecognised": {
+    "description": "Direction mapping this build of the app does not know."
+  },
+  "provenanceVersionsLabel": "Processing versions",
+  "@provenanceVersionsLabel": {
+    "description": "Label for the four algorithm versions that processed a record."
+  },
+  "provenanceParserVersionLabel": "Parser",
+  "@provenanceParserVersionLabel": {
+    "description": "Label for the parser version."
+  },
+  "provenanceMappingVersionLabel": "Mapping",
+  "@provenanceMappingVersionLabel": {
+    "description": "Label for the mapping version."
+  },
+  "provenanceNormalizationVersionLabel": "Normalization",
+  "@provenanceNormalizationVersionLabel": {
+    "description": "Label for the normalization version."
+  },
+  "provenanceFingerprintVersionLabel": "Duplicate check",
+  "@provenanceFingerprintVersionLabel": {
+    "description": "Label for the version of the duplicate-detection algorithm. It is an algorithm version, never a fingerprint."
+  },
+  "transactionCorrectAction": "Correct this transaction",
+  "@transactionCorrectAction": {
+    "description": "Action that opens the correction form."
+  },
+  "transactionCorrectTitle": "Correct transaction",
+  "@transactionCorrectTitle": {
+    "description": "Title of the correction form."
+  },
+  "transactionCorrectNotice": "A correction is added to the history. Nothing is overwritten.",
+  "@transactionCorrectNotice": {
+    "description": "Explains that corrections append rather than overwrite."
+  },
+  "transactionCorrectionSaved": "Correction recorded.",
+  "@transactionCorrectionSaved": {
+    "description": "Confirmation shown after a correction was stored."
+  },
+  "transactionVersionConflict": "This transaction changed while you were editing it. Reload it and try again.",
+  "@transactionVersionConflict": {
+    "description": "Explains an optimistic-concurrency refusal on a correction."
+  },
+  "transactionNoChange": "Nothing has changed yet.",
+  "@transactionNoChange": {
+    "description": "Explains that a correction was declined because it changes nothing."
+  },
+  "transactionRejected": "Karar could not save this transaction.",
+  "@transactionRejected": {
+    "description": "Generic failure message when a transaction could not be stored."
+  },
+  "transactionDuplicateTitle": "You may already have recorded this",
+  "@transactionDuplicateTitle": {
+    "description": "Title of the notice shown when the platform refuses an identical transaction as a possible duplicate."
+  },
+  "transactionDuplicateMessage": "An identical transaction is already recorded for this account on this date. If you really did buy this twice, record it as a separate purchase.",
+  "@transactionDuplicateMessage": {
+    "description": "Explains why a transaction was refused as a duplicate and what the person can do about it."
+  },
+  "transactionDuplicateConfirmAction": "Record as a separate purchase",
+  "@transactionDuplicateConfirmAction": {
+    "description": "Action that records a refused duplicate as a second genuine occurrence of the same movement."
+  },
+  "transactionDeleteAction": "Delete transaction",
+  "@transactionDeleteAction": {
+    "description": "Action that deletes one transaction."
+  },
+  "transactionDeleteConfirmTitle": "Delete this transaction?",
+  "@transactionDeleteConfirmTitle": {
+    "description": "Title of the confirmation dialog for deleting a transaction."
+  },
+  "transactionDeleteConfirmMessage": "The transaction and any transfer matches naming it will be removed.",
+  "@transactionDeleteConfirmMessage": {
+    "description": "Body of the confirmation dialog for deleting a transaction."
+  },
+  "transactionDeleted": "Deleted.",
+  "@transactionDeleted": {
+    "description": "Confirmation shown after a transaction was fully deleted."
+  },
+  "transactionDeletePartial": "Only part of this deletion completed. Some related records may remain.",
+  "@transactionDeletePartial": {
+    "description": "States that a delete was partially applied, rather than reporting success."
+  },
+  "transactionFormCreateTitle": "Record a transaction",
+  "@transactionFormCreateTitle": {
+    "description": "Title of the form that records a transaction by hand."
+  },
+  "transactionFormAccountLabel": "Account",
+  "@transactionFormAccountLabel": {
+    "description": "Label for choosing which account a manual transaction belongs to."
+  },
+  "transactionFormMagnitudeLabel": "Amount",
+  "@transactionFormMagnitudeLabel": {
+    "description": "Label for the amount of a manual transaction."
+  },
+  "transactionFormMagnitudeHelper": "A positive amount, in the currency of the account. Choose below whether it came in or went out.",
+  "@transactionFormMagnitudeHelper": {
+    "description": "Helper text explaining that the amount is a magnitude and the direction is chosen separately."
+  },
+  "transactionFormDirectionLabel": "Direction",
+  "@transactionFormDirectionLabel": {
+    "description": "Label for choosing whether money came in or went out."
+  },
+  "transactionFormBookingDateLabel": "Booked on",
+  "@transactionFormBookingDateLabel": {
+    "description": "Label for the calendar day a manual transaction was booked."
+  },
+  "transactionFormValueDateLabel": "Value date",
+  "@transactionFormValueDateLabel": {
+    "description": "Label for the optional value date of a manual transaction."
+  },
+  "transactionFormDayHelper": "A calendar day, as YYYY-MM-DD.",
+  "@transactionFormDayHelper": {
+    "description": "Helper text describing the shape of a calendar day entry."
+  },
+  "transactionFormDescriptionLabel": "Description",
+  "@transactionFormDescriptionLabel": {
+    "description": "Label for the description of a manual transaction."
+  },
+  "transactionFormMerchantLabel": "Merchant",
+  "@transactionFormMerchantLabel": {
+    "description": "Label for the optional merchant of a manual transaction."
+  },
+  "transactionFormNoteLabel": "Note",
+  "@transactionFormNoteLabel": {
+    "description": "Label for the optional note on a manual transaction."
+  },
+  "transactionFormOptionalHelper": "Optional.",
+  "@transactionFormOptionalHelper": {
+    "description": "Helper text marking a form field as optional."
+  },
+  "transactionFormValidationSummaryTitle": "Check these fields",
+  "@transactionFormValidationSummaryTitle": {
+    "description": "Heading of the list summarising which transaction fields must be corrected."
+  },
+  "transactionFormErrorAccount": "Choose an account.",
+  "@transactionFormErrorAccount": {
+    "description": "Validation message: no account was chosen for a manual transaction."
+  },
+  "transactionFormErrorDescription": "Enter a description.",
+  "@transactionFormErrorDescription": {
+    "description": "Validation message: the description is missing."
+  },
+  "transactionFormErrorDirection": "Choose whether money came in or went out.",
+  "@transactionFormErrorDirection": {
+    "description": "Validation message: no direction was chosen."
+  },
+  "transactionFormErrorMagnitude": "Enter a positive amount.",
+  "@transactionFormErrorMagnitude": {
+    "description": "Validation message: the amount is missing, malformed or signed."
+  },
+  "transactionFormErrorBookingDate": "Enter the day it was booked, as YYYY-MM-DD.",
+  "@transactionFormErrorBookingDate": {
+    "description": "Validation message: the booking day is missing or malformed."
+  },
+  "transactionFormErrorValueDate": "Enter the value date as YYYY-MM-DD, or leave it empty.",
+  "@transactionFormErrorValueDate": {
+    "description": "Validation message: the value date is malformed."
+  },
+  "transactionFormSaved": "Recorded.",
+  "@transactionFormSaved": {
+    "description": "Confirmation shown after a manual transaction was stored."
+  },
+  "transactionFormNoAccounts": "Add an account before recording a transaction.",
+  "@transactionFormNoAccounts": {
+    "description": "Explains that a transaction needs an account to belong to."
+  },
+  "transactionFiltersTitle": "Filters",
+  "@transactionFiltersTitle": {
+    "description": "Heading of the controls that narrow the transaction listing."
+  },
+  "transactionFilterDirectionLabel": "Direction",
+  "@transactionFilterDirectionLabel": {
+    "description": "Filter label for money in or money out."
+  },
+  "transactionFilterStatusLabel": "Status",
+  "@transactionFilterStatusLabel": {
+    "description": "Filter label for transaction status."
+  },
+  "transactionFilterCurrencyLabel": "Currency",
+  "@transactionFilterCurrencyLabel": {
+    "description": "Filter label for currency."
+  },
+  "transactionFilterSourceLabel": "Source",
+  "@transactionFilterSourceLabel": {
+    "description": "Filter label for the rail a transaction arrived on."
+  },
+  "transactionFilterAccountLabel": "Account",
+  "@transactionFilterAccountLabel": {
+    "description": "Filter label for the account a transaction belongs to."
+  },
+  "categoryPickerTitle": "Choose a category",
+  "@categoryPickerTitle": {
+    "description": "Title of the screen listing the reviewed category catalogue."
+  },
+  "categorySearchLabel": "Search categories",
+  "@categorySearchLabel": {
+    "description": "Label for the field that filters the category catalogue."
+  },
+  "categoriesEmptyTitle": "No categories available",
+  "@categoriesEmptyTitle": {
+    "description": "Empty state when the catalogue holds nothing selectable."
+  },
+  "categoriesEmptyDescription": "The reviewed catalogue offers nothing to choose right now.",
+  "@categoriesEmptyDescription": {
+    "description": "Empty state body for the category catalogue."
+  },
+  "categoriesUnavailableTitle": "Categories could not be loaded",
+  "@categoriesUnavailableTitle": {
+    "description": "Error state title when the category catalogue failed to load."
+  },
+  "categoriesUnavailableDescription": "Karar could not read the category catalogue just now.",
+  "@categoriesUnavailableDescription": {
+    "description": "Error state body when the category catalogue failed to load."
+  },
+  "categoryRetiredHint": "No longer offered",
+  "@categoryRetiredHint": {
+    "description": "Marks a category that may no longer be chosen."
+  },
+  "categoryAssigned": "Category saved.",
+  "@categoryAssigned": {
+    "description": "Confirmation shown after a category was assigned."
+  },
+  "categoryAssignmentWins": "Your own choice already stands.",
+  "@categoryAssignmentWins": {
+    "description": "Explains that an existing choice by the person was not replaced."
+  },
+  "categoryUnknown": "That category is not available.",
+  "@categoryUnknown": {
+    "description": "Explains that a category code could not be assigned."
+  },
+  "categoryCatalogueVersionLabel": "Catalogue version",
+  "@categoryCatalogueVersionLabel": {
+    "description": "Label for the version of the reviewed category catalogue."
+  },
+  "a11yFinancialAmount": "{amount}, {direction}",
+  "@a11yFinancialAmount": {
+    "description": "Screen reader label pairing a formatted amount with the direction it moved.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      },
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yAccountSummary": "{name}, {type}, {currency}",
+  "@a11yAccountSummary": {
+    "description": "Screen reader label for one account row in the portfolio. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yBalanceSummary": "{kind}, {amount}, {asOf}",
+  "@a11yBalanceSummary": {
+    "description": "Screen reader label for one reported balance figure. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "asOf": {
+        "type": "String"
+      }
+    }
+  },
+  "a11yInstrumentSummary": "{label}, {type}, {status}",
+  "@a11yInstrumentSummary": {
+    "description": "Screen reader label for one payment instrument nested under an account. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "statementImportTitle": "Import a statement",
+  "@statementImportTitle": {
+    "description": "Title of the statement-import surface."
+  },
+  "statementImportStartTitle": "Choose an account and a file",
+  "@statementImportStartTitle": {
+    "description": "Title of the first step, where the person picks the target account and the CSV."
+  },
+  "statementImportMappingTitle": "Match the columns",
+  "@statementImportMappingTitle": {
+    "description": "Title of the step where the person says which column holds which field."
+  },
+  "statementImportReviewTitle": "Review before importing",
+  "@statementImportReviewTitle": {
+    "description": "Title of the step where the person sees what the parse found and decides."
+  },
+  "statementImportRailExplanation": "Karar imports statements you upload yourself. It does not connect to your bank, and it never asks for a banking password, PIN or one-time code.",
+  "@statementImportRailExplanation": {
+    "description": "Says plainly that file upload is the only rail and that no banking credential is ever requested."
+  },
+  "statementImportAccountLabel": "Account to import into",
+  "@statementImportAccountLabel": {
+    "description": "Label for the account picker on the first step."
+  },
+  "statementImportAccountHelper": "You choose the account before the file is read. Nothing in the file can change where its rows land.",
+  "@statementImportAccountHelper": {
+    "description": "Explains that the target account is chosen by the person and cannot be redirected by file content."
+  },
+  "statementImportNoAccounts": "You need an account before you can import a statement.",
+  "@statementImportNoAccounts": {
+    "description": "Shown when the person holds no account to import into."
+  },
+  "statementImportChooseFile": "Choose a CSV file",
+  "@statementImportChooseFile": {
+    "description": "Action that opens the device document picker."
+  },
+  "statementImportChooseFileSemantics": "Choose a CSV statement file from your device",
+  "@statementImportChooseFileSemantics": {
+    "description": "Screen-reader label for the control that opens the document picker."
+  },
+  "statementImportFileRules": "CSV only, up to {megabytes} MB.",
+  "@statementImportFileRules": {
+    "description": "States the accepted media type and the byte bound the platform enforces.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportFileChosen": "File ready to upload",
+  "@statementImportFileChosen": {
+    "description": "Confirms a file has been chosen, without naming it."
+  },
+  "statementImportActionUpload": "Upload and continue",
+  "@statementImportActionUpload": {
+    "description": "Action that sends the chosen file to the platform."
+  },
+  "statementImportPickerUnavailableTitle": "No file picker is available here",
+  "@statementImportPickerUnavailableTitle": {
+    "description": "Title shown when the build ships no document-picker adapter."
+  },
+  "statementImportPickerUnavailableDetail": "This device offered no document picker, so a statement cannot be chosen on it. Nothing else about the import has changed — where a picker is available, Karar asks for the one file you choose and never for access to your storage.",
+  "@statementImportPickerUnavailableDetail": {
+    "description": "Shown where no document picker exists — a desktop host, or a device that presented no provider. Must not promise a future feature: Android and iOS already open the system picker."
+  },
+  "statementImportPickerUnreadable": "That file could not be read from your device.",
+  "@statementImportPickerUnreadable": {
+    "description": "Shown when the device could not read the chosen document. Names no path and no filename."
+  },
+  "statementImportSourceEmpty": "That file is empty.",
+  "@statementImportSourceEmpty": {
+    "description": "Shown when the chosen file has no bytes."
+  },
+  "statementImportSourceTooLarge": "That file is larger than the {megabytes} MB this import accepts.",
+  "@statementImportSourceTooLarge": {
+    "description": "Shown when the chosen file is past the byte bound, before any upload is attempted.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportSampleInvalidEncoding": "That file is not valid UTF-8 text. Karar refuses it rather than replacing the damaged characters, which would alter what your bank wrote.",
+  "@statementImportSampleInvalidEncoding": {
+    "description": "Shown when the chosen file cannot be decoded strictly as UTF-8."
+  },
+  "statementImportSampleMalformedQuoting": "A quoted value in that file is never closed, so its columns cannot be counted reliably.",
+  "@statementImportSampleMalformedQuoting": {
+    "description": "Shown when the local sample reader finds an unterminated quoted field."
+  },
+  "statementImportSampleTooManyColumns": "A line in that file has more columns than this import accepts.",
+  "@statementImportSampleTooManyColumns": {
+    "description": "Shown when a sampled line is wider than the platform column bound."
+  },
+  "statementImportMappingIntro": "Tell Karar what each column holds. Nothing is guessed, because a wrong guess moves money.",
+  "@statementImportMappingIntro": {
+    "description": "Introduces the mapping step and says why nothing is auto-detected."
+  },
+  "statementImportHeaderRowLabel": "The first row is a heading row",
+  "@statementImportHeaderRowLabel": {
+    "description": "Toggle for whether the file starts with a header row."
+  },
+  "statementImportHeaderRowHelper": "Stated, never detected. A heading row treated as data becomes a refused transaction.",
+  "@statementImportHeaderRowHelper": {
+    "description": "Explains why the header row is declared rather than sniffed."
+  },
+  "statementImportColumnNumber": "Column {number}",
+  "@statementImportColumnNumber": {
+    "description": "Names a CSV column by its 1-based position, for a file with no heading row.",
+    "placeholders": {
+      "number": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportColumnNotMapped": "Not mapped",
+  "@statementImportColumnNotMapped": {
+    "description": "The choice meaning a field is left without a column."
+  },
+  "statementImportPreviewCaption": "The first rows of your file, shown as plain text.",
+  "@statementImportPreviewCaption": {
+    "description": "Caption above the local sample grid on the mapping step."
+  },
+  "statementImportPreviewInertNote": "Values appear exactly as your file contains them. Karar never treats them as instructions.",
+  "@statementImportPreviewInertNote": {
+    "description": "States the untrusted-content posture: file text is data, rendered inertly, never acted on."
+  },
+  "statementImportFieldBookingDate": "Booking date",
+  "@statementImportFieldBookingDate": {
+    "description": "The day the institution booked the movement."
+  },
+  "statementImportFieldValueDate": "Value date",
+  "@statementImportFieldValueDate": {
+    "description": "The day the movement takes value."
+  },
+  "statementImportFieldEventOccurredAt": "Exact time",
+  "@statementImportFieldEventOccurredAt": {
+    "description": "An instant the source genuinely supplies."
+  },
+  "statementImportFieldSourceTimezone": "Time zone",
+  "@statementImportFieldSourceTimezone": {
+    "description": "A time zone the source itself states."
+  },
+  "statementImportFieldAmount": "Amount",
+  "@statementImportFieldAmount": {
+    "description": "The single signed amount column."
+  },
+  "statementImportFieldDebitAmount": "Debit",
+  "@statementImportFieldDebitAmount": {
+    "description": "The column carrying money out."
+  },
+  "statementImportFieldCreditAmount": "Credit",
+  "@statementImportFieldCreditAmount": {
+    "description": "The column carrying money in."
+  },
+  "statementImportFieldCurrency": "Currency",
+  "@statementImportFieldCurrency": {
+    "description": "The per-row currency column."
+  },
+  "statementImportFieldDescription": "Description",
+  "@statementImportFieldDescription": {
+    "description": "The statement narrative."
+  },
+  "statementImportFieldMerchant": "Merchant",
+  "@statementImportFieldMerchant": {
+    "description": "The merchant column, when the source separates one."
+  },
+  "statementImportFieldSourceBalance": "Balance",
+  "@statementImportFieldSourceBalance": {
+    "description": "A balance the source prints on each row."
+  },
+  "statementImportFieldSourceReference": "Reference",
+  "@statementImportFieldSourceReference": {
+    "description": "The transaction reference the source prints."
+  },
+  "statementImportFieldInstrumentMask": "Card or account tail",
+  "@statementImportFieldInstrumentMask": {
+    "description": "The masked tail digits the source prints."
+  },
+  "statementImportFieldAccountIdentifier": "Account identifier",
+  "@statementImportFieldAccountIdentifier": {
+    "description": "The column used only to detect that a file covers more than one account."
+  },
+  "statementImportFieldRow": "Whole row",
+  "@statementImportFieldRow": {
+    "description": "Names the whole line, used when it could not be split into fields at all."
+  },
+  "statementImportFieldUnrecognised": "A field this version does not recognise",
+  "@statementImportFieldUnrecognised": {
+    "description": "Fallback for a safe-field name a newer platform sent that this build does not ship."
+  },
+  "statementImportAccountIdentifierHelper": "Used only to notice that a file covers more than one account, so the import can refuse instead of mixing them.",
+  "@statementImportAccountIdentifierHelper": {
+    "description": "Explains that the account identifier column detects rather than selects."
+  },
+  "statementImportAmountShapeLabel": "How is the amount written?",
+  "@statementImportAmountShapeLabel": {
+    "description": "Asks whether the file uses one signed column or a debit and credit pair."
+  },
+  "statementImportAmountShapeSigned": "One column, with a sign",
+  "@statementImportAmountShapeSigned": {
+    "description": "The single signed amount column shape."
+  },
+  "statementImportAmountShapeDebitCredit": "Separate debit and credit columns",
+  "@statementImportAmountShapeDebitCredit": {
+    "description": "The two-column debit and credit shape."
+  },
+  "statementImportSignFrameLabel": "Whose point of view do the signs use?",
+  "@statementImportSignFrameLabel": {
+    "description": "Asks which frame a signed amount column is written in."
+  },
+  "statementImportSignFrameAccountHolder": "Mine, so money I spend is negative",
+  "@statementImportSignFrameAccountHolder": {
+    "description": "The account-holder sign frame."
+  },
+  "statementImportSignFrameBankLedger": "The bank ledger, so a deposit is a credit",
+  "@statementImportSignFrameBankLedger": {
+    "description": "The bank-ledger sign frame, in which the signs invert."
+  },
+  "statementImportSignFrameHelper": "There is no default. Reading the signs the wrong way turns every payment in the file into income.",
+  "@statementImportSignFrameHelper": {
+    "description": "Explains why the sign frame must be stated rather than assumed."
+  },
+  "statementImportDateOrderLabel": "How are ambiguous dates written?",
+  "@statementImportDateOrderLabel": {
+    "description": "Asks the date order to apply to dates that could be read two ways."
+  },
+  "statementImportDateOrderNotStated": "Not stated",
+  "@statementImportDateOrderNotStated": {
+    "description": "The choice meaning no date order has been declared."
+  },
+  "statementImportDateOrderIso": "Year first, as in 2026-04-03",
+  "@statementImportDateOrderIso": {
+    "description": "The ISO date order."
+  },
+  "statementImportDateOrderDayFirst": "Day first, so 03/04 is 3 April",
+  "@statementImportDateOrderDayFirst": {
+    "description": "The day-first date order, with a worked example."
+  },
+  "statementImportDateOrderMonthFirst": "Month first, so 03/04 is 4 March",
+  "@statementImportDateOrderMonthFirst": {
+    "description": "The month-first date order, with a worked example."
+  },
+  "statementImportDateOrderHelper": "If you do not state one, Karar refuses the rows it cannot read without guessing rather than picking a reading for you.",
+  "@statementImportDateOrderHelper": {
+    "description": "Explains that leaving the date order unstated produces typed refusals, not a silent default."
+  },
+  "statementImportCurrencySourceLabel": "Where does the currency come from?",
+  "@statementImportCurrencySourceLabel": {
+    "description": "Asks whether the currency is a column or one code for the whole file."
+  },
+  "statementImportCurrencyFromColumn": "A column in the file",
+  "@statementImportCurrencyFromColumn": {
+    "description": "The choice meaning each row carries its own currency."
+  },
+  "statementImportCurrencyStatedForFile": "The whole file is in one currency",
+  "@statementImportCurrencyStatedForFile": {
+    "description": "The choice meaning one currency code covers the file."
+  },
+  "statementImportStatedCurrencyLabel": "Currency of the file",
+  "@statementImportStatedCurrencyLabel": {
+    "description": "Field for the single currency code covering the whole file."
+  },
+  "statementImportCurrencyHelper": "One or the other, never both. Two sources for one currency can disagree, and resolving that would mean choosing on your behalf.",
+  "@statementImportCurrencyHelper": {
+    "description": "Explains why exactly one currency source is accepted."
+  },
+  "statementImportBalanceKindLabel": "What does the balance column hold?",
+  "@statementImportBalanceKindLabel": {
+    "description": "Asks which kind of balance a mapped balance column carries."
+  },
+  "statementImportBalanceKindRunning": "Running balance",
+  "@statementImportBalanceKindRunning": {
+    "description": "The balance after each movement."
+  },
+  "statementImportBalanceKindLedger": "Ledger balance",
+  "@statementImportBalanceKindLedger": {
+    "description": "The booked balance."
+  },
+  "statementImportBalanceKindAvailable": "Available balance",
+  "@statementImportBalanceKindAvailable": {
+    "description": "The balance available to spend."
+  },
+  "statementImportBalanceKindClosing": "Closing balance",
+  "@statementImportBalanceKindClosing": {
+    "description": "The balance at the end of the statement period."
+  },
+  "statementImportStatedBalanceLabel": "Balance the statement states",
+  "@statementImportStatedBalanceLabel": {
+    "description": "Optional field for the balance the statement claims, used for reconciliation."
+  },
+  "statementImportStatedBalanceHelper": "Optional. Used only to check that the rows add up. It is never saved as a balance of your account.",
+  "@statementImportStatedBalanceHelper": {
+    "description": "Explains that the stated balance is for reconciliation only and is never stored as an account balance."
+  },
+  "statementImportStatedBalanceKindLabel": "Which balance is it?",
+  "@statementImportStatedBalanceKindLabel": {
+    "description": "Asks which balance of the statement the stated figure is."
+  },
+  "statementImportStatedBalanceOpening": "Opening",
+  "@statementImportStatedBalanceOpening": {
+    "description": "The balance at the start of the statement period."
+  },
+  "statementImportStatedBalanceClosing": "Closing",
+  "@statementImportStatedBalanceClosing": {
+    "description": "The balance at the end of the statement period."
+  },
+  "statementImportStatedBalanceLedger": "Ledger",
+  "@statementImportStatedBalanceLedger": {
+    "description": "The booked balance of the statement."
+  },
+  "statementImportStatedBalanceAvailable": "Available",
+  "@statementImportStatedBalanceAvailable": {
+    "description": "The available balance of the statement."
+  },
+  "statementImportStatedBalanceInvalid": "Enter the balance as digits, with at most the decimal places this currency uses.",
+  "@statementImportStatedBalanceInvalid": {
+    "description": "Validation message when the typed statement balance is not an exact amount."
+  },
+  "statementImportMappingColumnIndexInvalid": "A chosen column is not in this file.",
+  "@statementImportMappingColumnIndexInvalid": {
+    "description": "Mapping refused because a column index is negative or past the end of the rows."
+  },
+  "statementImportMappingColumnUsedTwice": "One column is matched to two fields. A column cannot be two facts at once.",
+  "@statementImportMappingColumnUsedTwice": {
+    "description": "Mapping refused because one column index is used for more than one field."
+  },
+  "statementImportMappingCurrencyNotDetermined": "No currency column and no stated currency. The currency of your account is not an answer, because it would put a currency nobody chose on every row.",
+  "@statementImportMappingCurrencyNotDetermined": {
+    "description": "Mapping refused because the currency of the file is not determined."
+  },
+  "statementImportMappingCurrencyDoublyDetermined": "Both a currency column and a stated currency. The two can disagree.",
+  "@statementImportMappingCurrencyDoublyDetermined": {
+    "description": "Mapping refused because two sources determine one currency."
+  },
+  "statementImportMappingBalanceKindNotStated": "A balance column needs its kind stated. Running, ledger and available are three different numbers.",
+  "@statementImportMappingBalanceKindNotStated": {
+    "description": "Mapping refused because a balance column was given without saying what kind of balance it holds."
+  },
+  "statementImportMappingTimezoneWithoutInstant": "A time zone column needs an exact-time column to interpret.",
+  "@statementImportMappingTimezoneWithoutInstant": {
+    "description": "Mapping refused because a time zone was mapped with no instant to apply it to."
+  },
+  "statementImportActionParse": "Read the file",
+  "@statementImportActionParse": {
+    "description": "Action that parses the stored source under the stated mapping."
+  },
+  "statementImportCountsTitle": "What the file contained",
+  "@statementImportCountsTitle": {
+    "description": "Heading above the parse counts."
+  },
+  "statementImportCountRows": "Rows",
+  "@statementImportCountRows": {
+    "description": "Total data rows the parse read."
+  },
+  "statementImportCountValid": "Ready to import",
+  "@statementImportCountValid": {
+    "description": "Rows that parsed cleanly and would become transactions."
+  },
+  "statementImportCountInvalid": "Refused",
+  "@statementImportCountInvalid": {
+    "description": "Rows the parse refused."
+  },
+  "statementImportCountExactDuplicates": "Already imported",
+  "@statementImportCountExactDuplicates": {
+    "description": "Rows identical to transactions this person already holds."
+  },
+  "statementImportCountProbableDuplicates": "Possible duplicates",
+  "@statementImportCountProbableDuplicates": {
+    "description": "Rows that resemble existing transactions. Always zero; see the accompanying note."
+  },
+  "statementImportProbableDuplicatesNote": "Karar does not look for possible duplicates, so this is always zero.",
+  "@statementImportProbableDuplicatesNote": {
+    "description": "States that probable-duplicate detection is not implemented, so a zero reads as not looked for rather than none found."
+  },
+  "statementImportReconciliationTitle": "Does the statement add up?",
+  "@statementImportReconciliationTitle": {
+    "description": "Heading above the reconciliation verdict."
+  },
+  "statementImportReconciliationMatched": "The rows match the balance the statement states.",
+  "@statementImportReconciliationMatched": {
+    "description": "Reconciliation verdict: the rows and the stated balance agree."
+  },
+  "statementImportReconciliationMismatched": "The rows do not match the balance the statement states.",
+  "@statementImportReconciliationMismatched": {
+    "description": "Reconciliation verdict: the rows and the stated balance disagree."
+  },
+  "statementImportReconciliationNotAvailable": "The statement stated no balance, so nothing was compared.",
+  "@statementImportReconciliationNotAvailable": {
+    "description": "Reconciliation verdict: nothing to compare. Deliberately not the same as matched."
+  },
+  "statementImportReconciliationUnrecognised": "This version does not recognise the reconciliation result.",
+  "@statementImportReconciliationUnrecognised": {
+    "description": "Fallback for a reconciliation verdict a newer platform sent that this build does not ship."
+  },
+  "statementImportReconciliationBlocksCommit": "Importing is blocked while they disagree. Importing a statement that does not add up would write records nobody can trust.",
+  "@statementImportReconciliationBlocksCommit": {
+    "description": "Explains why a reconciliation mismatch prevents the commit."
+  },
+  "statementImportRowIssuesTitle": "Refused rows",
+  "@statementImportRowIssuesTitle": {
+    "description": "Heading above the list of refused rows."
+  },
+  "statementImportRowIssuesNone": "No row was refused.",
+  "@statementImportRowIssuesNone": {
+    "description": "Shown when the parse refused nothing."
+  },
+  "statementImportRowNumber": "Row {number}",
+  "@statementImportRowNumber": {
+    "description": "Names a refused row by its 1-based position among the data rows.",
+    "placeholders": {
+      "number": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportIssuesTruncated": "Showing {shown} of {total} refused rows.",
+  "@statementImportIssuesTruncated": {
+    "description": "Says that the refused-row report is truncated, so a partial list cannot read as a complete one.",
+    "placeholders": {
+      "shown": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "total": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "statementImportNoValuesShown": "Karar does not show values from your file here. Open your own file at these row numbers to see them.",
+  "@statementImportNoValuesShown": {
+    "description": "Explains that the review surface deliberately carries no cell values."
+  },
+  "statementImportRemedyStateAConvention": "State the convention and read the file again.",
+  "@statementImportRemedyStateAConvention": {
+    "description": "Remedy for a row refused because a convention was never stated."
+  },
+  "statementImportRemedyCorrectTheMapping": "Correct which column holds what.",
+  "@statementImportRemedyCorrectTheMapping": {
+    "description": "Remedy for a row refused because the column matching is wrong."
+  },
+  "statementImportRemedyCorrectTheFile": "Export the statement from your bank again.",
+  "@statementImportRemedyCorrectTheFile": {
+    "description": "Remedy for a row refused because the file itself carries something unreadable."
+  },
+  "statementImportRemedyRespectABound": "This line is past a limit this import enforces.",
+  "@statementImportRemedyRespectABound": {
+    "description": "Remedy for a row refused by a declared bound."
+  },
+  "statementImportRemedyUnknown": "This version does not know what to suggest here.",
+  "@statementImportRemedyUnknown": {
+    "description": "Fallback remedy for a reason code this build does not ship."
+  },
+  "statementImportReasonRequiredFieldMissing": "A required field was empty.",
+  "@statementImportReasonRequiredFieldMissing": {
+    "description": "Row refusal: a required field was absent or blank."
+  },
+  "statementImportReasonUnreadableAmount": "The amount is not a number Karar can read.",
+  "@statementImportReasonUnreadableAmount": {
+    "description": "Row refusal: the amount characters are not a number."
+  },
+  "statementImportReasonAmbiguousDecimalSeparator": "The decimal separator could be read two ways, and neither was stated.",
+  "@statementImportReasonAmbiguousDecimalSeparator": {
+    "description": "Row refusal: both a dot and a comma reading are defensible and neither convention was stated."
+  },
+  "statementImportReasonAmbiguousDateOrder": "The date could be read two ways, and neither was stated.",
+  "@statementImportReasonAmbiguousDateOrder": {
+    "description": "Row refusal: day-first and month-first both produce a real date and neither was stated."
+  },
+  "statementImportReasonUnreadableDate": "The date is not in a shape Karar accepts.",
+  "@statementImportReasonUnreadableDate": {
+    "description": "Row refusal: the value is not a date in any accepted shape."
+  },
+  "statementImportReasonUnreadableInstant": "The exact time is not a time Karar can read.",
+  "@statementImportReasonUnreadableInstant": {
+    "description": "Row refusal: a stated instant is not parseable."
+  },
+  "statementImportReasonUnknownTimezone": "The time zone is not one this platform knows.",
+  "@statementImportReasonUnknownTimezone": {
+    "description": "Row refusal: a stated zone is not an IANA zone the platform knows."
+  },
+  "statementImportReasonUnknownCurrency": "The currency is not one this platform supports.",
+  "@statementImportReasonUnknownCurrency": {
+    "description": "Row refusal: the currency code is not supported."
+  },
+  "statementImportReasonCurrencyMismatch": "The currency of this row is not the currency of the account, and nothing here converts between them.",
+  "@statementImportReasonCurrencyMismatch": {
+    "description": "Row refusal: the row currency differs from the account currency and no conversion is performed."
+  },
+  "statementImportReasonAmbiguousDirection": "Karar could not tell whether this row is money in or money out.",
+  "@statementImportReasonAmbiguousDirection": {
+    "description": "Row refusal: a direction word that is neither debit nor credit in any recognised form."
+  },
+  "statementImportReasonDebitAndCreditBothPresent": "The debit and credit columns both carried a value.",
+  "@statementImportReasonDebitAndCreditBothPresent": {
+    "description": "Row refusal: separate debit and credit columns both held a value on one line."
+  },
+  "statementImportReasonDebitAndCreditBothAbsent": "The debit and credit columns were both empty.",
+  "@statementImportReasonDebitAndCreditBothAbsent": {
+    "description": "Row refusal: separate debit and credit columns were both empty on one line."
+  },
+  "statementImportReasonFieldTooLarge": "A field is larger than this import accepts.",
+  "@statementImportReasonFieldTooLarge": {
+    "description": "Row refusal: one field exceeded the per-field byte ceiling."
+  },
+  "statementImportReasonTooManyColumns": "This row has more columns than this import accepts.",
+  "@statementImportReasonTooManyColumns": {
+    "description": "Row refusal: the line had more columns than the declared ceiling."
+  },
+  "statementImportReasonColumnCountMismatch": "This row has a different number of columns from the heading row.",
+  "@statementImportReasonColumnCountMismatch": {
+    "description": "Row refusal: the line had a different number of columns than the header."
+  },
+  "statementImportReasonInvalidEncoding": "This row is not valid UTF-8 text.",
+  "@statementImportReasonInvalidEncoding": {
+    "description": "Row refusal: the bytes are not valid UTF-8."
+  },
+  "statementImportReasonMalformedQuoting": "A quoted value in this row is never closed.",
+  "@statementImportReasonMalformedQuoting": {
+    "description": "Row refusal: quoting that cannot be resolved."
+  },
+  "statementImportReasonAmountExceedsRange": "The amount is too large to hold exactly.",
+  "@statementImportReasonAmountExceedsRange": {
+    "description": "Row refusal: a number too large to be exact minor units."
+  },
+  "statementImportReasonDecimalPlacesExceedCurrency": "The amount has more decimal places than its currency uses.",
+  "@statementImportReasonDecimalPlacesExceedCurrency": {
+    "description": "Row refusal: more decimal places than the currency exponent allows."
+  },
+  "statementImportReasonUnrecognised": "This version does not recognise the reason this row was refused.",
+  "@statementImportReasonUnrecognised": {
+    "description": "Fallback for a row reason code a newer platform sent that this build does not ship."
+  },
+  "statementImportRefusalSourceTooLarge": "The file is larger than this import accepts.",
+  "@statementImportRefusalSourceTooLarge": {
+    "description": "Import refused: past the byte bound."
+  },
+  "statementImportRefusalTooManyRows": "The file has more rows than this import accepts.",
+  "@statementImportRefusalTooManyRows": {
+    "description": "Import refused: past the row bound."
+  },
+  "statementImportRefusalTooManyColumns": "The file has more columns than this import accepts.",
+  "@statementImportRefusalTooManyColumns": {
+    "description": "Import refused: past the column bound."
+  },
+  "statementImportRefusalFieldTooLarge": "One field in the file is larger than this import accepts.",
+  "@statementImportRefusalFieldTooLarge": {
+    "description": "Import refused: one field exceeded the per-field byte ceiling."
+  },
+  "statementImportRefusalBufferedRowsExceeded": "The file needed more rows held at once than this import allows.",
+  "@statementImportRefusalBufferedRowsExceeded": {
+    "description": "Import refused: the buffered-row bound was crossed."
+  },
+  "statementImportRefusalBufferedBytesExceeded": "The file needed more memory held at once than this import allows.",
+  "@statementImportRefusalBufferedBytesExceeded": {
+    "description": "Import refused: the buffered-byte bound was crossed."
+  },
+  "statementImportRefusalDeadlineExceeded": "Reading the file took longer than this import allows.",
+  "@statementImportRefusalDeadlineExceeded": {
+    "description": "Import refused: the wall-clock deadline was crossed."
+  },
+  "statementImportRefusalCancelled": "Reading the file was cancelled.",
+  "@statementImportRefusalCancelled": {
+    "description": "Import refused: the read was cancelled."
+  },
+  "statementImportRefusalTooManyErrors": "Too many rows were refused for the file to be read any further.",
+  "@statementImportRefusalTooManyErrors": {
+    "description": "Import refused: the error ceiling was reached."
+  },
+  "statementImportRefusalUnsupportedMediaType": "The file was not sent as CSV.",
+  "@statementImportRefusalUnsupportedMediaType": {
+    "description": "Import refused: the body was not the accepted media type."
+  },
+  "statementImportRefusalInvalidEncoding": "The file is not valid UTF-8 text.",
+  "@statementImportRefusalInvalidEncoding": {
+    "description": "Import refused: the bytes are not valid UTF-8."
+  },
+  "statementImportRefusalBinaryContent": "The file is not text.",
+  "@statementImportRefusalBinaryContent": {
+    "description": "Import refused: the content is binary."
+  },
+  "statementImportRefusalSpreadsheetContent": "The file is a spreadsheet. Export it as CSV and try again.",
+  "@statementImportRefusalSpreadsheetContent": {
+    "description": "Import refused: the content is a spreadsheet workbook rather than CSV."
+  },
+  "statementImportRefusalCompressedContent": "The file is compressed. Extract it and upload the CSV inside.",
+  "@statementImportRefusalCompressedContent": {
+    "description": "Import refused: the content is a compressed archive."
+  },
+  "statementImportRefusalMalformedQuoting": "A quoted value in the file is never closed.",
+  "@statementImportRefusalMalformedQuoting": {
+    "description": "Import refused: quoting that cannot be resolved."
+  },
+  "statementImportRefusalEmptySource": "The file is empty.",
+  "@statementImportRefusalEmptySource": {
+    "description": "Import refused: the source carried no content."
+  },
+  "statementImportRefusalNoHeaderRow": "The file was read as having a heading row, and it has none.",
+  "@statementImportRefusalNoHeaderRow": {
+    "description": "Import refused: a header row was declared but the file has none."
+  },
+  "statementImportRefusalMappingAmbiguous": "The columns as matched leave too much unstated to read the file.",
+  "@statementImportRefusalMappingAmbiguous": {
+    "description": "Import refused: the mapping is too ambiguous to parse under."
+  },
+  "statementImportRefusalMultipleAccountsInSource": "The file covers more than one account. Karar refuses it rather than mixing them into the account you chose.",
+  "@statementImportRefusalMultipleAccountsInSource": {
+    "description": "Import refused: the file describes more than one account."
+  },
+  "statementImportRefusalCurrencyMismatch": "The currency of the file is not the currency of the account, and nothing here converts between them.",
+  "@statementImportRefusalCurrencyMismatch": {
+    "description": "Import refused: the file currency differs from the account currency."
+  },
+  "statementImportRefusalReconciliationMismatch": "The rows do not add up to the balance the statement states.",
+  "@statementImportRefusalReconciliationMismatch": {
+    "description": "Import refused: reconciliation against the stated balance failed."
+  },
+  "statementImportRefusalSourceAlreadyImported": "You have already imported this exact file.",
+  "@statementImportRefusalSourceAlreadyImported": {
+    "description": "Import refused: this subject already committed the same file."
+  },
+  "statementImportRefusalSourceIntegrityFailed": "The stored file no longer matches what was uploaded, so it was not read.",
+  "@statementImportRefusalSourceIntegrityFailed": {
+    "description": "Import refused: the stored source failed its integrity check."
+  },
+  "statementImportRefusalSourceUnreadable": "The stored file could not be read.",
+  "@statementImportRefusalSourceUnreadable": {
+    "description": "Import refused: the stored source could not be read back."
+  },
+  "statementImportRefusalUnrecognised": "This version does not recognise the reason this import was refused.",
+  "@statementImportRefusalUnrecognised": {
+    "description": "Fallback for an import refusal code a newer platform sent that this build does not ship."
+  },
+  "statementImportStateDraft": "Not started",
+  "@statementImportStateDraft": {
+    "description": "Import state: draft."
+  },
+  "statementImportStateSourceStored": "File uploaded",
+  "@statementImportStateSourceStored": {
+    "description": "Import state: the encrypted source is stored."
+  },
+  "statementImportStateParsing": "Reading the file",
+  "@statementImportStateParsing": {
+    "description": "Import state: the parser is running."
+  },
+  "statementImportStateReviewRequired": "Waiting for your decision",
+  "@statementImportStateReviewRequired": {
+    "description": "Import state: parsed and staged, awaiting the person."
+  },
+  "statementImportStateCommitting": "Importing",
+  "@statementImportStateCommitting": {
+    "description": "Import state: the atomic write is in progress."
+  },
+  "statementImportStateCommitted": "Imported",
+  "@statementImportStateCommitted": {
+    "description": "Import state: the rows became transactions."
+  },
+  "statementImportStateRejected": "Discarded",
+  "@statementImportStateRejected": {
+    "description": "Import state: the person said no."
+  },
+  "statementImportStateFailed": "Refused",
+  "@statementImportStateFailed": {
+    "description": "Import state: something refused the import."
+  },
+  "statementImportStateDuplicate": "Already imported",
+  "@statementImportStateDuplicate": {
+    "description": "Import state: this exact file was already imported."
+  },
+  "statementImportStateErased": "Erased",
+  "@statementImportStateErased": {
+    "description": "Import state: the staged statement has been removed."
+  },
+  "statementImportStateUnrecognised": "A state this version does not recognise",
+  "@statementImportStateUnrecognised": {
+    "description": "Fallback for an import state a newer platform sent that this build does not ship."
+  },
+  "statementImportActionCommit": "Import these transactions",
+  "@statementImportActionCommit": {
+    "description": "Action that commits the reviewed import."
+  },
+  "statementImportActionDiscard": "Discard this import",
+  "@statementImportActionDiscard": {
+    "description": "Action that erases the staged statement without importing it."
+  },
+  "statementImportUploadingStatus": "Uploading your file",
+  "@statementImportUploadingStatus": {
+    "description": "Screen-reader and visible status while the file is being sent."
+  },
+  "statementImportParsingStatus": "Reading your file",
+  "@statementImportParsingStatus": {
+    "description": "Screen-reader and visible status while the platform parses the file."
+  },
+  "statementImportCommittingStatus": "Importing your transactions",
+  "@statementImportCommittingStatus": {
+    "description": "Screen-reader and visible status while the commit is in progress."
+  },
+  "statementImportCommittedTitle": "Statement imported",
+  "@statementImportCommittedTitle": {
+    "description": "Title shown after a successful commit."
+  },
+  "statementImportCommittedCount": "Transactions added",
+  "@statementImportCommittedCount": {
+    "description": "Label for how many transactions the commit wrote."
+  },
+  "statementImportAlreadyCommitted": "This statement was already imported. Nothing was added a second time.",
+  "@statementImportAlreadyCommitted": {
+    "description": "Shown when a commit was an idempotent retry, so a person is told it succeeded rather than failed."
+  },
+  "statementImportDiscardedTitle": "Import discarded",
+  "@statementImportDiscardedTitle": {
+    "description": "Title shown after the staged statement is erased."
+  },
+  "statementImportDiscardedDetail": "The file and the rows it staged are gone. Transactions already imported from it are not affected.",
+  "@statementImportDiscardedDetail": {
+    "description": "Explains that erasing an import does not delete transactions it already produced."
+  },
+  "statementImportUnavailableTitle": "This import cannot be shown",
+  "@statementImportUnavailableTitle": {
+    "description": "Title shown when the import surface could not be reached."
+  },
+  "statementImportUnavailableDescription": "Karar could not reach the platform. Nothing was changed.",
+  "@statementImportUnavailableDescription": {
+    "description": "Body shown when a statement-import request failed, stating that nothing was written."
+  },
+  "statementImportRefusedTitle": "This file was refused",
+  "@statementImportRefusedTitle": {
+    "description": "Title above a typed import refusal code."
+  },
+  "statementImportHeaderRowYes": "Yes, the first row is a heading",
+  "@statementImportHeaderRowYes": {
+    "description": "Answer meaning the file starts with a header row."
+  },
+  "statementImportHeaderRowNo": "No, the first row is a transaction",
+  "@statementImportHeaderRowNo": {
+    "description": "Answer meaning the first row of the file is data rather than a heading."
+  },
+  "transferMatchesScreenTitle": "Transfers between your own accounts",
+  "@transferMatchesScreenTitle": {
+    "description": "Title of the screen that lists proposed and decided transfer matches."
+  },
+  "transferMatchesIntro": "Moving money between two accounts you own is one movement recorded twice — once leaving, once arriving. Karar proposes the pairs it found. Nothing changes until you answer.",
+  "@transferMatchesIntro": {
+    "description": "Explains what a transfer match is and that a proposal on its own changes nothing."
+  },
+  "transferMatchesFilterLabel": "Show",
+  "@transferMatchesFilterLabel": {
+    "description": "Label above the control that chooses which decisions the list shows."
+  },
+  "transferMatchesFilterAwaiting": "Waiting for you",
+  "@transferMatchesFilterAwaiting": {
+    "description": "Filter that shows only the pairs the person has not answered."
+  },
+  "transferMatchesFilterConfirmed": "You confirmed",
+  "@transferMatchesFilterConfirmed": {
+    "description": "Filter that shows only the pairs the person confirmed."
+  },
+  "transferMatchesFilterRejected": "You kept separate",
+  "@transferMatchesFilterRejected": {
+    "description": "Filter that shows only the pairs the person turned down or withdrew."
+  },
+  "transferMatchStateSuggested": "Proposed",
+  "@transferMatchStateSuggested": {
+    "description": "Badge for a pair the platform proposed and nobody has answered."
+  },
+  "transferMatchStateConfirmed": "Confirmed by you",
+  "@transferMatchStateConfirmed": {
+    "description": "Badge for a pair the person confirmed."
+  },
+  "transferMatchStateRejected": "Kept separate",
+  "@transferMatchStateRejected": {
+    "description": "Badge for a pair the person turned down, or a confirmation they withdrew."
+  },
+  "transferMatchStateUnrecognised": "A state this version does not know",
+  "@transferMatchStateUnrecognised": {
+    "description": "Badge for a match state the shipped build does not recognise."
+  },
+  "transferMatchNothingChangedNote": "Nothing has changed. This is a question, not a decision.",
+  "@transferMatchNothingChangedNote": {
+    "description": "Stated on every proposed pair so a suggestion is never read as something already applied."
+  },
+  "transferMatchConfirmedNote": "You confirmed this pair, so Karar counts the two entries as one movement.",
+  "@transferMatchConfirmedNote": {
+    "description": "Stated on a confirmed pair, naming the person as the one who decided."
+  },
+  "transferMatchRejectedNote": "The two entries keep counting separately, and this pair will not be proposed again.",
+  "@transferMatchRejectedNote": {
+    "description": "Stated on a pair the person kept separate, including a withdrawn confirmation."
+  },
+  "transferMatchUnrecognisedNote": "This version of Karar cannot act on this pair. Update the app to answer it.",
+  "@transferMatchUnrecognisedNote": {
+    "description": "Stated on a pair whose state the shipped build does not recognise."
+  },
+  "transferMatchBasisHeading": "Why this pair was proposed",
+  "@transferMatchBasisHeading": {
+    "description": "Heading above the rule the platform matched on."
+  },
+  "transferMatchBasisEqualAndOpposite": "The two amounts are exactly equal and opposite, they are in the same currency, and they were booked within the window of the rule below.",
+  "@transferMatchBasisEqualAndOpposite": {
+    "description": "The one suggestion rule the platform declares, written out for a person."
+  },
+  "transferMatchBasisUnrecognised": "This version of Karar does not know the rule that proposed this pair.",
+  "@transferMatchBasisUnrecognised": {
+    "description": "Shown when the suggestion basis is a value the shipped build does not recognise."
+  },
+  "transferMatchRuleLabel": "Rule that proposed it",
+  "@transferMatchRuleLabel": {
+    "description": "Label for the version label of the suggestion rule, shown verbatim."
+  },
+  "transferMatchNoScoreNote": "Karar does not score a pair. It either meets the rule or it is not proposed at all.",
+  "@transferMatchNoScoreNote": {
+    "description": "States that no confidence figure exists, so nobody looks for one."
+  },
+  "transferMatchOutflowHeading": "Money left this account",
+  "@transferMatchOutflowHeading": {
+    "description": "Heading for the outflow side of a proposed pair."
+  },
+  "transferMatchInflowHeading": "Money arrived in this account",
+  "@transferMatchInflowHeading": {
+    "description": "Heading for the inflow side of a proposed pair."
+  },
+  "transferMatchAccountLabel": "Account",
+  "@transferMatchAccountLabel": {
+    "description": "Label for the account one side of a pair sits on."
+  },
+  "transferMatchCurrencyLabel": "Currency",
+  "@transferMatchCurrencyLabel": {
+    "description": "Label for the currency one side of a pair is held in."
+  },
+  "transferMatchAmountLabel": "Amount",
+  "@transferMatchAmountLabel": {
+    "description": "Label for the amount of one side of a pair, as the platform reported it."
+  },
+  "transferMatchBookedLabel": "Booked",
+  "@transferMatchBookedLabel": {
+    "description": "Label for the calendar day the institution booked one side of a pair."
+  },
+  "transferMatchDescriptionLabel": "Description",
+  "@transferMatchDescriptionLabel": {
+    "description": "Label for the description the source supplied for one side of a pair."
+  },
+  "transferMatchProposedAtLabel": "Proposed on",
+  "@transferMatchProposedAtLabel": {
+    "description": "Label for when the platform first proposed a pair."
+  },
+  "transferMatchDecidedAtLabel": "You answered on",
+  "@transferMatchDecidedAtLabel": {
+    "description": "Label for when the person answered a pair."
+  },
+  "transferMatchAccountNotNamed": "Account name unavailable",
+  "@transferMatchAccountNotNamed": {
+    "description": "Shown in place of an account name when the portfolio could not be read."
+  },
+  "transferMatchActionOpenMovements": "Show both movements",
+  "@transferMatchActionOpenMovements": {
+    "description": "Action that opens the two movements a pair relates."
+  },
+  "transferMatchActionHideMovements": "Hide both movements",
+  "@transferMatchActionHideMovements": {
+    "description": "Action that closes the two movements a pair relates."
+  },
+  "transferMatchActionConfirm": "Yes, one movement",
+  "@transferMatchActionConfirm": {
+    "description": "Action recording the person's confirmation that two entries are one movement."
+  },
+  "transferMatchActionReject": "No, two separate movements",
+  "@transferMatchActionReject": {
+    "description": "Action recording that the person considers the two entries separate."
+  },
+  "transferMatchActionWithdraw": "Withdraw my confirmation",
+  "@transferMatchActionWithdraw": {
+    "description": "Action withdrawing a confirmation the person previously made."
+  },
+  "transferMatchConfirmingStatus": "Recording your confirmation",
+  "@transferMatchConfirmingStatus": {
+    "description": "Screen-reader and visible status while a confirmation is being sent."
+  },
+  "transferMatchRejectingStatus": "Recording your answer",
+  "@transferMatchRejectingStatus": {
+    "description": "Screen-reader and visible status while a refusal or withdrawal is being sent."
+  },
+  "transferMatchOpenToAnswerNote": "Open both movements to answer.",
+  "@transferMatchOpenToAnswerNote": {
+    "description": "Tells the person that the answer controls appear once both movements are shown."
+  },
+  "transferMatchRejectDialogTitle": "Keep these two separate?",
+  "@transferMatchRejectDialogTitle": {
+    "description": "Title of the dialog confirming that a pair is not a transfer."
+  },
+  "transferMatchRejectDialogMessage": "Both entries stay exactly as they are and keep counting separately. Karar will not propose this pair again.",
+  "@transferMatchRejectDialogMessage": {
+    "description": "States the consequence of keeping a pair separate, including that it is remembered."
+  },
+  "transferMatchWithdrawDialogTitle": "Withdraw your confirmation?",
+  "@transferMatchWithdrawDialogTitle": {
+    "description": "Title of the dialog confirming that a confirmation is being withdrawn."
+  },
+  "transferMatchWithdrawDialogMessage": "The two entries go back to counting separately. Karar will not propose this pair again, and you cannot confirm it later.",
+  "@transferMatchWithdrawDialogMessage": {
+    "description": "States that withdrawing a confirmation is final: the pair cannot be confirmed again."
+  },
+  "transferMatchCrossCurrencyTitle": "Two different currencies",
+  "@transferMatchCrossCurrencyTitle": {
+    "description": "Heading shown when the two sides of a pair name different currencies."
+  },
+  "transferMatchCrossCurrencyDetail": "These two movements are held in different currencies. Karar holds no exchange rate and never relates an amount in one currency to an amount in another, so this pair cannot be confirmed here.",
+  "@transferMatchCrossCurrencyDetail": {
+    "description": "Explains why a cross-currency pair is shown as two amounts and cannot be confirmed."
+  },
+  "transferMatchesEmptyAwaitingTitle": "Nothing waiting for you",
+  "@transferMatchesEmptyAwaitingTitle": {
+    "description": "Empty state when no pair is waiting to be answered."
+  },
+  "transferMatchesEmptyAwaitingDescription": "Karar has not proposed any transfers between your own accounts.",
+  "@transferMatchesEmptyAwaitingDescription": {
+    "description": "Body of the empty state when nothing is waiting to be answered."
+  },
+  "transferMatchesEmptyConfirmedTitle": "You have not confirmed a pair yet",
+  "@transferMatchesEmptyConfirmedTitle": {
+    "description": "Empty state when the person has confirmed nothing."
+  },
+  "transferMatchesEmptyConfirmedDescription": "Pairs you confirm are kept here.",
+  "@transferMatchesEmptyConfirmedDescription": {
+    "description": "Body of the empty state for confirmed pairs."
+  },
+  "transferMatchesEmptyRejectedTitle": "You have not kept a pair separate yet",
+  "@transferMatchesEmptyRejectedTitle": {
+    "description": "Empty state when the person has turned nothing down."
+  },
+  "transferMatchesEmptyRejectedDescription": "Pairs you keep separate are remembered here, so Karar does not ask about them again.",
+  "@transferMatchesEmptyRejectedDescription": {
+    "description": "Body of the empty state for pairs the person kept separate."
+  },
+  "transferMatchesUnavailableTitle": "Proposed transfers cannot be shown",
+  "@transferMatchesUnavailableTitle": {
+    "description": "Title shown when the transfer-matching listing could not be read."
+  },
+  "transferMatchesUnavailableDescription": "Karar could not reach the platform. Nothing was changed.",
+  "@transferMatchesUnavailableDescription": {
+    "description": "Body shown when the listing failed, stating that nothing was written."
+  },
+  "transferMatchRefusalConflict": "This pair changed while it was on your screen. Reload it and answer again.",
+  "@transferMatchRefusalConflict": {
+    "description": "Refusal shown when the platform reported a version conflict on a decision."
+  },
+  "transferMatchRefusalGone": "This pair is no longer here. Nothing was changed.",
+  "@transferMatchRefusalGone": {
+    "description": "Refusal shown when the platform no longer has the pair the person answered."
+  },
+  "transferMatchRefusalNotAvailable": "That answer is no longer available for this pair.",
+  "@transferMatchRefusalNotAvailable": {
+    "description": "Refusal shown when the transition the person asked for is not legal from the pair's state."
+  },
+  "transferMatchRefusalCrossCurrency": "Karar cannot pair two movements in different currencies.",
+  "@transferMatchRefusalCrossCurrency": {
+    "description": "Refusal shown when a confirmation was asked for across two currencies."
+  },
+  "transferMatchRefusalGeneric": "Your answer was not recorded. Nothing was changed.",
+  "@transferMatchRefusalGeneric": {
+    "description": "Refusal shown for any other reason a decision was not recorded."
+  },
+  "transferMatchMovementUnavailable": "This movement could not be loaded. Answer only when you can see both.",
+  "@transferMatchMovementUnavailable": {
+    "description": "Shown in place of one side of a pair when the transaction behind it could not be read."
+  },
+  "transferMatchMovementsLoading": "Loading both movements",
+  "@transferMatchMovementsLoading": {
+    "description": "Screen-reader and visible status while the two movements of a pair are read."
+  },
+  "transferMatchesLoadMore": "Show more pairs",
+  "@transferMatchesLoadMore": {
+    "description": "Action that follows the platform's cursor to the next page of pairs."
+  },
+  "transferMatchesLoadingMore": "Loading more pairs",
+  "@transferMatchesLoadingMore": {
+    "description": "Screen-reader and visible status while the next page of pairs is read."
+  },
+  "dataSourcesScreenTitle": "Where your data comes from",
+  "@dataSourcesScreenTitle": {
+    "description": "Title of the screen that lists the data sources a person holds."
+  },
+  "dataSourcesIntro": "Everything in Karar is here because you put it here. Karar does not connect to any bank, wallet or card issuer, and it holds no credential for any of them.",
+  "@dataSourcesIntro": {
+    "description": "Opening paragraph stating that data arrives only because the person supplied it."
+  },
+  "dataSourcesNoLiveLinkTitle": "No link to any institution",
+  "@dataSourcesNoLiveLinkTitle": {
+    "description": "Title of the banner stating that no live institution link exists."
+  },
+  "dataSourcesCredentialNote": "Karar never asks for a password, PIN, mPIN, one-time code, recovery code or card number, and stores none of them.",
+  "@dataSourcesCredentialNote": {
+    "description": "States that no credential of any kind is requested or stored anywhere."
+  },
+  "dataSourcesConnectionsHeading": "Your data sources",
+  "@dataSourcesConnectionsHeading": {
+    "description": "Heading above the list of data sources the person holds."
+  },
+  "dataSourcesFilterLabel": "Show",
+  "@dataSourcesFilterLabel": {
+    "description": "Label of the control that narrows the data-source list."
+  },
+  "dataSourcesFilterAll": "All",
+  "@dataSourcesFilterAll": {
+    "description": "Filter option showing every data source."
+  },
+  "dataSourcesFilterAccepting": "Accepting what you supply",
+  "@dataSourcesFilterAccepting": {
+    "description": "Filter option for sources that accept data the person supplies."
+  },
+  "dataSourcesFilterNotConfigured": "Not set up",
+  "@dataSourcesFilterNotConfigured": {
+    "description": "Filter option for sources with nothing set up on them yet."
+  },
+  "dataSourcesFilterUnavailable": "Not usable now",
+  "@dataSourcesFilterUnavailable": {
+    "description": "Filter option for sources that are set up and not usable at the moment."
+  },
+  "dataSourcesFilterRetired": "Finished with",
+  "@dataSourcesFilterRetired": {
+    "description": "Filter option for sources the person has retired."
+  },
+  "dataSourcesFilterNotImplemented": "Never built",
+  "@dataSourcesFilterNotImplemented": {
+    "description": "Filter option for sources whose way of receiving data was never built."
+  },
+  "dataSourcesEmptyTitle": "No data sources yet",
+  "@dataSourcesEmptyTitle": {
+    "description": "Empty-state title when the person holds no data sources at all."
+  },
+  "dataSourcesEmptyDescription": "Nothing has been recorded about how your data arrives. Add an account by hand or import a statement file, and a source will appear here.",
+  "@dataSourcesEmptyDescription": {
+    "description": "Empty-state description naming the two ways a source can come to exist."
+  },
+  "dataSourcesFilteredEmptyTitle": "Nothing matches this filter",
+  "@dataSourcesFilteredEmptyTitle": {
+    "description": "Empty-state title when a filter hides every data source."
+  },
+  "dataSourcesFilteredEmptyDescription": "Choose “All” to see every data source you hold.",
+  "@dataSourcesFilteredEmptyDescription": {
+    "description": "Empty-state description telling the person how to clear the filter."
+  },
+  "dataSourcesUnavailableTitle": "Your data sources could not be read",
+  "@dataSourcesUnavailableTitle": {
+    "description": "Error-state title when the data-source list could not be read."
+  },
+  "dataSourcesUnavailableDescription": "Karar could not read where your data comes from just now. Nothing about your data has changed.",
+  "@dataSourcesUnavailableDescription": {
+    "description": "Error-state description, ending with the statement that nothing changed."
+  },
+  "dataSourcesLoadMore": "Show more data sources",
+  "@dataSourcesLoadMore": {
+    "description": "Action that follows the platform cursor to the next page of data sources."
+  },
+  "dataSourcesLoadingMore": "Loading more data sources",
+  "@dataSourcesLoadingMore": {
+    "description": "Screen-reader and visible status while the next page of data sources is read."
+  },
+  "connectionLabelFieldLabel": "Your name for this",
+  "@connectionLabelFieldLabel": {
+    "description": "Field label for the name the person gave one data source."
+  },
+  "connectionRailFieldLabel": "How data arrives",
+  "@connectionRailFieldLabel": {
+    "description": "Field label for the way data reaches the platform on one data source."
+  },
+  "connectionStatusFieldLabel": "State of this record",
+  "@connectionStatusFieldLabel": {
+    "description": "Field label for the lifecycle state of one data-source record."
+  },
+  "connectionAvailabilityFieldLabel": "Can Karar run this way of receiving data",
+  "@connectionAvailabilityFieldLabel": {
+    "description": "Field label for whether the platform can run the way of receiving data."
+  },
+  "connectionAddedAtLabel": "Added",
+  "@connectionAddedAtLabel": {
+    "description": "Field label for when a data-source record was created."
+  },
+  "connectionRecordChangedLabel": "This record last changed",
+  "@connectionRecordChangedLabel": {
+    "description": "Field label for when the data-source record itself was last edited."
+  },
+  "connectionRecordChangedNote": "That is when the record itself changed. It is not when data arrived, and it is not a check with any institution.",
+  "@connectionRecordChangedNote": {
+    "description": "Note preventing the record-changed date from being read as a freshness date."
+  },
+  "connectionShowDetailAction": "Show details",
+  "@connectionShowDetailAction": {
+    "description": "Action that opens the detail of one data source."
+  },
+  "connectionHideDetailAction": "Hide details",
+  "@connectionHideDetailAction": {
+    "description": "Action that closes the detail of one data source."
+  },
+  "connectionRailManual": "Typed in by you",
+  "@connectionRailManual": {
+    "description": "Name of the MANUAL way of receiving data."
+  },
+  "connectionRailUserFileUpload": "A file you upload",
+  "@connectionRailUserFileUpload": {
+    "description": "Name of the USER_FILE_UPLOAD way of receiving data."
+  },
+  "connectionRailOpenFinanceApi": "Open finance interface",
+  "@connectionRailOpenFinanceApi": {
+    "description": "Name of the OPEN_FINANCE_API way of receiving data, which is not built."
+  },
+  "connectionRailDirectBankOrWalletApi": "Direct bank or wallet interface",
+  "@connectionRailDirectBankOrWalletApi": {
+    "description": "Name of the DIRECT_BANK_OR_WALLET_API way of receiving data, which is not built."
+  },
+  "connectionRailLicensedAggregatorApi": "Licensed aggregator interface",
+  "@connectionRailLicensedAggregatorApi": {
+    "description": "Name of the LICENSED_AGGREGATOR_API way of receiving data, which is not built."
+  },
+  "connectionRailHostToHostSftp": "Host-to-host file transfer",
+  "@connectionRailHostToHostSftp": {
+    "description": "Name of the HOST_TO_HOST_SFTP way of receiving data, which is not built."
+  },
+  "connectionRailIso20022File": "ISO 20022 file",
+  "@connectionRailIso20022File": {
+    "description": "Name of the ISO_20022_FILE way of receiving data, which is not built."
+  },
+  "connectionRailSwiftMtFile": "SWIFT MT file",
+  "@connectionRailSwiftMtFile": {
+    "description": "Name of the SWIFT_MT_FILE way of receiving data, which is not built."
+  },
+  "connectionRailOfxQfxFile": "OFX or QFX file",
+  "@connectionRailOfxQfxFile": {
+    "description": "Name of the OFX_QFX_FILE way of receiving data, which is not built."
+  },
+  "connectionRailQifFile": "QIF file",
+  "@connectionRailQifFile": {
+    "description": "Name of the QIF_FILE way of receiving data, which is not built."
+  },
+  "connectionRailPdfStatement": "PDF statement",
+  "@connectionRailPdfStatement": {
+    "description": "Name of the PDF_STATEMENT way of receiving data, which is not built."
+  },
+  "connectionRailSecureEmailStatement": "Statement by secure email",
+  "@connectionRailSecureEmailStatement": {
+    "description": "Name of the SECURE_EMAIL_STATEMENT way of receiving data, which is not built."
+  },
+  "connectionRailDeviceSignal": "Signal from this device",
+  "@connectionRailDeviceSignal": {
+    "description": "Name of the DEVICE_SIGNAL way of receiving data, which is not built."
+  },
+  "connectionRailUnrecognised": "A way of receiving data this version does not know",
+  "@connectionRailUnrecognised": {
+    "description": "Name used when the platform sent a way of receiving data this build does not know."
+  },
+  "railStandingBadgeYouEnterIt": "You enter it",
+  "@railStandingBadgeYouEnterIt": {
+    "description": "Short badge for a way of receiving data where the person types the data in."
+  },
+  "railStandingBadgeYouUploadIt": "You upload it",
+  "@railStandingBadgeYouUploadIt": {
+    "description": "Short badge for a way of receiving data where the person uploads a file."
+  },
+  "railStandingBadgeNotBuilt": "Not built",
+  "@railStandingBadgeNotBuilt": {
+    "description": "Short badge for a way of receiving data that has no implementation at all."
+  },
+  "railStandingBadgeUnknown": "Unknown to this version",
+  "@railStandingBadgeUnknown": {
+    "description": "Short badge for a way of receiving data this build does not know."
+  },
+  "railStandingYouEnterIt": "You type this in yourself. Karar records exactly what you enter and nothing else.",
+  "@railStandingYouEnterIt": {
+    "description": "Sentence for the MANUAL way of receiving data."
+  },
+  "railStandingYouUploadIt": "You upload a file and Karar reads it. You choose the file, and Karar reads nothing you have not given it.",
+  "@railStandingYouUploadIt": {
+    "description": "Sentence for the USER_FILE_UPLOAD way of receiving data."
+  },
+  "railStandingNotBuilt": "Karar has not built this. It is not switched off and it is not scheduled: there is no code for it, nothing to set up, and nothing to wait for.",
+  "@railStandingNotBuilt": {
+    "description": "Sentence for a way of receiving data that has no implementation. It must not read as a promise."
+  },
+  "railStandingUnknown": "This version of Karar does not know this way of receiving data and will not describe it.",
+  "@railStandingUnknown": {
+    "description": "Sentence for a way of receiving data this build does not know."
+  },
+  "railAvailabilityExecutable": "Yes",
+  "@railAvailabilityExecutable": {
+    "description": "The platform answer that it can run this way of receiving data."
+  },
+  "railAvailabilityNotImplemented": "No, Karar has never built it",
+  "@railAvailabilityNotImplemented": {
+    "description": "The platform answer that this way of receiving data was never implemented."
+  },
+  "railAvailabilityUnrecognised": "An answer this version of Karar does not know",
+  "@railAvailabilityUnrecognised": {
+    "description": "Shown when the platform answer about a way of receiving data is unknown to this build."
+  },
+  "connectionStatusAcceptsWhatYouSupply": "Accepts what you supply",
+  "@connectionStatusAcceptsWhatYouSupply": {
+    "description": "ACTIVE lifecycle state. It means the record accepts data the person supplies, never that anything is connected."
+  },
+  "connectionStatusNotConfigured": "Nothing has been set up on this yet",
+  "@connectionStatusNotConfigured": {
+    "description": "NOT_CONFIGURED lifecycle state, kept distinct from unavailable and never built."
+  },
+  "connectionStatusUnavailable": "Set up, and not usable at the moment",
+  "@connectionStatusUnavailable": {
+    "description": "UNAVAILABLE lifecycle state, kept distinct from not set up and never built."
+  },
+  "connectionStatusRetired": "You are finished with this. What it already supplied stays readable.",
+  "@connectionStatusRetired": {
+    "description": "RETIRED lifecycle state."
+  },
+  "connectionStatusNotImplemented": "The way of receiving data this names was never built",
+  "@connectionStatusNotImplemented": {
+    "description": "NOT_IMPLEMENTED lifecycle state, kept distinct from not set up and unavailable."
+  },
+  "connectionStatusUnrecognised": "A state this version of Karar does not know",
+  "@connectionStatusUnrecognised": {
+    "description": "Lifecycle state this build does not know."
+  },
+  "dataSourcesBuiltRailsHeading": "The only two ways data reaches Karar",
+  "@dataSourcesBuiltRailsHeading": {
+    "description": "Heading above the two ways of receiving data that actually exist."
+  },
+  "dataSourcesRailsHeading": "Ways of receiving data Karar has not built",
+  "@dataSourcesRailsHeading": {
+    "description": "Heading above every way of receiving data that has no implementation."
+  },
+  "dataSourcesRailsExplanation": "These are named so Karar can describe the world accurately. None of them exists here: there is no code for any of them, nothing to set up, and nothing to wait for. Naming one is not a plan to build it.",
+  "@dataSourcesRailsExplanation": {
+    "description": "Explains why unimplemented ways of receiving data are named at all, and states that naming is not a promise."
+  },
+  "dataSourcesAccountsHeading": "Which sources feed each account",
+  "@dataSourcesAccountsHeading": {
+    "description": "Heading above the list of accounts, each linking to the sources feeding it."
+  },
+  "dataSourcesAccountsEmpty": "You hold no accounts yet, so nothing feeds anything.",
+  "@dataSourcesAccountsEmpty": {
+    "description": "Shown when the person holds no accounts, so no account can be listed."
+  },
+  "dataSourcesAccountsUnavailable": "Your accounts could not be read just now, so they cannot be listed here.",
+  "@dataSourcesAccountsUnavailable": {
+    "description": "Shown when the account list could not be read."
+  },
+  "dataSourcesOpenAccountSourcesAction": "Where its data comes from",
+  "@dataSourcesOpenAccountSourcesAction": {
+    "description": "Action opening the sources feeding one account."
+  },
+  "dataSourcesOpenAccountSourcesA11y": "Where the data for {account} comes from",
+  "@dataSourcesOpenAccountSourcesA11y": {
+    "description": "Screen-reader label naming the account whose sources the action opens.",
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "accountSourcesScreenTitle": "Sources feeding this account",
+  "@accountSourcesScreenTitle": {
+    "description": "Title of the screen listing the sources that feed one account."
+  },
+  "accountSourcesIntro": "Every source below is something you supplied. Karar does not contact your bank, wallet or card issuer, so no date here is a check with anyone.",
+  "@accountSourcesIntro": {
+    "description": "Opening paragraph of the per-account sources screen."
+  },
+  "accountSourcesEmptyTitle": "No source feeds this account",
+  "@accountSourcesEmptyTitle": {
+    "description": "Empty-state title when nothing feeds the account."
+  },
+  "accountSourcesEmptyDescription": "Nothing has been attached to this account yet. Enter figures by hand or import a statement file, and the source will appear here.",
+  "@accountSourcesEmptyDescription": {
+    "description": "Empty-state description for an account with no sources."
+  },
+  "accountSourcesUnavailableTitle": "Sources could not be read",
+  "@accountSourcesUnavailableTitle": {
+    "description": "Error-state title when the sources for one account could not be read."
+  },
+  "accountSourcesUnavailableDescription": "Karar could not read the sources for this account just now.",
+  "@accountSourcesUnavailableDescription": {
+    "description": "Error-state description when the sources for one account could not be read."
+  },
+  "accountSourcesCardHeading": "Source {position}",
+  "@accountSourcesCardHeading": {
+    "description": "Heading of one source card, numbered by its place in the stated order.",
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "accountSourcesPriorityLabel": "Priority stated by Karar",
+  "@accountSourcesPriorityLabel": {
+    "description": "Field label for the priority the platform stated for one source."
+  },
+  "accountSourcesPriorityValue": "Rank {priority}",
+  "@accountSourcesPriorityValue": {
+    "description": "The stated priority of one source, as a rank.",
+    "placeholders": {
+      "priority": {
+        "type": "int"
+      }
+    }
+  },
+  "accountSourcesPriorityNote": "Sources are listed in the order Karar stated, strongest first. A smaller rank is a stronger source.",
+  "@accountSourcesPriorityNote": {
+    "description": "Explains that the order on screen is the order the platform stated."
+  },
+  "accountSourcesPriorityAmbiguous": "Two of these sources claim the same rank, so which one takes precedence is not decided. Karar will not choose one for you.",
+  "@accountSourcesPriorityAmbiguous": {
+    "description": "Shown when two sources share a priority, so no precedence is stated."
+  },
+  "sourceArrivalYouSupplied": "You last supplied data through this source on {instant}.",
+  "@sourceArrivalYouSupplied": {
+    "description": "States when data last arrived, naming the person as the origin so it cannot read as a check with an institution.",
+    "placeholders": {
+      "instant": {
+        "type": "String"
+      }
+    }
+  },
+  "sourceArrivalNone": "Nothing has arrived through this source yet.",
+  "@sourceArrivalNone": {
+    "description": "Shown when no import has ever succeeded for one source."
+  },
+  "accountSourcesArrivalNote": "Karar does not contact your bank, so this is a record of what you did, not a check with anyone.",
+  "@accountSourcesArrivalNote": {
+    "description": "Note preventing the arrival date from being read as a check with an institution."
+  },
+  "accountSourcesFirstRecordedLabel": "First recorded",
+  "@accountSourcesFirstRecordedLabel": {
+    "description": "Field label for when this source was first observed."
+  },
+  "accountSourcesLastRecordedLabel": "Last recorded activity",
+  "@accountSourcesLastRecordedLabel": {
+    "description": "Field label for when this source was last observed."
+  },
+  "accountSourcesLastRecordedNote": "Karar last recorded something about this source then. Recording is not receiving: an upload that failed to read moves this date too.",
+  "@accountSourcesLastRecordedNote": {
+    "description": "Note separating the last-observed date from the moment data actually arrived."
+  },
+  "accountSourcesCoverageNote": "This is the range of dates the supplied data itself covers. It is not a freshness date and says nothing about what happened after it.",
+  "@accountSourcesCoverageNote": {
+    "description": "Note preventing the coverage range from being read as a freshness guarantee."
+  },
+  "accountSourcesConfirmedLabel": "You confirmed this source",
+  "@accountSourcesConfirmedLabel": {
+    "description": "Field label for when the person confirmed a source link."
+  },
+  "accountSourcesConfirmedPending": "Waiting for you to confirm",
+  "@accountSourcesConfirmedPending": {
+    "description": "Shown when the person has not yet confirmed a source link."
+  },
+  "accountSourcesMatchLabel": "Why this source was attached",
+  "@accountSourcesMatchLabel": {
+    "description": "Field label for the basis on which a source was attached to an account."
+  },
+  "sourceMatchBasisExact": "The reference matched exactly",
+  "@sourceMatchBasisExact": {
+    "description": "EXACT_EXTERNAL_REFERENCE basis for attaching a source to an account."
+  },
+  "sourceMatchBasisProbable": "A probable match, waiting for you to say",
+  "@sourceMatchBasisProbable": {
+    "description": "PROBABLE basis for attaching a source to an account."
+  },
+  "sourceMatchBasisUnrecognised": "A reason this version of Karar does not know",
+  "@sourceMatchBasisUnrecognised": {
+    "description": "Basis for attaching a source that this build does not know."
+  },
+  "accountSourcesNoScoreNote": "Karar gives a source no confidence score. Either the reference matched exactly, or you are asked.",
+  "@accountSourcesNoScoreNote": {
+    "description": "States that no confidence figure exists, so none is shown."
+  },
+  "accountSourcesCapabilitiesHeading": "What this source was seen to supply",
+  "@accountSourcesCapabilitiesHeading": {
+    "description": "Heading above what a source was observed to supply."
+  },
+  "accountSourcesCapabilitiesNote": "Seen, not supported. A thing nobody looked for is not the same answer as a thing looked for and absent.",
+  "@accountSourcesCapabilitiesNote": {
+    "description": "Keeps NOT_OBSERVED and NOT_PROVIDED apart in words."
+  },
+  "dataSourcesRefusalGone": "This is no longer there. Nothing about your data changed.",
+  "@dataSourcesRefusalGone": {
+    "description": "Refusal shown when what was asked for is gone."
+  },
+  "dataSourcesRefusalOffline": "Karar could not reach the network. Nothing about your data changed.",
+  "@dataSourcesRefusalOffline": {
+    "description": "Refusal shown when the device has no usable connection or the request timed out."
+  },
+  "dataSourcesRefusalGeneric": "This could not be read just now. Nothing about your data changed.",
+  "@dataSourcesRefusalGeneric": {
+    "description": "Refusal shown for any other reason a read did not complete."
+  },
+  "sourceAuthorityFieldLabel": "How much weight this source carries",
+  "@sourceAuthorityFieldLabel": {
+    "description": "Field label for how authoritative a source claims to be. It names the field; the value beside it is the weight itself."
   }
 }

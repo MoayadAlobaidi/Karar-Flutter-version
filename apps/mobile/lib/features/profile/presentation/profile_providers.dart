@@ -7,6 +7,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/dependency_injection/providers.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_profile_repository.dart';
@@ -47,9 +48,12 @@ final class ProfileUnavailable extends ProfileView {
 }
 
 /// Reads the subject's own profile.
-final class OwnProfileController extends AsyncNotifier<ProfileView> {
+final class OwnProfileController extends TenantScopedAsyncNotifier<ProfileView> {
   @override
-  Future<ProfileView> build() async {
+  ProfileView get discarded => const ProfileUnavailable(SessionChangedFailure());
+
+  @override
+  Future<ProfileView> load() async {
     final result = await ref.watch(loadOwnProfileProvider)();
     return switch (result) {
       Success<UserProfile>(:final value) => ProfileLoaded(value),
@@ -58,8 +62,15 @@ final class OwnProfileController extends AsyncNotifier<ProfileView> {
   }
 
   Future<void> refresh() async {
+    final TenantDataGeneration issued = binding;
     state = const AsyncLoading<ProfileView>();
-    state = await AsyncValue.guard<ProfileView>(build);
+    final AsyncValue<ProfileView> answer = await AsyncValue.guard<ProfileView>(load);
+    if (issued.hasEnded) {
+      // Riverpod reuses this notifier across the discard, so an unguarded write
+      // puts the profile read under the previous binding back on screen.
+      return;
+    }
+    state = answer;
   }
 }
 
@@ -104,8 +115,14 @@ final class ProfileEditController extends Notifier<ProfileEditState> {
     if (state is ProfileEditSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = ref.tenantBinding();
     state = const ProfileEditSubmitting();
     final result = await ref.read(updateOwnProfileProvider)(changes);
+    if (issued.hasEnded) {
+      // An edit confirmed under a binding that has since been discarded would
+      // otherwise surface as saved on the new one's form.
+      return;
+    }
     switch (result) {
       case Failed<UserProfile>(:final failure):
         state = ProfileEditRejected(failure);
@@ -157,10 +174,16 @@ final class AccountDisableController extends Notifier<AccountDisableState> {
     if (state is AccountDisableSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = ref.tenantBinding();
     state = const AccountDisableSubmitting();
     // No reason is sent. A free-text reason would be personal data the client
     // has no instruction to collect.
     final result = await ref.read(requestAccountDisableProvider)();
+    if (issued.hasEnded) {
+      // Recorded under a binding that is gone; reporting it on the new one
+      // would attribute the request to the wrong session.
+      return;
+    }
     switch (result) {
       case Failed<AccountDisableRequest>(:final failure):
         state = AccountDisableRejected(failure);

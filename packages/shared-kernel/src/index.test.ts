@@ -11,13 +11,13 @@ import {
   UserId,
 } from './index';
 
-// The public surface: every one of the nine universals is importable from the
+// The public surface: every one of the ten universals is importable from the
 // package entry point and usable, and the supporting vocabulary is reachable
-// as members of the nine (the export cap of architecture test 20 hides
+// as members of the ten (the export cap of architecture test 20 hides
 // nothing it should not).
 
 describe('kernel surface', () => {
-  it('exposes all nine universals in working form', () => {
+  it('exposes all ten universals in working form', () => {
     const qar = Currency.get('QAR');
     const money = Money.of(1234n, qar);
     const percentage = Percentage.fromPercent('2.5');

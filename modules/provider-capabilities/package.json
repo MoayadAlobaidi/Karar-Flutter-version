@@ -1,0 +1,22 @@
+{
+  "name": "@karar/provider-capabilities",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What a financial institution's data interface COULD offer, as reviewed configuration and never as a live fact. Zero real profiles ship, VERIFIED is unconstructible without an evidence reference, and nothing here can make a rail executable — only modules/financial-connections decides that.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/financial-accounts": "workspace:*",
+    "@karar/financial-connections": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5"
+  }
+}

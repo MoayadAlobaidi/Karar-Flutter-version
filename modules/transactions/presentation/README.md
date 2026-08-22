@@ -10,4 +10,4 @@ May import this module's `application/`. **Never another module's `domain/`.**
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_This directory is empty. The module holds production code in its other layers, and its controllers live in the API application: `apps/api/src/financial/financial-transactions.controller.ts` and `financial-transaction-detail.controller.ts` mount eight operations over five `/financial/transactions` paths._

@@ -4,6 +4,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -56,6 +57,7 @@ import {
 } from '../infrastructure/persistence/prisma-repositories.js';
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import { AllowAllPolicyService, DenyAllPolicyService } from './fakes/allow-all-policy-service.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // Live-PostgreSQL evidence for the operating-entity module: the register,
 // licences with an honest vocabulary, relationship-scoped role assignments
@@ -88,6 +90,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('operating-entity operating entity suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -157,7 +160,7 @@ describe.skipIf(unreachable !== null)('operating-entity (live PostgreSQL)', () =
     await migratorAdapter?.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }

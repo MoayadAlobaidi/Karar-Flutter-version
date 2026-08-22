@@ -1,0 +1,159 @@
+// financial-connections module mapping (migrations
+// 0096_financial_connections.sql, 0097_account_source_links.sql).
+// Prisma maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma); `make prisma-drift` is what keeps this file honest.
+//
+// This module holds no money. It records HOW data reaches Karar and WHICH
+// source feeds which account, never what the data said, so there is no
+// amount, no currency and no balance in either model — and no NUMERIC,
+// DOUBLE PRECISION or FLOAT anywhere near them.
+//
+// Subject narrative and the external account reference are Bytes: ciphertext,
+// nonce and auth tag per field, with the algorithm and key version per row.
+// No plaintext field exists for the connection's display label or for the
+// source account reference, because no plaintext column exists for either —
+// both are HIGHLY_SENSITIVE_FINANCIAL and are treated exactly as the
+// financial-accounts and transactions narrative columns are.
+//
+// Deliberately NOT expressed here, enforced by the migrations and their tests
+// instead: every CHECK constraint — above all the two that carry this
+// module's central guarantees, `financial_connections_rail_implemented_check`
+// (only MANUAL and USER_FILE_UPLOAD may be written AT THE DATABASE, so an
+// unimplemented rail cannot be inserted even by direct SQL) and
+// `account_source_links_probable_requires_confirmation` (a probable match may
+// not become LINKED without the subject's recorded confirmation) — plus the
+// ACTIVE-requires-implemented-rail rule, the device-signal authority rule,
+// the coverage pairing and ordering rules, the ciphertext bounds, the
+// identity and rail immutability triggers, the rule that one source account
+// maps to at most one canonical account across every connection, RLS
+// enable/force with the tenant+user principal policies, and the grants.
+//
+// ALSO NOT EXPRESSIBLE HERE, and worth naming: there is NO @@unique over
+// institution + account type + currency on AccountSourceLink, and there
+// cannot be one — the model carries no such field, because that combination
+// is exactly what a real person legitimately duplicates (ADR-0028). The only
+// @@unique on it is (tenant, user, connection, fingerprint version,
+// fingerprint): one source account, one link, per connection.
+//
+// tenant_id, user_id, account_id and institution_ref are plain scalars by
+// design (data-model.md §2): no relation crosses a module boundary, and
+// accountReferenceType / institutionReferenceType declare what those uuids
+// point at without importing another module's types. The connection relation
+// below IS a real relation because both tables belong to this module; it is
+// composite against (id, rail) so a link's rail is a referential fact rather
+// than a copy that can drift.
+
+model FinancialConnection {
+  id                       String   @id @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  userId                   String   @map("user_id") @db.Uuid
+  // Raw reference into another module's catalogue (public.institutions,
+  // 0087), paired with the kind of thing it points at. Both or neither.
+  institutionRef           String?  @map("institution_ref") @db.Uuid
+  institutionReferenceType String?  @map("institution_reference_type")
+
+  // HOW data arrives. Thirteen rails are named by CHECK; only MANUAL and
+  // USER_FILE_UPLOAD may be written. Immutable by trigger.
+  rail                     String
+  // ACTIVE | NOT_CONFIGURED | UNAVAILABLE | RETIRED | NOT_IMPLEMENTED. No
+  // value means connected, synced, linked or authorized, and none may be
+  // added — nothing in this platform holds a live link to an institution.
+  status                   String
+
+  hsfAlgorithm             String   @map("hsf_algorithm")
+  hsfKeyVersion            String   @map("hsf_key_version")
+  displayLabelCiphertext   Bytes    @map("display_label_ciphertext")
+  displayLabelNonce        Bytes    @map("display_label_nonce")
+  displayLabelAuthTag      Bytes    @map("display_label_auth_tag")
+
+  version                  Int      @default(1)
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @map("updated_at") @db.Timestamptz(6)
+
+  sourceLinks AccountSourceLink[]
+
+  // Sole purpose: the target of AccountSourceLink's composite foreign key. It
+  // restricts nothing — id is the primary key. There is deliberately no
+  // uniqueness over user + institution or user + rail: several connections to
+  // one institution on one rail is the ordinary case, not a duplicate.
+  @@unique([id, rail], map: "financial_connections_id_rail_key")
+  @@index([tenantId, userId, createdAt], map: "financial_connections_owner_idx")
+  @@index([institutionRef], map: "financial_connections_institution_idx")
+  @@map("financial_connections")
+}
+
+model AccountSourceLink {
+  id                     String   @id @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  userId                 String   @map("user_id") @db.Uuid
+  accountId              String   @map("account_id") @db.Uuid
+  accountReferenceType   String   @map("account_reference_type")
+
+  connectionId           String   @map("connection_id") @db.Uuid
+  connectionRail         String   @map("connection_rail")
+
+  // AUTHORITATIVE | SUPPLEMENTAL | UNVERIFIED. A device signal can never be
+  // authoritative (CHECK in 0097).
+  sourceAuthority        String   @map("source_authority")
+
+  hsfAlgorithm           String   @map("hsf_algorithm")
+  hsfKeyVersion          String   @map("hsf_key_version")
+  // The opaque external account reference, ciphertext only. Never returned to
+  // a client by any read path in this module.
+  sourceAccountReferenceCiphertext Bytes @map("source_account_reference_ciphertext")
+  sourceAccountReferenceNonce      Bytes @map("source_account_reference_nonce")
+  sourceAccountReferenceAuthTag    Bytes @map("source_account_reference_auth_tag")
+
+  // The keyed, per-subject, versioned equality value. Opaque; equality only,
+  // and only against a value of the same version. Never exposed, never logged.
+  sourceAccountFingerprint String @map("source_account_fingerprint")
+  // Prefixed rather than bare `fingerprintVersion`: public.transactions
+  // carries a fingerprint_version of its own, for a different fingerprint
+  // over different inputs (migration 0097 header).
+  sourceAccountFingerprintVersion String @map("source_account_fingerprint_version")
+
+  // EXACT_EXTERNAL_REFERENCE may link automatically; PROBABLE may not.
+  matchBasis             String   @map("match_basis")
+  // PENDING_CONFIRMATION | LINKED | DECLINED | DORMANT.
+  sourceStatus           String   @map("source_status")
+  // The instant the SUBJECT confirmed a probable match. Never written by a
+  // rule, a heuristic, or a default.
+  subjectConfirmedAt     DateTime? @map("subject_confirmed_at") @db.Timestamptz(6)
+
+  // Lower is stronger. Stored here, applied nowhere in this module.
+  sourcePriority         Int      @default(100) @map("source_priority")
+
+  firstObservedAt        DateTime  @map("first_observed_at") @db.Timestamptz(6)
+  lastObservedAt         DateTime  @map("last_observed_at") @db.Timestamptz(6)
+  lastSuccessfulImportAt DateTime? @map("last_successful_import_at") @db.Timestamptz(6)
+
+  // Calendar days, not instants (ADR-0027): a statement covers days, and an
+  // instant here would invent a midnight in a timezone nobody stated. Prisma
+  // has one TypeScript type for both, so the row mappers — not this file —
+  // convert @db.Date to CalendarDay and back.
+  historyCoverageStart   DateTime? @map("history_coverage_start") @db.Date
+  historyCoverageEnd     DateTime? @map("history_coverage_end") @db.Date
+
+  // OBSERVED | NOT_OBSERVED | NOT_PROVIDED. What this platform has actually
+  // seen the source provide — never a claim, and deliberately no VERIFIED or
+  // AVAILABLE value.
+  balanceCapability            String @default("NOT_OBSERVED") @map("balance_capability")
+  pendingTransactionCapability String @default("NOT_OBSERVED") @map("pending_transaction_capability")
+
+  version                Int      @default(1)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @map("updated_at") @db.Timestamptz(6)
+
+  connection FinancialConnection @relation(fields: [connectionId, connectionRail], references: [id, rail], onDelete: Cascade, onUpdate: NoAction, map: "account_source_links_connection_fkey")
+
+  // One source account, one link, per connection — and deliberately NOT
+  // (institution, account type, currency), which is what a real person
+  // duplicates. The cross-connection half of the invariant ("one source
+  // account maps to at most one canonical account") is a trigger, because it
+  // spans rows in a way no index can express.
+  @@unique([tenantId, userId, connectionId, sourceAccountFingerprintVersion, sourceAccountFingerprint], map: "account_source_links_source_account_key")
+  @@index([tenantId, userId, accountId, sourcePriority], map: "account_source_links_account_idx")
+  @@index([tenantId, userId, connectionId, createdAt], map: "account_source_links_connection_idx")
+  @@index([tenantId, userId, sourceAccountFingerprintVersion, sourceAccountFingerprint], map: "account_source_links_fingerprint_idx")
+  @@map("account_source_links")
+}

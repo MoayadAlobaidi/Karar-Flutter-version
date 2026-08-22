@@ -49,7 +49,7 @@ Entities, aggregates, value objects, domain events, domain services, and invaria
 
 - **May import:** `shared-kernel` and nothing else.
 - **May not:** touch a framework, a database, a clock, a random source, the network, or the filesystem.
-- **Time and randomness arrive as arguments.** `Clock` is one of the nine universals precisely so that `domain/` never reads the system clock.
+- **Time and randomness arrive as arguments.** `Clock` is one of the ten universals precisely so that `domain/` never reads the system clock.
 
 A domain object is testable with no mocks, no container, and no database, because it has nothing to mock.
 
@@ -131,7 +131,7 @@ This is why `shared-kernel` narrowed from v1: see §7.
 
 **A port with no implementation is honest. A fake implementation that pretends to work is not.** The legacy shipped a `BillerConnector` interface with no implementations by explicit design, and that was the right call — while a sibling screen fabricated bank connections in local state, which was not. See [`../legacy/reusable-assets.md`](../legacy/reusable-assets.md).
 
-## 7. `shared-kernel` — exactly nine universals
+## 7. `shared-kernel` — exactly ten universals
 
 ```
 Money · Currency · Percentage · ExchangeRate · Clock · Result · DomainEvent · TenantId · UserId
@@ -164,7 +164,7 @@ Nothing else. CI caps the export surface; additions require an ADR.
 | 11 | Deterministic domain | `domain/` reads the system clock or a random source |
 | 12 | No jurisdiction branching | A conditional on a country or jurisdiction identifier appears in `domain/`, `application/`, or `presentation/` |
 | 17 | Pure packages | `jurisdiction-policy` or `state-machine` gains a framework dependency |
-| 20 | Kernel surface | `shared-kernel` exports anything beyond the nine universals |
+| 20 | Kernel surface | `shared-kernel` exports anything beyond the ten universals, or is missing one |
 | 23 | No orphan guards | A class documented as a protection has no call site |
 
 Tests 13–16, 18–19, 21–22, 24–26 concern sealed data, events, documents, disclosure, pinning, RLS, limits, erasure, and legal-document reconciliation; they are listed in `docs/testing/architecture-tests.md`.

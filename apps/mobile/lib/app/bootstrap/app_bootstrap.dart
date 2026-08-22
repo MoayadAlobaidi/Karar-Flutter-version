@@ -69,7 +69,9 @@ Future<void> bootstrapKararApp({List<Override> overrides = const <Override>[]}) 
       );
 
       // Reading the coordinator constructs it and, with it, the whole
-      // dependency graph the shell needs before its first frame.
+      // dependency graph the shell needs before its first frame — including
+      // the subscription that discards one organisation's cached answers when
+      // the session ends.  See `startupCoordinatorProvider`.
       final coordinator = container.read(startupCoordinatorProvider);
       unawaited(coordinator.start());
 

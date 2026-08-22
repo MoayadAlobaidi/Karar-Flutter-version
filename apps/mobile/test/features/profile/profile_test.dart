@@ -124,9 +124,14 @@ void main() {
       final request = transport.requests.single;
       expect(request.path, '/users/me');
       expect(request.method.wireName, 'PATCH');
+      // ONLY the field that changed. This used to expect `locale` here too,
+      // because the generated encoder wrote every optional key including the
+      // ones the caller never set; a change set naming one field asked the
+      // platform to consider both. An optional field left out of a PATCH means
+      // "leave this alone", so it is now left out.
       expect(
         (request.body! as Map<String, Object?>).keys.toSet(),
-        <String>{'displayName', 'locale'},
+        <String>{'displayName'},
       );
     });
 

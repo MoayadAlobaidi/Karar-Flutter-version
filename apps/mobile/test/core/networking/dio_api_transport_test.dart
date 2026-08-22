@@ -4,6 +4,8 @@
 // propagation, the refresh-and-replay decision, idempotency-aware retry, and
 // the guarantee that no credential ever reaches a log record.
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,12 +31,12 @@ import '../support/fakes.dart';
 
 final DateTime _now = DateTime.utc(2026, 8, 16, 12);
 
-SessionTokens _tokens(String access) => SessionTokens(
+SessionTokens _tokens(String access, {String sessionId = 'session-1'}) => SessionTokens(
       accessToken: access,
       accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
       refreshToken: 'refresh-$access',
       refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
-      sessionId: 'session-1',
+      sessionId: sessionId,
     );
 
 final class _Harness {
@@ -108,6 +110,163 @@ void main() {
       final sent = harness.adapter.requests.single;
       expect(sent.headers[correlationIdHeader], 'corr-1');
       expect(sent.headers['authorization'], 'Bearer live');
+    });
+
+    test('sends a raw body under its own media type, unencoded', () async {
+      // The statement-import upload declares text/csv. Before a raw body
+      // existed, every non-null body was sent as application/json, so the
+      // bytes would have been JSON-encoded under a media type the contract
+      // does not declare — and refused as unsupported, which reads like a
+      // bad file rather than a bad client.
+      final harness = _Harness(
+        handler: (RequestOptions options, int _) => jsonResponse(202, <String, Object?>{}),
+      );
+      addTearDown(harness.dispose);
+      await harness.sessions.adopt(_tokens('live'));
+
+      final bytes = Uint8List.fromList(
+        utf8.encode('Booking Date,Description,Amount\n2026-08-10,SYNTHETIC,-45.00\n'),
+      );
+
+      await harness.transport.send(
+        ApiRequest(
+          method: HttpMethod.post,
+          path: '/financial/statement-imports/x/source',
+          rawBody: RawRequestBody(bytes: bytes, mediaType: 'text/csv; charset=utf-8'),
+        ),
+      );
+
+      final sent = harness.adapter.requests.single;
+      expect(sent.contentType, 'text/csv; charset=utf-8');
+      // The bytes go out as bytes. Identity, not equality: nothing re-encoded
+      // them on the way.
+      expect(sent.data, same(bytes));
+    });
+
+    test('a JSON body is still JSON, and no body declares no content type', () async {
+      final harness = _Harness(
+        handler: (RequestOptions options, int _) => jsonResponse(200, <String, Object?>{}),
+      );
+      addTearDown(harness.dispose);
+      await harness.sessions.adopt(_tokens('live'));
+
+      await harness.transport.send(
+        const ApiRequest(
+          method: HttpMethod.post,
+          path: '/users/me',
+          body: <String, Object?>{'displayName': 'A'},
+        ),
+      );
+      expect(harness.adapter.requests.single.contentType, Headers.jsonContentType);
+
+      await harness.transport.send(
+        const ApiRequest(method: HttpMethod.get, path: '/users/me'),
+      );
+      expect(harness.adapter.requests.last.contentType, isNull);
+    });
+
+    test('a raw body never reaches a log record, not even its length', () async {
+      final harness = _Harness(
+        handler: (RequestOptions options, int _) => jsonResponse(202, <String, Object?>{}),
+      );
+      addTearDown(harness.dispose);
+      await harness.sessions.adopt(_tokens('live'));
+
+      const secret = 'SALARY,ACME CORP,120000.00';
+      await harness.transport.send(
+        ApiRequest(
+          method: HttpMethod.post,
+          path: '/financial/statement-imports/x/source',
+          rawBody: RawRequestBody(
+            bytes: Uint8List.fromList(utf8.encode(secret)),
+            mediaType: 'text/csv',
+          ),
+        ),
+      );
+
+      expect(harness.logSink.records, isNotEmpty);
+      final logged =
+          harness.logSink.records.map((record) => record.toString()).join('\n');
+      expect(logged, isNot(contains('SALARY')));
+      expect(logged, isNot(contains('ACME')));
+      expect(logged, isNot(contains('120000')));
+    });
+
+    test('refuses an answer that arrives after the organisation changed', () async {
+      // The leak this exists to stop: a read issued under organisation A
+      // resolves after the person switched to organisation B, and its body —
+      // A's figures — is handed to a controller that writes it into the
+      // screen B is looking at. The switch adopts a NEW server-issued
+      // session, so the session that asked is no longer the session signed
+      // in, and the answer is refused rather than returned.
+      late _Harness harness;
+      harness = _Harness(
+        handler: (RequestOptions options, int _) async {
+          // The switch happens while this request is in flight.
+          await harness.sessions.adopt(_tokens('b', sessionId: 'session-2'));
+          return jsonResponse(200, <String, Object?>{'accounts': <String>['organisation-a']});
+        },
+      );
+      addTearDown(harness.dispose);
+      await harness.sessions.adopt(_tokens('a'));
+
+      await expectLater(
+        harness.transport.send(
+          const ApiRequest(method: HttpMethod.get, path: '/financial/accounts'),
+        ),
+        throwsA(
+          isA<ApiException>().having(
+            (ApiException error) => error.failure,
+            'failure',
+            isA<SessionChangedFailure>(),
+          ),
+        ),
+      );
+    });
+
+    test('refuses an answer that arrives after the person signed out', () async {
+      late _Harness harness;
+      harness = _Harness(
+        handler: (RequestOptions options, int _) async {
+          await harness.sessions.end(SessionEndReason.signedOut);
+          return jsonResponse(200, <String, Object?>{'accounts': <String>['organisation-a']});
+        },
+      );
+      addTearDown(harness.dispose);
+      await harness.sessions.adopt(_tokens('a'));
+
+      await expectLater(
+        harness.transport.send(
+          const ApiRequest(method: HttpMethod.get, path: '/financial/accounts'),
+        ),
+        throwsA(
+          isA<ApiException>().having(
+            (ApiException error) => error.failure,
+            'failure',
+            isA<SessionChangedFailure>(),
+          ),
+        ),
+      );
+    });
+
+    test('a token refresh is NOT a session change, and the answer stands', () async {
+      // The distinction the check rests on. Refreshing rotates the access
+      // token within the same session; treating that as a switch would refuse
+      // every answer that raced a proactive refresh.
+      late _Harness harness;
+      harness = _Harness(
+        handler: (RequestOptions options, int _) async {
+          await harness.sessions.adopt(_tokens('rotated'));
+          return jsonResponse(200, <String, Object?>{'ok': true});
+        },
+      );
+      addTearDown(harness.dispose);
+      await harness.sessions.adopt(_tokens('a'));
+
+      final response = await harness.transport.send(
+        const ApiRequest(method: HttpMethod.get, path: '/users/me'),
+      );
+      expect(response.statusCode, 200);
     });
 
     test('sends an idempotency key when the caller supplies one', () async {

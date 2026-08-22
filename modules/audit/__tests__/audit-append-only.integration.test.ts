@@ -2,6 +2,7 @@ import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -15,6 +16,7 @@ import { AuditMetadataViolation } from '../application/audit-metadata-guard.js';
 import { RecordAuditEvent } from '../application/use-cases/record-audit-event.js';
 import { PostgresAuditWriter } from '../infrastructure/persistence/postgres-audit-writer.js';
 import { Uuidv7AuditEventIdSource } from '../infrastructure/persistence/uuidv7-audit-event-id-source.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // Append-only audit foundation against a real PostgreSQL (data-model.md §10;
 // migration 0010). One file, serial execution, same pattern and reasoning as
@@ -49,6 +51,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('audit append only suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -102,19 +105,27 @@ describe.skipIf(unreachable !== null)('audit.audit_events append-only (live Post
   afterAll(async () => {
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }
   });
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('migrates a fresh database including 0010_audit_events', async () => {
     await bootstrapRolesAndDatabase({ database });
     await withAdapter('migrator', async (adapter) => {
       const { applied } = await migrateToLatest({ adapter });
       expect(applied.map((file) => file.filename)).toContain('0010_audit_events.sql');
     });
-  });
+  }, 30_000);
 
   it('appends as karar_app and stores trace ids and redacted HSF metadata', async () => {
     await withAdapter('app', async (adapter) => {

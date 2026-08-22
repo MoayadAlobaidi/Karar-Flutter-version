@@ -61,7 +61,7 @@ See [`clean-architecture.md` §5](clean-architecture.md) for why the coupling is
 | `sealed` | Ciphertext + wrapped DEKs | `SealedRecordStore` only | Enabled + grant GUC required |
 | `platform` | Infrastructure bookkeeping: migration metadata, outbox, jobs | Migration runner; producers, relay, and job queue | Not tenant-scoped; access bounded by role grants |
 
-**As implemented in Phases 2–3.5** — 48 tables across `platform`, `audit`, and `public` (number ranges owned per workstream, with deliberate gaps that stay gaps). Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md). `readmodel` and `sealed` arrive with their phases.
+**As implemented in Phases 2–5** — **66 tables** across `platform`, `audit`, and `public`, created by **53 migrations** numbered `0001` through `0101` (number ranges owned per workstream, with deliberate gaps that stay gaps): 48 through Phase 3.5, and **eighteen** added by the Phase 5 financial data platform. Phase 2 created the `platform` and `audit` schemas and their five infrastructure tables; Phase 3 created the first 32 domain tables in `public`; Phase 3.5 added eleven more for the jurisdiction, capability, and subject-policy dimensions. Every one is RLS-enabled and FORCEd or allow-listed with a written reason (§12; architecture test 22 is active). Full six-field lifecycle declarations: each owning module's `MODULE.md`, mirrored with [`packages/platform/db/DATA_LIFECYCLE.md`](../../packages/platform/db/DATA_LIFECYCLE.md) — that register holds 62 rows, and the four it does not hold are the statement-import tables, declared in `modules/statement-imports/MODULE.md` because that module owns both the tables and the decision. Architecture test 25 reads both, so the split is checked rather than trusted. Of the 66, **61 are mapped in Prisma** and verified against the live database by `scripts/db/prisma-mapping-check.mjs`; the five that are not are the platform and audit infrastructure tables no module owns. `readmodel` and `sealed` arrive with their phases.
 
 | Table | Purpose | Classification |
 |---|---|---|
@@ -90,6 +90,67 @@ The Phase 3.5 domain tables, same convention:
 | [`jurisdiction`](../../modules/jurisdiction/MODULE.md) | `countries`, `jurisdictions`, `user_jurisdiction_assignments`, `tenant_jurisdiction_assignments`, `jurisdiction_settings`, `policy_pack_activations` (`0070`–`0075`) |
 | [`capability`](../../modules/capability/MODULE.md) | `capability_availability`, `capability_availability_history`, `tenant_capability_entitlements`, `tenant_capability_entitlement_history` (`0076`–`0077`) |
 | [`subject-policy`](../../modules/subject-policy/MODULE.md) | `subject_policy_selections` (`0083`) |
+
+The Phase 5 financial tables, same convention. They are reached by **27 operations over 21 `/financial/*` paths**, and `modules/provider-capabilities` is listed with them precisely because it owns **no table at all**:
+
+| Module | Tables |
+|---|---|
+| [`financial-accounts`](../../modules/financial-accounts/MODULE.md) | `institutions`, `financial_accounts`, `financial_account_balance_snapshots`, `institution_markets` (`0087`–`0089`, `0094`; `0095` adds columns and creates no table) |
+| [`transactions`](../../modules/transactions/MODULE.md) | `transactions`, `transaction_revisions`, `transaction_provenance`, `financial_categories`, `merchant_rules`, `transaction_category_assignments` (`0090`–`0093`) |
+| [`financial-connections`](../../modules/financial-connections/MODULE.md) | `financial_connections`, `account_source_links` (`0096`–`0097`) |
+| [`payment-instruments`](../../modules/payment-instruments/MODULE.md) | `payment_instruments` (`0098`) |
+| [`transfer-matching`](../../modules/transfer-matching/MODULE.md) | `transfer_matches` (`0099`) |
+| [`statement-imports`](../../modules/statement-imports/MODULE.md) | `statement_imports`, `statement_import_sources`, `statement_import_rows`, `statement_import_row_errors` (`0100`–`0101`) |
+| [`provider-capabilities`](../../modules/provider-capabilities/MODULE.md) | **none** — the module is typed profiles describing what a rail could do, and a profile that owned a row would look like a fact about a provider |
+
+```mermaid
+graph TD
+  U[User] --> C[FinancialConnection]
+  I[Institution / issuer] --> M[InstitutionMarket<br/>one row per country]
+  I -.names.-> C
+  C --> L[AccountSourceLink]
+  L --> A[FinancialAccount / Wallet]
+  A --> S[BalanceSnapshot<br/>per balance kind]
+  A --> PI[PaymentInstrument<br/>no balance column]
+  A --> T[Transaction]
+  T --> P[TransactionProvenance]
+  T --> TM[TransferMatch<br/>no amount]
+  SI[StatementImport<br/>staged rows, reviewed] --commit--> T
+  ING[Manual entry · CSV upload<br/>BUILT] --writes--> SI
+  API[HTTP route<br/>27 operations] --reads--> A
+  CLI[Client method · screen<br/>NOT BUILT] -.would call.-> API
+
+  style CLI stroke-dasharray: 5 5
+```
+
+**The dashed box is the one that is not built.** Every solid box is a table that exists, code tested against live PostgreSQL, and — where it is a route — an operation the runtime-conformance suite drives for real. **Staged import rows are not financial records**: they live in their own tables, they are inert, and only a reviewed commit turns them into transactions.
+
+Seven concepts the Phase 5 model keeps apart, following [ADR-0028](../adr/0028-multi-rail-financial-sources.md), because collapsing any pair produces a specific untruth:
+
+- **An issuer is not a market presence.** `institutions` holds stable global issuer identity with a kind (`BANK`, `E_MONEY_ISSUER`, `MOBILE_MONEY_OPERATOR`, `TELCO_FINANCIAL_SERVICES`, `PAYMENT_INSTITUTION`, `FINTECH_WALLET`, `CARD_ISSUER`, `EXCHANGE_HOUSE`, `OTHER`); `institution_markets` holds one row per issuer per **country**. A global issuer operating in four countries is one issuer with four market rows, not four issuers. The issuer code carries no country prefix, precisely because a code beginning `QA_` reads as a fact about where the issuer belongs and invites a second row the moment a second market appears. **Country is not Jurisdiction**: the market table keys on country and has no jurisdiction column.
+- **A connection is not an account.** `financial_connections` says how data arrives; one connection may feed many accounts, and one person may hold several connections to one institution. **Thirteen acquisition rails are named and only `MANUAL` and `USER_FILE_UPLOAD` may exist**, refused otherwise by `financial_connections_rail_implemented_check` at the database rather than by application code — so an unimplemented rail cannot be written even by direct SQL. **No credential of any kind is stored** in any column of any table here, and the absence is proved by reading `information_schema.columns` against an exhaustive expected list, because a CHECK cannot assert that a column does not exist.
+- **A source link is neither.** `account_source_links` is many-to-many in both directions and carries the encrypted external account reference plus a keyed, per-subject, versioned fingerprint — never a plain hash, which would be a confirmation oracle over a real account number.
+- **An account's origin is not its current source.** `origin_kind` (`MANUAL`, `CSV`, `EXTERNAL_PROVIDER`) is immutable and says only how the account first came to exist. `provider_connection_ref` and the biconditional that bound it to a source kind are **gone from the schema**, not merely unused — an account may be typed in, then fed by CSV, then linked to an API, and remain one account. Later sources belong to account-source links, not to the account row.
+- **A wallet is an account; a card is not.** `account_type = 'WALLET'` carries a required `wallet_kind`, enforced biconditionally: `CHECK ((wallet_kind IS NOT NULL) = (account_type = 'WALLET'))`. Crypto is not modelled here. `payment_instruments` has **no balance column at all**, so two virtual cards on one wallet cannot read as two more balances.
+- **A liability is not cash.** `account_nature` (`ASSET`, `LIABILITY`, `UNKNOWN`) is stored rather than derived from the type, and nothing in Phase 5 sums, nets or totals with it. `UNKNOWN` is the honest default rather than a placeholder.
+- **A reported balance is a specific balance.** `financial_account_balance_snapshots.balance_kind` is `NOT NULL` **with no default** (`BOOKED`, `AVAILABLE`, `CURRENT`, `OUTSTANDING`, `CREDIT_LIMIT`, `OTHER_SOURCE_REPORTED`). A default would be a guess written on a caller's behalf and stored as though a source had said it, and a caller asking what can be spent would be able to receive a settled figure silently.
+- **A transfer match is a relationship, not a movement.** `transfer_matches` names two of a person's transactions and carries **no amount** — the figures stay on the transactions, where a third copy cannot disagree with them.
+
+**No provider is connected, and nothing in this schema can say otherwise.** `provider_access_status` is `NOT_IMPLEMENTED` on every market row and `AVAILABLE` is refused by CHECK unless regulatory evidence is named. Neither the connection nor the instrument vocabulary contains a `CONNECTED`, `SYNCED`, `LINKED` or `AUTHORIZED` value, and `impliesLiveInstitutionLink` / `impliesLiveIssuerLink` answer `false` for every value they permit — functions rather than sentences, so the claim is checkable. Nothing may display "Connected" for data a person typed or uploaded.
+
+**The account is identified by its id and nothing else.** There is deliberately no uniqueness over institution + user, institution + type, institution + currency, institution + type + currency, or issuer + wallet kind — every one of those forbids something people actually have, such as two current accounts at one bank in one currency, or two credit cards from one issuer. The absence is asserted against the live catalogue rather than merely intended: a test reads `pg_index` and requires the only unique indexes to be the primary key and the composite the currency-freeze foreign key depends on.
+
+Three of them — `institutions`, `financial_categories`, `merchant_rules` — are catalogue tables owned by no tenant, and are allow-listed with a written reason rather than given a no-op policy (§12). On `financial_accounts`, the holder-sensitive fields are stored only as ciphertext with a nonce, an auth tag, an algorithm and a key version; there is no plaintext column for a display name, an institution label or a mask.
+
+### A calendar day is not an instant, and a session is not a timezone
+
+[ADR-0027](../adr/0027-calendar-day-and-instant.md) is ACCEPTED, approved by the Platform Owner, and admits **`CalendarDay` as the tenth shared-kernel universal** — the cap architecture test 20 enforces, in both directions, so a rename shows up as one absent name and one extra. The kernel's ten are `CalendarDay`, `Clock`, `Currency`, `DomainEvent`, `ExchangeRate`, `Money`, `Percentage`, `Result`, `TenantId`, `UserId`; an eleventh needs its own ADR, architecture justification, test change and approval.
+
+The distinction is not pedantry about types. A booking date is what an institution wrote on its books — no time, therefore no timezone, therefore nothing to shift by. Stored as an instant it moves across day and month boundaries for readers at different offsets, and a statement for August gains or loses a line depending on where it is read. So `booking_date` and `value_date` are `date` in PostgreSQL and `CalendarDay` in the domain; `event_occurred_at` is `timestamptz` and is present **only when the source actually supplied an instant**, never manufactured from midnight on a booked day; and `source_timezone` is present only when the source explicitly stated one, never guessed from the account's country, the issuer, the server or the device.
+
+**Every database session is pinned to UTC by a connection STARTUP parameter**, which closes a defect that would otherwise have made every time-window predicate wrong by the server's offset. Reading one row in one transaction, the `pg` driver returned the correct instant while Prisma returned it shifted — so on a UTC+3 server a fresh grant read as not-yet-effective and, in the direction that matters, a time-bounded window read as still open for three hours after it should have closed. A startup parameter rather than a per-checkout statement is the point: a pool cannot hand out a session that missed it, and no round trip is needed. Readiness pings with `SHOW TimeZone` rather than `SELECT 1`, so a session that would misreport time reads as `postgres: down` rather than as healthy.
+
+The verification environment is deliberately adversarial: **PostgreSQL 17.11 with the server default left at `Asia/Qatar`.** CI runs `postgres:17-alpine`, which is UTC and would not have caught this. A test environment that agrees with the code's assumption is not evidence for the assumption.
 
 Two Phase 3.5 migrations create no table: `0080` and `0081` add the self- and member-arm policies that make tenant *selection* possible before a session is bound ([`tenancy.md` §6](tenancy.md)). [`modules/bootstrap`](../../modules/bootstrap/MODULE.md) owns no persistent data at all — it composes views over the modules above.
 
@@ -175,6 +236,56 @@ Six classes: `PUBLIC` · `INTERNAL` · `CONFIDENTIAL` · `HIGHLY_SENSITIVE_FINAN
 
 `HIGHLY_SENSITIVE_FINANCIAL` may carry payload in an event only with a declared `payloadExemption` naming owner, reason, and reviewer — CI fails without it. **`SEALED` has no exemption mechanism at all.** See [`event-governance.md`](event-governance.md).
 
+## 7.1 Content trust — a second axis, and not a second classification
+
+Classification answers **how sensitive is this**. It does not answer **who wrote it, and may it direct behaviour** — and those are different questions with different consequences. A merchant narrative and a system prompt can both be `HIGHLY_SENSITIVE_FINANCIAL`; only one of them may tell the platform what to do.
+
+`ContentTrustClass` (ADR-0029) is that second axis. Four members, no more:
+
+| Class | Means | May direct behaviour |
+|---|---|---|
+| `TRUSTED_PLATFORM_INSTRUCTION` | platform-owned code or configuration | **yes — the only one** |
+| `TRUSTED_STRUCTURED_PLATFORM_FACT` | a value this platform derived under a named, versioned ruleset | no |
+| `UNTRUSTED_USER_CONTENT` | the subject typed it into Karar | no |
+| `UNTRUSTED_EXTERNAL_CONTENT` | it arrived in a file or a feed | no |
+
+**External content is DATA. External content is never INSTRUCTION.** That covers uploaded CSV cells, column headers, merchant descriptions, bank narratives, source references, imported account labels, and — in later phases — PDF text, OCR output, email bodies, aggregator payloads and device signals.
+
+### The trusted arm is unconstructible from data, structurally
+
+Three mechanisms, none of which is a convention: the mint accepts a member of a closed source-declared registry rather than a `string`, so a cell cannot be passed without a compile error; the origin is nominally branded, so an object literal is not a classification either; and the mint re-checks membership against a frozen registry at runtime, so a cast past the first two throws. **There is no function that reads text and returns a trust class** — such a function is a keyword blacklist wearing a type.
+
+**Trust is not confidence.** There is no score, no threshold and no numeric field on any arm, and a compile-time assertion fails the build if one appears. A threshold is a number at which an attacker becomes believable.
+
+### There is no trust column, and that is the decision
+
+**No table stores a content trust class.** A stored narrative's class is a total function of provenance that is already persisted: `transaction_provenance.source_kind` is `NOT NULL` and `CHECK`ed to `MANUAL` or `CSV` on every revision of every transaction, so `CSV` is `UNTRUSTED_EXTERNAL_CONTENT` and `MANUAL` is `UNTRUSTED_USER_CONTENT`. A column beside it would give one fact two homes and a way to disagree.
+
+The general rule this instance illustrates: **persist trust metadata only where its absence would create real later ambiguity.** A denormalised constant is not a control; it is a second thing to keep true. Prefer typed wrappers at the boundary where raw text enters, and explicit projection contracts at the boundary where it leaves.
+
+### A derived figure is a fact; the text it came from is not
+
+Reading `1.234` as `123400` minor units under `statement-csv/normalization/v1` produces a `TRUSTED_STRUCTURED_PLATFORM_FACT` whose derivation, ruleset version and untrusted origin are all recorded. **The narrative stays untrusted**, and the fact carries no authority either — trusted-as-a-value and may-direct-behaviour are separate properties, and collapsing them is the mistake the four-member vocabulary exists to prevent.
+
+### Storage never sanitises for a destination it does not have
+
+A record is never rejected or rewritten because a text field contains instruction-shaped, markup-shaped or JSON-shaped content. Escaping is a property of a **destination**, and a value escaped for one destination is wrong in every other — applied at storage it corrupts the fact for the API, the client, the subject's own export and the deduplication fingerprint at once, inside a ciphertext column where the corruption is undiscoverable.
+
+**The export-boundary rule:** spreadsheet formula syntax (a leading `=`, `+`, `-` or `@`) is ordinary text here, and any future CSV or XLSX export must neutralise untrusted text for its target format **as it writes**. No export exists in Phase 5, and none was built to satisfy this rule in advance.
+
+### The flow, and the direction it does not run
+
+```
+uploaded source  ->  parser  ->  normalisation  ->  structured facts + provenance
+UNTRUSTED_EXTERNAL   bounded,     deterministic,     TRUSTED_STRUCTURED_PLATFORM_FACT
+                     byte-        versioned,         (narrative stays UNTRUSTED)
+                     verified     refuses rather
+                                  than guesses
+        ->  Phase 6 verified facts  ->  Phase 7 AI context, as DATA
+```
+
+Every arrow is one-way. Nothing downstream writes back to a source fact, and no future AI layer reaches past the minimised projection it is given — **no raw artifact is ever automatically placed in a prompt, a retrieval index, a vector store or an agent memory.** See [ADR-0029](../adr/0029-untrusted-external-financial-content.md) for the full contract, and [`../security/threat-model.md`](../security/threat-model.md) for the threats it answers.
+
 ## 8. Sealed storage — the split that makes it work
 
 ```
@@ -252,7 +363,7 @@ Architecture test 22 detects all three failure shapes the legacy exhibits:
 | Enabled but no policy | The only shape the legacy's own guard tested for |
 | **FORCEd but not enabled** | The admin audit log itself (RLS-02) |
 
-**Active since Phase 3** (CODE); after Phase 3.5: 48 tables scanned — 22 RLS-enabled and FORCEd, 33 allow-listed in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, 7 deliberately both (identity's bootstrap-armed tables). Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
+**Active since Phase 3** (CODE). Current coverage, as architecture test 22 reports it over the tree at `ef1d155`: **66 tables scanned across 53 migrations — 36 RLS-enabled and FORCEd, 37 allow-listed** in [`packages/platform/db/rls-allow-list.json`](../../packages/platform/db/rls-allow-list.json) with written reasons, **7 deliberately both** (identity's bootstrap-armed tables). The Phase 5 additions split the same way as everything before them: every subject-owned financial table is ENABLE + FORCE with principal GUCs, the four statement-import tables included, and the three catalogue tables that sit outside the tenant boundary (`institutions`, `financial_categories`, `merchant_rules`) are allow-listed rather than given a no-op policy, so a reviewer reads them in the register instead of inferring them from an absent one. Policies read their GUCs through the fail-closed `NULLIF(current_setting(name, true), '')` pattern, bound transaction-locally by `withPrincipalContext`. The landed mechanism is canonical in [`tenancy.md` §3–§4](tenancy.md).
 
 The six new allow-list entries are all Phase 3.5 reference or deployment-wide configuration with no tenant or subject column to scope on: the country and jurisdiction registers, jurisdiction settings, the pack-activation ledger, and capability availability with its history. The five new ENABLE+FORCE tables are the ones that do have a subject or tenant: both jurisdiction-assignment tables, subject policy selections, and the tenant entitlement table with its history. Each carries its own compensating grants — `karar_app` holds `SELECT` only on the reference and configuration tables, and `SELECT`+`INSERT` only on the ledgers. A tenant predicate on capability availability would fabricate a relationship that does not exist and break resolution for every tenant at once, which is the reason recorded in the entry.
 

@@ -141,7 +141,7 @@ modules declared inward.
 - **No cache.** Roles are re-derived from the database on every authorization
   (access-control.md §7) — revocation is immediately effective in-process, test-asserted. The only
   sanctioned memo is `RequestScopedPolicyService`, constructed per request and discarded with it.
-- **Both enforcement points** (capability-registry.md §6): `requirePermission(...)` at the
+- **One enforcement point is live, and the other is not — stated so a reader does not plan against it.** `authorize()` INSIDE the use case is the convention every enforcing module follows. `requirePermission(...)` at the controller boundary is declared here and has **no production call site anywhere in the repository**; only this module's own guard test constructs one. Text describing both halves describes an intended second layer, not the current state. Enforcement is `capability-registry.md` §7; §6 covers entitlements.
   controller boundary AND `authorize()` inside use cases, because HTTP is not the only caller —
   worker jobs and AI tools invoke use cases directly.
 - **Writes are RLS-bound to the target.** Grant/revoke transactions bind the TARGET principal

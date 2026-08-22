@@ -12,4 +12,4 @@ Imported by `application/` and `infrastructure/` within this module. **Never by 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_This directory holds 7 production files. The rules above are enforced by the architecture tests, not by its emptiness._

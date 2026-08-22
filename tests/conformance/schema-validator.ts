@@ -110,6 +110,26 @@ const FORMAT_CHECKS: ReadonlyMap<string, { test: (value: string) => boolean; des
       },
     ],
     [
+      // A CALENDAR DAY, and nothing else (ADR-0027). `2026-08-12` is what an
+      // institution wrote on its books; it is not a moment, and a value
+      // carrying a time or a zone is REFUSED here rather than truncated —
+      // truncating would silently decide which timezone turns the instant
+      // into a day, which is exactly the decision the type exists to force
+      // somebody to make. The range check is real too: `2026-02-30` matches
+      // the shape and is not a date.
+      'date',
+      {
+        test: (value) => {
+          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+          if (match === null) return false;
+          const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+          if (month < 1 || month > 12 || day < 1) return false;
+          return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+        },
+        describe: 'an ISO calendar date YYYY-MM-DD with no time and no zone',
+      },
+    ],
+    [
       // ISO-8601 with an explicit offset. A timestamp without one is ambiguous
       // to every client that receives it, so it is not accepted here.
       'date-time',

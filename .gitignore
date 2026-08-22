@@ -70,3 +70,6 @@ postgres-data/
 
 # Prisma generated client (regenerated via make prisma-generate)
 packages/platform/prisma/client/
+
+# Agent worktrees, scratch and transcripts. Never committed.
+.claude/

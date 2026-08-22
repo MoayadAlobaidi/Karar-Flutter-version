@@ -1,0 +1,25 @@
+{
+  "name": "@karar/transactions",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The transactions core: exact signed amounts under one canonical sign convention, append-only revision history keeping an imported value attributable after a correction, per-revision provenance back to manual input or an exact source row, and deterministic categorisation where a person's choice beats a rule.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/financial-accounts": "workspace:*",
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@karar/financial-retention-local-fixtures": "workspace:*",
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}

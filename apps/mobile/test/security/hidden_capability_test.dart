@@ -48,6 +48,22 @@ const List<String> _hiddenCapabilityNames = <String>[
 /// produces no destination. There is therefore NO scoped exception left — a
 /// withheld identifier appearing anywhere in compiled content fails outright.
 
+/// Capability identifiers the server registry defines. A client-side enum that
+/// writes any of these down is an inventory of what the platform can do,
+/// hidden entries included, and drifts from the registry the moment either
+/// changes. These are the names, not a capability model — the client still
+/// treats a capability as an opaque identifier it was handed.
+const List<String> _knownCapabilityIdentifiers = <String>[
+  'TRANSACTIONS',
+  'BUDGETS',
+  'GOALS',
+  'ZAKAT',
+  'AMANAT',
+  'INSIGHTS',
+  'DOCUMENTS',
+  'SEALED_VAULT',
+];
+
 void main() {
   group('no hidden capability is named anywhere in the client', () {
     // SCOPE: lib, android and ios — the surfaces that are COMPILED INTO THE
@@ -108,7 +124,18 @@ void main() {
               : name;
           final describesState =
               stateSuffixes.any((String suffix) => bare.endsWith(suffix));
-          if (!describesState) {
+          // Judge the MEMBERS, not just the name. An inventory lists capability
+          // identifiers; SourceCapabilityObservation lists OBSERVED,
+          // NOT_OBSERVED and NOT_PROVIDED — an observation about one source,
+          // which discloses no capability at all. Naming alone flagged it the
+          // moment the generator began emitting enum members, and a suffix
+          // allow-list would have to grow with every new noun. What actually
+          // matters is whether a capability identifier is written down here.
+          final memberBlock = RegExp('enum\\s+$name\\b[^{]*\\{([^}]*)\\}').firstMatch(body);
+          final listsCapabilityIdentifiers = memberBlock != null &&
+              _knownCapabilityIdentifiers
+                  .any((String id) => memberBlock.group(1)!.contains(id));
+          if (!describesState && listsCapabilityIdentifiers) {
             offenders.add('${file.relativePath}: $name');
           }
         }

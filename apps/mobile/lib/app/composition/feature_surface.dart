@@ -1,48 +1,124 @@
 // THE COMPOSITION ROOT'S FEATURE SURFACE.
 //
-// Three workstreams contribute startup-gate screens, routes and tenant-scoped
-// providers, and each expresses its contribution as Riverpod overrides. An
-// override REPLACES a provider's value rather than adding to it, so applying
-// the sets independently would mean the last one silently discards the rest.
-// This file is the single place they are merged, and the only place that
-// knows all three exist.
+// Four workstreams contribute startup-gate screens, routes, a home surface and
+// tenant-scoped providers, and each expresses its contribution as Riverpod
+// overrides. An override REPLACES a provider's value rather than adding to it,
+// and Riverpod 3 throws outright on a provider overridden twice in one
+// container — so applying the sets independently is not merely lossy, it does
+// not start. This file is the single place they are merged, and the only place
+// that knows all four exist.
 //
 // Precedence is explicit rather than positional: identity owns the
 // authentication gates, the platform surface owns tenant selection and
 // bootstrap-unavailable, session management owns the two security-state gates,
 // and the sets are disjoint by construction — the test beside this file fails
 // if they ever overlap, rather than letting one quietly win.
+//
+// WHY THE FOUR OVERRIDES ARE ASSEMBLED HERE rather than through
+// `platformSurfaceOverrides`. That helper emits all four of them, including the
+// home-screen builder, and takes the other workstreams' ROUTES and GATES as
+// inputs but not their home surface. The financial workstream wraps the
+// platform home rather than replacing it, so it needs the builder slot; adding
+// a second `homeScreenBuilderProvider` override alongside the helper's would
+// be the duplicate Riverpod rejects. The platform workstream's own pieces are
+// still used — `platformFeatureRoutes`, `platformStartupScreens`,
+// `platformTenantScopedProviders` and `buildPlatformHomeScreen` are its public
+// contributions, and every one of them is merged below.
 
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:go_router/go_router.dart';
 
 import '../../features/authentication/presentation/routes/identity_module.dart';
+import '../../features/financial_accounts/presentation/financial_feature_registration.dart';
+import '../../features/financial_accounts/presentation/financial_home_shell.dart';
+import '../../features/financial_connections/presentation/financial_connections_feature_registration.dart';
 import '../../features/platform_bootstrap/presentation/platform_feature_registration.dart';
 import '../../features/session_management/presentation/security_state_screens.dart';
+import '../../features/statement_imports/presentation/statement_import_feature_registration.dart';
+import '../../features/transfer_matching/presentation/transfer_matching_feature_registration.dart';
 import '../../shared/design_system/theme/karar_theme.dart';
 import '../dependency_injection/providers.dart';
 import '../lifecycle/startup_state.dart';
+import '../lifecycle/tenant_data_scope.dart';
 import '../routing/app_router.dart';
 
 /// Every feature contribution the shell mounts, merged into one override list.
 ///
-/// `platformSurfaceOverrides` takes the other workstreams' contributions as its
-/// `additional*` inputs, so exactly one override per provider is produced and
-/// the merge happens inside the function that owns the provider's shape.
-///
 /// The session-management gates are merged here rather than added to either of
-/// the other two registration files: the two security-state stages belong to
-/// the workstream that owns the states behind them, and neither identity nor
-/// the platform surface has any reason to know they exist. The three sets are
-/// disjoint, which the test beside this file asserts rather than assumes.
+/// the other registration files: the two security-state stages belong to the
+/// workstream that owns the states behind them, and neither identity nor the
+/// platform surface has any reason to know they exist. The sets are disjoint,
+/// which the test beside this file asserts rather than assumes.
 List<Override> featureSurfaceOverrides() => <Override>[
-      ...platformSurfaceOverrides(
-        additionalRoutes: identityRoutes(),
-        additionalStartupScreens: <StartupStage, StartupScreenBuilder>{
+      featureRoutesProvider.overrideWithValue(everyFeatureRoute()),
+      startupScreenOverridesProvider.overrideWithValue(
+        <StartupStage, StartupScreenBuilder>{
+          ...platformStartupScreens(),
           ...identityStartupScreens(),
           ...securityStateStartupScreens(),
         },
       ),
+      // The financial shell WRAPS the platform home: without the capability it
+      // returns `buildPlatformHomeScreen` unchanged, so the surface a person
+      // without it sees is the platform home and nothing else.
+      homeScreenBuilderProvider.overrideWithValue(buildFinancialHomeShell),
+      tenantScopedDataProvider.overrideWithValue(everyTenantScopedProvider()),
       ...themeOverrides(),
+    ];
+
+/// Every route the shell mounts, from every workstream.
+///
+/// Split out so a test can read THE table rather than reconstructing it. The
+/// capability-gate suite used to derive its paths by calling the four
+/// financial contributions by name, which meant a route added ANYWHERE ELSE —
+/// including here, directly — was never visited: an ungated route mounted
+/// straight into this list passed every test in that suite.
+///
+/// The financial contributions are still named separately below, because the
+/// gate suite needs to know which routes are supposed to refuse. What it can
+/// no longer do is miss one: [everyFeatureRoute] and the sum of the named
+/// contributions are asserted equal, so a route that belongs to no named
+/// contribution fails rather than hiding.
+List<RouteBase> everyFeatureRoute() => <RouteBase>[
+      ...platformFeatureRoutes(),
+      ...identityRoutes(),
+      ...everyFinancialRoute(),
+    ];
+
+/// The financial contributions, which are the routes that must refuse without
+/// the capability.
+///
+/// Contributed unconditionally and gated inside every builder. The route table
+/// is read once when the router is built, so making its shape depend on a
+/// runtime capability would rebuild the router — and reset navigation — the
+/// moment bootstrap resolved. The gate decides per build instead, before any
+/// financial screen is constructed.
+///
+/// Statement imports, transfer matching and connections sit under their own
+/// location prefixes rather than `/financial…`: the architecture rule that
+/// keeps contract paths out of the application tree allows exactly one file to
+/// spell one, and a second exemption would be a second place a contract path
+/// could hide.
+List<RouteBase> everyFinancialRoute() => <RouteBase>[
+      ...financialFeatureRoutes(),
+      ...statementImportRoutes(),
+      ...transferMatchingRoutes(),
+      ...financialConnectionRoutes(),
+    ];
+
+/// Every tenant-scoped provider the shell installs, from every workstream.
+///
+/// Named and exported so a test can assert against THE list rather than
+/// restating part of it. A test that rebuilt this by hand covered one of the
+/// five contributions while its comment said "exactly as the composition root
+/// installs it", and that gap is why an entire later workstream was never held
+/// to the discard discipline.
+List<TenantScopedProvider> everyTenantScopedProvider() => <TenantScopedProvider>[
+      ...platformTenantScopedProviders(),
+      ...financialTenantScopedProviders(),
+      ...statementImportFeatureTenantScopedProviders(),
+      ...transferMatchingTenantScopedProviders(),
+      ...financialConnectionTenantScopedProviders(),
     ];
 
 /// Installs the design system's themes on the shell.

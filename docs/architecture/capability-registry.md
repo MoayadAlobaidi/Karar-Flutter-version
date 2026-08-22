@@ -225,11 +225,11 @@ Append-only. Nothing existing is modified.
 
 ## 10. Current registry
 
-Every real capability is honestly unbuilt. This table is the descriptor content, not an ambition:
+One real capability is built and six are not, and none is deployed. This table is the descriptor content, not an ambition:
 
 | Capability | Lifecycle | Implementation | Deployment | `declaredJurisdictions` | Client exposure |
 |---|---|---|---|---|---|
-| `TRANSACTIONS` | `PLANNED` | `NOT_IMPLEMENTED` | none | `[]` | `ACTIONABLE` |
+| `TRANSACTIONS` | `ALPHA` | `IMPLEMENTED` | none | `[]` | `ACTIONABLE` |
 | `BUDGETS` | `PLANNED` | `NOT_IMPLEMENTED` | none | `[]` | `ACTIONABLE` |
 | `GOALS` | `PLANNED` | `NOT_IMPLEMENTED` | none | `[]` | `ACTIONABLE` |
 | `INSIGHTS` | `PLANNED` | `NOT_IMPLEMENTED` | none | `[]` | `ACTIONABLE` |
@@ -241,6 +241,12 @@ Every real capability is honestly unbuilt. This table is the descriptor content,
 > **No capability is available anywhere.** Gate 1 denies all seven regardless of any row, pack, or entitlement, and the availability and entitlement tables ship empty.
 
 **`ZAKAT` carries a non-engineering gate** recorded outside the descriptor: no Sharia review, board, scholar, or certificate exists, and none is implied by any of this work. **`AMANAT` declares no jurisdiction**, so it is unreachable regardless of configuration until per-jurisdiction legal clearance exists.
+
+**`TRANSACTIONS` is `IMPLEMENTED`, and available nowhere.** Seven bounded contexts beneath that capability — `financial-accounts`, `transactions`, `financial-connections`, `payment-instruments`, `transfer-matching`, `statement-imports`, `provider-capabilities` — carry schema, domain, ports, repositories and tests behind migrations `0087`-`0101`; 27 operations are mounted from the composition root; and seven Flutter feature folders call them. `implementation` asks one question — does the capability's code exist in this repository — and the answer is yes.
+
+This row previously read `NOT_IMPLEMENTED`, defended on the reading that "`IMPLEMENTED` here means the capability's code exists as something a deployment could expose". That redefinition contradicted the type's own doc comment and §3's dimension table in this same document, and it rested on a premise that has since become false — that no client calls the generated methods. Under-claiming is not the conservative direction: a field that answers "does the code exist?" with "no" while the code exists teaches a reader to distrust the field, and the reader's next move is to trust something else for the question it does answer.
+
+**Nothing follows from it.** Deployment is empty, so gate 1 denies with `NOT_DEPLOYED`. `declaredJurisdictions` is empty, so the clearance intersection is empty. `qa/v1` declares `clearedCapabilities: []` and clears nothing. The availability tables ship with no rows. Four independent denials, and flipping this field removes none of them — which `modules/capability/__tests__/transactions-implemented-not-available.test.ts` asserts over all four environments, and the `capability-registry-truth` supplementary check enforces in both directions.
 
 See [`capability-map.md`](capability-map.md) for the module, classification, provider, and phase view of the same set.
 

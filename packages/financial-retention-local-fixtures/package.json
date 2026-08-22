@@ -1,0 +1,14 @@
+{
+  "name": "@karar/financial-retention-local-fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "description": "LOCAL/TEST ONLY. The synthetic financial-retention decision values — basis text, approval reference, pack version and period — held OUTSIDE @karar/financial-accounts and @karar/transactions so no production build, package or dependency closure can contain them. Never list this package under `dependencies`: it is a devDependency of its consumers and nothing else, and every consumer resolves it at runtime inside a local-only branch.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  }
+}

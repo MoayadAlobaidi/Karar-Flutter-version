@@ -10,4 +10,4 @@ May import this module's `domain/`, its own ports, and `shared-kernel`. **Never 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_This directory holds 19 production files. The rules above are enforced by the architecture tests, not by its emptiness._

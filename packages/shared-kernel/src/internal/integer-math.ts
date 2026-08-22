@@ -6,7 +6,7 @@
  * is no default, so rounding is visible at every call site.
  *
  * This module is internal: it is reachable from kernel code only and is not
- * part of the nine-name kernel surface. Consumers reach the rounding-mode
+ * part of the ten-name kernel surface. Consumers reach the rounding-mode
  * vocabulary as `Money.RoundingMode`.
  */
 import { KernelError } from './kernel-error';

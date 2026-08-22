@@ -26,10 +26,26 @@ final class StartupGateScreen extends StatelessWidget {
   /// when the state has no action the user can take.
   final VoidCallback? onRecover;
 
+  /// Names the transient branch in the widget tree.
+  ///
+  /// A key carried for OBSERVABILITY, not for identity. This phase's central
+  /// client failure was that nothing outside the app could tell whether a
+  /// person was looking at a screen or at an indicator that would never
+  /// resolve, and pixels cannot tell them apart: a frozen spinner and a
+  /// settled screen are both a run of identical frames. `tool/startup_smoke.sh`
+  /// asks the UI isolate for its widget tree and looks for this key, so the
+  /// one state that is NOT terminal can be named rather than guessed at. Every
+  /// other resting place of this screen — a fail-closed security error, an
+  /// invalid build configuration — is one a person can act on and must not be
+  /// matched by that search, which is why the key is on the branch and not on
+  /// the class.
+  static const Key transientKey = Key('startup-transient');
+
   @override
   Widget build(BuildContext context) {
     if (state.isTransient) {
       return const Scaffold(
+        key: transientKey,
         body: Center(child: CircularProgressIndicator.adaptive()),
       );
     }
@@ -80,13 +96,13 @@ final class ReadyPlaceholderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: Text(
-              StartupStage.ready.name,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
+    body: SafeArea(
+      child: Center(
+        child: Text(
+          StartupStage.ready.name,
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      );
+      ),
+    ),
+  );
 }

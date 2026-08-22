@@ -61,6 +61,7 @@ import '../lifecycle/api_bootstrap_gateway.dart';
 import '../lifecycle/startup_coordinator.dart';
 import '../lifecycle/startup_listenable.dart';
 import '../lifecycle/startup_state.dart';
+import '../lifecycle/tenant_data_scope.dart';
 import '../routing/app_router.dart';
 
 /// Thrown when a provider that the bootstrap sequence must override is read
@@ -297,14 +298,39 @@ final Provider<BootstrapGateway> bootstrapGatewayProvider = Provider<BootstrapGa
 
 final Provider<StartupCoordinator> startupCoordinatorProvider =
     Provider<StartupCoordinator>((Ref ref) {
+  final sessions = ref.watch(sessionManagerProvider);
   final coordinator = StartupCoordinator(
     loadConfiguration: () => ref.read(configurationResultProvider),
     appLock: ref.watch(appLockGateProvider),
-    sessionManager: ref.watch(sessionManagerProvider),
+    sessionManager: sessions,
     bootstrapGateway: ref.watch(bootstrapGatewayProvider),
     logger: ref.watch(loggerProvider),
     clock: ref.watch(clockProvider),
   );
+
+  // A SESSION THAT ENDS MUST TAKE THE ORGANISATION'S DATA WITH IT.
+  //
+  // `StartupCoordinator.signOut` only ends the session; the container survives
+  // it, one per process (`app/bootstrap/app_bootstrap.dart`), so without this
+  // the previous principal's portfolio and transactions are still what the
+  // providers yield to whoever signs in next. It is installed HERE because the
+  // coordinator is the one thing that observes the whole session lifecycle and
+  // is alive for all of it, and because the scope itself must depend on
+  // nothing — see `app/lifecycle/tenant_data_scope.dart`.
+  //
+  // Nothing is re-read: a session that has ended has no credential to read
+  // under. The answers are emptied and left empty.
+  //
+  // IT ALSO FIRES ON A TENANT SWITCH, because the data layer ends the old
+  // session before adopting the replacement one. Discarding twice is wasteful
+  // and harmless — the switch's own discard follows and re-reads. The obvious
+  // narrowing, "skip when a session is already held again", is NOT applied: it
+  // would also skip the discard whenever a sign-in raced a sign-out, and
+  // over-discarding is the failure worth having.
+  final subscription = sessions.onSessionEnded.listen(
+    (_) => discardTenantScopedData(ref, TenantDataDiscardReason.sessionEnded),
+  );
+  ref.onDispose(subscription.cancel);
   ref.onDispose(coordinator.dispose);
   return coordinator;
 });

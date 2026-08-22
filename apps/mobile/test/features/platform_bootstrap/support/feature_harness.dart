@@ -233,3 +233,64 @@ SessionTokens liveTokens({String sessionId = 'session-1'}) => SessionTokens(
 
 /// Yields to the event loop so scheduled futures complete.
 Future<void> settleMicrotasks() => Future<void>.delayed(Duration.zero);
+
+/// Asserts every pressable control on screen is big enough to hit.
+///
+/// `androidTapTargetGuideline` is asserted alongside this and does NOT
+/// substitute for it — but the reason recorded here previously was WRONG, and
+/// the correction matters more than the original claim.
+///
+/// It said the guideline could not see `KararPressable`, on the strength of
+/// two probes: a `KararPressable` at 20x20 passing and an `ElevatedButton` at
+/// 20x20 failing. Those probes used DIFFERENT HARNESSES, which was the
+/// variable nobody controlled. Run in one tree, both behave identically: both
+/// are flagged on a phone-sized surface, and NEITHER is flagged on this
+/// harness's default 1000x4000 one. The guideline skips nodes it considers
+/// offscreen relative to the render view, and on a four-thousand-pixel
+/// surface almost everything is.
+///
+/// So the guideline is not blind to a widget; it is blind to a SURFACE. That
+/// is why this measurement exists and why it is the load-bearing control: it
+/// walks the render tree and is indifferent to how large the test surface is.
+/// Screens are pumped tall on purpose — a lazy list only builds what fits —
+/// so the guideline alone would be near-vacuous on every long screen here.
+///
+/// The minimum is the larger of the two platform figures — Android asks for
+/// 48dp, iOS for 44pt — because one build serves both.
+/// [expectAtLeast] is the number of pressables the caller believes are on
+/// screen, and it is REQUIRED to be stated rather than defaulted, because the
+/// loop below passes trivially when it finds nothing. A read-only surface
+/// legitimately has none — the statement-import review is one — and passing
+/// `0` there says so deliberately, where a silent empty measurement said
+/// nothing at all while a test named "every interactive control is big
+/// enough" reported success.
+void expectEveryTapTargetLargeEnough(
+  WidgetTester tester, {
+  required int expectAtLeast,
+  double minimum = 48.0,
+}) {
+  final Finder pressables = find.byType(KararPressable);
+  final int count = pressables.evaluate().length;
+  expect(
+    count,
+    greaterThanOrEqualTo(expectAtLeast),
+    reason: 'the surface was expected to carry at least $expectAtLeast pressable '
+        'control(s) and carries $count; either the screen changed or this '
+        'measurement is not reaching it',
+  );
+  final List<String> tooSmall = <String>[];
+
+  for (int index = 0; index < count; index += 1) {
+    final Size size = tester.getSize(pressables.at(index));
+    if (size.width + 0.01 < minimum || size.height + 0.01 < minimum) {
+      tooSmall.add('#$index $size');
+    }
+  }
+
+  expect(
+    tooSmall,
+    isEmpty,
+    reason: 'every control a person taps must be at least '
+        '${minimum}x$minimum; these are not: $tooSmall',
+  );
+}

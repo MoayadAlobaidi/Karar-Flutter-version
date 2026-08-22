@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/dependency_injection/providers.dart';
 import '../../../app/lifecycle/bootstrap_snapshot.dart';
 import '../../../app/lifecycle/startup_state.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../core/errors/failure.dart';
 import '../../../core/errors/result.dart';
 import '../data/api_consent_repository.dart';
@@ -79,11 +80,15 @@ final class ConsentSurfaceUnavailable extends ConsentSurface {
 }
 
 /// Loads the consent surface.
-final class ConsentSurfaceController extends AsyncNotifier<ConsentSurface> {
+final class ConsentSurfaceController extends TenantScopedAsyncNotifier<ConsentSurface> {
   static const ResolveConsentOverview _resolve = ResolveConsentOverview();
 
   @override
-  Future<ConsentSurface> build() async {
+  ConsentSurface get discarded =>
+      const ConsentSurfaceUnavailable(SessionChangedFailure());
+
+  @override
+  Future<ConsentSurface> load() async {
     final repository = ref.watch(consentRepositoryProvider);
     final prerequisites = ref.watch(consentPrerequisitesProvider);
 
@@ -123,8 +128,16 @@ final class ConsentSurfaceController extends AsyncNotifier<ConsentSurface> {
 
   /// Re-reads the surface after an action the platform confirmed.
   Future<void> refresh() async {
+    final TenantDataGeneration issued = binding;
     state = const AsyncLoading<ConsentSurface>();
-    state = await AsyncValue.guard<ConsentSurface>(build);
+    final AsyncValue<ConsentSurface> answer =
+        await AsyncValue.guard<ConsentSurface>(load);
+    if (issued.hasEnded) {
+      // The notifier survives the discard, so without this the surface read
+      // under the previous binding is written back over the new one's.
+      return;
+    }
+    state = answer;
   }
 }
 
@@ -186,11 +199,17 @@ final class ConsentActionController extends Notifier<ConsentActionState> {
     if (state is ConsentActionSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = ref.tenantBinding();
     state = ConsentActionSubmitting(purposeRef);
     final result = await ref.read(acceptLegalDocumentProvider)(
       legalDocumentVersionId: legalDocumentVersionId,
       purposeRef: purposeRef,
     );
+    if (issued.hasEnded) {
+      // An acceptance recorded under a binding that is gone would otherwise be
+      // reported as this binding's, and would refresh this binding's surface.
+      return;
+    }
     switch (result) {
       case Failed<ConsentGrant>(:final failure):
         state = ConsentActionFailed(purposeRef: purposeRef, failure: failure);
@@ -204,8 +223,12 @@ final class ConsentActionController extends Notifier<ConsentActionState> {
     if (state is ConsentActionSubmitting) {
       return;
     }
+    final TenantDataGeneration issued = ref.tenantBinding();
     state = ConsentActionSubmitting(purposeRef);
     final result = await ref.read(withdrawConsentProvider)(grantId);
+    if (issued.hasEnded) {
+      return;
+    }
     switch (result) {
       case Failed<ConsentWithdrawal>(:final failure):
         state = ConsentActionFailed(purposeRef: purposeRef, failure: failure);

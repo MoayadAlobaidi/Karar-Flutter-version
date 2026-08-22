@@ -1,0 +1,202 @@
+// Prisma mapping for the transactions module's tables (migrations 0090-0093).
+// The SQL migrations remain authoritative; this file maps them exactly so
+// `make prisma-drift` stays meaningful (base.prisma header).
+//
+// Money is BigInt minor units plus the ISO 4217 code, never Decimal and never
+// Float (ADR-0006, data-model.md §1). Prisma's Decimal would be just as wrong
+// as a float here: the exponent belongs to the Currency type in code, and a
+// scaled decimal column would re-introduce the "minor units means cents"
+// assumption that is wrong for KWD, BHD and OMR.
+//
+// Encrypted narrative is Bytes: ciphertext, nonce and auth tag per field,
+// with the algorithm and key version per row. No plaintext field exists in
+// any of these models, because no plaintext column exists in the tables.
+//
+// Deliberately NOT expressed here, enforced by the migrations and their tests
+// instead: every CHECK constraint (vocabularies, the all-or-nothing amount
+// and ciphertext triples, the source-kind/origin pairing, the merchant-rule
+// generalisation rules), the immutability, supersession and occurrence
+// guards — including the rule that an occurrence ordinal must be the next
+// unused one for its content identity, without which duplicate review would
+// be one field away from optional — the
+// partial unique index that keeps exactly one ACTIVE category assignment, RLS
+// enable/force with the tenant+user principal policies, and the grants. The
+// repositories run every statement inside a principal-context transaction
+// (SET LOCAL app.tenant_id / app.user_id) or the policies return nothing —
+// failing closed.
+//
+// Cross-module references (tenant_id, user_id, account_id, actor_ref,
+// import_ref, row_ref) are plain scalars by design (data-model.md §2): no
+// relation crosses a module boundary, and account_reference_type declares
+// what account_id points at without importing another module's types.
+
+model Transaction {
+  id                   String    @id @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  accountId            String    @map("account_id") @db.Uuid
+  accountReferenceType String    @map("account_reference_type")
+
+  amountMinor          BigInt    @map("amount_minor")
+  currencyCode         String    @map("currency_code") @db.Char(3)
+  originalAmountMinor  BigInt?   @map("original_amount_minor")
+  originalCurrencyCode String?   @map("original_currency_code") @db.Char(3)
+
+  // Calendar days and instants are different kinds of value (ADR-0027), and
+  // the column types say so: @db.Date carries no time and therefore no
+  // timezone, @db.Timestamptz(6) carries a moment. Prisma has one TypeScript
+  // type for both, so the domain — not this file — is where the distinction
+  // is enforced: the row mappers convert @db.Date to CalendarDay and back.
+  bookingDate          DateTime  @map("booking_date") @db.Date
+  valueDate            DateTime? @map("value_date") @db.Date
+  // Present only when the source supplied them; never inferred from the days
+  // above. The CHECK that keeps the zone from appearing without the instant
+  // lives in migration 0090, not here.
+  eventOccurredAt      DateTime? @map("event_occurred_at") @db.Timestamptz(6)
+  sourceTimezone       String?   @map("source_timezone")
+
+  hsfAlgorithm         String    @map("hsf_algorithm")
+  hsfKeyVersion        String    @map("hsf_key_version")
+  descriptionCiphertext Bytes    @map("description_ciphertext")
+  descriptionNonce     Bytes     @map("description_nonce")
+  descriptionAuthTag   Bytes     @map("description_auth_tag")
+  merchantCiphertext   Bytes?    @map("merchant_ciphertext")
+  merchantNonce        Bytes?    @map("merchant_nonce")
+  merchantAuthTag      Bytes?    @map("merchant_auth_tag")
+  noteCiphertext       Bytes?    @map("note_ciphertext")
+  noteNonce            Bytes?    @map("note_nonce")
+  noteAuthTag          Bytes?    @map("note_auth_tag")
+
+  sourceKind           String    @map("source_kind")
+  status               String
+  // Content identity, and separately which occurrence of that content this
+  // row is. The digest carries nothing about occurrence; the unique key below
+  // carries both (migration 0090).
+  dedupFingerprint     String    @map("dedup_fingerprint")
+  fingerprintVersion   String    @map("fingerprint_version")
+  occurrenceOrdinal    Int       @default(1) @map("occurrence_ordinal")
+
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  version              Int       @default(1)
+
+  @@unique([tenantId, userId, accountId, fingerprintVersion, dedupFingerprint, occurrenceOrdinal], map: "transactions_dedup_key")
+  @@index([tenantId, userId, bookingDate, id], map: "transactions_owner_recent_idx")
+  @@index([tenantId, userId, accountId, bookingDate, id], map: "transactions_account_recent_idx")
+  @@map("transactions")
+}
+
+model TransactionRevision {
+  id                    String    @id @db.Uuid
+  transactionId         String    @map("transaction_id") @db.Uuid
+  tenantId              String    @map("tenant_id") @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  revisionNumber        Int       @map("revision_number")
+  attribution           String
+  actorRef              String    @map("actor_ref") @db.Uuid
+
+  amountMinor           BigInt    @map("amount_minor")
+  currencyCode          String    @map("currency_code") @db.Char(3)
+  bookingDate           DateTime  @map("booking_date") @db.Date
+  valueDate             DateTime? @map("value_date") @db.Date
+  // The snapshot is complete, so it carries the source instant too — even
+  // though a correction cannot move it (migration 0091).
+  eventOccurredAt       DateTime? @map("event_occurred_at") @db.Timestamptz(6)
+  sourceTimezone        String?   @map("source_timezone")
+  status                String
+
+  hsfAlgorithm          String    @map("hsf_algorithm")
+  hsfKeyVersion         String    @map("hsf_key_version")
+  descriptionCiphertext Bytes     @map("description_ciphertext")
+  descriptionNonce      Bytes     @map("description_nonce")
+  descriptionAuthTag    Bytes     @map("description_auth_tag")
+  merchantCiphertext    Bytes?    @map("merchant_ciphertext")
+  merchantNonce         Bytes?    @map("merchant_nonce")
+  merchantAuthTag       Bytes?    @map("merchant_auth_tag")
+  noteCiphertext        Bytes?    @map("note_ciphertext")
+  noteNonce             Bytes?    @map("note_nonce")
+  noteAuthTag           Bytes?    @map("note_auth_tag")
+
+  changedFields         String[]  @default([]) @map("changed_fields")
+  recordedAt            DateTime  @map("recorded_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([transactionId, revisionNumber], map: "transaction_revisions_sequence")
+  @@index([tenantId, userId, transactionId, revisionNumber], map: "transaction_revisions_history_idx")
+  @@map("transaction_revisions")
+}
+
+model TransactionProvenance {
+  id                       String   @id @db.Uuid
+  transactionId            String   @map("transaction_id") @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  userId                   String   @map("user_id") @db.Uuid
+  revisionNumber           Int      @map("revision_number")
+
+  sourceKind               String   @map("source_kind")
+  importRef                String?  @map("import_ref")
+  rowRef                   String?  @map("row_ref")
+  actorRef                 String   @map("actor_ref") @db.Uuid
+  accountId                String   @map("account_id") @db.Uuid
+  accountReferenceType     String   @map("account_reference_type")
+
+  parserVersion            String   @map("parser_version")
+  mappingVersion           String   @map("mapping_version")
+  normalizationVersion     String   @map("normalization_version")
+  fingerprintVersion       String   @map("fingerprint_version")
+
+  sourceDirection          String   @map("source_direction")
+  directionMapping         String   @map("direction_mapping")
+  categoryAssignmentSource String   @map("category_assignment_source")
+
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([transactionId, revisionNumber], map: "transaction_provenance_per_revision")
+  @@index([tenantId, userId, transactionId, revisionNumber], map: "transaction_provenance_lookup_idx")
+  @@map("transaction_provenance")
+}
+
+model FinancialCategory {
+  code             String    @id
+  parentCode       String?   @map("parent_code")
+  labelEn          String    @map("label_en")
+  labelAr          String    @map("label_ar")
+  catalogueVersion String    @map("catalogue_version")
+  retiredAt        DateTime? @map("retired_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("financial_categories")
+}
+
+model MerchantRule {
+  id           String    @id @db.Uuid
+  patternKind  String    @map("pattern_kind")
+  patternToken String    @map("pattern_token")
+  categoryCode String    @map("category_code")
+  ruleVersion  String    @map("rule_version")
+  reviewRef    String    @map("review_ref")
+  retiredAt    DateTime? @map("retired_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([patternKind, patternToken, ruleVersion], map: "merchant_rules_unique_pattern")
+  @@map("merchant_rules")
+}
+
+model TransactionCategoryAssignment {
+  id               String    @id @db.Uuid
+  transactionId    String    @map("transaction_id") @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  categoryCode     String    @map("category_code")
+  assignmentSource String    @map("assignment_source")
+  ruleVersion      String?   @map("rule_version")
+  assignedBy       String    @map("assigned_by") @db.Uuid
+  assignedAt       DateTime  @map("assigned_at") @db.Timestamptz(6)
+  status           String
+  supersededById   String?   @map("superseded_by_id") @db.Uuid
+  supersededAt     DateTime? @map("superseded_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, userId, transactionId, assignedAt, id], map: "transaction_category_assignments_chain_idx")
+  @@map("transaction_category_assignments")
+}

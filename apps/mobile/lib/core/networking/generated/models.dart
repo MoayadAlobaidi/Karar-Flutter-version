@@ -3,9 +3,9 @@
 // Data-transfer objects for the Karar API.
 //
 // Source:     packages/api-contracts/openapi/openapi.yaml
-// Contract:   Karar API 0.5.0
-// Digest:     82f00bc1
-// Generator:  tool/generate_api_client.dart 1.0.0
+// Contract:   Karar API 0.6.0
+// Digest:     9157dde5
+// Generator:  tool/generate_api_client.dart 1.2.0
 //
 // Regenerate:  dart run tool/generate_api_client.dart
 // Drift check: dart run tool/generate_api_client.dart --check
@@ -19,6 +19,709 @@
 // through an interpolated string.
 
 import 'package:meta/meta.dart';
+
+/// A request field that may be OMITTED, or sent carrying a value, or sent
+/// carrying an explicit `null`.
+///
+/// The three are three different requests. On a PATCH the contract reads an
+/// absent field as "leave this alone" and a `null` field as "clear this", and
+/// a plain `T?` cannot tell the two apart — a client holding one would either
+/// clear every field it did not set or never be able to clear any.
+///
+/// The generator emits this type for exactly the properties a REQUEST schema
+/// declares optional AND nullable. Every other field keeps its plain type: a
+/// required field is always sent, an optional non-nullable field is omitted
+/// when null, and a response field has nothing to distinguish because a reader
+/// cannot act on the difference.
+@immutable
+final class Omittable<T extends Object> {
+  /// The field does not appear in the encoded body at all.
+  const Omittable.omitted()
+      : valueOrNull = null,
+        isSent = false;
+
+  /// The field appears in the encoded body carrying [valueOrNull], which is
+  /// null to send an explicit `null`.
+  const Omittable.sent(this.valueOrNull) : isSent = true;
+
+  /// Whether the field is encoded at all.
+  final bool isSent;
+
+  /// The value to encode. Null while [isSent] means an explicit `null` on the
+  /// wire; null while it is not sent means nothing at all.
+  final T? valueOrNull;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Omittable<T> &&
+      other.isSent == isSent &&
+      other.valueOrNull == valueOrNull;
+
+  @override
+  int get hashCode => Object.hash(isSent, valueOrNull);
+
+  /// Carries no value: an omittable field routinely holds a display name, a
+  /// merchant or a masked tail.
+  @override
+  String toString() => 'Omittable()';
+}
+
+/// A response that does not match the contract, naming the field that drifted.
+///
+/// It extends `FormatException` so every repository that already catches one
+/// keeps working unchanged. What it adds is [path]: a caller that wants to say
+/// WHICH field drifted, rather than only which call did, reads it. That
+/// distinction is the difference between an incident somebody can act on and a
+/// line that says a response was wrong.
+final class ContractFormatException extends FormatException {
+  ContractFormatException(this.path)
+      : super('A response field does not match the contract.');
+
+  /// `Schema.field`, for example `FinancialAccountView.currency`.
+  ///
+  /// A NAME and never a value. The field that drifted is contract vocabulary;
+  /// what it carried is a person's money, and neither a log line nor a crash
+  /// dump may hold it.
+  final String path;
+
+  /// The type name only.
+  ///
+  /// Even the field NAME stays out of it: an exception's `toString` is what a
+  /// framework prints into a crash dump, and a generated type renders nothing
+  /// but itself there. Callers that want the location read [path].
+  @override
+  String toString() => 'ContractFormatException()';
+}
+
+/// Decodes one field, naming it if the response does not match the contract.
+///
+/// Both failure shapes a decoder can produce are caught: a wrongly typed or
+/// absent field raises a `TypeError` through the cast or the null check, and a
+/// malformed instant raises a `FormatException`. Either way the contract was
+/// not honoured, and the answer says which field it was.
+T decodeField<T>(String path, T Function() read) {
+  try {
+    return read();
+  } on ContractFormatException {
+    // Already named, by the schema closest to the drift. Re-wrapping would
+    // replace a precise location with a coarser one.
+    rethrow;
+  } on TypeError {
+    throw ContractFormatException(path);
+  } on FormatException {
+    throw ContractFormatException(path);
+  }
+}
+
+
+/// What this platform's relationship with the issuer actually IS. The vocabulary contains one value, and it is the honest one: no issuer named in the catalogue exposes an interface to Karar, no credential of any kind is stored, and nothing may render "Connected", "Synced" or "Linked" for data a person typed or uploaded. The two booleans-by-enum are stated on the wire so a client cannot infer otherwise from a status it recognises.
+@immutable
+final class AccountLinkStateDto {
+  const AccountLinkStateDto({
+    required this.impliesLiveInstitutionLink,
+    required this.providerAccessStatus,
+    required this.state,
+  });
+
+  /// Decodes the contract representation.
+  factory AccountLinkStateDto.fromJson(Map<String, Object?> json) => AccountLinkStateDto(
+        impliesLiveInstitutionLink: decodeField<bool>('AccountLinkState.impliesLiveInstitutionLink',
+            () => json['impliesLiveInstitutionLink']! as bool),
+        providerAccessStatus: decodeField<AccountLinkStateProviderAccessStatusDto>('AccountLinkState.providerAccessStatus',
+            () => AccountLinkStateProviderAccessStatusDto.fromWire(json['providerAccessStatus']! as String)),
+        state: decodeField<AccountLinkStateStateDto>('AccountLinkState.state',
+            () => AccountLinkStateStateDto.fromWire(json['state']! as String)),
+      );
+
+  final bool impliesLiveInstitutionLink;
+
+  final AccountLinkStateProviderAccessStatusDto providerAccessStatus;
+
+  final AccountLinkStateStateDto state;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'impliesLiveInstitutionLink': impliesLiveInstitutionLink,
+        'providerAccessStatus': providerAccessStatus.toWire(),
+        'state': state.toWire(),
+      };
+
+  @override
+  String toString() => 'AccountLinkStateDto()';
+}
+
+/// Contract enumeration.
+enum AccountLinkStateProviderAccessStatusDto {
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AccountLinkStateProviderAccessStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountLinkStateProviderAccessStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum AccountLinkStateStateDto {
+  notLinked('NOT_LINKED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AccountLinkStateStateDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountLinkStateStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum AccountNatureDto {
+  asset('ASSET'),
+  liability('LIABILITY'),
+  unknown('UNKNOWN'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unrecognised('');
+
+  const AccountNatureDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unrecognised].
+  static AccountNatureDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unrecognised) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unrecognised;
+  }
+
+  /// The wire value, or null for [unrecognised], which has none.
+  String? toWire() => this == unrecognised ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum AccountOriginDto {
+  csv('CSV'),
+  externalProvider('EXTERNAL_PROVIDER'),
+  manual('MANUAL'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AccountOriginDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountOriginDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The safe source-and-freshness summary. This is the ONLY shape a read path returns for a source link; the stored entity carries the external account reference and its keyed fingerprint, and neither has a field here.
+@immutable
+final class AccountSourceLinkViewDto {
+  const AccountSourceLinkViewDto({
+    required this.accountId,
+    required this.availability,
+    required this.capabilities,
+    required this.connectionId,
+    required this.createdAt,
+    this.historyCoverage,
+    required this.link,
+    required this.matchBasis,
+    required this.observation,
+    required this.rail,
+    required this.sourceAuthority,
+    required this.sourceLinkId,
+    required this.sourcePriority,
+    required this.status,
+    this.subjectConfirmedAt,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory AccountSourceLinkViewDto.fromJson(Map<String, Object?> json) => AccountSourceLinkViewDto(
+        accountId: decodeField<String>('AccountSourceLinkView.accountId',
+            () => json['accountId']! as String),
+        availability: decodeField<RailAvailabilityDto>('AccountSourceLinkView.availability',
+            () => RailAvailabilityDto.fromWire(json['availability']! as String)),
+        capabilities: decodeField<SourceCapabilitiesViewDto>('AccountSourceLinkView.capabilities',
+            () => SourceCapabilitiesViewDto.fromJson(json['capabilities']! as Map<String, Object?>)),
+        connectionId: decodeField<String>('AccountSourceLinkView.connectionId',
+            () => json['connectionId']! as String),
+        createdAt: decodeField<DateTime>('AccountSourceLinkView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        historyCoverage: decodeField<HistoryCoverageViewDto?>('AccountSourceLinkView.historyCoverage',
+            () => json['historyCoverage'] == null ? null : HistoryCoverageViewDto.fromJson(json['historyCoverage']! as Map<String, Object?>)),
+        link: decodeField<InstitutionLinkClaimDto>('AccountSourceLinkView.link',
+            () => InstitutionLinkClaimDto.fromJson(json['link']! as Map<String, Object?>)),
+        matchBasis: decodeField<MatchBasisDto>('AccountSourceLinkView.matchBasis',
+            () => MatchBasisDto.fromWire(json['matchBasis']! as String)),
+        observation: decodeField<SourceObservationViewDto>('AccountSourceLinkView.observation',
+            () => SourceObservationViewDto.fromJson(json['observation']! as Map<String, Object?>)),
+        rail: decodeField<ConnectionRailDto>('AccountSourceLinkView.rail',
+            () => ConnectionRailDto.fromWire(json['rail']! as String)),
+        sourceAuthority: decodeField<SourceAuthorityDto>('AccountSourceLinkView.sourceAuthority',
+            () => SourceAuthorityDto.fromWire(json['sourceAuthority']! as String)),
+        sourceLinkId: decodeField<String>('AccountSourceLinkView.sourceLinkId',
+            () => json['sourceLinkId']! as String),
+        sourcePriority: decodeField<int>('AccountSourceLinkView.sourcePriority',
+            () => json['sourcePriority']! as int),
+        status: decodeField<SourceLinkStatusDto>('AccountSourceLinkView.status',
+            () => SourceLinkStatusDto.fromWire(json['status']! as String)),
+        subjectConfirmedAt: decodeField<DateTime?>('AccountSourceLinkView.subjectConfirmedAt',
+            () => json['subjectConfirmedAt'] == null ? null : DateTime.parse(json['subjectConfirmedAt']! as String).toUtc()),
+        updatedAt: decodeField<DateTime>('AccountSourceLinkView.updatedAt',
+            () => DateTime.parse(json['updatedAt']! as String).toUtc()),
+        version: decodeField<int>('AccountSourceLinkView.version',
+            () => json['version']! as int),
+      );
+
+  final String accountId;
+
+  final RailAvailabilityDto availability;
+
+  final SourceCapabilitiesViewDto capabilities;
+
+  final String connectionId;
+
+  final DateTime createdAt;
+
+  /// The calendar range this source has supplied, as DAYS (ADR-0027). Null when nothing has been supplied.
+  final HistoryCoverageViewDto? historyCoverage;
+
+  final InstitutionLinkClaimDto link;
+
+  final MatchBasisDto matchBasis;
+
+  final SourceObservationViewDto observation;
+
+  final ConnectionRailDto rail;
+
+  final SourceAuthorityDto sourceAuthority;
+
+  final String sourceLinkId;
+
+  final int sourcePriority;
+
+  final SourceLinkStatusDto status;
+
+  /// When the person confirmed this link, or null while they have not.
+  final DateTime? subjectConfirmedAt;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'availability': availability.toWire(),
+        'capabilities': capabilities.toJson(),
+        'connectionId': connectionId,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'historyCoverage': historyCoverage?.toJson(),
+        'link': link.toJson(),
+        'matchBasis': matchBasis.toWire(),
+        'observation': observation.toJson(),
+        'rail': rail.toWire(),
+        'sourceAuthority': sourceAuthority.toWire(),
+        'sourceLinkId': sourceLinkId,
+        'sourcePriority': sourcePriority,
+        'status': status.toWire(),
+        'subjectConfirmedAt': subjectConfirmedAt?.toUtc().toIso8601String(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'AccountSourceLinkViewDto()';
+}
+
+/// Contract enumeration.
+enum AccountStatusDto {
+  active('ACTIVE'),
+  archived('ARCHIVED'),
+  closed('CLOSED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AccountStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum AccountTypeDto {
+  cash('CASH'),
+  creditCard('CREDIT_CARD'),
+  current('CURRENT'),
+  other('OTHER'),
+  savings('SAVINGS'),
+  wallet('WALLET'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AccountTypeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AccountTypeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// How the amount is expressed in the file. A signed column needs its SIGN FRAME stated — a bank ledger and an account holder disagree about which way is positive — and a debit/credit pair needs both columns.
+@immutable
+sealed class AmountColumnsDto {
+  const AmountColumnsDto();
+
+  /// Decodes the branch named by `kind`.
+  ///
+  /// An unrecognised discriminator throws [FormatException]: a union the
+  /// client cannot classify must not be guessed at, and the transport turns
+  /// the throw into a typed contract-violation failure.
+  factory AmountColumnsDto.fromJson(Map<String, Object?> json) {
+    final discriminator = json['kind'];
+    return switch (discriminator) {
+      'DEBIT_CREDIT' => AmountColumnsDebitCreditDto.fromJson(json),
+      'SIGNED' => AmountColumnsSignedDto.fromJson(json),
+      _ => throw FormatException(
+          'Unknown kind for AmountColumnsDto.',
+        ),
+    };
+  }
+
+  /// The raw discriminator value for this branch.
+  String get kind;
+
+  /// Encodes this branch, including its discriminator.
+  Map<String, Object?> toJson();
+}
+
+/// The `DEBIT_CREDIT` branch of [AmountColumnsDto].
+@immutable
+final class AmountColumnsDebitCreditDto extends AmountColumnsDto {
+  const AmountColumnsDebitCreditDto({
+    required this.creditColumn,
+    required this.debitColumn,
+  });
+
+  /// Decodes this branch.
+  factory AmountColumnsDebitCreditDto.fromJson(Map<String, Object?> json) =>
+      AmountColumnsDebitCreditDto(
+        creditColumn: decodeField<int>('AmountColumnsDebitCredit.creditColumn',
+            () => json['creditColumn']! as int),
+        debitColumn: decodeField<int>('AmountColumnsDebitCredit.debitColumn',
+            () => json['debitColumn']! as int),
+      );
+
+  final int creditColumn;
+
+  final int debitColumn;
+
+  @override
+  String get kind => 'DEBIT_CREDIT';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'kind': 'DEBIT_CREDIT',
+        'creditColumn': creditColumn,
+        'debitColumn': debitColumn,
+      };
+
+  @override
+  String toString() => 'AmountColumnsDebitCreditDto()';
+}
+
+/// The `SIGNED` branch of [AmountColumnsDto].
+@immutable
+final class AmountColumnsSignedDto extends AmountColumnsDto {
+  const AmountColumnsSignedDto({
+    required this.amountColumn,
+    required this.signFrame,
+  });
+
+  /// Decodes this branch.
+  factory AmountColumnsSignedDto.fromJson(Map<String, Object?> json) =>
+      AmountColumnsSignedDto(
+        amountColumn: decodeField<int>('AmountColumnsSigned.amountColumn',
+            () => json['amountColumn']! as int),
+        signFrame: decodeField<AmountColumnsSignedSignFrameDto>('AmountColumnsSigned.signFrame',
+            () => AmountColumnsSignedSignFrameDto.fromWire(json['signFrame']! as String)),
+      );
+
+  final int amountColumn;
+
+  final AmountColumnsSignedSignFrameDto signFrame;
+
+  @override
+  String get kind => 'SIGNED';
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+        'kind': 'SIGNED',
+        'amountColumn': amountColumn,
+        'signFrame': signFrame.toWire(),
+      };
+
+  @override
+  String toString() => 'AmountColumnsSignedDto()';
+}
+
+/// Contract enumeration.
+enum AmountColumnsSignedSignFrameDto {
+  accountHolder('ACCOUNT_HOLDER'),
+  bankLedger('BANK_LEDGER'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AmountColumnsSignedSignFrameDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AmountColumnsSignedSignFrameDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class AssignOwnTransactionCategoryRequestDto {
+  const AssignOwnTransactionCategoryRequestDto({
+    required this.categoryCode,
+  });
+
+  /// Decodes the contract representation.
+  factory AssignOwnTransactionCategoryRequestDto.fromJson(Map<String, Object?> json) => AssignOwnTransactionCategoryRequestDto(
+        categoryCode: decodeField<String>('AssignOwnTransactionCategoryRequest.categoryCode',
+            () => json['categoryCode']! as String),
+      );
+
+  final String categoryCode;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'categoryCode': categoryCode,
+      };
+
+  @override
+  String toString() => 'AssignOwnTransactionCategoryRequestDto()';
+}
+
+/// Who decided. There is no AI member and no SUGGESTED member: this platform assigns categories deterministically or a person does.
+enum AssignmentSourceDto {
+  rule('RULE'),
+  user('USER'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AssignmentSourceDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AssignmentSourceDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum AssignmentStatusDto {
+  active('ACTIVE'),
+  superseded('SUPERSEDED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const AssignmentStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static AssignmentStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
 
 /// Contract object.
 @immutable
@@ -34,12 +737,18 @@ final class AuthenticatedSessionDto {
 
   /// Decodes the contract representation.
   factory AuthenticatedSessionDto.fromJson(Map<String, Object?> json) => AuthenticatedSessionDto(
-        accessToken: json['accessToken']! as String,
-        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
-        refreshToken: json['refreshToken']! as String,
-        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
-        sessionId: json['sessionId']! as String,
-        status: AuthenticatedSessionStatusDto.fromWire(json['status']! as String),
+        accessToken: decodeField<String>('AuthenticatedSession.accessToken',
+            () => json['accessToken']! as String),
+        accessTokenExpiresAt: decodeField<DateTime>('AuthenticatedSession.accessTokenExpiresAt',
+            () => DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc()),
+        refreshToken: decodeField<String>('AuthenticatedSession.refreshToken',
+            () => json['refreshToken']! as String),
+        refreshTokenExpiresAt: decodeField<DateTime>('AuthenticatedSession.refreshTokenExpiresAt',
+            () => DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc()),
+        sessionId: decodeField<String>('AuthenticatedSession.sessionId',
+            () => json['sessionId']! as String),
+        status: decodeField<AuthenticatedSessionStatusDto>('AuthenticatedSession.status',
+            () => AuthenticatedSessionStatusDto.fromWire(json['status']! as String)),
       );
 
   /// ES256 JWT, 10 minutes. Carries no roles, permissions, or e-mail.
@@ -78,6 +787,10 @@ enum AuthenticatedSessionStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const AuthenticatedSessionStatusDto(this.wireValue);
@@ -87,6 +800,9 @@ enum AuthenticatedSessionStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static AuthenticatedSessionStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -94,8 +810,117 @@ enum AuthenticatedSessionStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum BalanceKindDto {
+  available('AVAILABLE'),
+  booked('BOOKED'),
+  creditLimit('CREDIT_LIMIT'),
+  current('CURRENT'),
+  otherSourceReported('OTHER_SOURCE_REPORTED'),
+  outstanding('OUTSTANDING'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const BalanceKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static BalanceKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One figure a source reported, with the kind it reported and the moment it was true. `asOf` and `capturedAt` are INSTANTS, not calendar days: they are moments, and typing them as days would invent a timezone.
+/// Deliberately absent: the source's own reference (an opaque internal identifier that is not the subject's to read on this route), the row's tenant and user, and anything derived — nothing here sums, nets or converts.
+@immutable
+final class BalanceSnapshotViewDto {
+  const BalanceSnapshotViewDto({
+    required this.accountId,
+    required this.amount,
+    required this.asOf,
+    required this.availability,
+    required this.balanceKind,
+    required this.capturedAt,
+    required this.snapshotId,
+    required this.sourceKind,
+  });
+
+  /// Decodes the contract representation.
+  factory BalanceSnapshotViewDto.fromJson(Map<String, Object?> json) => BalanceSnapshotViewDto(
+        accountId: decodeField<String>('BalanceSnapshotView.accountId',
+            () => json['accountId']! as String),
+        amount: decodeField<MinorUnitAmountDto>('BalanceSnapshotView.amount',
+            () => MinorUnitAmountDto.fromJson(json['amount']! as Map<String, Object?>)),
+        asOf: decodeField<DateTime>('BalanceSnapshotView.asOf',
+            () => DateTime.parse(json['asOf']! as String).toUtc()),
+        availability: decodeField<RailAvailabilityDto>('BalanceSnapshotView.availability',
+            () => RailAvailabilityDto.fromWire(json['availability']! as String)),
+        balanceKind: decodeField<BalanceKindDto>('BalanceSnapshotView.balanceKind',
+            () => BalanceKindDto.fromWire(json['balanceKind']! as String)),
+        capturedAt: decodeField<DateTime>('BalanceSnapshotView.capturedAt',
+            () => DateTime.parse(json['capturedAt']! as String).toUtc()),
+        snapshotId: decodeField<String>('BalanceSnapshotView.snapshotId',
+            () => json['snapshotId']! as String),
+        sourceKind: decodeField<SourceKindDto>('BalanceSnapshotView.sourceKind',
+            () => SourceKindDto.fromWire(json['sourceKind']! as String)),
+      );
+
+  final String accountId;
+
+  final MinorUnitAmountDto amount;
+
+  /// The moment the source says this figure was true.
+  final DateTime asOf;
+
+  final RailAvailabilityDto availability;
+
+  final BalanceKindDto balanceKind;
+
+  /// The moment this platform recorded it.
+  final DateTime capturedAt;
+
+  final String snapshotId;
+
+  final SourceKindDto sourceKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'amount': amount.toJson(),
+        'asOf': asOf.toUtc().toIso8601String(),
+        'availability': availability.toWire(),
+        'balanceKind': balanceKind.toWire(),
+        'capturedAt': capturedAt.toUtc().toIso8601String(),
+        'snapshotId': snapshotId,
+        'sourceKind': sourceKind.toWire(),
+      };
+
+  @override
+  String toString() => 'BalanceSnapshotViewDto()';
 }
 
 /// Discriminated union keyed on `kind`.
@@ -137,7 +962,8 @@ final class BindingStateBoundDto extends BindingStateDto {
   /// Decodes this branch.
   factory BindingStateBoundDto.fromJson(Map<String, Object?> json) =>
       BindingStateBoundDto(
-        tenant: TenantChoiceDto.fromJson(json['tenant']! as Map<String, Object?>),
+        tenant: decodeField<TenantChoiceDto>('BindingStateBound.tenant',
+            () => TenantChoiceDto.fromJson(json['tenant']! as Map<String, Object?>)),
       );
 
   final TenantChoiceDto tenant;
@@ -165,9 +991,10 @@ final class BindingStateTenantSelectionRequiredDto extends BindingStateDto {
   /// Decodes this branch.
   factory BindingStateTenantSelectionRequiredDto.fromJson(Map<String, Object?> json) =>
       BindingStateTenantSelectionRequiredDto(
-        choices: (json['choices']! as List<Object?>)
+        choices: decodeField<List<TenantChoiceDto>>('BindingStateTenantSelectionRequired.choices',
+            () => (json['choices']! as List<Object?>)
             .map((Object? element) => TenantChoiceDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final List<TenantChoiceDto> choices;
@@ -223,13 +1050,20 @@ final class BootstrapContextDto {
 
   /// Decodes the contract representation.
   factory BootstrapContextDto.fromJson(Map<String, Object?> json) => BootstrapContextDto(
-        binding: BindingStateDto.fromJson(json['binding']! as Map<String, Object?>),
-        capabilities: CapabilitiesSectionDto.fromJson(json['capabilities']! as Map<String, Object?>),
-        jurisdiction: BootstrapContextJurisdictionDto.fromJson(json['jurisdiction']! as Map<String, Object?>),
-        operatingEntity: OperatingEntityStateDto.fromJson(json['operatingEntity']! as Map<String, Object?>),
-        policyPack: json['policyPack'] == null ? null : BootstrapContextPolicyPackDto.fromJson(json['policyPack']! as Map<String, Object?>),
-        session: BootstrapContextSessionDto.fromJson(json['session']! as Map<String, Object?>),
-        user: BootstrapContextUserDto.fromJson(json['user']! as Map<String, Object?>),
+        binding: decodeField<BindingStateDto>('BootstrapContext.binding',
+            () => BindingStateDto.fromJson(json['binding']! as Map<String, Object?>)),
+        capabilities: decodeField<CapabilitiesSectionDto>('BootstrapContext.capabilities',
+            () => CapabilitiesSectionDto.fromJson(json['capabilities']! as Map<String, Object?>)),
+        jurisdiction: decodeField<BootstrapContextJurisdictionDto>('BootstrapContext.jurisdiction',
+            () => BootstrapContextJurisdictionDto.fromJson(json['jurisdiction']! as Map<String, Object?>)),
+        operatingEntity: decodeField<OperatingEntityStateDto>('BootstrapContext.operatingEntity',
+            () => OperatingEntityStateDto.fromJson(json['operatingEntity']! as Map<String, Object?>)),
+        policyPack: decodeField<BootstrapContextPolicyPackDto?>('BootstrapContext.policyPack',
+            () => json['policyPack'] == null ? null : BootstrapContextPolicyPackDto.fromJson(json['policyPack']! as Map<String, Object?>)),
+        session: decodeField<BootstrapContextSessionDto>('BootstrapContext.session',
+            () => BootstrapContextSessionDto.fromJson(json['session']! as Map<String, Object?>)),
+        user: decodeField<BootstrapContextUserDto>('BootstrapContext.user',
+            () => BootstrapContextUserDto.fromJson(json['user']! as Map<String, Object?>)),
       );
 
   final BindingStateDto binding;
@@ -272,8 +1106,10 @@ final class BootstrapContextJurisdictionDto {
 
   /// Decodes the contract representation.
   factory BootstrapContextJurisdictionDto.fromJson(Map<String, Object?> json) => BootstrapContextJurisdictionDto(
-        jurisdictionId: json['jurisdictionId'] as String?,
-        state: BootstrapContextJurisdictionStateDto.fromWire(json['state']! as String),
+        jurisdictionId: decodeField<String?>('BootstrapContextJurisdiction.jurisdictionId',
+            () => json['jurisdictionId'] as String?),
+        state: decodeField<BootstrapContextJurisdictionStateDto>('BootstrapContextJurisdiction.state',
+            () => BootstrapContextJurisdictionStateDto.fromWire(json['state']! as String)),
       );
 
   /// The assigned jurisdiction as DATA (display, pack selection); null when the state is NONE.
@@ -302,6 +1138,10 @@ enum BootstrapContextJurisdictionStateDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const BootstrapContextJurisdictionStateDto(this.wireValue);
@@ -311,6 +1151,9 @@ enum BootstrapContextJurisdictionStateDto {
   /// Parses a wire value, falling back to [unknown].
   static BootstrapContextJurisdictionStateDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -318,7 +1161,7 @@ enum BootstrapContextJurisdictionStateDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -332,8 +1175,10 @@ final class BootstrapContextPolicyPackDto {
 
   /// Decodes the contract representation.
   factory BootstrapContextPolicyPackDto.fromJson(Map<String, Object?> json) => BootstrapContextPolicyPackDto(
-        status: json['status']! as String,
-        version: json['version']! as String,
+        status: decodeField<String>('BootstrapContextPolicyPack.status',
+            () => json['status']! as String),
+        version: decodeField<String>('BootstrapContextPolicyPack.version',
+            () => json['version']! as String),
       );
 
   final String status;
@@ -359,7 +1204,8 @@ final class BootstrapContextSessionDto {
 
   /// Decodes the contract representation.
   factory BootstrapContextSessionDto.fromJson(Map<String, Object?> json) => BootstrapContextSessionDto(
-        sessionId: json['sessionId']! as String,
+        sessionId: decodeField<String>('BootstrapContextSession.sessionId',
+            () => json['sessionId']! as String),
       );
 
   final String sessionId;
@@ -383,8 +1229,10 @@ final class BootstrapContextUserDto {
 
   /// Decodes the contract representation.
   factory BootstrapContextUserDto.fromJson(Map<String, Object?> json) => BootstrapContextUserDto(
-        emailVerified: json['emailVerified']! as bool,
-        userId: json['userId']! as String,
+        emailVerified: decodeField<bool>('BootstrapContextUser.emailVerified',
+            () => json['emailVerified']! as bool),
+        userId: decodeField<String>('BootstrapContextUser.userId',
+            () => json['userId']! as String),
       );
 
   final bool emailVerified;
@@ -411,10 +1259,12 @@ final class CapabilitiesSectionDto {
 
   /// Decodes the contract representation.
   factory CapabilitiesSectionDto.fromJson(Map<String, Object?> json) => CapabilitiesSectionDto(
-        items: (json['items']! as List<Object?>)
+        items: decodeField<List<CapabilityViewDto>>('CapabilitiesSection.items',
+            () => (json['items']! as List<Object?>)
             .map((Object? element) => CapabilityViewDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
-        state: CapabilitiesSectionStateDto.fromWire(json['state']! as String),
+            .toList(growable: false)),
+        state: decodeField<CapabilitiesSectionStateDto>('CapabilitiesSection.state',
+            () => CapabilitiesSectionStateDto.fromWire(json['state']! as String)),
       );
 
   /// CLIENT-SAFE capability views, passed through from the client-safe resolver unenriched. Hidden capabilities never appear, in any state; requirements are actionable only.
@@ -442,6 +1292,10 @@ enum CapabilitiesSectionStateDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const CapabilitiesSectionStateDto(this.wireValue);
@@ -451,6 +1305,9 @@ enum CapabilitiesSectionStateDto {
   /// Parses a wire value, falling back to [unknown].
   static CapabilitiesSectionStateDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -458,7 +1315,7 @@ enum CapabilitiesSectionStateDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -473,11 +1330,14 @@ final class CapabilityViewDto {
 
   /// Decodes the contract representation.
   factory CapabilityViewDto.fromJson(Map<String, Object?> json) => CapabilityViewDto(
-        id: json['id']! as String,
-        requirements: (json['requirements']! as List<Object?>)
+        id: decodeField<String>('CapabilityView.id',
+            () => json['id']! as String),
+        requirements: decodeField<List<CapabilityViewRequirementsItemDto>>('CapabilityView.requirements',
+            () => (json['requirements']! as List<Object?>)
             .map((Object? element) => CapabilityViewRequirementsItemDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
-        status: json['status']! as String,
+            .toList(growable: false)),
+        status: decodeField<String>('CapabilityView.status',
+            () => json['status']! as String),
       );
 
   final String id;
@@ -509,8 +1369,10 @@ final class CapabilityViewRequirementsItemDto {
 
   /// Decodes the contract representation.
   factory CapabilityViewRequirementsItemDto.fromJson(Map<String, Object?> json) => CapabilityViewRequirementsItemDto(
-        detail: json['detail'] as String?,
-        kind: json['kind']! as String,
+        detail: decodeField<String?>('CapabilityViewRequirementsItem.detail',
+            () => json['detail'] as String?),
+        kind: decodeField<String>('CapabilityViewRequirementsItem.kind',
+            () => json['kind']! as String),
       );
 
   final String? detail;
@@ -519,12 +1381,663 @@ final class CapabilityViewRequirementsItemDto {
 
   /// Encodes the contract representation.
   Map<String, Object?> toJson() => <String, Object?>{
-        'detail': detail,
+        if (detail != null) 'detail': detail,
         'kind': kind,
       };
 
   @override
   String toString() => 'CapabilityViewRequirementsItemDto()';
+}
+
+/// Who decided this category and when. There is no confidence and no score. `ruleVersion` is present only for a RULE assignment and is null for a person's own choice.
+@immutable
+final class CategoryAssignmentViewDto {
+  const CategoryAssignmentViewDto({
+    required this.assignedAt,
+    required this.assignmentId,
+    required this.assignmentSource,
+    required this.categoryCode,
+    this.ruleVersion,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory CategoryAssignmentViewDto.fromJson(Map<String, Object?> json) => CategoryAssignmentViewDto(
+        assignedAt: decodeField<DateTime>('CategoryAssignmentView.assignedAt',
+            () => DateTime.parse(json['assignedAt']! as String).toUtc()),
+        assignmentId: decodeField<String>('CategoryAssignmentView.assignmentId',
+            () => json['assignmentId']! as String),
+        assignmentSource: decodeField<AssignmentSourceDto>('CategoryAssignmentView.assignmentSource',
+            () => AssignmentSourceDto.fromWire(json['assignmentSource']! as String)),
+        categoryCode: decodeField<String>('CategoryAssignmentView.categoryCode',
+            () => json['categoryCode']! as String),
+        ruleVersion: decodeField<String?>('CategoryAssignmentView.ruleVersion',
+            () => json['ruleVersion'] as String?),
+        status: decodeField<AssignmentStatusDto>('CategoryAssignmentView.status',
+            () => AssignmentStatusDto.fromWire(json['status']! as String)),
+      );
+
+  final DateTime assignedAt;
+
+  final String assignmentId;
+
+  final AssignmentSourceDto assignmentSource;
+
+  final String categoryCode;
+
+  final String? ruleVersion;
+
+  final AssignmentStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'assignedAt': assignedAt.toUtc().toIso8601String(),
+        'assignmentId': assignmentId,
+        'assignmentSource': assignmentSource.toWire(),
+        'categoryCode': categoryCode,
+        'ruleVersion': ruleVersion,
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'CategoryAssignmentViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class CategoryViewDto {
+  const CategoryViewDto({
+    required this.assignable,
+    required this.catalogueVersion,
+    required this.code,
+    required this.labels,
+    this.parentCode,
+    this.retiredAt,
+  });
+
+  /// Decodes the contract representation.
+  factory CategoryViewDto.fromJson(Map<String, Object?> json) => CategoryViewDto(
+        assignable: decodeField<bool>('CategoryView.assignable',
+            () => json['assignable']! as bool),
+        catalogueVersion: decodeField<String>('CategoryView.catalogueVersion',
+            () => json['catalogueVersion']! as String),
+        code: decodeField<String>('CategoryView.code',
+            () => json['code']! as String),
+        labels: decodeField<CategoryViewLabelsDto>('CategoryView.labels',
+            () => CategoryViewLabelsDto.fromJson(json['labels']! as Map<String, Object?>)),
+        parentCode: decodeField<String?>('CategoryView.parentCode',
+            () => json['parentCode'] as String?),
+        retiredAt: decodeField<DateTime?>('CategoryView.retiredAt',
+            () => json['retiredAt'] == null ? null : DateTime.parse(json['retiredAt']! as String).toUtc()),
+      );
+
+  /// Whether this entry may be chosen now.
+  final bool assignable;
+
+  final String catalogueVersion;
+
+  final String code;
+
+  final CategoryViewLabelsDto labels;
+
+  final String? parentCode;
+
+  final DateTime? retiredAt;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'assignable': assignable,
+        'catalogueVersion': catalogueVersion,
+        'code': code,
+        'labels': labels.toJson(),
+        'parentCode': parentCode,
+        'retiredAt': retiredAt?.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'CategoryViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class CategoryViewLabelsDto {
+  const CategoryViewLabelsDto({
+    required this.ar,
+    required this.en,
+  });
+
+  /// Decodes the contract representation.
+  factory CategoryViewLabelsDto.fromJson(Map<String, Object?> json) => CategoryViewLabelsDto(
+        ar: decodeField<String>('CategoryViewLabels.ar',
+            () => json['ar']! as String),
+        en: decodeField<String>('CategoryViewLabels.en',
+            () => json['en']! as String),
+      );
+
+  final String ar;
+
+  final String en;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'ar': ar,
+        'en': en,
+      };
+
+  @override
+  String toString() => 'CategoryViewLabelsDto()';
+}
+
+/// Contract object.
+@immutable
+final class CommitOwnStatementImportRequestDto {
+  const CommitOwnStatementImportRequestDto({
+    required this.expectedVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory CommitOwnStatementImportRequestDto.fromJson(Map<String, Object?> json) => CommitOwnStatementImportRequestDto(
+        expectedVersion: decodeField<int>('CommitOwnStatementImportRequest.expectedVersion',
+            () => json['expectedVersion']! as int),
+      );
+
+  final int expectedVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'expectedVersion': expectedVersion,
+      };
+
+  @override
+  String toString() => 'CommitOwnStatementImportRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class ConfirmOwnTransferMatchRequestDto {
+  const ConfirmOwnTransferMatchRequestDto({
+    required this.expectedVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory ConfirmOwnTransferMatchRequestDto.fromJson(Map<String, Object?> json) => ConfirmOwnTransferMatchRequestDto(
+        expectedVersion: decodeField<int>('ConfirmOwnTransferMatchRequest.expectedVersion',
+            () => json['expectedVersion']! as int),
+      );
+
+  final int expectedVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'expectedVersion': expectedVersion,
+      };
+
+  @override
+  String toString() => 'ConfirmOwnTransferMatchRequestDto()';
+}
+
+/// How data arrives. Thirteen rails are NAMED because the vocabulary has to describe the world; exactly two may be WRITTEN. Naming a rail is not a claim that it works, which is why `availability` travels beside it everywhere.
+enum ConnectionRailDto {
+  deviceSignal('DEVICE_SIGNAL'),
+  directBankOrWalletApi('DIRECT_BANK_OR_WALLET_API'),
+  hostToHostSftp('HOST_TO_HOST_SFTP'),
+  iso20022File('ISO_20022_FILE'),
+  licensedAggregatorApi('LICENSED_AGGREGATOR_API'),
+  manual('MANUAL'),
+  ofxQfxFile('OFX_QFX_FILE'),
+  openFinanceApi('OPEN_FINANCE_API'),
+  pdfStatement('PDF_STATEMENT'),
+  qifFile('QIF_FILE'),
+  secureEmailStatement('SECURE_EMAIL_STATEMENT'),
+  swiftMtFile('SWIFT_MT_FILE'),
+  userFileUpload('USER_FILE_UPLOAD'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const ConnectionRailDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ConnectionRailDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The connection's own lifecycle. NOT ONE OF THESE MEANS CONNECTED: ACTIVE means the connection accepts data the subject supplies.
+enum ConnectionStatusDto {
+  active('ACTIVE'),
+  notConfigured('NOT_CONFIGURED'),
+  notImplemented('NOT_IMPLEMENTED'),
+  retired('RETIRED'),
+  unavailable('UNAVAILABLE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const ConnectionStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ConnectionStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// A safe summary. Deliberately absent, and to stay absent: `tenantId` and `userId`; any credential of any kind (none is stored); any ciphertext, nonce, auth tag, algorithm or key version; and any synchronisation cursor or last-sync token, which would imply a sync that does not exist.
+@immutable
+final class ConnectionSummaryViewDto {
+  const ConnectionSummaryViewDto({
+    required this.availability,
+    required this.connectionId,
+    required this.createdAt,
+    required this.displayLabel,
+    this.institutionId,
+    required this.link,
+    required this.rail,
+    required this.status,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory ConnectionSummaryViewDto.fromJson(Map<String, Object?> json) => ConnectionSummaryViewDto(
+        availability: decodeField<RailAvailabilityDto>('ConnectionSummaryView.availability',
+            () => RailAvailabilityDto.fromWire(json['availability']! as String)),
+        connectionId: decodeField<String>('ConnectionSummaryView.connectionId',
+            () => json['connectionId']! as String),
+        createdAt: decodeField<DateTime>('ConnectionSummaryView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        displayLabel: decodeField<String>('ConnectionSummaryView.displayLabel',
+            () => json['displayLabel']! as String),
+        institutionId: decodeField<String?>('ConnectionSummaryView.institutionId',
+            () => json['institutionId'] as String?),
+        link: decodeField<InstitutionLinkClaimDto>('ConnectionSummaryView.link',
+            () => InstitutionLinkClaimDto.fromJson(json['link']! as Map<String, Object?>)),
+        rail: decodeField<ConnectionRailDto>('ConnectionSummaryView.rail',
+            () => ConnectionRailDto.fromWire(json['rail']! as String)),
+        status: decodeField<ConnectionStatusDto>('ConnectionSummaryView.status',
+            () => ConnectionStatusDto.fromWire(json['status']! as String)),
+        updatedAt: decodeField<DateTime>('ConnectionSummaryView.updatedAt',
+            () => DateTime.parse(json['updatedAt']! as String).toUtc()),
+        version: decodeField<int>('ConnectionSummaryView.version',
+            () => json['version']! as int),
+      );
+
+  final RailAvailabilityDto availability;
+
+  final String connectionId;
+
+  final DateTime createdAt;
+
+  /// The subject's own name for this connection, decrypted for its owner.
+  final String displayLabel;
+
+  final String? institutionId;
+
+  final InstitutionLinkClaimDto link;
+
+  final ConnectionRailDto rail;
+
+  final ConnectionStatusDto status;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'availability': availability.toWire(),
+        'connectionId': connectionId,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'displayLabel': displayLabel,
+        'institutionId': institutionId,
+        'link': link.toJson(),
+        'rail': rail.toWire(),
+        'status': status.toWire(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'ConnectionSummaryViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class CorrectOwnTransactionRequestDto {
+  const CorrectOwnTransactionRequestDto({
+    this.bookingDate,
+    this.description,
+    this.direction,
+    required this.expectedVersion,
+    this.magnitude,
+    this.merchant = const Omittable<String>.omitted(),
+    this.note = const Omittable<String>.omitted(),
+    this.status,
+    this.valueDate = const Omittable<String>.omitted(),
+  });
+
+  /// Decodes the contract representation.
+  factory CorrectOwnTransactionRequestDto.fromJson(Map<String, Object?> json) => CorrectOwnTransactionRequestDto(
+        bookingDate: decodeField<String?>('CorrectOwnTransactionRequest.bookingDate',
+            () => json['bookingDate'] as String?),
+        description: decodeField<String?>('CorrectOwnTransactionRequest.description',
+            () => json['description'] as String?),
+        direction: decodeField<MoneyDirectionDto?>('CorrectOwnTransactionRequest.direction',
+            () => json['direction'] == null ? null : MoneyDirectionDto.fromWire(json['direction']! as String)),
+        expectedVersion: decodeField<int>('CorrectOwnTransactionRequest.expectedVersion',
+            () => json['expectedVersion']! as int),
+        magnitude: decodeField<MinorUnitAmountDto?>('CorrectOwnTransactionRequest.magnitude',
+            () => json['magnitude'] == null ? null : MinorUnitAmountDto.fromJson(json['magnitude']! as Map<String, Object?>)),
+        merchant: decodeField<Omittable<String>>('CorrectOwnTransactionRequest.merchant',
+            () => json.containsKey('merchant')
+            ? Omittable<String>.sent(json['merchant'] as String?)
+            : const Omittable<String>.omitted()),
+        note: decodeField<Omittable<String>>('CorrectOwnTransactionRequest.note',
+            () => json.containsKey('note')
+            ? Omittable<String>.sent(json['note'] as String?)
+            : const Omittable<String>.omitted()),
+        status: decodeField<TransactionStatusDto?>('CorrectOwnTransactionRequest.status',
+            () => json['status'] == null ? null : TransactionStatusDto.fromWire(json['status']! as String)),
+        valueDate: decodeField<Omittable<String>>('CorrectOwnTransactionRequest.valueDate',
+            () => json.containsKey('valueDate')
+            ? Omittable<String>.sent(json['valueDate'] as String?)
+            : const Omittable<String>.omitted()),
+      );
+
+  final String? bookingDate;
+
+  final String? description;
+
+  final MoneyDirectionDto? direction;
+
+  final int expectedVersion;
+
+  final MinorUnitAmountDto? magnitude;
+
+  final Omittable<String> merchant;
+
+  final Omittable<String> note;
+
+  final TransactionStatusDto? status;
+
+  final Omittable<String> valueDate;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        if (bookingDate != null) 'bookingDate': bookingDate,
+        if (description != null) 'description': description,
+        if (direction != null) 'direction': direction?.toWire(),
+        'expectedVersion': expectedVersion,
+        if (magnitude != null) 'magnitude': magnitude?.toJson(),
+        if (merchant.isSent) 'merchant': merchant.valueOrNull,
+        if (note.isSent) 'note': note.valueOrNull,
+        if (status != null) 'status': status?.toWire(),
+        if (valueDate.isSent) 'valueDate': valueDate.valueOrNull,
+      };
+
+  @override
+  String toString() => 'CorrectOwnTransactionRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class CreateOwnManualFinancialAccountRequestDto {
+  const CreateOwnManualFinancialAccountRequestDto({
+    required this.accountType,
+    required this.currency,
+    required this.displayName,
+    this.institutionId = const Omittable<String>.omitted(),
+    this.mask = const Omittable<String>.omitted(),
+    this.nature,
+    this.userSuppliedInstitutionLabel = const Omittable<String>.omitted(),
+    this.walletKind = const Omittable<WalletKindDto>.omitted(),
+  });
+
+  /// Decodes the contract representation.
+  factory CreateOwnManualFinancialAccountRequestDto.fromJson(Map<String, Object?> json) => CreateOwnManualFinancialAccountRequestDto(
+        accountType: decodeField<AccountTypeDto>('CreateOwnManualFinancialAccountRequest.accountType',
+            () => AccountTypeDto.fromWire(json['accountType']! as String)),
+        currency: decodeField<String>('CreateOwnManualFinancialAccountRequest.currency',
+            () => json['currency']! as String),
+        displayName: decodeField<String>('CreateOwnManualFinancialAccountRequest.displayName',
+            () => json['displayName']! as String),
+        institutionId: decodeField<Omittable<String>>('CreateOwnManualFinancialAccountRequest.institutionId',
+            () => json.containsKey('institutionId')
+            ? Omittable<String>.sent(json['institutionId'] as String?)
+            : const Omittable<String>.omitted()),
+        mask: decodeField<Omittable<String>>('CreateOwnManualFinancialAccountRequest.mask',
+            () => json.containsKey('mask')
+            ? Omittable<String>.sent(json['mask'] as String?)
+            : const Omittable<String>.omitted()),
+        nature: decodeField<AccountNatureDto?>('CreateOwnManualFinancialAccountRequest.nature',
+            () => json['nature'] == null ? null : AccountNatureDto.fromWire(json['nature']! as String)),
+        userSuppliedInstitutionLabel: decodeField<Omittable<String>>('CreateOwnManualFinancialAccountRequest.userSuppliedInstitutionLabel',
+            () => json.containsKey('userSuppliedInstitutionLabel')
+            ? Omittable<String>.sent(json['userSuppliedInstitutionLabel'] as String?)
+            : const Omittable<String>.omitted()),
+        walletKind: decodeField<Omittable<WalletKindDto>>('CreateOwnManualFinancialAccountRequest.walletKind',
+            () => json.containsKey('walletKind')
+            ? Omittable<WalletKindDto>.sent(json['walletKind'] == null ? null : WalletKindDto.fromWire(json['walletKind']! as String))
+            : const Omittable<WalletKindDto>.omitted()),
+      );
+
+  final AccountTypeDto accountType;
+
+  /// ISO 4217 alphabetic code; immutable once records exist.
+  final String currency;
+
+  /// Holder-sensitive. Stored only as ciphertext bound by AAD to tenant, user, table, row and field.
+  final String displayName;
+
+  /// A reviewed catalogue entry, or null.
+  final Omittable<String> institutionId;
+
+  /// A masked tail, e.g. `**1234`. A value that reads as a full account or card number is refused rather than stored.
+  final Omittable<String> mask;
+
+  final AccountNatureDto? nature;
+
+  /// The subject's own name for an issuer the catalogue does not hold. Never promoted to reference data.
+  final Omittable<String> userSuppliedInstitutionLabel;
+
+  /// Required when `accountType` is WALLET and refused otherwise — the database holds the same biconditional (migration 0095).
+  final Omittable<WalletKindDto> walletKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountType': accountType.toWire(),
+        'currency': currency,
+        'displayName': displayName,
+        if (institutionId.isSent) 'institutionId': institutionId.valueOrNull,
+        if (mask.isSent) 'mask': mask.valueOrNull,
+        if (nature != null) 'nature': nature?.toWire(),
+        if (userSuppliedInstitutionLabel.isSent) 'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel.valueOrNull,
+        if (walletKind.isSent) 'walletKind': walletKind.valueOrNull?.toWire(),
+      };
+
+  @override
+  String toString() => 'CreateOwnManualFinancialAccountRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class CreateOwnManualTransactionRequestDto {
+  const CreateOwnManualTransactionRequestDto({
+    required this.accountId,
+    required this.bookingDate,
+    required this.description,
+    required this.direction,
+    this.eventOccurredAt = const Omittable<DateTime>.omitted(),
+    required this.magnitude,
+    this.merchant = const Omittable<String>.omitted(),
+    this.note = const Omittable<String>.omitted(),
+    this.occurrenceOrdinal,
+    this.originalAmount = const Omittable<MinorUnitAmountDto>.omitted(),
+    this.sourceTimezone = const Omittable<String>.omitted(),
+    this.valueDate = const Omittable<String>.omitted(),
+  });
+
+  /// Decodes the contract representation.
+  factory CreateOwnManualTransactionRequestDto.fromJson(Map<String, Object?> json) => CreateOwnManualTransactionRequestDto(
+        accountId: decodeField<String>('CreateOwnManualTransactionRequest.accountId',
+            () => json['accountId']! as String),
+        bookingDate: decodeField<String>('CreateOwnManualTransactionRequest.bookingDate',
+            () => json['bookingDate']! as String),
+        description: decodeField<String>('CreateOwnManualTransactionRequest.description',
+            () => json['description']! as String),
+        direction: decodeField<MoneyDirectionDto>('CreateOwnManualTransactionRequest.direction',
+            () => MoneyDirectionDto.fromWire(json['direction']! as String)),
+        eventOccurredAt: decodeField<Omittable<DateTime>>('CreateOwnManualTransactionRequest.eventOccurredAt',
+            () => json.containsKey('eventOccurredAt')
+            ? Omittable<DateTime>.sent(json['eventOccurredAt'] == null ? null : DateTime.parse(json['eventOccurredAt']! as String).toUtc())
+            : const Omittable<DateTime>.omitted()),
+        magnitude: decodeField<MinorUnitAmountDto>('CreateOwnManualTransactionRequest.magnitude',
+            () => MinorUnitAmountDto.fromJson(json['magnitude']! as Map<String, Object?>)),
+        merchant: decodeField<Omittable<String>>('CreateOwnManualTransactionRequest.merchant',
+            () => json.containsKey('merchant')
+            ? Omittable<String>.sent(json['merchant'] as String?)
+            : const Omittable<String>.omitted()),
+        note: decodeField<Omittable<String>>('CreateOwnManualTransactionRequest.note',
+            () => json.containsKey('note')
+            ? Omittable<String>.sent(json['note'] as String?)
+            : const Omittable<String>.omitted()),
+        occurrenceOrdinal: decodeField<int?>('CreateOwnManualTransactionRequest.occurrenceOrdinal',
+            () => json['occurrenceOrdinal'] as int?),
+        originalAmount: decodeField<Omittable<MinorUnitAmountDto>>('CreateOwnManualTransactionRequest.originalAmount',
+            () => json.containsKey('originalAmount')
+            ? Omittable<MinorUnitAmountDto>.sent(json['originalAmount'] == null ? null : MinorUnitAmountDto.fromJson(json['originalAmount']! as Map<String, Object?>))
+            : const Omittable<MinorUnitAmountDto>.omitted()),
+        sourceTimezone: decodeField<Omittable<String>>('CreateOwnManualTransactionRequest.sourceTimezone',
+            () => json.containsKey('sourceTimezone')
+            ? Omittable<String>.sent(json['sourceTimezone'] as String?)
+            : const Omittable<String>.omitted()),
+        valueDate: decodeField<Omittable<String>>('CreateOwnManualTransactionRequest.valueDate',
+            () => json.containsKey('valueDate')
+            ? Omittable<String>.sent(json['valueDate'] as String?)
+            : const Omittable<String>.omitted()),
+      );
+
+  final String accountId;
+
+  /// The day the institution booked it. A calendar day, never an instant.
+  final String bookingDate;
+
+  final String description;
+
+  final MoneyDirectionDto direction;
+
+  /// A true instant, recorded only when the source stated one. Requires `sourceTimezone` to be meaningful and refuses it when absent.
+  final Omittable<DateTime> eventOccurredAt;
+
+  final MinorUnitAmountDto magnitude;
+
+  final Omittable<String> merchant;
+
+  final Omittable<String> note;
+
+  /// Which occurrence of an otherwise identical movement this is, so a person who genuinely bought the same coffee twice can record both. Must be the next unused ordinal.
+  final int? occurrenceOrdinal;
+
+  /// The amount as the source stated it, when that differs in currency from the booked amount. All-or-nothing: a magnitude without a currency is refused, not half-recorded.
+  final Omittable<MinorUnitAmountDto> originalAmount;
+
+  /// IANA zone name; refused unless `eventOccurredAt` is present.
+  final Omittable<String> sourceTimezone;
+
+  final Omittable<String> valueDate;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'bookingDate': bookingDate,
+        'description': description,
+        'direction': direction.toWire(),
+        if (eventOccurredAt.isSent) 'eventOccurredAt': eventOccurredAt.valueOrNull?.toUtc().toIso8601String(),
+        'magnitude': magnitude.toJson(),
+        if (merchant.isSent) 'merchant': merchant.valueOrNull,
+        if (note.isSent) 'note': note.valueOrNull,
+        if (occurrenceOrdinal != null) 'occurrenceOrdinal': occurrenceOrdinal,
+        if (originalAmount.isSent) 'originalAmount': originalAmount.valueOrNull?.toJson(),
+        if (sourceTimezone.isSent) 'sourceTimezone': sourceTimezone.valueOrNull,
+        if (valueDate.isSent) 'valueDate': valueDate.valueOrNull,
+      };
+
+  @override
+  String toString() => 'CreateOwnManualTransactionRequestDto()';
+}
+
+/// Contract object.
+@immutable
+final class CreateOwnStatementImportRequestDto {
+  const CreateOwnStatementImportRequestDto({
+    required this.accountId,
+    this.connectionId = const Omittable<String>.omitted(),
+  });
+
+  /// Decodes the contract representation.
+  factory CreateOwnStatementImportRequestDto.fromJson(Map<String, Object?> json) => CreateOwnStatementImportRequestDto(
+        accountId: decodeField<String>('CreateOwnStatementImportRequest.accountId',
+            () => json['accountId']! as String),
+        connectionId: decodeField<Omittable<String>>('CreateOwnStatementImportRequest.connectionId',
+            () => json.containsKey('connectionId')
+            ? Omittable<String>.sent(json['connectionId'] as String?)
+            : const Omittable<String>.omitted()),
+      );
+
+  /// One of the caller's OWN accounts.
+  final String accountId;
+
+  /// The caller's own USER_FILE_UPLOAD connection, when they are attributing this file to one. Null attributes it to none. Every word of that is enforced: an id that is not the caller's own or names nothing answers 404 CONNECTION_NOT_FOUND — one arm for both, so a guessed identifier is not a membership test — and one of the caller's own connections on any other rail answers 409 CONNECTION_NOT_USABLE.
+  final Omittable<String> connectionId;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        if (connectionId.isSent) 'connectionId': connectionId.valueOrNull,
+      };
+
+  @override
+  String toString() => 'CreateOwnStatementImportRequestDto()';
 }
 
 /// Contract object.
@@ -538,9 +2051,12 @@ final class CreateTenantInvitationRequestDto {
 
   /// Decodes the contract representation.
   factory CreateTenantInvitationRequestDto.fromJson(Map<String, Object?> json) => CreateTenantInvitationRequestDto(
-        email: json['email']! as String,
-        expiresInHours: json['expiresInHours'] as int?,
-        roleHint: json['roleHint'] as String?,
+        email: decodeField<String>('CreateTenantInvitationRequest.email',
+            () => json['email']! as String),
+        expiresInHours: decodeField<int?>('CreateTenantInvitationRequest.expiresInHours',
+            () => json['expiresInHours'] as int?),
+        roleHint: decodeField<String?>('CreateTenantInvitationRequest.roleHint',
+            () => json['roleHint'] as String?),
       );
 
   /// Normalized (trim + lowercase) before storage and matching.
@@ -554,8 +2070,8 @@ final class CreateTenantInvitationRequestDto {
   /// Encodes the contract representation.
   Map<String, Object?> toJson() => <String, Object?>{
         'email': email,
-        'expiresInHours': expiresInHours,
-        'roleHint': roleHint,
+        if (expiresInHours != null) 'expiresInHours': expiresInHours,
+        if (roleHint != null) 'roleHint': roleHint,
       };
 
   @override
@@ -572,8 +2088,10 @@ final class CreateTenantInvitationResponseDto {
 
   /// Decodes the contract representation.
   factory CreateTenantInvitationResponseDto.fromJson(Map<String, Object?> json) => CreateTenantInvitationResponseDto(
-        invitation: InvitationDto.fromJson(json['invitation']! as Map<String, Object?>),
-        token: json['token']! as String,
+        invitation: decodeField<InvitationDto>('CreateTenantInvitationResponse.invitation',
+            () => InvitationDto.fromJson(json['invitation']! as Map<String, Object?>)),
+        token: decodeField<String>('CreateTenantInvitationResponse.token',
+            () => json['token']! as String),
       );
 
   final InvitationDto invitation;
@@ -593,6 +2111,36 @@ final class CreateTenantInvitationResponseDto {
 
 /// Contract object.
 @immutable
+final class CurrencyViewDto {
+  const CurrencyViewDto({
+    required this.code,
+    required this.exponent,
+  });
+
+  /// Decodes the contract representation.
+  factory CurrencyViewDto.fromJson(Map<String, Object?> json) => CurrencyViewDto(
+        code: decodeField<String>('CurrencyView.code',
+            () => json['code']! as String),
+        exponent: decodeField<int>('CurrencyView.exponent',
+            () => json['exponent']! as int),
+      );
+
+  final String code;
+
+  final int exponent;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'code': code,
+        'exponent': exponent,
+      };
+
+  @override
+  String toString() => 'CurrencyViewDto()';
+}
+
+/// Contract object.
+@immutable
 final class DeclarableJurisdictionReferenceDto {
   const DeclarableJurisdictionReferenceDto({
     required this.approvalRecorded,
@@ -605,12 +2153,18 @@ final class DeclarableJurisdictionReferenceDto {
 
   /// Decodes the contract representation.
   factory DeclarableJurisdictionReferenceDto.fromJson(Map<String, Object?> json) => DeclarableJurisdictionReferenceDto(
-        approvalRecorded: json['approvalRecorded']! as bool,
-        code: json['code']! as String,
-        countryCode: json['countryCode']! as String,
-        countryDisplayNameKey: json['countryDisplayNameKey']! as String,
-        jurisdictionId: json['jurisdictionId']! as String,
-        type: DeclarableJurisdictionReferenceTypeDto.fromWire(json['type']! as String),
+        approvalRecorded: decodeField<bool>('DeclarableJurisdictionReference.approvalRecorded',
+            () => json['approvalRecorded']! as bool),
+        code: decodeField<String>('DeclarableJurisdictionReference.code',
+            () => json['code']! as String),
+        countryCode: decodeField<String>('DeclarableJurisdictionReference.countryCode',
+            () => json['countryCode']! as String),
+        countryDisplayNameKey: decodeField<String>('DeclarableJurisdictionReference.countryDisplayNameKey',
+            () => json['countryDisplayNameKey']! as String),
+        jurisdictionId: decodeField<String>('DeclarableJurisdictionReference.jurisdictionId',
+            () => json['jurisdictionId']! as String),
+        type: decodeField<DeclarableJurisdictionReferenceTypeDto>('DeclarableJurisdictionReference.type',
+            () => DeclarableJurisdictionReferenceTypeDto.fromWire(json['type']! as String)),
       );
 
   /// Whether the platform's register records a COMPLETED legal approval for this entry. False for every entry today. A selectable jurisdiction is a declarable one; it is not an approved one, and a declaration into it stays UNVERIFIED.
@@ -655,6 +2209,10 @@ enum DeclarableJurisdictionReferenceTypeDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const DeclarableJurisdictionReferenceTypeDto(this.wireValue);
@@ -664,6 +2222,9 @@ enum DeclarableJurisdictionReferenceTypeDto {
   /// Parses a wire value, falling back to [unknown].
   static DeclarableJurisdictionReferenceTypeDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -671,7 +2232,7 @@ enum DeclarableJurisdictionReferenceTypeDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -684,7 +2245,8 @@ final class DeclareOwnJurisdictionRequestDto {
 
   /// Decodes the contract representation.
   factory DeclareOwnJurisdictionRequestDto.fromJson(Map<String, Object?> json) => DeclareOwnJurisdictionRequestDto(
-        jurisdictionId: json['jurisdictionId']! as String,
+        jurisdictionId: decodeField<String>('DeclareOwnJurisdictionRequest.jurisdictionId',
+            () => json['jurisdictionId']! as String),
       );
 
   /// A jurisdiction reference code from the platform register, verified server-side. An identifier the register does not hold is refused (400) rather than stored as free text.
@@ -712,11 +2274,16 @@ final class DeclaredJurisdictionDto {
 
   /// Decodes the contract representation.
   factory DeclaredJurisdictionDto.fromJson(Map<String, Object?> json) => DeclaredJurisdictionDto(
-        effectiveFrom: DateTime.parse(json['effectiveFrom']! as String).toUtc(),
-        jurisdictionId: json['jurisdictionId']! as String,
-        recorded: json['recorded']! as bool,
-        source: DeclaredJurisdictionSourceDto.fromWire(json['source']! as String),
-        state: DeclaredJurisdictionStateDto.fromWire(json['state']! as String),
+        effectiveFrom: decodeField<DateTime>('DeclaredJurisdiction.effectiveFrom',
+            () => DateTime.parse(json['effectiveFrom']! as String).toUtc()),
+        jurisdictionId: decodeField<String>('DeclaredJurisdiction.jurisdictionId',
+            () => json['jurisdictionId']! as String),
+        recorded: decodeField<bool>('DeclaredJurisdiction.recorded',
+            () => json['recorded']! as bool),
+        source: decodeField<DeclaredJurisdictionSourceDto>('DeclaredJurisdiction.source',
+            () => DeclaredJurisdictionSourceDto.fromWire(json['source']! as String)),
+        state: decodeField<DeclaredJurisdictionStateDto>('DeclaredJurisdiction.state',
+            () => DeclaredJurisdictionStateDto.fromWire(json['state']! as String)),
       );
 
   final DateTime effectiveFrom;
@@ -753,6 +2320,10 @@ enum DeclaredJurisdictionSourceDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const DeclaredJurisdictionSourceDto(this.wireValue);
@@ -762,6 +2333,9 @@ enum DeclaredJurisdictionSourceDto {
   /// Parses a wire value, falling back to [unknown].
   static DeclaredJurisdictionSourceDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -769,7 +2343,7 @@ enum DeclaredJurisdictionSourceDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -781,6 +2355,10 @@ enum DeclaredJurisdictionStateDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const DeclaredJurisdictionStateDto(this.wireValue);
@@ -790,6 +2368,9 @@ enum DeclaredJurisdictionStateDto {
   /// Parses a wire value, falling back to [unknown].
   static DeclaredJurisdictionStateDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -797,7 +2378,45 @@ enum DeclaredJurisdictionStateDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// How the source's statement was turned into the canonical sign.
+enum DirectionMappingDto {
+  manualEntry('MANUAL_ENTRY'),
+  sourceDirectionWord('SOURCE_DIRECTION_WORD'),
+  sourceSignedAmount('SOURCE_SIGNED_AMOUNT'),
+  sourceSignedAmountInverted('SOURCE_SIGNED_AMOUNT_INVERTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const DirectionMappingDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static DirectionMappingDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -810,7 +2429,8 @@ final class EmailVerifiedResultDto {
 
   /// Decodes the contract representation.
   factory EmailVerifiedResultDto.fromJson(Map<String, Object?> json) => EmailVerifiedResultDto(
-        status: EmailVerifiedResultStatusDto.fromWire(json['status']! as String),
+        status: decodeField<EmailVerifiedResultStatusDto>('EmailVerifiedResult.status',
+            () => EmailVerifiedResultStatusDto.fromWire(json['status']! as String)),
       );
 
   final EmailVerifiedResultStatusDto status;
@@ -832,6 +2452,10 @@ enum EmailVerifiedResultStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const EmailVerifiedResultStatusDto(this.wireValue);
@@ -841,6 +2465,9 @@ enum EmailVerifiedResultStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static EmailVerifiedResultStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -848,8 +2475,119 @@ enum EmailVerifiedResultStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The caller's own account. Every optional value is present-and-null rather than omitted, so absence is something the contract states rather than something a client infers from a missing key.
+/// Deliberately absent, and to stay absent: `tenantId` and `userId` (the caller IS the subject); any ciphertext, nonce, auth tag, encryption algorithm or key version; any external account identifier or fingerprint; and any balance — a balance is a reported fact with its own route, and a figure on the account row would be a second number free to disagree with it.
+@immutable
+final class FinancialAccountViewDto {
+  const FinancialAccountViewDto({
+    required this.accountId,
+    required this.accountType,
+    required this.createdAt,
+    required this.currency,
+    required this.displayName,
+    this.institution,
+    required this.link,
+    this.mask,
+    required this.nature,
+    required this.origin,
+    required this.status,
+    required this.updatedAt,
+    this.userSuppliedInstitutionLabel,
+    required this.version,
+    this.walletKind,
+  });
+
+  /// Decodes the contract representation.
+  factory FinancialAccountViewDto.fromJson(Map<String, Object?> json) => FinancialAccountViewDto(
+        accountId: decodeField<String>('FinancialAccountView.accountId',
+            () => json['accountId']! as String),
+        accountType: decodeField<AccountTypeDto>('FinancialAccountView.accountType',
+            () => AccountTypeDto.fromWire(json['accountType']! as String)),
+        createdAt: decodeField<DateTime>('FinancialAccountView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        currency: decodeField<CurrencyViewDto>('FinancialAccountView.currency',
+            () => CurrencyViewDto.fromJson(json['currency']! as Map<String, Object?>)),
+        displayName: decodeField<String>('FinancialAccountView.displayName',
+            () => json['displayName']! as String),
+        institution: decodeField<InstitutionViewDto?>('FinancialAccountView.institution',
+            () => json['institution'] == null ? null : InstitutionViewDto.fromJson(json['institution']! as Map<String, Object?>)),
+        link: decodeField<AccountLinkStateDto>('FinancialAccountView.link',
+            () => AccountLinkStateDto.fromJson(json['link']! as Map<String, Object?>)),
+        mask: decodeField<String?>('FinancialAccountView.mask',
+            () => json['mask'] as String?),
+        nature: decodeField<AccountNatureDto>('FinancialAccountView.nature',
+            () => AccountNatureDto.fromWire(json['nature']! as String)),
+        origin: decodeField<AccountOriginDto>('FinancialAccountView.origin',
+            () => AccountOriginDto.fromWire(json['origin']! as String)),
+        status: decodeField<AccountStatusDto>('FinancialAccountView.status',
+            () => AccountStatusDto.fromWire(json['status']! as String)),
+        updatedAt: decodeField<DateTime>('FinancialAccountView.updatedAt',
+            () => DateTime.parse(json['updatedAt']! as String).toUtc()),
+        userSuppliedInstitutionLabel: decodeField<String?>('FinancialAccountView.userSuppliedInstitutionLabel',
+            () => json['userSuppliedInstitutionLabel'] as String?),
+        version: decodeField<int>('FinancialAccountView.version',
+            () => json['version']! as int),
+        walletKind: decodeField<WalletKindDto?>('FinancialAccountView.walletKind',
+            () => json['walletKind'] == null ? null : WalletKindDto.fromWire(json['walletKind']! as String)),
+      );
+
+  final String accountId;
+
+  final AccountTypeDto accountType;
+
+  final DateTime createdAt;
+
+  final CurrencyViewDto currency;
+
+  /// The subject's own name for the account, decrypted for its owner.
+  final String displayName;
+
+  /// The reviewed catalogue entry this account points at, resolved for display, or null when the subject named no catalogue issuer. A RETIRED entry still resolves here — an existing record has to remain readable.
+  final InstitutionViewDto? institution;
+
+  final AccountLinkStateDto link;
+
+  final String? mask;
+
+  final AccountNatureDto nature;
+
+  final AccountOriginDto origin;
+
+  final AccountStatusDto status;
+
+  final DateTime updatedAt;
+
+  final String? userSuppliedInstitutionLabel;
+
+  final int version;
+
+  final WalletKindDto? walletKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'accountType': accountType.toWire(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'currency': currency.toJson(),
+        'displayName': displayName,
+        'institution': institution?.toJson(),
+        'link': link.toJson(),
+        'mask': mask,
+        'nature': nature.toWire(),
+        'origin': origin.toWire(),
+        'status': status.toWire(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel,
+        'version': version,
+        'walletKind': walletKind?.toWire(),
+      };
+
+  @override
+  String toString() => 'FinancialAccountViewDto()';
 }
 
 /// Contract object.
@@ -862,8 +2600,10 @@ final class GetOwnTenantResponseDto {
 
   /// Decodes the contract representation.
   factory GetOwnTenantResponseDto.fromJson(Map<String, Object?> json) => GetOwnTenantResponseDto(
-        membership: MembershipDto.fromJson(json['membership']! as Map<String, Object?>),
-        tenant: TenantDto.fromJson(json['tenant']! as Map<String, Object?>),
+        membership: decodeField<MembershipDto>('GetOwnTenantResponse.membership',
+            () => MembershipDto.fromJson(json['membership']! as Map<String, Object?>)),
+        tenant: decodeField<TenantDto>('GetOwnTenantResponse.tenant',
+            () => TenantDto.fromJson(json['tenant']! as Map<String, Object?>)),
       );
 
   final MembershipDto membership;
@@ -882,6 +2622,36 @@ final class GetOwnTenantResponseDto {
 
 /// Contract object.
 @immutable
+final class HistoryCoverageViewDto {
+  const HistoryCoverageViewDto({
+    required this.end,
+    required this.start,
+  });
+
+  /// Decodes the contract representation.
+  factory HistoryCoverageViewDto.fromJson(Map<String, Object?> json) => HistoryCoverageViewDto(
+        end: decodeField<String>('HistoryCoverageView.end',
+            () => json['end']! as String),
+        start: decodeField<String>('HistoryCoverageView.start',
+            () => json['start']! as String),
+      );
+
+  final String end;
+
+  final String start;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'end': end,
+        'start': start,
+      };
+
+  @override
+  String toString() => 'HistoryCoverageViewDto()';
+}
+
+/// Contract object.
+@immutable
 final class IdentityChangePasswordRequestDto {
   const IdentityChangePasswordRequestDto({
     required this.currentPassword,
@@ -890,8 +2660,10 @@ final class IdentityChangePasswordRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityChangePasswordRequestDto.fromJson(Map<String, Object?> json) => IdentityChangePasswordRequestDto(
-        currentPassword: json['currentPassword']! as String,
-        newPassword: json['newPassword']! as String,
+        currentPassword: decodeField<String>('IdentityChangePasswordRequest.currentPassword',
+            () => json['currentPassword']! as String),
+        newPassword: decodeField<String>('IdentityChangePasswordRequest.newPassword',
+            () => json['newPassword']! as String),
       );
 
   final String currentPassword;
@@ -917,7 +2689,8 @@ final class IdentityForgotPasswordRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityForgotPasswordRequestDto.fromJson(Map<String, Object?> json) => IdentityForgotPasswordRequestDto(
-        email: json['email']! as String,
+        email: decodeField<String>('IdentityForgotPasswordRequest.email',
+            () => json['email']! as String),
       );
 
   final String email;
@@ -941,8 +2714,10 @@ final class IdentityLoginRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityLoginRequestDto.fromJson(Map<String, Object?> json) => IdentityLoginRequestDto(
-        email: json['email']! as String,
-        password: json['password']! as String,
+        email: decodeField<String>('IdentityLoginRequest.email',
+            () => json['email']! as String),
+        password: decodeField<String>('IdentityLoginRequest.password',
+            () => json['password']! as String),
       );
 
   final String email;
@@ -1001,11 +2776,16 @@ final class IdentityLoginResponseAuthenticatedDto extends IdentityLoginResponseD
   /// Decodes this branch.
   factory IdentityLoginResponseAuthenticatedDto.fromJson(Map<String, Object?> json) =>
       IdentityLoginResponseAuthenticatedDto(
-        accessToken: json['accessToken']! as String,
-        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
-        refreshToken: json['refreshToken']! as String,
-        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
-        sessionId: json['sessionId']! as String,
+        accessToken: decodeField<String>('IdentityLoginResponseAuthenticated.accessToken',
+            () => json['accessToken']! as String),
+        accessTokenExpiresAt: decodeField<DateTime>('IdentityLoginResponseAuthenticated.accessTokenExpiresAt',
+            () => DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc()),
+        refreshToken: decodeField<String>('IdentityLoginResponseAuthenticated.refreshToken',
+            () => json['refreshToken']! as String),
+        refreshTokenExpiresAt: decodeField<DateTime>('IdentityLoginResponseAuthenticated.refreshTokenExpiresAt',
+            () => DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc()),
+        sessionId: decodeField<String>('IdentityLoginResponseAuthenticated.sessionId',
+            () => json['sessionId']! as String),
       );
 
   /// ES256 JWT, 10 minutes. Carries no roles, permissions, or e-mail.
@@ -1048,8 +2828,10 @@ final class IdentityLoginResponseMfaRequiredDto extends IdentityLoginResponseDto
   /// Decodes this branch.
   factory IdentityLoginResponseMfaRequiredDto.fromJson(Map<String, Object?> json) =>
       IdentityLoginResponseMfaRequiredDto(
-        challengeExpiresAt: DateTime.parse(json['challengeExpiresAt']! as String).toUtc(),
-        challengeToken: json['challengeToken']! as String,
+        challengeExpiresAt: decodeField<DateTime>('IdentityLoginResponseMfaRequired.challengeExpiresAt',
+            () => DateTime.parse(json['challengeExpiresAt']! as String).toUtc()),
+        challengeToken: decodeField<String>('IdentityLoginResponseMfaRequired.challengeToken',
+            () => json['challengeToken']! as String),
       );
 
   final DateTime challengeExpiresAt;
@@ -1081,8 +2863,10 @@ final class IdentityMfaChallengeRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityMfaChallengeRequestDto.fromJson(Map<String, Object?> json) => IdentityMfaChallengeRequestDto(
-        challengeToken: json['challengeToken']! as String,
-        code: json['code']! as String,
+        challengeToken: decodeField<String>('IdentityMfaChallengeRequest.challengeToken',
+            () => json['challengeToken']! as String),
+        code: decodeField<String>('IdentityMfaChallengeRequest.code',
+            () => json['code']! as String),
       );
 
   final String challengeToken;
@@ -1108,7 +2892,8 @@ final class IdentityMfaConfirmRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityMfaConfirmRequestDto.fromJson(Map<String, Object?> json) => IdentityMfaConfirmRequestDto(
-        code: json['code']! as String,
+        code: decodeField<String>('IdentityMfaConfirmRequest.code',
+            () => json['code']! as String),
       );
 
   /// current 6-digit TOTP code
@@ -1132,7 +2917,8 @@ final class IdentityMfaDisableRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityMfaDisableRequestDto.fromJson(Map<String, Object?> json) => IdentityMfaDisableRequestDto(
-        code: json['code']! as String,
+        code: decodeField<String>('IdentityMfaDisableRequest.code',
+            () => json['code']! as String),
       );
 
   /// TOTP code or an unused recovery code
@@ -1157,8 +2943,10 @@ final class IdentityMfaRecoveryRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityMfaRecoveryRequestDto.fromJson(Map<String, Object?> json) => IdentityMfaRecoveryRequestDto(
-        challengeToken: json['challengeToken']! as String,
-        recoveryCode: json['recoveryCode']! as String,
+        challengeToken: decodeField<String>('IdentityMfaRecoveryRequest.challengeToken',
+            () => json['challengeToken']! as String),
+        recoveryCode: decodeField<String>('IdentityMfaRecoveryRequest.recoveryCode',
+            () => json['recoveryCode']! as String),
       );
 
   final String challengeToken;
@@ -1184,7 +2972,8 @@ final class IdentityRefreshRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityRefreshRequestDto.fromJson(Map<String, Object?> json) => IdentityRefreshRequestDto(
-        refreshToken: json['refreshToken']! as String,
+        refreshToken: decodeField<String>('IdentityRefreshRequest.refreshToken',
+            () => json['refreshToken']! as String),
       );
 
   final String refreshToken;
@@ -1208,8 +2997,10 @@ final class IdentityRegisterRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityRegisterRequestDto.fromJson(Map<String, Object?> json) => IdentityRegisterRequestDto(
-        email: json['email']! as String,
-        password: json['password']! as String,
+        email: decodeField<String>('IdentityRegisterRequest.email',
+            () => json['email']! as String),
+        password: decodeField<String>('IdentityRegisterRequest.password',
+            () => json['password']! as String),
       );
 
   final String email;
@@ -1235,7 +3026,8 @@ final class IdentityResendVerificationRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityResendVerificationRequestDto.fromJson(Map<String, Object?> json) => IdentityResendVerificationRequestDto(
-        email: json['email']! as String,
+        email: decodeField<String>('IdentityResendVerificationRequest.email',
+            () => json['email']! as String),
       );
 
   final String email;
@@ -1259,8 +3051,10 @@ final class IdentityResetPasswordRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityResetPasswordRequestDto.fromJson(Map<String, Object?> json) => IdentityResetPasswordRequestDto(
-        newPassword: json['newPassword']! as String,
-        token: json['token']! as String,
+        newPassword: decodeField<String>('IdentityResetPasswordRequest.newPassword',
+            () => json['newPassword']! as String),
+        token: decodeField<String>('IdentityResetPasswordRequest.token',
+            () => json['token']! as String),
       );
 
   final String newPassword;
@@ -1287,8 +3081,10 @@ final class IdentityVerifyEmailRequestDto {
 
   /// Decodes the contract representation.
   factory IdentityVerifyEmailRequestDto.fromJson(Map<String, Object?> json) => IdentityVerifyEmailRequestDto(
-        code: json['code']! as String,
-        email: json['email']! as String,
+        code: decodeField<String>('IdentityVerifyEmailRequest.code',
+            () => json['code']! as String),
+        email: decodeField<String>('IdentityVerifyEmailRequest.email',
+            () => json['email']! as String),
       );
 
   /// 8-character code from the e-mail
@@ -1304,6 +3100,438 @@ final class IdentityVerifyEmailRequestDto {
 
   @override
   String toString() => 'IdentityVerifyEmailRequestDto()';
+}
+
+/// Counts only. `probableDuplicateCount` is present and is 0: probable- duplicate detection is not implemented, and a field that quietly did not exist would read as "none found" rather than "none looked for".
+@immutable
+final class ImportCountsViewDto {
+  const ImportCountsViewDto({
+    required this.committedTransactionCount,
+    required this.exactDuplicateCount,
+    required this.invalidRowCount,
+    required this.probableDuplicateCount,
+    required this.rowCount,
+    required this.validRowCount,
+  });
+
+  /// Decodes the contract representation.
+  factory ImportCountsViewDto.fromJson(Map<String, Object?> json) => ImportCountsViewDto(
+        committedTransactionCount: decodeField<int>('ImportCountsView.committedTransactionCount',
+            () => json['committedTransactionCount']! as int),
+        exactDuplicateCount: decodeField<int>('ImportCountsView.exactDuplicateCount',
+            () => json['exactDuplicateCount']! as int),
+        invalidRowCount: decodeField<int>('ImportCountsView.invalidRowCount',
+            () => json['invalidRowCount']! as int),
+        probableDuplicateCount: decodeField<int>('ImportCountsView.probableDuplicateCount',
+            () => json['probableDuplicateCount']! as int),
+        rowCount: decodeField<int>('ImportCountsView.rowCount',
+            () => json['rowCount']! as int),
+        validRowCount: decodeField<int>('ImportCountsView.validRowCount',
+            () => json['validRowCount']! as int),
+      );
+
+  final int committedTransactionCount;
+
+  final int exactDuplicateCount;
+
+  final int invalidRowCount;
+
+  final int probableDuplicateCount;
+
+  final int rowCount;
+
+  final int validRowCount;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'committedTransactionCount': committedTransactionCount,
+        'exactDuplicateCount': exactDuplicateCount,
+        'invalidRowCount': invalidRowCount,
+        'probableDuplicateCount': probableDuplicateCount,
+        'rowCount': rowCount,
+        'validRowCount': validRowCount,
+      };
+
+  @override
+  String toString() => 'ImportCountsViewDto()';
+}
+
+/// Why an import was refused. A closed vocabulary; never free prose from a file.
+enum ImportRefusalCodeDto {
+  binaryContent('BINARY_CONTENT'),
+  bufferedBytesExceeded('BUFFERED_BYTES_EXCEEDED'),
+  bufferedRowsExceeded('BUFFERED_ROWS_EXCEEDED'),
+  cancelled('CANCELLED'),
+  compressedContent('COMPRESSED_CONTENT'),
+  currencyMismatch('CURRENCY_MISMATCH'),
+  deadlineExceeded('DEADLINE_EXCEEDED'),
+  emptySource('EMPTY_SOURCE'),
+  fieldTooLarge('FIELD_TOO_LARGE'),
+  invalidEncoding('INVALID_ENCODING'),
+  malformedQuoting('MALFORMED_QUOTING'),
+  mappingAmbiguous('MAPPING_AMBIGUOUS'),
+  multipleAccountsInSource('MULTIPLE_ACCOUNTS_IN_SOURCE'),
+  noHeaderRow('NO_HEADER_ROW'),
+  reconciliationMismatch('RECONCILIATION_MISMATCH'),
+  sourceAlreadyImported('SOURCE_ALREADY_IMPORTED'),
+  sourceIntegrityFailed('SOURCE_INTEGRITY_FAILED'),
+  sourceTooLarge('SOURCE_TOO_LARGE'),
+  sourceUnreadable('SOURCE_UNREADABLE'),
+  spreadsheetContent('SPREADSHEET_CONTENT'),
+  tooManyColumns('TOO_MANY_COLUMNS'),
+  tooManyErrors('TOO_MANY_ERRORS'),
+  tooManyRows('TOO_MANY_ROWS'),
+  unsupportedMediaType('UNSUPPORTED_MEDIA_TYPE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const ImportRefusalCodeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ImportRefusalCodeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum ImportStateDto {
+  committed('COMMITTED'),
+  committing('COMMITTING'),
+  draft('DRAFT'),
+  duplicate('DUPLICATE'),
+  erased('ERASED'),
+  failed('FAILED'),
+  parsing('PARSING'),
+  rejected('REJECTED'),
+  reviewRequired('REVIEW_REQUIRED'),
+  sourceStored('SOURCE_STORED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const ImportStateDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ImportStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum InstitutionKindDto {
+  bank('BANK'),
+  cardIssuer('CARD_ISSUER'),
+  exchangeHouse('EXCHANGE_HOUSE'),
+  eMoneyIssuer('E_MONEY_ISSUER'),
+  fintechWallet('FINTECH_WALLET'),
+  mobileMoneyOperator('MOBILE_MONEY_OPERATOR'),
+  other('OTHER'),
+  paymentInstitution('PAYMENT_INSTITUTION'),
+  telcoFinancialServices('TELCO_FINANCIAL_SERVICES'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const InstitutionKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstitutionKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Emitted on the wire so the claim is checkable rather than merely stated in prose. `impliesLiveInstitutionLink` is false for every value of every status vocabulary on this surface, and no issuer exposes an interface to this platform.
+@immutable
+final class InstitutionLinkClaimDto {
+  const InstitutionLinkClaimDto({
+    required this.impliesLiveInstitutionLink,
+    required this.providerAccessStatus,
+  });
+
+  /// Decodes the contract representation.
+  factory InstitutionLinkClaimDto.fromJson(Map<String, Object?> json) => InstitutionLinkClaimDto(
+        impliesLiveInstitutionLink: decodeField<bool>('InstitutionLinkClaim.impliesLiveInstitutionLink',
+            () => json['impliesLiveInstitutionLink']! as bool),
+        providerAccessStatus: decodeField<InstitutionLinkClaimProviderAccessStatusDto>('InstitutionLinkClaim.providerAccessStatus',
+            () => InstitutionLinkClaimProviderAccessStatusDto.fromWire(json['providerAccessStatus']! as String)),
+      );
+
+  final bool impliesLiveInstitutionLink;
+
+  final InstitutionLinkClaimProviderAccessStatusDto providerAccessStatus;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'impliesLiveInstitutionLink': impliesLiveInstitutionLink,
+        'providerAccessStatus': providerAccessStatus.toWire(),
+      };
+
+  @override
+  String toString() => 'InstitutionLinkClaimDto()';
+}
+
+/// Contract enumeration.
+enum InstitutionLinkClaimProviderAccessStatusDto {
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const InstitutionLinkClaimProviderAccessStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstitutionLinkClaimProviderAccessStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// A reviewed catalogue row. It carries no tenant, no user, no country and no market: market presence is a separate per-country concern (`institution_markets`) and is not fabricated here.
+@immutable
+final class InstitutionViewDto {
+  const InstitutionViewDto({
+    required this.code,
+    required this.displayNameAr,
+    required this.displayNameEn,
+    required this.institutionId,
+    required this.kind,
+    required this.status,
+  });
+
+  /// Decodes the contract representation.
+  factory InstitutionViewDto.fromJson(Map<String, Object?> json) => InstitutionViewDto(
+        code: decodeField<String>('InstitutionView.code',
+            () => json['code']! as String),
+        displayNameAr: decodeField<String>('InstitutionView.displayNameAr',
+            () => json['displayNameAr']! as String),
+        displayNameEn: decodeField<String>('InstitutionView.displayNameEn',
+            () => json['displayNameEn']! as String),
+        institutionId: decodeField<String>('InstitutionView.institutionId',
+            () => json['institutionId']! as String),
+        kind: decodeField<InstitutionKindDto>('InstitutionView.kind',
+            () => InstitutionKindDto.fromWire(json['kind']! as String)),
+        status: decodeField<InstitutionViewStatusDto>('InstitutionView.status',
+            () => InstitutionViewStatusDto.fromWire(json['status']! as String)),
+      );
+
+  final String code;
+
+  final String displayNameAr;
+
+  final String displayNameEn;
+
+  final String institutionId;
+
+  final InstitutionKindDto kind;
+
+  final InstitutionViewStatusDto status;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'code': code,
+        'displayNameAr': displayNameAr,
+        'displayNameEn': displayNameEn,
+        'institutionId': institutionId,
+        'kind': kind.toWire(),
+        'status': status.toWire(),
+      };
+
+  @override
+  String toString() => 'InstitutionViewDto()';
+}
+
+/// Contract enumeration.
+enum InstitutionViewStatusDto {
+  active('ACTIVE'),
+  retired('RETIRED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const InstitutionViewStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstitutionViewStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The instrument's own lifecycle. TOKENIZED_CARD is a TYPE, not a live provisioning state, and no member of this vocabulary means the issuer is reachable.
+enum InstrumentStatusDto {
+  active('ACTIVE'),
+  cancelled('CANCELLED'),
+  expired('EXPIRED'),
+  suspended('SUSPENDED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const InstrumentStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstrumentStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum InstrumentTypeDto {
+  other('OTHER'),
+  physicalCard('PHYSICAL_CARD'),
+  prepaidCard('PREPAID_CARD'),
+  qrPaymentIdentity('QR_PAYMENT_IDENTITY'),
+  tokenizedCard('TOKENIZED_CARD'),
+  virtualCard('VIRTUAL_CARD'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const InstrumentTypeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static InstrumentTypeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
 }
 
 /// Contract object.
@@ -1322,14 +3550,22 @@ final class InvitationDto {
 
   /// Decodes the contract representation.
   factory InvitationDto.fromJson(Map<String, Object?> json) => InvitationDto(
-        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
-        email: json['email']! as String,
-        expiresAt: DateTime.parse(json['expiresAt']! as String).toUtc(),
-        id: json['id']! as String,
-        redeemedAt: json['redeemedAt'] == null ? null : DateTime.parse(json['redeemedAt']! as String).toUtc(),
-        revokedAt: json['revokedAt'] == null ? null : DateTime.parse(json['revokedAt']! as String).toUtc(),
-        roleHint: json['roleHint']! as String,
-        tenantId: json['tenantId']! as String,
+        createdAt: decodeField<DateTime>('Invitation.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        email: decodeField<String>('Invitation.email',
+            () => json['email']! as String),
+        expiresAt: decodeField<DateTime>('Invitation.expiresAt',
+            () => DateTime.parse(json['expiresAt']! as String).toUtc()),
+        id: decodeField<String>('Invitation.id',
+            () => json['id']! as String),
+        redeemedAt: decodeField<DateTime?>('Invitation.redeemedAt',
+            () => json['redeemedAt'] == null ? null : DateTime.parse(json['redeemedAt']! as String).toUtc()),
+        revokedAt: decodeField<DateTime?>('Invitation.revokedAt',
+            () => json['revokedAt'] == null ? null : DateTime.parse(json['revokedAt']! as String).toUtc()),
+        roleHint: decodeField<String>('Invitation.roleHint',
+            () => json['roleHint']! as String),
+        tenantId: decodeField<String>('Invitation.tenantId',
+            () => json['tenantId']! as String),
       );
 
   final DateTime createdAt;
@@ -1365,6 +3601,71 @@ final class InvitationDto {
   String toString() => 'InvitationDto()';
 }
 
+/// Emitted on the wire so the claim is checkable rather than merely stated. `impliesLiveIssuerLink` is false for every status the vocabulary permits; no issuer exposes an interface to this platform and no credential of any kind is stored.
+@immutable
+final class IssuerLinkClaimDto {
+  const IssuerLinkClaimDto({
+    required this.impliesLiveIssuerLink,
+    required this.providerAccessStatus,
+  });
+
+  /// Decodes the contract representation.
+  factory IssuerLinkClaimDto.fromJson(Map<String, Object?> json) => IssuerLinkClaimDto(
+        impliesLiveIssuerLink: decodeField<bool>('IssuerLinkClaim.impliesLiveIssuerLink',
+            () => json['impliesLiveIssuerLink']! as bool),
+        providerAccessStatus: decodeField<IssuerLinkClaimProviderAccessStatusDto>('IssuerLinkClaim.providerAccessStatus',
+            () => IssuerLinkClaimProviderAccessStatusDto.fromWire(json['providerAccessStatus']! as String)),
+      );
+
+  final bool impliesLiveIssuerLink;
+
+  final IssuerLinkClaimProviderAccessStatusDto providerAccessStatus;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'impliesLiveIssuerLink': impliesLiveIssuerLink,
+        'providerAccessStatus': providerAccessStatus.toWire(),
+      };
+
+  @override
+  String toString() => 'IssuerLinkClaimDto()';
+}
+
+/// Contract enumeration.
+enum IssuerLinkClaimProviderAccessStatusDto {
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const IssuerLinkClaimProviderAccessStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static IssuerLinkClaimProviderAccessStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
 /// Contract object.
 @immutable
 final class ListApplicableConsentDocumentsResponseDocumentsItemDto {
@@ -1379,14 +3680,20 @@ final class ListApplicableConsentDocumentsResponseDocumentsItemDto {
 
   /// Decodes the contract representation.
   factory ListApplicableConsentDocumentsResponseDocumentsItemDto.fromJson(Map<String, Object?> json) => ListApplicableConsentDocumentsResponseDocumentsItemDto(
-        documentId: json['documentId']! as String,
-        effectiveVersion: json['effectiveVersion'] == null ? null : ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionDto.fromJson(json['effectiveVersion']! as Map<String, Object?>),
-        entityId: json['entityId']! as String,
-        jurisdictionRef: json['jurisdictionRef']! as String,
-        kind: json['kind']! as String,
-        purposeRefs: (json['purposeRefs']! as List<Object?>)
+        documentId: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItem.documentId',
+            () => json['documentId']! as String),
+        effectiveVersion: decodeField<ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionDto?>('ListApplicableConsentDocumentsResponseDocumentsItem.effectiveVersion',
+            () => json['effectiveVersion'] == null ? null : ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionDto.fromJson(json['effectiveVersion']! as Map<String, Object?>)),
+        entityId: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItem.entityId',
+            () => json['entityId']! as String),
+        jurisdictionRef: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItem.jurisdictionRef',
+            () => json['jurisdictionRef']! as String),
+        kind: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItem.kind',
+            () => json['kind']! as String),
+        purposeRefs: decodeField<List<String>>('ListApplicableConsentDocumentsResponseDocumentsItem.purposeRefs',
+            () => (json['purposeRefs']! as List<Object?>)
             .map((Object? element) => element! as String)
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final String documentId;
@@ -1427,6 +3734,10 @@ enum ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassifi
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto(this.wireValue);
@@ -1436,6 +3747,9 @@ enum ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassifi
   /// Parses a wire value, falling back to [unknown].
   static ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1443,7 +3757,7 @@ enum ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassifi
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1460,11 +3774,16 @@ final class ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionD
 
   /// Decodes the contract representation.
   factory ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionDto.fromJson(Map<String, Object?> json) => ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionDto(
-        classification: json['classification'] == null ? null : ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto.fromWire(json['classification']! as String),
-        contentHash: json['contentHash']! as String,
-        effectiveAt: json['effectiveAt'] == null ? null : DateTime.parse(json['effectiveAt']! as String).toUtc(),
-        version: json['version']! as String,
-        versionId: json['versionId']! as String,
+        classification: decodeField<ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto?>('ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersion.classification',
+            () => json['classification'] == null ? null : ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto.fromWire(json['classification']! as String)),
+        contentHash: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersion.contentHash',
+            () => json['contentHash']! as String),
+        effectiveAt: decodeField<DateTime?>('ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersion.effectiveAt',
+            () => json['effectiveAt'] == null ? null : DateTime.parse(json['effectiveAt']! as String).toUtc()),
+        version: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersion.version',
+            () => json['version']! as String),
+        versionId: decodeField<String>('ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersion.versionId',
+            () => json['versionId']! as String),
       );
 
   final ListApplicableConsentDocumentsResponseDocumentsItemEffectiveVersionClassificationDto? classification;
@@ -1500,9 +3819,10 @@ final class ListApplicableConsentDocumentsResponseDto {
 
   /// Decodes the contract representation.
   factory ListApplicableConsentDocumentsResponseDto.fromJson(Map<String, Object?> json) => ListApplicableConsentDocumentsResponseDto(
-        documents: (json['documents']! as List<Object?>)
+        documents: decodeField<List<ListApplicableConsentDocumentsResponseDocumentsItemDto>>('ListApplicableConsentDocumentsResponse.documents',
+            () => (json['documents']! as List<Object?>)
             .map((Object? element) => ListApplicableConsentDocumentsResponseDocumentsItemDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final List<ListApplicableConsentDocumentsResponseDocumentsItemDto> documents;
@@ -1527,9 +3847,10 @@ final class ListDeclarableJurisdictionReferencesResponseDto {
 
   /// Decodes the contract representation.
   factory ListDeclarableJurisdictionReferencesResponseDto.fromJson(Map<String, Object?> json) => ListDeclarableJurisdictionReferencesResponseDto(
-        references: (json['references']! as List<Object?>)
+        references: decodeField<List<DeclarableJurisdictionReferenceDto>>('ListDeclarableJurisdictionReferencesResponse.references',
+            () => (json['references']! as List<Object?>)
             .map((Object? element) => DeclarableJurisdictionReferenceDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final List<DeclarableJurisdictionReferenceDto> references;
@@ -1547,6 +3868,244 @@ final class ListDeclarableJurisdictionReferencesResponseDto {
 
 /// Contract object.
 @immutable
+final class ListFinancialCategoriesResponseDto {
+  const ListFinancialCategoriesResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListFinancialCategoriesResponseDto.fromJson(Map<String, Object?> json) => ListFinancialCategoriesResponseDto(
+        items: decodeField<List<CategoryViewDto>>('ListFinancialCategoriesResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => CategoryViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListFinancialCategoriesResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<CategoryViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((CategoryViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListFinancialCategoriesResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListFinancialInstitutionsResponseDto {
+  const ListFinancialInstitutionsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListFinancialInstitutionsResponseDto.fromJson(Map<String, Object?> json) => ListFinancialInstitutionsResponseDto(
+        items: decodeField<List<InstitutionViewDto>>('ListFinancialInstitutionsResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => InstitutionViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListFinancialInstitutionsResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<InstitutionViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((InstitutionViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListFinancialInstitutionsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnAccountBalanceSnapshotsResponseDto {
+  const ListOwnAccountBalanceSnapshotsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnAccountBalanceSnapshotsResponseDto.fromJson(Map<String, Object?> json) => ListOwnAccountBalanceSnapshotsResponseDto(
+        items: decodeField<List<BalanceSnapshotViewDto>>('ListOwnAccountBalanceSnapshotsResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => BalanceSnapshotViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnAccountBalanceSnapshotsResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<BalanceSnapshotViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((BalanceSnapshotViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnAccountBalanceSnapshotsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnAccountPaymentInstrumentsResponseDto {
+  const ListOwnAccountPaymentInstrumentsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnAccountPaymentInstrumentsResponseDto.fromJson(Map<String, Object?> json) => ListOwnAccountPaymentInstrumentsResponseDto(
+        items: decodeField<List<PaymentInstrumentViewDto>>('ListOwnAccountPaymentInstrumentsResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => PaymentInstrumentViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnAccountPaymentInstrumentsResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<PaymentInstrumentViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((PaymentInstrumentViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnAccountPaymentInstrumentsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnAccountSourceLinksResponseDto {
+  const ListOwnAccountSourceLinksResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnAccountSourceLinksResponseDto.fromJson(Map<String, Object?> json) => ListOwnAccountSourceLinksResponseDto(
+        items: decodeField<List<AccountSourceLinkViewDto>>('ListOwnAccountSourceLinksResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => AccountSourceLinkViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnAccountSourceLinksResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<AccountSourceLinkViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((AccountSourceLinkViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnAccountSourceLinksResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnFinancialAccountsResponseDto {
+  const ListOwnFinancialAccountsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnFinancialAccountsResponseDto.fromJson(Map<String, Object?> json) => ListOwnFinancialAccountsResponseDto(
+        items: decodeField<List<FinancialAccountViewDto>>('ListOwnFinancialAccountsResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => FinancialAccountViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnFinancialAccountsResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<FinancialAccountViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((FinancialAccountViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnFinancialAccountsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnFinancialConnectionsResponseDto {
+  const ListOwnFinancialConnectionsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnFinancialConnectionsResponseDto.fromJson(Map<String, Object?> json) => ListOwnFinancialConnectionsResponseDto(
+        items: decodeField<List<ConnectionSummaryViewDto>>('ListOwnFinancialConnectionsResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => ConnectionSummaryViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnFinancialConnectionsResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<ConnectionSummaryViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((ConnectionSummaryViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnFinancialConnectionsResponseDto()';
+}
+
+/// Contract object.
+@immutable
 final class ListOwnTenantMembershipsResponseDto {
   const ListOwnTenantMembershipsResponseDto({
     required this.memberships,
@@ -1554,9 +4113,10 @@ final class ListOwnTenantMembershipsResponseDto {
 
   /// Decodes the contract representation.
   factory ListOwnTenantMembershipsResponseDto.fromJson(Map<String, Object?> json) => ListOwnTenantMembershipsResponseDto(
-        memberships: (json['memberships']! as List<Object?>)
+        memberships: decodeField<List<MembershipDto>>('ListOwnTenantMembershipsResponse.memberships',
+            () => (json['memberships']! as List<Object?>)
             .map((Object? element) => MembershipDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final List<MembershipDto> memberships;
@@ -1574,6 +4134,108 @@ final class ListOwnTenantMembershipsResponseDto {
 
 /// Contract object.
 @immutable
+final class ListOwnTransactionProvenanceResponseDto {
+  const ListOwnTransactionProvenanceResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTransactionProvenanceResponseDto.fromJson(Map<String, Object?> json) => ListOwnTransactionProvenanceResponseDto(
+        items: decodeField<List<ProvenanceViewDto>>('ListOwnTransactionProvenanceResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => ProvenanceViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnTransactionProvenanceResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<ProvenanceViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((ProvenanceViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnTransactionProvenanceResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnTransactionsResponseDto {
+  const ListOwnTransactionsResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTransactionsResponseDto.fromJson(Map<String, Object?> json) => ListOwnTransactionsResponseDto(
+        items: decodeField<List<TransactionViewDto>>('ListOwnTransactionsResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => TransactionViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnTransactionsResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<TransactionViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((TransactionViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnTransactionsResponseDto()';
+}
+
+/// Contract object.
+@immutable
+final class ListOwnTransferMatchesResponseDto {
+  const ListOwnTransferMatchesResponseDto({
+    required this.items,
+    required this.page,
+  });
+
+  /// Decodes the contract representation.
+  factory ListOwnTransferMatchesResponseDto.fromJson(Map<String, Object?> json) => ListOwnTransferMatchesResponseDto(
+        items: decodeField<List<TransferMatchViewDto>>('ListOwnTransferMatchesResponse.items',
+            () => (json['items']! as List<Object?>)
+            .map((Object? element) => TransferMatchViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        page: decodeField<PageInfoDto>('ListOwnTransferMatchesResponse.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+      );
+
+  final List<TransferMatchViewDto> items;
+
+  final PageInfoDto page;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'items': items
+            .map((TransferMatchViewDto element) => element.toJson())
+            .toList(growable: false),
+        'page': page.toJson(),
+      };
+
+  @override
+  String toString() => 'ListOwnTransferMatchesResponseDto()';
+}
+
+/// Contract object.
+@immutable
 final class ListTenantMembersResponseDto {
   const ListTenantMembersResponseDto({
     required this.members,
@@ -1581,9 +4243,10 @@ final class ListTenantMembersResponseDto {
 
   /// Decodes the contract representation.
   factory ListTenantMembersResponseDto.fromJson(Map<String, Object?> json) => ListTenantMembersResponseDto(
-        members: (json['members']! as List<Object?>)
+        members: decodeField<List<MembershipDto>>('ListTenantMembersResponse.members',
+            () => (json['members']! as List<Object?>)
             .map((Object? element) => MembershipDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final List<MembershipDto> members;
@@ -1608,7 +4271,8 @@ final class LoggedOutResultDto {
 
   /// Decodes the contract representation.
   factory LoggedOutResultDto.fromJson(Map<String, Object?> json) => LoggedOutResultDto(
-        status: LoggedOutResultStatusDto.fromWire(json['status']! as String),
+        status: decodeField<LoggedOutResultStatusDto>('LoggedOutResult.status',
+            () => LoggedOutResultStatusDto.fromWire(json['status']! as String)),
       );
 
   final LoggedOutResultStatusDto status;
@@ -1630,6 +4294,10 @@ enum LoggedOutResultStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const LoggedOutResultStatusDto(this.wireValue);
@@ -1639,6 +4307,9 @@ enum LoggedOutResultStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static LoggedOutResultStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1646,7 +4317,116 @@ enum LoggedOutResultStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Why this source was linked to this account. EXACT_EXTERNAL_REFERENCE or PROBABLE, and nothing in between — there is no confidence score in this platform and none may be invented for display.
+enum MatchBasisDto {
+  exactExternalReference('EXACT_EXTERNAL_REFERENCE'),
+  probable('PROBABLE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const MatchBasisDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static MatchBasisDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One side of the relationship. It carries no amount and no date: those belong to the transaction it names, which the caller can read on the transactions surface. A copy here would be free to disagree with it.
+@immutable
+final class MatchSideViewDto {
+  const MatchSideViewDto({
+    required this.accountId,
+    required this.currency,
+    required this.transactionId,
+  });
+
+  /// Decodes the contract representation.
+  factory MatchSideViewDto.fromJson(Map<String, Object?> json) => MatchSideViewDto(
+        accountId: decodeField<String>('MatchSideView.accountId',
+            () => json['accountId']! as String),
+        currency: decodeField<String>('MatchSideView.currency',
+            () => json['currency']! as String),
+        transactionId: decodeField<String>('MatchSideView.transactionId',
+            () => json['transactionId']! as String),
+      );
+
+  final String accountId;
+
+  final String currency;
+
+  final String transactionId;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'currency': currency,
+        'transactionId': transactionId,
+      };
+
+  @override
+  String toString() => 'MatchSideViewDto()';
+}
+
+/// Contract enumeration.
+enum MatchStateDto {
+  confirmed('CONFIRMED'),
+  rejected('REJECTED'),
+  suggested('SUGGESTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const MatchStateDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static MatchStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1665,13 +4445,20 @@ final class MembershipDto {
 
   /// Decodes the contract representation.
   factory MembershipDto.fromJson(Map<String, Object?> json) => MembershipDto(
-        effectiveFrom: DateTime.parse(json['effectiveFrom']! as String).toUtc(),
-        effectiveTo: json['effectiveTo'] == null ? null : DateTime.parse(json['effectiveTo']! as String).toUtc(),
-        id: json['id']! as String,
-        roleHint: json['roleHint']! as String,
-        state: MembershipStateDto.fromWire(json['state']! as String),
-        tenantId: json['tenantId']! as String,
-        userId: json['userId']! as String,
+        effectiveFrom: decodeField<DateTime>('Membership.effectiveFrom',
+            () => DateTime.parse(json['effectiveFrom']! as String).toUtc()),
+        effectiveTo: decodeField<DateTime?>('Membership.effectiveTo',
+            () => json['effectiveTo'] == null ? null : DateTime.parse(json['effectiveTo']! as String).toUtc()),
+        id: decodeField<String>('Membership.id',
+            () => json['id']! as String),
+        roleHint: decodeField<String>('Membership.roleHint',
+            () => json['roleHint']! as String),
+        state: decodeField<MembershipStateDto>('Membership.state',
+            () => MembershipStateDto.fromWire(json['state']! as String)),
+        tenantId: decodeField<String>('Membership.tenantId',
+            () => json['tenantId']! as String),
+        userId: decodeField<String>('Membership.userId',
+            () => json['userId']! as String),
       );
 
   final DateTime effectiveFrom;
@@ -1716,6 +4503,10 @@ enum MembershipStateDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const MembershipStateDto(this.wireValue);
@@ -1725,6 +4516,9 @@ enum MembershipStateDto {
   /// Parses a wire value, falling back to [unknown].
   static MembershipStateDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1732,7 +4526,7 @@ enum MembershipStateDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1746,10 +4540,12 @@ final class MfaConfirmedDto {
 
   /// Decodes the contract representation.
   factory MfaConfirmedDto.fromJson(Map<String, Object?> json) => MfaConfirmedDto(
-        recoveryCodes: (json['recoveryCodes']! as List<Object?>)
+        recoveryCodes: decodeField<List<String>>('MfaConfirmed.recoveryCodes',
+            () => (json['recoveryCodes']! as List<Object?>)
             .map((Object? element) => element! as String)
-            .toList(growable: false),
-        status: MfaConfirmedStatusDto.fromWire(json['status']! as String),
+            .toList(growable: false)),
+        status: decodeField<MfaConfirmedStatusDto>('MfaConfirmed.status',
+            () => MfaConfirmedStatusDto.fromWire(json['status']! as String)),
       );
 
   /// Ten single-use recovery codes, delivered exactly once. The platform keeps only their digests; there is no route that re-issues them.
@@ -1777,6 +4573,10 @@ enum MfaConfirmedStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const MfaConfirmedStatusDto(this.wireValue);
@@ -1786,6 +4586,9 @@ enum MfaConfirmedStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static MfaConfirmedStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1793,7 +4596,7 @@ enum MfaConfirmedStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1806,7 +4609,8 @@ final class MfaDisabledResultDto {
 
   /// Decodes the contract representation.
   factory MfaDisabledResultDto.fromJson(Map<String, Object?> json) => MfaDisabledResultDto(
-        status: MfaDisabledResultStatusDto.fromWire(json['status']! as String),
+        status: decodeField<MfaDisabledResultStatusDto>('MfaDisabledResult.status',
+            () => MfaDisabledResultStatusDto.fromWire(json['status']! as String)),
       );
 
   final MfaDisabledResultStatusDto status;
@@ -1828,6 +4632,10 @@ enum MfaDisabledResultStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const MfaDisabledResultStatusDto(this.wireValue);
@@ -1837,6 +4645,9 @@ enum MfaDisabledResultStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static MfaDisabledResultStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1844,7 +4655,7 @@ enum MfaDisabledResultStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1859,9 +4670,12 @@ final class MfaEnrolmentStartedDto {
 
   /// Decodes the contract representation.
   factory MfaEnrolmentStartedDto.fromJson(Map<String, Object?> json) => MfaEnrolmentStartedDto(
-        otpauthUrl: json['otpauthUrl']! as String,
-        secret: json['secret']! as String,
-        status: MfaEnrolmentStartedStatusDto.fromWire(json['status']! as String),
+        otpauthUrl: decodeField<String>('MfaEnrolmentStarted.otpauthUrl',
+            () => json['otpauthUrl']! as String),
+        secret: decodeField<String>('MfaEnrolmentStarted.secret',
+            () => json['secret']! as String),
+        status: decodeField<MfaEnrolmentStartedStatusDto>('MfaEnrolmentStarted.status',
+            () => MfaEnrolmentStartedStatusDto.fromWire(json['status']! as String)),
       );
 
   /// The same secret in otpauth form, for a QR code. It EMBEDS the secret: treat it as the credential it is.
@@ -1891,6 +4705,10 @@ enum MfaEnrolmentStartedStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const MfaEnrolmentStartedStatusDto(this.wireValue);
@@ -1900,6 +4718,9 @@ enum MfaEnrolmentStartedStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static MfaEnrolmentStartedStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1907,7 +4728,79 @@ enum MfaEnrolmentStartedStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// An exact amount. `minorUnits` is the signed integer the ledger holds, serialized as CHARACTERS — never a JSON number, because a number is a float and a float is not a ledger value (ADR-0006). `exponent` is the currency's ISO 4217 minor-unit exponent, supplied so a client can render without a currency table of its own; it is not a licence to divide.
+@immutable
+final class MinorUnitAmountDto {
+  const MinorUnitAmountDto({
+    required this.currency,
+    required this.exponent,
+    required this.minorUnits,
+  });
+
+  /// Decodes the contract representation.
+  factory MinorUnitAmountDto.fromJson(Map<String, Object?> json) => MinorUnitAmountDto(
+        currency: decodeField<String>('MinorUnitAmount.currency',
+            () => json['currency']! as String),
+        exponent: decodeField<int>('MinorUnitAmount.exponent',
+            () => json['exponent']! as int),
+        minorUnits: decodeField<String>('MinorUnitAmount.minorUnits',
+            () => json['minorUnits']! as String),
+      );
+
+  final String currency;
+
+  final int exponent;
+
+  final String minorUnits;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'currency': currency,
+        'exponent': exponent,
+        'minorUnits': minorUnits,
+      };
+
+  @override
+  String toString() => 'MinorUnitAmountDto()';
+}
+
+/// MONEY_OUT is money leaving the account and is stored negative; MONEY_IN is money arriving and is stored positive. One convention, named on the wire, so nobody has to infer it from a sign.
+enum MoneyDirectionDto {
+  moneyIn('MONEY_IN'),
+  moneyOut('MONEY_OUT'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const MoneyDirectionDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static MoneyDirectionDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1921,8 +4814,10 @@ final class NeutralReceiptDto {
 
   /// Decodes the contract representation.
   factory NeutralReceiptDto.fromJson(Map<String, Object?> json) => NeutralReceiptDto(
-        detail: json['detail']! as String,
-        status: NeutralReceiptStatusDto.fromWire(json['status']! as String),
+        detail: decodeField<String>('NeutralReceipt.detail',
+            () => json['detail']! as String),
+        status: decodeField<NeutralReceiptStatusDto>('NeutralReceipt.status',
+            () => NeutralReceiptStatusDto.fromWire(json['status']! as String)),
       );
 
   /// Fixed, conditional prose ("if the address is eligible…"). It states no fact about the address and never varies.
@@ -1948,6 +4843,10 @@ enum NeutralReceiptStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const NeutralReceiptStatusDto(this.wireValue);
@@ -1957,6 +4856,9 @@ enum NeutralReceiptStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static NeutralReceiptStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -1964,7 +4866,7 @@ enum NeutralReceiptStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -1978,8 +4880,10 @@ final class OperatingEntityStateDto {
 
   /// Decodes the contract representation.
   factory OperatingEntityStateDto.fromJson(Map<String, Object?> json) => OperatingEntityStateDto(
-        entity: json['entity'] == null ? null : OperatingEntitySummaryDto.fromJson(json['entity']! as Map<String, Object?>),
-        state: OperatingEntityStateStateDto.fromWire(json['state']! as String),
+        entity: decodeField<OperatingEntitySummaryDto?>('OperatingEntityState.entity',
+            () => json['entity'] == null ? null : OperatingEntitySummaryDto.fromJson(json['entity']! as Map<String, Object?>)),
+        state: decodeField<OperatingEntityStateStateDto>('OperatingEntityState.state',
+            () => OperatingEntityStateStateDto.fromWire(json['state']! as String)),
       );
 
   final OperatingEntitySummaryDto? entity;
@@ -2006,6 +4910,10 @@ enum OperatingEntityStateStateDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const OperatingEntityStateStateDto(this.wireValue);
@@ -2015,6 +4923,9 @@ enum OperatingEntityStateStateDto {
   /// Parses a wire value, falling back to [unknown].
   static OperatingEntityStateStateDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2022,7 +4933,7 @@ enum OperatingEntityStateStateDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2038,10 +4949,14 @@ final class OperatingEntitySummaryDto {
 
   /// Decodes the contract representation.
   factory OperatingEntitySummaryDto.fromJson(Map<String, Object?> json) => OperatingEntitySummaryDto(
-        contactReference: json['contactReference'] as String?,
-        id: json['id']! as String,
-        jurisdictionRef: json['jurisdictionRef'] as String?,
-        name: json['name']! as String,
+        contactReference: decodeField<String?>('OperatingEntitySummary.contactReference',
+            () => json['contactReference'] as String?),
+        id: decodeField<String>('OperatingEntitySummary.id',
+            () => json['id']! as String),
+        jurisdictionRef: decodeField<String?>('OperatingEntitySummary.jurisdictionRef',
+            () => json['jurisdictionRef'] as String?),
+        name: decodeField<String>('OperatingEntitySummary.name',
+            () => json['name']! as String),
       );
 
   /// A published role-mailbox reference for data-protection contact, where the register carries one. Never a named person.
@@ -2077,8 +4992,10 @@ final class OtherSessionsRevokedDto {
 
   /// Decodes the contract representation.
   factory OtherSessionsRevokedDto.fromJson(Map<String, Object?> json) => OtherSessionsRevokedDto(
-        revokedCount: json['revokedCount']! as int,
-        status: OtherSessionsRevokedStatusDto.fromWire(json['status']! as String),
+        revokedCount: decodeField<int>('OtherSessionsRevoked.revokedCount',
+            () => json['revokedCount']! as int),
+        status: decodeField<OtherSessionsRevokedStatusDto>('OtherSessionsRevoked.status',
+            () => OtherSessionsRevokedStatusDto.fromWire(json['status']! as String)),
       );
 
   final int revokedCount;
@@ -2103,6 +5020,10 @@ enum OtherSessionsRevokedStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const OtherSessionsRevokedStatusDto(this.wireValue);
@@ -2112,6 +5033,9 @@ enum OtherSessionsRevokedStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static OtherSessionsRevokedStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2119,8 +5043,83 @@ enum OtherSessionsRevokedStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// What this page IS, stated rather than inferred. `hasMore` is explicit so an empty page is a stated end rather than something a client guesses at, and `nextCursor` is null exactly when there is no next page.
+@immutable
+final class PageInfoDto {
+  const PageInfoDto({
+    required this.hasMore,
+    required this.limit,
+    this.nextCursor,
+    required this.returned,
+  });
+
+  /// Decodes the contract representation.
+  factory PageInfoDto.fromJson(Map<String, Object?> json) => PageInfoDto(
+        hasMore: decodeField<bool>('PageInfo.hasMore',
+            () => json['hasMore']! as bool),
+        limit: decodeField<int>('PageInfo.limit',
+            () => json['limit']! as int),
+        nextCursor: decodeField<String?>('PageInfo.nextCursor',
+            () => json['nextCursor'] as String?),
+        returned: decodeField<int>('PageInfo.returned',
+            () => json['returned']! as int),
+      );
+
+  final bool hasMore;
+
+  final int limit;
+
+  final String? nextCursor;
+
+  final int returned;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'hasMore': hasMore,
+        'limit': limit,
+        'nextCursor': nextCursor,
+        'returned': returned,
+      };
+
+  @override
+  String toString() => 'PageInfoDto()';
+}
+
+/// Contract object.
+@immutable
+final class ParseOwnStatementImportSourceRequestDto {
+  const ParseOwnStatementImportSourceRequestDto({
+    required this.mapping,
+    this.statedBalance = const Omittable<StatedStatementBalanceDto>.omitted(),
+  });
+
+  /// Decodes the contract representation.
+  factory ParseOwnStatementImportSourceRequestDto.fromJson(Map<String, Object?> json) => ParseOwnStatementImportSourceRequestDto(
+        mapping: decodeField<StatementColumnMappingDto>('ParseOwnStatementImportSourceRequest.mapping',
+            () => StatementColumnMappingDto.fromJson(json['mapping']! as Map<String, Object?>)),
+        statedBalance: decodeField<Omittable<StatedStatementBalanceDto>>('ParseOwnStatementImportSourceRequest.statedBalance',
+            () => json.containsKey('statedBalance')
+            ? Omittable<StatedStatementBalanceDto>.sent(json['statedBalance'] == null ? null : StatedStatementBalanceDto.fromJson(json['statedBalance']! as Map<String, Object?>))
+            : const Omittable<StatedStatementBalanceDto>.omitted()),
+      );
+
+  final StatementColumnMappingDto mapping;
+
+  /// The balance the statement itself states, for reconciliation. Null when the statement states none.
+  final Omittable<StatedStatementBalanceDto> statedBalance;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'mapping': mapping.toJson(),
+        if (statedBalance.isSent) 'statedBalance': statedBalance.valueOrNull?.toJson(),
+      };
+
+  @override
+  String toString() => 'ParseOwnStatementImportSourceRequestDto()';
 }
 
 /// Contract object.
@@ -2132,7 +5131,8 @@ final class PasswordChangedResultDto {
 
   /// Decodes the contract representation.
   factory PasswordChangedResultDto.fromJson(Map<String, Object?> json) => PasswordChangedResultDto(
-        status: PasswordChangedResultStatusDto.fromWire(json['status']! as String),
+        status: decodeField<PasswordChangedResultStatusDto>('PasswordChangedResult.status',
+            () => PasswordChangedResultStatusDto.fromWire(json['status']! as String)),
       );
 
   final PasswordChangedResultStatusDto status;
@@ -2154,6 +5154,10 @@ enum PasswordChangedResultStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const PasswordChangedResultStatusDto(this.wireValue);
@@ -2163,6 +5167,9 @@ enum PasswordChangedResultStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static PasswordChangedResultStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2170,7 +5177,7 @@ enum PasswordChangedResultStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2183,7 +5190,8 @@ final class PasswordResetResultDto {
 
   /// Decodes the contract representation.
   factory PasswordResetResultDto.fromJson(Map<String, Object?> json) => PasswordResetResultDto(
-        status: PasswordResetResultStatusDto.fromWire(json['status']! as String),
+        status: decodeField<PasswordResetResultStatusDto>('PasswordResetResult.status',
+            () => PasswordResetResultStatusDto.fromWire(json['status']! as String)),
       );
 
   final PasswordResetResultStatusDto status;
@@ -2205,6 +5213,10 @@ enum PasswordResetResultStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const PasswordResetResultStatusDto(this.wireValue);
@@ -2214,6 +5226,9 @@ enum PasswordResetResultStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static PasswordResetResultStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2221,7 +5236,288 @@ enum PasswordResetResultStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One instrument. `version` is the ONLY number in this object, and that is the point: the question "how much is on this card" has no answer in this platform and must not acquire one here.
+@immutable
+final class PaymentInstrumentViewDto {
+  const PaymentInstrumentViewDto({
+    required this.accountId,
+    required this.createdAt,
+    required this.displayLabel,
+    required this.instrumentId,
+    required this.instrumentType,
+    required this.issuerLink,
+    required this.mask,
+    required this.spendable,
+    required this.status,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory PaymentInstrumentViewDto.fromJson(Map<String, Object?> json) => PaymentInstrumentViewDto(
+        accountId: decodeField<String>('PaymentInstrumentView.accountId',
+            () => json['accountId']! as String),
+        createdAt: decodeField<DateTime>('PaymentInstrumentView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        displayLabel: decodeField<String>('PaymentInstrumentView.displayLabel',
+            () => json['displayLabel']! as String),
+        instrumentId: decodeField<String>('PaymentInstrumentView.instrumentId',
+            () => json['instrumentId']! as String),
+        instrumentType: decodeField<InstrumentTypeDto>('PaymentInstrumentView.instrumentType',
+            () => InstrumentTypeDto.fromWire(json['instrumentType']! as String)),
+        issuerLink: decodeField<IssuerLinkClaimDto>('PaymentInstrumentView.issuerLink',
+            () => IssuerLinkClaimDto.fromJson(json['issuerLink']! as Map<String, Object?>)),
+        mask: decodeField<String>('PaymentInstrumentView.mask',
+            () => json['mask']! as String),
+        spendable: decodeField<bool>('PaymentInstrumentView.spendable',
+            () => json['spendable']! as bool),
+        status: decodeField<InstrumentStatusDto>('PaymentInstrumentView.status',
+            () => InstrumentStatusDto.fromWire(json['status']! as String)),
+        updatedAt: decodeField<DateTime>('PaymentInstrumentView.updatedAt',
+            () => DateTime.parse(json['updatedAt']! as String).toUtc()),
+        version: decodeField<int>('PaymentInstrumentView.version',
+            () => json['version']! as int),
+      );
+
+  /// The single balance-bearing account this instrument spends from. Singular and required; there is no field through which it could be re-pointed.
+  final String accountId;
+
+  final DateTime createdAt;
+
+  /// The subject's own name for the instrument, decrypted for its owner.
+  final String displayLabel;
+
+  final String instrumentId;
+
+  final InstrumentTypeDto instrumentType;
+
+  final IssuerLinkClaimDto issuerLink;
+
+  /// A short masked tail, e.g. `**1234`, decrypted for its owner. Never a full number: a value that reads as one is refused at the domain.
+  final String mask;
+
+  /// Whether this instrument may currently be used to spend, stated rather than derived from the status vocabulary.
+  final bool spendable;
+
+  final InstrumentStatusDto status;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'displayLabel': displayLabel,
+        'instrumentId': instrumentId,
+        'instrumentType': instrumentType.toWire(),
+        'issuerLink': issuerLink.toJson(),
+        'mask': mask,
+        'spendable': spendable,
+        'status': status.toWire(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'PaymentInstrumentViewDto()';
+}
+
+/// How this import was processed. `fingerprintVersion` is the ALGORITHM version, never a fingerprint.
+@immutable
+final class ProcessingVersionsViewDto {
+  const ProcessingVersionsViewDto({
+    required this.fingerprintVersion,
+    required this.mappingVersion,
+    required this.normalizationVersion,
+    required this.parserVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory ProcessingVersionsViewDto.fromJson(Map<String, Object?> json) => ProcessingVersionsViewDto(
+        fingerprintVersion: decodeField<String>('ProcessingVersionsView.fingerprintVersion',
+            () => json['fingerprintVersion']! as String),
+        mappingVersion: decodeField<String>('ProcessingVersionsView.mappingVersion',
+            () => json['mappingVersion']! as String),
+        normalizationVersion: decodeField<String>('ProcessingVersionsView.normalizationVersion',
+            () => json['normalizationVersion']! as String),
+        parserVersion: decodeField<String>('ProcessingVersionsView.parserVersion',
+            () => json['parserVersion']! as String),
+      );
+
+  final String fingerprintVersion;
+
+  final String mappingVersion;
+
+  final String normalizationVersion;
+
+  final String parserVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'fingerprintVersion': fingerprintVersion,
+        'mappingVersion': mappingVersion,
+        'normalizationVersion': normalizationVersion,
+        'parserVersion': parserVersion,
+      };
+
+  @override
+  String toString() => 'ProcessingVersionsViewDto()';
+}
+
+/// Contract enumeration.
+enum ProvenanceViewCategoryAssignmentSourceDto {
+  none('NONE'),
+  rule('RULE'),
+  user('USER'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const ProvenanceViewCategoryAssignmentSourceDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ProvenanceViewCategoryAssignmentSourceDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The safe projection. `importedFromStatement` reports EXISTENCE of a statement origin as a boolean; the import id and the row reference are not carried, because a row reference is a handle into staged source content.
+@immutable
+final class ProvenanceViewDto {
+  const ProvenanceViewDto({
+    required this.accountId,
+    required this.availability,
+    required this.categoryAssignmentSource,
+    required this.createdAt,
+    required this.directionMapping,
+    required this.importedFromStatement,
+    required this.revisionNumber,
+    required this.sourceDirection,
+    required this.sourceKind,
+    required this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory ProvenanceViewDto.fromJson(Map<String, Object?> json) => ProvenanceViewDto(
+        accountId: decodeField<String>('ProvenanceView.accountId',
+            () => json['accountId']! as String),
+        availability: decodeField<RailAvailabilityDto>('ProvenanceView.availability',
+            () => RailAvailabilityDto.fromWire(json['availability']! as String)),
+        categoryAssignmentSource: decodeField<ProvenanceViewCategoryAssignmentSourceDto>('ProvenanceView.categoryAssignmentSource',
+            () => ProvenanceViewCategoryAssignmentSourceDto.fromWire(json['categoryAssignmentSource']! as String)),
+        createdAt: decodeField<DateTime>('ProvenanceView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        directionMapping: decodeField<DirectionMappingDto>('ProvenanceView.directionMapping',
+            () => DirectionMappingDto.fromWire(json['directionMapping']! as String)),
+        importedFromStatement: decodeField<bool>('ProvenanceView.importedFromStatement',
+            () => json['importedFromStatement']! as bool),
+        revisionNumber: decodeField<int>('ProvenanceView.revisionNumber',
+            () => json['revisionNumber']! as int),
+        sourceDirection: decodeField<SourceDirectionDto>('ProvenanceView.sourceDirection',
+            () => SourceDirectionDto.fromWire(json['sourceDirection']! as String)),
+        sourceKind: decodeField<SourceKindDto>('ProvenanceView.sourceKind',
+            () => SourceKindDto.fromWire(json['sourceKind']! as String)),
+        versions: decodeField<ProcessingVersionsViewDto>('ProvenanceView.versions',
+            () => ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>)),
+      );
+
+  final String accountId;
+
+  final RailAvailabilityDto availability;
+
+  final ProvenanceViewCategoryAssignmentSourceDto categoryAssignmentSource;
+
+  final DateTime createdAt;
+
+  final DirectionMappingDto directionMapping;
+
+  final bool importedFromStatement;
+
+  final int revisionNumber;
+
+  final SourceDirectionDto sourceDirection;
+
+  final SourceKindDto sourceKind;
+
+  final ProcessingVersionsViewDto versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'availability': availability.toWire(),
+        'categoryAssignmentSource': categoryAssignmentSource.toWire(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'directionMapping': directionMapping.toWire(),
+        'importedFromStatement': importedFromStatement,
+        'revisionNumber': revisionNumber,
+        'sourceDirection': sourceDirection.toWire(),
+        'sourceKind': sourceKind.toWire(),
+        'versions': versions.toJson(),
+      };
+
+  @override
+  String toString() => 'ProvenanceViewDto()';
+}
+
+/// Whether this platform can actually run the rail today. EXECUTABLE for MANUAL and USER_FILE_UPLOAD, NOT_IMPLEMENTED for every other rail — and the database enforces the same split, so an unimplemented rail cannot be written even by direct SQL.
+enum RailAvailabilityDto {
+  executable('EXECUTABLE'),
+  notImplemented('NOT_IMPLEMENTED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const RailAvailabilityDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static RailAvailabilityDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2241,14 +5537,22 @@ final class ReadConsentDocumentContentResponseDto {
 
   /// Decodes the contract representation.
   factory ReadConsentDocumentContentResponseDto.fromJson(Map<String, Object?> json) => ReadConsentDocumentContentResponseDto(
-        content: json['content']! as String,
-        contentHash: json['contentHash']! as String,
-        documentId: json['documentId']! as String,
-        effectiveAt: json['effectiveAt'] == null ? null : DateTime.parse(json['effectiveAt']! as String).toUtc(),
-        format: ReadConsentDocumentContentResponseFormatDto.fromWire(json['format']! as String),
-        language: json['language']! as String,
-        version: json['version']! as String,
-        versionId: json['versionId']! as String,
+        content: decodeField<String>('ReadConsentDocumentContentResponse.content',
+            () => json['content']! as String),
+        contentHash: decodeField<String>('ReadConsentDocumentContentResponse.contentHash',
+            () => json['contentHash']! as String),
+        documentId: decodeField<String>('ReadConsentDocumentContentResponse.documentId',
+            () => json['documentId']! as String),
+        effectiveAt: decodeField<DateTime?>('ReadConsentDocumentContentResponse.effectiveAt',
+            () => json['effectiveAt'] == null ? null : DateTime.parse(json['effectiveAt']! as String).toUtc()),
+        format: decodeField<ReadConsentDocumentContentResponseFormatDto>('ReadConsentDocumentContentResponse.format',
+            () => ReadConsentDocumentContentResponseFormatDto.fromWire(json['format']! as String)),
+        language: decodeField<String>('ReadConsentDocumentContentResponse.language',
+            () => json['language']! as String),
+        version: decodeField<String>('ReadConsentDocumentContentResponse.version',
+            () => json['version']! as String),
+        versionId: decodeField<String>('ReadConsentDocumentContentResponse.versionId',
+            () => json['versionId']! as String),
       );
 
   /// The document text, server-supplied. No internal storage locator appears anywhere in this response.
@@ -2296,6 +5600,10 @@ enum ReadConsentDocumentContentResponseFormatDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const ReadConsentDocumentContentResponseFormatDto(this.wireValue);
@@ -2305,6 +5613,9 @@ enum ReadConsentDocumentContentResponseFormatDto {
   /// Parses a wire value, falling back to [unknown].
   static ReadConsentDocumentContentResponseFormatDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2312,7 +5623,7 @@ enum ReadConsentDocumentContentResponseFormatDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2334,16 +5645,26 @@ final class ReadOwnConsentStatusResponseDto {
 
   /// Decodes the contract representation.
   factory ReadOwnConsentStatusResponseDto.fromJson(Map<String, Object?> json) => ReadOwnConsentStatusResponseDto(
-        documentId: json['documentId'] as String?,
-        effectiveVersion: json['effectiveVersion'] as String?,
-        effectiveVersionId: json['effectiveVersionId'] as String?,
-        grantId: json['grantId'] as String?,
-        grantedVersion: json['grantedVersion'] as String?,
-        jurisdictionRef: json['jurisdictionRef'] as String?,
-        noticeRequired: json['noticeRequired']! as bool,
-        operatingEntityId: json['operatingEntityId']! as String,
-        purposeRef: json['purposeRef']! as String,
-        state: ReadOwnConsentStatusResponseStateDto.fromWire(json['state']! as String),
+        documentId: decodeField<String?>('ReadOwnConsentStatusResponse.documentId',
+            () => json['documentId'] as String?),
+        effectiveVersion: decodeField<String?>('ReadOwnConsentStatusResponse.effectiveVersion',
+            () => json['effectiveVersion'] as String?),
+        effectiveVersionId: decodeField<String?>('ReadOwnConsentStatusResponse.effectiveVersionId',
+            () => json['effectiveVersionId'] as String?),
+        grantId: decodeField<String?>('ReadOwnConsentStatusResponse.grantId',
+            () => json['grantId'] as String?),
+        grantedVersion: decodeField<String?>('ReadOwnConsentStatusResponse.grantedVersion',
+            () => json['grantedVersion'] as String?),
+        jurisdictionRef: decodeField<String?>('ReadOwnConsentStatusResponse.jurisdictionRef',
+            () => json['jurisdictionRef'] as String?),
+        noticeRequired: decodeField<bool>('ReadOwnConsentStatusResponse.noticeRequired',
+            () => json['noticeRequired']! as bool),
+        operatingEntityId: decodeField<String>('ReadOwnConsentStatusResponse.operatingEntityId',
+            () => json['operatingEntityId']! as String),
+        purposeRef: decodeField<String>('ReadOwnConsentStatusResponse.purposeRef',
+            () => json['purposeRef']! as String),
+        state: decodeField<ReadOwnConsentStatusResponseStateDto>('ReadOwnConsentStatusResponse.state',
+            () => ReadOwnConsentStatusResponseStateDto.fromWire(json['state']! as String)),
       );
 
   final String? documentId;
@@ -2395,6 +5716,10 @@ enum ReadOwnConsentStatusResponseStateDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const ReadOwnConsentStatusResponseStateDto(this.wireValue);
@@ -2404,6 +5729,9 @@ enum ReadOwnConsentStatusResponseStateDto {
   /// Parses a wire value, falling back to [unknown].
   static ReadOwnConsentStatusResponseStateDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2411,7 +5739,91 @@ enum ReadOwnConsentStatusResponseStateDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class ReadOwnTransactionResponseDto {
+  const ReadOwnTransactionResponseDto({
+    this.activeCategory,
+    required this.divergesFromSource,
+    required this.revisions,
+    required this.transaction,
+  });
+
+  /// Decodes the contract representation.
+  factory ReadOwnTransactionResponseDto.fromJson(Map<String, Object?> json) => ReadOwnTransactionResponseDto(
+        activeCategory: decodeField<CategoryAssignmentViewDto?>('ReadOwnTransactionResponse.activeCategory',
+            () => json['activeCategory'] == null ? null : CategoryAssignmentViewDto.fromJson(json['activeCategory']! as Map<String, Object?>)),
+        divergesFromSource: decodeField<bool>('ReadOwnTransactionResponse.divergesFromSource',
+            () => json['divergesFromSource']! as bool),
+        revisions: decodeField<List<TransactionRevisionViewDto>>('ReadOwnTransactionResponse.revisions',
+            () => (json['revisions']! as List<Object?>)
+            .map((Object? element) => TransactionRevisionViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        transaction: decodeField<TransactionViewDto>('ReadOwnTransactionResponse.transaction',
+            () => TransactionViewDto.fromJson(json['transaction']! as Map<String, Object?>)),
+      );
+
+  final CategoryAssignmentViewDto? activeCategory;
+
+  /// True when a person has corrected a value the source supplied. The source's own values remain in `revisions`.
+  final bool divergesFromSource;
+
+  final List<TransactionRevisionViewDto> revisions;
+
+  final TransactionViewDto transaction;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'activeCategory': activeCategory?.toJson(),
+        'divergesFromSource': divergesFromSource,
+        'revisions': revisions
+            .map((TransactionRevisionViewDto element) => element.toJson())
+            .toList(growable: false),
+        'transaction': transaction.toJson(),
+      };
+
+  @override
+  String toString() => 'ReadOwnTransactionResponseDto()';
+}
+
+/// Whether the statement's own stated balance agrees with its rows. NOT_AVAILABLE is a real answer — the statement stated no balance, or there was nothing to compare against — and is not the same as MATCHED.
+enum ReconciliationStatusDto {
+  matched('MATCHED'),
+  mismatched('MISMATCHED'),
+  notAvailable('NOT_AVAILABLE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const ReconciliationStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static ReconciliationStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2425,8 +5837,10 @@ final class RecordOwnConsentAcceptanceRequestDto {
 
   /// Decodes the contract representation.
   factory RecordOwnConsentAcceptanceRequestDto.fromJson(Map<String, Object?> json) => RecordOwnConsentAcceptanceRequestDto(
-        legalDocumentVersionId: json['legalDocumentVersionId']! as String,
-        purposeRef: json['purposeRef']! as String,
+        legalDocumentVersionId: decodeField<String>('RecordOwnConsentAcceptanceRequest.legalDocumentVersionId',
+            () => json['legalDocumentVersionId']! as String),
+        purposeRef: decodeField<String>('RecordOwnConsentAcceptanceRequest.purposeRef',
+            () => json['purposeRef']! as String),
       );
 
   final String legalDocumentVersionId;
@@ -2459,14 +5873,22 @@ final class RecordOwnConsentAcceptanceResponseDto {
 
   /// Decodes the contract representation.
   factory RecordOwnConsentAcceptanceResponseDto.fromJson(Map<String, Object?> json) => RecordOwnConsentAcceptanceResponseDto(
-        consentVersion: json['consentVersion']! as String,
-        grantId: json['grantId']! as String,
-        grantedAt: DateTime.parse(json['grantedAt']! as String).toUtc(),
-        jurisdictionRef: json['jurisdictionRef']! as String,
-        legalDocumentVersionId: json['legalDocumentVersionId']! as String,
-        operatingEntityId: json['operatingEntityId']! as String,
-        purposeRef: json['purposeRef']! as String,
-        status: RecordOwnConsentAcceptanceResponseStatusDto.fromWire(json['status']! as String),
+        consentVersion: decodeField<String>('RecordOwnConsentAcceptanceResponse.consentVersion',
+            () => json['consentVersion']! as String),
+        grantId: decodeField<String>('RecordOwnConsentAcceptanceResponse.grantId',
+            () => json['grantId']! as String),
+        grantedAt: decodeField<DateTime>('RecordOwnConsentAcceptanceResponse.grantedAt',
+            () => DateTime.parse(json['grantedAt']! as String).toUtc()),
+        jurisdictionRef: decodeField<String>('RecordOwnConsentAcceptanceResponse.jurisdictionRef',
+            () => json['jurisdictionRef']! as String),
+        legalDocumentVersionId: decodeField<String>('RecordOwnConsentAcceptanceResponse.legalDocumentVersionId',
+            () => json['legalDocumentVersionId']! as String),
+        operatingEntityId: decodeField<String>('RecordOwnConsentAcceptanceResponse.operatingEntityId',
+            () => json['operatingEntityId']! as String),
+        purposeRef: decodeField<String>('RecordOwnConsentAcceptanceResponse.purposeRef',
+            () => json['purposeRef']! as String),
+        status: decodeField<RecordOwnConsentAcceptanceResponseStatusDto>('RecordOwnConsentAcceptanceResponse.status',
+            () => RecordOwnConsentAcceptanceResponseStatusDto.fromWire(json['status']! as String)),
       );
 
   final String consentVersion;
@@ -2509,6 +5931,10 @@ enum RecordOwnConsentAcceptanceResponseStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const RecordOwnConsentAcceptanceResponseStatusDto(this.wireValue);
@@ -2518,6 +5944,9 @@ enum RecordOwnConsentAcceptanceResponseStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static RecordOwnConsentAcceptanceResponseStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2525,7 +5954,7 @@ enum RecordOwnConsentAcceptanceResponseStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2538,7 +5967,8 @@ final class RedeemTenantInvitationRequestDto {
 
   /// Decodes the contract representation.
   factory RedeemTenantInvitationRequestDto.fromJson(Map<String, Object?> json) => RedeemTenantInvitationRequestDto(
-        token: json['token']! as String,
+        token: decodeField<String>('RedeemTenantInvitationRequest.token',
+            () => json['token']! as String),
       );
 
   final String token;
@@ -2562,8 +5992,10 @@ final class RedeemTenantInvitationResponseDto {
 
   /// Decodes the contract representation.
   factory RedeemTenantInvitationResponseDto.fromJson(Map<String, Object?> json) => RedeemTenantInvitationResponseDto(
-        membership: MembershipDto.fromJson(json['membership']! as Map<String, Object?>),
-        tenantId: json['tenantId']! as String,
+        membership: decodeField<MembershipDto>('RedeemTenantInvitationResponse.membership',
+            () => MembershipDto.fromJson(json['membership']! as Map<String, Object?>)),
+        tenantId: decodeField<String>('RedeemTenantInvitationResponse.tenantId',
+            () => json['tenantId']! as String),
       );
 
   final MembershipDto membership;
@@ -2594,11 +6026,16 @@ final class RefreshedSessionDto {
 
   /// Decodes the contract representation.
   factory RefreshedSessionDto.fromJson(Map<String, Object?> json) => RefreshedSessionDto(
-        accessToken: json['accessToken']! as String,
-        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
-        refreshToken: json['refreshToken']! as String,
-        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
-        status: RefreshedSessionStatusDto.fromWire(json['status']! as String),
+        accessToken: decodeField<String>('RefreshedSession.accessToken',
+            () => json['accessToken']! as String),
+        accessTokenExpiresAt: decodeField<DateTime>('RefreshedSession.accessTokenExpiresAt',
+            () => DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc()),
+        refreshToken: decodeField<String>('RefreshedSession.refreshToken',
+            () => json['refreshToken']! as String),
+        refreshTokenExpiresAt: decodeField<DateTime>('RefreshedSession.refreshTokenExpiresAt',
+            () => DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc()),
+        status: decodeField<RefreshedSessionStatusDto>('RefreshedSession.status',
+            () => RefreshedSessionStatusDto.fromWire(json['status']! as String)),
       );
 
   final String accessToken;
@@ -2633,6 +6070,10 @@ enum RefreshedSessionStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const RefreshedSessionStatusDto(this.wireValue);
@@ -2642,6 +6083,9 @@ enum RefreshedSessionStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static RefreshedSessionStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2649,8 +6093,32 @@ enum RefreshedSessionStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class RejectOwnTransferMatchRequestDto {
+  const RejectOwnTransferMatchRequestDto({
+    required this.expectedVersion,
+  });
+
+  /// Decodes the contract representation.
+  factory RejectOwnTransferMatchRequestDto.fromJson(Map<String, Object?> json) => RejectOwnTransferMatchRequestDto(
+        expectedVersion: decodeField<int>('RejectOwnTransferMatchRequest.expectedVersion',
+            () => json['expectedVersion']! as int),
+      );
+
+  final int expectedVersion;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'expectedVersion': expectedVersion,
+      };
+
+  @override
+  String toString() => 'RejectOwnTransferMatchRequestDto()';
 }
 
 /// Contract object.
@@ -2662,14 +6130,15 @@ final class RequestOwnAccountDisableRequestDto {
 
   /// Decodes the contract representation.
   factory RequestOwnAccountDisableRequestDto.fromJson(Map<String, Object?> json) => RequestOwnAccountDisableRequestDto(
-        reason: json['reason'] as String?,
+        reason: decodeField<String?>('RequestOwnAccountDisableRequest.reason',
+            () => json['reason'] as String?),
       );
 
   final String? reason;
 
   /// Encodes the contract representation.
   Map<String, Object?> toJson() => <String, Object?>{
-        'reason': reason,
+        if (reason != null) 'reason': reason,
       };
 
   @override
@@ -2687,9 +6156,12 @@ final class RequestOwnAccountDisableResponseDto {
 
   /// Decodes the contract representation.
   factory RequestOwnAccountDisableResponseDto.fromJson(Map<String, Object?> json) => RequestOwnAccountDisableResponseDto(
-        auditRecorded: json['auditRecorded']! as bool,
-        requestedAt: DateTime.parse(json['requestedAt']! as String).toUtc(),
-        status: RequestOwnAccountDisableResponseStatusDto.fromWire(json['status']! as String),
+        auditRecorded: decodeField<bool>('RequestOwnAccountDisableResponse.auditRecorded',
+            () => json['auditRecorded']! as bool),
+        requestedAt: decodeField<DateTime>('RequestOwnAccountDisableResponse.requestedAt',
+            () => DateTime.parse(json['requestedAt']! as String).toUtc()),
+        status: decodeField<RequestOwnAccountDisableResponseStatusDto>('RequestOwnAccountDisableResponse.status',
+            () => RequestOwnAccountDisableResponseStatusDto.fromWire(json['status']! as String)),
       );
 
   /// False when the state change committed but the audit append failed.
@@ -2718,6 +6190,10 @@ enum RequestOwnAccountDisableResponseStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const RequestOwnAccountDisableResponseStatusDto(this.wireValue);
@@ -2727,6 +6203,9 @@ enum RequestOwnAccountDisableResponseStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static RequestOwnAccountDisableResponseStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2734,8 +6213,164 @@ enum RequestOwnAccountDisableResponseStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum RevisableFieldDto {
+  amount('amount'),
+  bookingdate('bookingDate'),
+  description('description'),
+  merchant('merchant'),
+  note('note'),
+  status('status'),
+  valuedate('valueDate'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const RevisableFieldDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static RevisableFieldDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum RevisionAttributionDto {
+  manualEntry('MANUAL_ENTRY'),
+  sourceImport('SOURCE_IMPORT'),
+  userInput('USER_INPUT'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const RevisionAttributionDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static RevisionAttributionDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// A COMPLETE snapshot of the revisable values, never a patch.
+@immutable
+final class RevisionValuesViewDto {
+  const RevisionValuesViewDto({
+    required this.amount,
+    required this.bookingDate,
+    required this.description,
+    required this.direction,
+    this.eventOccurredAt,
+    this.merchant,
+    this.note,
+    this.sourceTimezone,
+    required this.status,
+    this.valueDate,
+  });
+
+  /// Decodes the contract representation.
+  factory RevisionValuesViewDto.fromJson(Map<String, Object?> json) => RevisionValuesViewDto(
+        amount: decodeField<MinorUnitAmountDto>('RevisionValuesView.amount',
+            () => MinorUnitAmountDto.fromJson(json['amount']! as Map<String, Object?>)),
+        bookingDate: decodeField<String>('RevisionValuesView.bookingDate',
+            () => json['bookingDate']! as String),
+        description: decodeField<String>('RevisionValuesView.description',
+            () => json['description']! as String),
+        direction: decodeField<MoneyDirectionDto>('RevisionValuesView.direction',
+            () => MoneyDirectionDto.fromWire(json['direction']! as String)),
+        eventOccurredAt: decodeField<DateTime?>('RevisionValuesView.eventOccurredAt',
+            () => json['eventOccurredAt'] == null ? null : DateTime.parse(json['eventOccurredAt']! as String).toUtc()),
+        merchant: decodeField<String?>('RevisionValuesView.merchant',
+            () => json['merchant'] as String?),
+        note: decodeField<String?>('RevisionValuesView.note',
+            () => json['note'] as String?),
+        sourceTimezone: decodeField<String?>('RevisionValuesView.sourceTimezone',
+            () => json['sourceTimezone'] as String?),
+        status: decodeField<TransactionStatusDto>('RevisionValuesView.status',
+            () => TransactionStatusDto.fromWire(json['status']! as String)),
+        valueDate: decodeField<String?>('RevisionValuesView.valueDate',
+            () => json['valueDate'] as String?),
+      );
+
+  final MinorUnitAmountDto amount;
+
+  final String bookingDate;
+
+  final String description;
+
+  final MoneyDirectionDto direction;
+
+  final DateTime? eventOccurredAt;
+
+  final String? merchant;
+
+  final String? note;
+
+  final String? sourceTimezone;
+
+  final TransactionStatusDto status;
+
+  final String? valueDate;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'amount': amount.toJson(),
+        'bookingDate': bookingDate,
+        'description': description,
+        'direction': direction.toWire(),
+        'eventOccurredAt': eventOccurredAt?.toUtc().toIso8601String(),
+        'merchant': merchant,
+        'note': note,
+        'sourceTimezone': sourceTimezone,
+        'status': status.toWire(),
+        'valueDate': valueDate,
+      };
+
+  @override
+  String toString() => 'RevisionValuesViewDto()';
 }
 
 /// Contract object.
@@ -2747,7 +6382,8 @@ final class RevokeTenantInvitationResponseDto {
 
   /// Decodes the contract representation.
   factory RevokeTenantInvitationResponseDto.fromJson(Map<String, Object?> json) => RevokeTenantInvitationResponseDto(
-        invitation: InvitationDto.fromJson(json['invitation']! as Map<String, Object?>),
+        invitation: decodeField<InvitationDto>('RevokeTenantInvitationResponse.invitation',
+            () => InvitationDto.fromJson(json['invitation']! as Map<String, Object?>)),
       );
 
   final InvitationDto invitation;
@@ -2761,6 +6397,143 @@ final class RevokeTenantInvitationResponseDto {
   String toString() => 'RevokeTenantInvitationResponseDto()';
 }
 
+/// Contract enumeration.
+enum RowErrorReasonCodeDto {
+  ambiguousDateOrder('AMBIGUOUS_DATE_ORDER'),
+  ambiguousDecimalSeparator('AMBIGUOUS_DECIMAL_SEPARATOR'),
+  ambiguousDirection('AMBIGUOUS_DIRECTION'),
+  amountExceedsRange('AMOUNT_EXCEEDS_RANGE'),
+  columnCountMismatch('COLUMN_COUNT_MISMATCH'),
+  currencyMismatch('CURRENCY_MISMATCH'),
+  debitAndCreditBothAbsent('DEBIT_AND_CREDIT_BOTH_ABSENT'),
+  debitAndCreditBothPresent('DEBIT_AND_CREDIT_BOTH_PRESENT'),
+  decimalPlacesExceedCurrency('DECIMAL_PLACES_EXCEED_CURRENCY'),
+  fieldTooLarge('FIELD_TOO_LARGE'),
+  invalidEncoding('INVALID_ENCODING'),
+  malformedQuoting('MALFORMED_QUOTING'),
+  requiredFieldMissing('REQUIRED_FIELD_MISSING'),
+  tooManyColumns('TOO_MANY_COLUMNS'),
+  unknownCurrency('UNKNOWN_CURRENCY'),
+  unknownTimezone('UNKNOWN_TIMEZONE'),
+  unreadableAmount('UNREADABLE_AMOUNT'),
+  unreadableDate('UNREADABLE_DATE'),
+  unreadableInstant('UNREADABLE_INSTANT'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const RowErrorReasonCodeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static RowErrorReasonCodeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Exactly three fields, and there is never a fourth. `rowNumber` is 1-based among DATA rows — never an offset into the file — and no cell value accompanies it.
+@immutable
+final class RowErrorViewDto {
+  const RowErrorViewDto({
+    required this.reasonCode,
+    required this.rowNumber,
+    required this.safeField,
+  });
+
+  /// Decodes the contract representation.
+  factory RowErrorViewDto.fromJson(Map<String, Object?> json) => RowErrorViewDto(
+        reasonCode: decodeField<RowErrorReasonCodeDto>('RowErrorView.reasonCode',
+            () => RowErrorReasonCodeDto.fromWire(json['reasonCode']! as String)),
+        rowNumber: decodeField<int>('RowErrorView.rowNumber',
+            () => json['rowNumber']! as int),
+        safeField: decodeField<SafeFieldDto>('RowErrorView.safeField',
+            () => SafeFieldDto.fromWire(json['safeField']! as String)),
+      );
+
+  final RowErrorReasonCodeDto reasonCode;
+
+  final int rowNumber;
+
+  final SafeFieldDto safeField;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'reasonCode': reasonCode.toWire(),
+        'rowNumber': rowNumber,
+        'safeField': safeField.toWire(),
+      };
+
+  @override
+  String toString() => 'RowErrorViewDto()';
+}
+
+/// WHICH field of a row failed, from a CLOSED module vocabulary — never the file's own header text, which can itself contain an account number.
+enum SafeFieldDto {
+  amount('AMOUNT'),
+  bookingDate('BOOKING_DATE'),
+  creditAmount('CREDIT_AMOUNT'),
+  currency('CURRENCY'),
+  debitAmount('DEBIT_AMOUNT'),
+  description('DESCRIPTION'),
+  eventOccurredAt('EVENT_OCCURRED_AT'),
+  instrumentMask('INSTRUMENT_MASK'),
+  merchant('MERCHANT'),
+  row('ROW'),
+  sourceBalance('SOURCE_BALANCE'),
+  sourceReference('SOURCE_REFERENCE'),
+  sourceTimezone('SOURCE_TIMEZONE'),
+  valueDate('VALUE_DATE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SafeFieldDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SafeFieldDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
 /// Contract object.
 @immutable
 final class SessionListingDto {
@@ -2770,9 +6543,10 @@ final class SessionListingDto {
 
   /// Decodes the contract representation.
   factory SessionListingDto.fromJson(Map<String, Object?> json) => SessionListingDto(
-        sessions: (json['sessions']! as List<Object?>)
+        sessions: decodeField<List<SessionSummaryDto>>('SessionListing.sessions',
+            () => (json['sessions']! as List<Object?>)
             .map((Object? element) => SessionSummaryDto.fromJson(element! as Map<String, Object?>))
-            .toList(growable: false),
+            .toList(growable: false)),
       );
 
   final List<SessionSummaryDto> sessions;
@@ -2797,7 +6571,8 @@ final class SessionRevokedResultDto {
 
   /// Decodes the contract representation.
   factory SessionRevokedResultDto.fromJson(Map<String, Object?> json) => SessionRevokedResultDto(
-        status: SessionRevokedResultStatusDto.fromWire(json['status']! as String),
+        status: decodeField<SessionRevokedResultStatusDto>('SessionRevokedResult.status',
+            () => SessionRevokedResultStatusDto.fromWire(json['status']! as String)),
       );
 
   final SessionRevokedResultStatusDto status;
@@ -2819,6 +6594,10 @@ enum SessionRevokedResultStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const SessionRevokedResultStatusDto(this.wireValue);
@@ -2828,6 +6607,9 @@ enum SessionRevokedResultStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static SessionRevokedResultStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -2835,7 +6617,7 @@ enum SessionRevokedResultStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -2853,12 +6635,18 @@ final class SessionSummaryDto {
 
   /// Decodes the contract representation.
   factory SessionSummaryDto.fromJson(Map<String, Object?> json) => SessionSummaryDto(
-        absoluteExpiresAt: DateTime.parse(json['absoluteExpiresAt']! as String).toUtc(),
-        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
-        current: json['current']! as bool,
-        lastSeenAt: DateTime.parse(json['lastSeenAt']! as String).toUtc(),
-        sessionId: json['sessionId']! as String,
-        userAgentSummary: json['userAgentSummary'] as String?,
+        absoluteExpiresAt: decodeField<DateTime>('SessionSummary.absoluteExpiresAt',
+            () => DateTime.parse(json['absoluteExpiresAt']! as String).toUtc()),
+        createdAt: decodeField<DateTime>('SessionSummary.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        current: decodeField<bool>('SessionSummary.current',
+            () => json['current']! as bool),
+        lastSeenAt: decodeField<DateTime>('SessionSummary.lastSeenAt',
+            () => DateTime.parse(json['lastSeenAt']! as String).toUtc()),
+        sessionId: decodeField<String>('SessionSummary.sessionId',
+            () => json['sessionId']! as String),
+        userAgentSummary: decodeField<String?>('SessionSummary.userAgentSummary',
+            () => json['userAgentSummary'] as String?),
       );
 
   final DateTime absoluteExpiresAt;
@@ -2898,7 +6686,8 @@ final class SetPlatformTenantBindingRequestDto {
 
   /// Decodes the contract representation.
   factory SetPlatformTenantBindingRequestDto.fromJson(Map<String, Object?> json) => SetPlatformTenantBindingRequestDto(
-        tenantId: json['tenantId']! as String,
+        tenantId: decodeField<String>('SetPlatformTenantBindingRequest.tenantId',
+            () => json['tenantId']! as String),
       );
 
   /// The selected tenant — must be one of the caller's own active memberships; verified server-side, never trusted.
@@ -2951,7 +6740,8 @@ final class SetPlatformTenantBindingResponseBoundDto extends SetPlatformTenantBi
   /// Decodes this branch.
   factory SetPlatformTenantBindingResponseBoundDto.fromJson(Map<String, Object?> json) =>
       SetPlatformTenantBindingResponseBoundDto(
-        binding: BindingStateDto.fromJson(json['binding']! as Map<String, Object?>),
+        binding: decodeField<BindingStateDto>('SetPlatformTenantBindingResponseBound.binding',
+            () => BindingStateDto.fromJson(json['binding']! as Map<String, Object?>)),
       );
 
   final BindingStateDto binding;
@@ -2980,8 +6770,10 @@ final class SetPlatformTenantBindingResponseSwitchedDto extends SetPlatformTenan
   /// Decodes this branch.
   factory SetPlatformTenantBindingResponseSwitchedDto.fromJson(Map<String, Object?> json) =>
       SetPlatformTenantBindingResponseSwitchedDto(
-        binding: BindingStateDto.fromJson(json['binding']! as Map<String, Object?>),
-        tokens: SetPlatformTenantBindingResponseSwitchedTokensDto.fromJson(json['tokens']! as Map<String, Object?>),
+        binding: decodeField<BindingStateDto>('SetPlatformTenantBindingResponseSwitched.binding',
+            () => BindingStateDto.fromJson(json['binding']! as Map<String, Object?>)),
+        tokens: decodeField<SetPlatformTenantBindingResponseSwitchedTokensDto>('SetPlatformTenantBindingResponseSwitched.tokens',
+            () => SetPlatformTenantBindingResponseSwitchedTokensDto.fromJson(json['tokens']! as Map<String, Object?>)),
       );
 
   final BindingStateDto binding;
@@ -3015,11 +6807,16 @@ final class SetPlatformTenantBindingResponseSwitchedTokensDto {
 
   /// Decodes the contract representation.
   factory SetPlatformTenantBindingResponseSwitchedTokensDto.fromJson(Map<String, Object?> json) => SetPlatformTenantBindingResponseSwitchedTokensDto(
-        accessToken: json['accessToken']! as String,
-        accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc(),
-        refreshToken: json['refreshToken']! as String,
-        refreshTokenExpiresAt: DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc(),
-        sessionId: json['sessionId']! as String,
+        accessToken: decodeField<String>('SetPlatformTenantBindingResponseSwitchedTokens.accessToken',
+            () => json['accessToken']! as String),
+        accessTokenExpiresAt: decodeField<DateTime>('SetPlatformTenantBindingResponseSwitchedTokens.accessTokenExpiresAt',
+            () => DateTime.parse(json['accessTokenExpiresAt']! as String).toUtc()),
+        refreshToken: decodeField<String>('SetPlatformTenantBindingResponseSwitchedTokens.refreshToken',
+            () => json['refreshToken']! as String),
+        refreshTokenExpiresAt: decodeField<DateTime>('SetPlatformTenantBindingResponseSwitchedTokens.refreshTokenExpiresAt',
+            () => DateTime.parse(json['refreshTokenExpiresAt']! as String).toUtc()),
+        sessionId: decodeField<String>('SetPlatformTenantBindingResponseSwitchedTokens.sessionId',
+            () => json['sessionId']! as String),
       );
 
   final String accessToken;
@@ -3046,6 +6843,1124 @@ final class SetPlatformTenantBindingResponseSwitchedTokensDto {
   String toString() => 'SetPlatformTenantBindingResponseSwitchedTokensDto()';
 }
 
+/// How much weight this source's version of a fact carries.
+enum SourceAuthorityDto {
+  authoritative('AUTHORITATIVE'),
+  supplemental('SUPPLEMENTAL'),
+  unverified('UNVERIFIED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SourceAuthorityDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SourceAuthorityDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract object.
+@immutable
+final class SourceCapabilitiesViewDto {
+  const SourceCapabilitiesViewDto({
+    required this.balance,
+    required this.pendingTransactions,
+  });
+
+  /// Decodes the contract representation.
+  factory SourceCapabilitiesViewDto.fromJson(Map<String, Object?> json) => SourceCapabilitiesViewDto(
+        balance: decodeField<SourceCapabilityObservationDto>('SourceCapabilitiesView.balance',
+            () => SourceCapabilityObservationDto.fromWire(json['balance']! as String)),
+        pendingTransactions: decodeField<SourceCapabilityObservationDto>('SourceCapabilitiesView.pendingTransactions',
+            () => SourceCapabilityObservationDto.fromWire(json['pendingTransactions']! as String)),
+      );
+
+  final SourceCapabilityObservationDto balance;
+
+  final SourceCapabilityObservationDto pendingTransactions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'balance': balance.toWire(),
+        'pendingTransactions': pendingTransactions.toWire(),
+      };
+
+  @override
+  String toString() => 'SourceCapabilitiesViewDto()';
+}
+
+/// What was OBSERVED, not what is supported. NOT_PROVIDED means the source never offered it; NOT_OBSERVED means this platform has not seen it. The two are different answers and are kept apart.
+enum SourceCapabilityObservationDto {
+  notObserved('NOT_OBSERVED'),
+  notProvided('NOT_PROVIDED'),
+  observed('OBSERVED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SourceCapabilityObservationDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SourceCapabilityObservationDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// What the source itself said, before any mapping.
+enum SourceDirectionDto {
+  credit('CREDIT'),
+  debit('DEBIT'),
+  notStated('NOT_STATED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SourceDirectionDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SourceDirectionDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The rail a stored figure arrived on. EXTERNAL_PROVIDER is in the vocabulary because the column can hold it; no path in this platform can produce it, and `availability` on every rail-bearing response says so.
+enum SourceKindDto {
+  csv('CSV'),
+  externalProvider('EXTERNAL_PROVIDER'),
+  manual('MANUAL'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SourceKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SourceKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum SourceLinkStatusDto {
+  declined('DECLINED'),
+  dormant('DORMANT'),
+  linked('LINKED'),
+  pendingConfirmation('PENDING_CONFIRMATION'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SourceLinkStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SourceLinkStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Freshness as OBSERVATION, not as health. These are instants, not days.
+@immutable
+final class SourceObservationViewDto {
+  const SourceObservationViewDto({
+    required this.firstObservedAt,
+    required this.lastObservedAt,
+    this.lastSuccessfulImportAt,
+  });
+
+  /// Decodes the contract representation.
+  factory SourceObservationViewDto.fromJson(Map<String, Object?> json) => SourceObservationViewDto(
+        firstObservedAt: decodeField<DateTime>('SourceObservationView.firstObservedAt',
+            () => DateTime.parse(json['firstObservedAt']! as String).toUtc()),
+        lastObservedAt: decodeField<DateTime>('SourceObservationView.lastObservedAt',
+            () => DateTime.parse(json['lastObservedAt']! as String).toUtc()),
+        lastSuccessfulImportAt: decodeField<DateTime?>('SourceObservationView.lastSuccessfulImportAt',
+            () => json['lastSuccessfulImportAt'] == null ? null : DateTime.parse(json['lastSuccessfulImportAt']! as String).toUtc()),
+      );
+
+  final DateTime firstObservedAt;
+
+  final DateTime lastObservedAt;
+
+  /// Null when no import has yet succeeded. Never approximated.
+  final DateTime? lastSuccessfulImportAt;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'firstObservedAt': firstObservedAt.toUtc().toIso8601String(),
+        'lastObservedAt': lastObservedAt.toUtc().toIso8601String(),
+        'lastSuccessfulImportAt': lastSuccessfulImportAt?.toUtc().toIso8601String(),
+      };
+
+  @override
+  String toString() => 'SourceObservationViewDto()';
+}
+
+/// What the STATEMENT says its balance is, for reconciliation only.
+@immutable
+final class StatedStatementBalanceDto {
+  const StatedStatementBalanceDto({
+    required this.currency,
+    required this.kind,
+    required this.minorUnits,
+  });
+
+  /// Decodes the contract representation.
+  factory StatedStatementBalanceDto.fromJson(Map<String, Object?> json) => StatedStatementBalanceDto(
+        currency: decodeField<String>('StatedStatementBalance.currency',
+            () => json['currency']! as String),
+        kind: decodeField<StatedStatementBalanceKindDto>('StatedStatementBalance.kind',
+            () => StatedStatementBalanceKindDto.fromWire(json['kind']! as String)),
+        minorUnits: decodeField<String>('StatedStatementBalance.minorUnits',
+            () => json['minorUnits']! as String),
+      );
+
+  final String currency;
+
+  final StatedStatementBalanceKindDto kind;
+
+  final String minorUnits;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'currency': currency,
+        'kind': kind.toWire(),
+        'minorUnits': minorUnits,
+      };
+
+  @override
+  String toString() => 'StatedStatementBalanceDto()';
+}
+
+/// Contract enumeration.
+enum StatedStatementBalanceKindDto {
+  available('AVAILABLE'),
+  closing('CLOSING'),
+  ledger('LEDGER'),
+  opening('OPENING'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatedStatementBalanceKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatedStatementBalanceKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Stated rather than inferred. `03/04` is two different days depending on the answer, and guessing it wrong moves a person's money.
+enum StatementColumnMappingDateOrderDto {
+  dayFirst('DAY_FIRST'),
+  iso('ISO'),
+  monthFirst('MONTH_FIRST'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatementColumnMappingDateOrderDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementColumnMappingDateOrderDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Column INDEXES, 0-based. Deliberately not header names: a header is untrusted text from a file, and matching on it is how a column of dates becomes a column of amounts.
+/// `accountIdentifierColumn` exists for DETECTION only — it lets the parse notice that a file covers more than one account and refuse. It never selects an account: the account is the one the draft was created against, and a file cannot redirect itself.
+@immutable
+final class StatementColumnMappingDto {
+  const StatementColumnMappingDto({
+    this.accountIdentifierColumn,
+    required this.amount,
+    required this.bookingDateColumn,
+    this.currencyColumn,
+    this.dateOrder,
+    required this.descriptionColumn,
+    this.eventOccurredAtColumn,
+    required this.hasHeaderRow,
+    this.instrumentMaskColumn,
+    this.merchantColumn,
+    this.sourceBalanceColumn,
+    this.sourceBalanceKind,
+    this.sourceReferenceColumn,
+    this.sourceTimezoneColumn,
+    this.statedCurrency,
+    this.valueDateColumn,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementColumnMappingDto.fromJson(Map<String, Object?> json) => StatementColumnMappingDto(
+        accountIdentifierColumn: decodeField<int?>('StatementColumnMapping.accountIdentifierColumn',
+            () => json['accountIdentifierColumn'] as int?),
+        amount: decodeField<AmountColumnsDto>('StatementColumnMapping.amount',
+            () => AmountColumnsDto.fromJson(json['amount']! as Map<String, Object?>)),
+        bookingDateColumn: decodeField<int>('StatementColumnMapping.bookingDateColumn',
+            () => json['bookingDateColumn']! as int),
+        currencyColumn: decodeField<int?>('StatementColumnMapping.currencyColumn',
+            () => json['currencyColumn'] as int?),
+        dateOrder: decodeField<StatementColumnMappingDateOrderDto?>('StatementColumnMapping.dateOrder',
+            () => json['dateOrder'] == null ? null : StatementColumnMappingDateOrderDto.fromWire(json['dateOrder']! as String)),
+        descriptionColumn: decodeField<int>('StatementColumnMapping.descriptionColumn',
+            () => json['descriptionColumn']! as int),
+        eventOccurredAtColumn: decodeField<int?>('StatementColumnMapping.eventOccurredAtColumn',
+            () => json['eventOccurredAtColumn'] as int?),
+        hasHeaderRow: decodeField<bool>('StatementColumnMapping.hasHeaderRow',
+            () => json['hasHeaderRow']! as bool),
+        instrumentMaskColumn: decodeField<int?>('StatementColumnMapping.instrumentMaskColumn',
+            () => json['instrumentMaskColumn'] as int?),
+        merchantColumn: decodeField<int?>('StatementColumnMapping.merchantColumn',
+            () => json['merchantColumn'] as int?),
+        sourceBalanceColumn: decodeField<int?>('StatementColumnMapping.sourceBalanceColumn',
+            () => json['sourceBalanceColumn'] as int?),
+        sourceBalanceKind: decodeField<StatementColumnMappingSourceBalanceKindDto?>('StatementColumnMapping.sourceBalanceKind',
+            () => json['sourceBalanceKind'] == null ? null : StatementColumnMappingSourceBalanceKindDto.fromWire(json['sourceBalanceKind']! as String)),
+        sourceReferenceColumn: decodeField<int?>('StatementColumnMapping.sourceReferenceColumn',
+            () => json['sourceReferenceColumn'] as int?),
+        sourceTimezoneColumn: decodeField<int?>('StatementColumnMapping.sourceTimezoneColumn',
+            () => json['sourceTimezoneColumn'] as int?),
+        statedCurrency: decodeField<String?>('StatementColumnMapping.statedCurrency',
+            () => json['statedCurrency'] as String?),
+        valueDateColumn: decodeField<int?>('StatementColumnMapping.valueDateColumn',
+            () => json['valueDateColumn'] as int?),
+      );
+
+  final int? accountIdentifierColumn;
+
+  final AmountColumnsDto amount;
+
+  final int bookingDateColumn;
+
+  /// Exactly one of `currencyColumn` and `statedCurrency` must be given. Two sources for one currency is an ambiguity, not a fallback.
+  final int? currencyColumn;
+
+  /// Stated rather than inferred. `03/04` is two different days depending on the answer, and guessing it wrong moves a person's money.
+  final StatementColumnMappingDateOrderDto? dateOrder;
+
+  final int descriptionColumn;
+
+  final int? eventOccurredAtColumn;
+
+  final bool hasHeaderRow;
+
+  final int? instrumentMaskColumn;
+
+  final int? merchantColumn;
+
+  final int? sourceBalanceColumn;
+
+  /// Required when a balance column is given; a balance of unstated kind is unusable.
+  final StatementColumnMappingSourceBalanceKindDto? sourceBalanceKind;
+
+  final int? sourceReferenceColumn;
+
+  final int? sourceTimezoneColumn;
+
+  final String? statedCurrency;
+
+  final int? valueDateColumn;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        if (accountIdentifierColumn != null) 'accountIdentifierColumn': accountIdentifierColumn,
+        'amount': amount.toJson(),
+        'bookingDateColumn': bookingDateColumn,
+        if (currencyColumn != null) 'currencyColumn': currencyColumn,
+        if (dateOrder != null) 'dateOrder': dateOrder?.toWire(),
+        'descriptionColumn': descriptionColumn,
+        if (eventOccurredAtColumn != null) 'eventOccurredAtColumn': eventOccurredAtColumn,
+        'hasHeaderRow': hasHeaderRow,
+        if (instrumentMaskColumn != null) 'instrumentMaskColumn': instrumentMaskColumn,
+        if (merchantColumn != null) 'merchantColumn': merchantColumn,
+        if (sourceBalanceColumn != null) 'sourceBalanceColumn': sourceBalanceColumn,
+        if (sourceBalanceKind != null) 'sourceBalanceKind': sourceBalanceKind?.toWire(),
+        if (sourceReferenceColumn != null) 'sourceReferenceColumn': sourceReferenceColumn,
+        if (sourceTimezoneColumn != null) 'sourceTimezoneColumn': sourceTimezoneColumn,
+        if (statedCurrency != null) 'statedCurrency': statedCurrency,
+        if (valueDateColumn != null) 'valueDateColumn': valueDateColumn,
+      };
+
+  @override
+  String toString() => 'StatementColumnMappingDto()';
+}
+
+/// Required when a balance column is given; a balance of unstated kind is unusable.
+enum StatementColumnMappingSourceBalanceKindDto {
+  available('AVAILABLE'),
+  closing('CLOSING'),
+  ledger('LEDGER'),
+  running('RUNNING'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatementColumnMappingSourceBalanceKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementColumnMappingSourceBalanceKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// What the commit wrote. `alreadyCommitted` true means this was an idempotent retry and nothing was written a second time.
+@immutable
+final class StatementImportCommittedViewDto {
+  const StatementImportCommittedViewDto({
+    required this.alreadyCommitted,
+    required this.committedTransactionCount,
+    required this.importId,
+    required this.transactionIds,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportCommittedViewDto.fromJson(Map<String, Object?> json) => StatementImportCommittedViewDto(
+        alreadyCommitted: decodeField<bool>('StatementImportCommittedView.alreadyCommitted',
+            () => json['alreadyCommitted']! as bool),
+        committedTransactionCount: decodeField<int>('StatementImportCommittedView.committedTransactionCount',
+            () => json['committedTransactionCount']! as int),
+        importId: decodeField<String>('StatementImportCommittedView.importId',
+            () => json['importId']! as String),
+        transactionIds: decodeField<List<String>>('StatementImportCommittedView.transactionIds',
+            () => (json['transactionIds']! as List<Object?>)
+            .map((Object? element) => element! as String)
+            .toList(growable: false)),
+      );
+
+  final bool alreadyCommitted;
+
+  final int committedTransactionCount;
+
+  final String importId;
+
+  /// The caller's own new transactions, addressable on the transactions surface.
+  final List<String> transactionIds;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'alreadyCommitted': alreadyCommitted,
+        'committedTransactionCount': committedTransactionCount,
+        'importId': importId,
+        'transactionIds': transactionIds
+            .map((String element) => element)
+            .toList(growable: false),
+      };
+
+  @override
+  String toString() => 'StatementImportCommittedViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class StatementImportErasedViewDto {
+  const StatementImportErasedViewDto({
+    required this.importId,
+    required this.rowsDeleted,
+    required this.storedObjectDeleted,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportErasedViewDto.fromJson(Map<String, Object?> json) => StatementImportErasedViewDto(
+        importId: decodeField<String>('StatementImportErasedView.importId',
+            () => json['importId']! as String),
+        rowsDeleted: decodeField<bool>('StatementImportErasedView.rowsDeleted',
+            () => json['rowsDeleted']! as bool),
+        storedObjectDeleted: decodeField<bool>('StatementImportErasedView.storedObjectDeleted',
+            () => json['storedObjectDeleted']! as bool),
+      );
+
+  final String importId;
+
+  final bool rowsDeleted;
+
+  final bool storedObjectDeleted;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'importId': importId,
+        'rowsDeleted': rowsDeleted,
+        'storedObjectDeleted': storedObjectDeleted,
+      };
+
+  @override
+  String toString() => 'StatementImportErasedViewDto()';
+}
+
+/// The review surface. `rowErrors` is one PAGE of the bounded report; `reportedErrorCount` is how many the report holds and `totalErrorCount` is how many rows really failed. Both are carried because collapsing them turns a truncated report into a complete-looking one.
+@immutable
+final class StatementImportPreviewViewDto {
+  const StatementImportPreviewViewDto({
+    required this.accountId,
+    required this.awaitsDecision,
+    this.connectionId,
+    required this.counts,
+    required this.hasStoredSource,
+    required this.importId,
+    required this.page,
+    required this.reconciliationStatus,
+    this.refusalCode,
+    required this.reportedErrorCount,
+    required this.rowErrors,
+    required this.state,
+    required this.totalErrorCount,
+    this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportPreviewViewDto.fromJson(Map<String, Object?> json) => StatementImportPreviewViewDto(
+        accountId: decodeField<String>('StatementImportPreviewView.accountId',
+            () => json['accountId']! as String),
+        awaitsDecision: decodeField<bool>('StatementImportPreviewView.awaitsDecision',
+            () => json['awaitsDecision']! as bool),
+        connectionId: decodeField<String?>('StatementImportPreviewView.connectionId',
+            () => json['connectionId'] as String?),
+        counts: decodeField<ImportCountsViewDto>('StatementImportPreviewView.counts',
+            () => ImportCountsViewDto.fromJson(json['counts']! as Map<String, Object?>)),
+        hasStoredSource: decodeField<bool>('StatementImportPreviewView.hasStoredSource',
+            () => json['hasStoredSource']! as bool),
+        importId: decodeField<String>('StatementImportPreviewView.importId',
+            () => json['importId']! as String),
+        page: decodeField<PageInfoDto>('StatementImportPreviewView.page',
+            () => PageInfoDto.fromJson(json['page']! as Map<String, Object?>)),
+        reconciliationStatus: decodeField<ReconciliationStatusDto>('StatementImportPreviewView.reconciliationStatus',
+            () => ReconciliationStatusDto.fromWire(json['reconciliationStatus']! as String)),
+        refusalCode: decodeField<ImportRefusalCodeDto?>('StatementImportPreviewView.refusalCode',
+            () => json['refusalCode'] == null ? null : ImportRefusalCodeDto.fromWire(json['refusalCode']! as String)),
+        reportedErrorCount: decodeField<int>('StatementImportPreviewView.reportedErrorCount',
+            () => json['reportedErrorCount']! as int),
+        rowErrors: decodeField<List<RowErrorViewDto>>('StatementImportPreviewView.rowErrors',
+            () => (json['rowErrors']! as List<Object?>)
+            .map((Object? element) => RowErrorViewDto.fromJson(element! as Map<String, Object?>))
+            .toList(growable: false)),
+        state: decodeField<ImportStateDto>('StatementImportPreviewView.state',
+            () => ImportStateDto.fromWire(json['state']! as String)),
+        totalErrorCount: decodeField<int>('StatementImportPreviewView.totalErrorCount',
+            () => json['totalErrorCount']! as int),
+        versions: decodeField<ProcessingVersionsViewDto?>('StatementImportPreviewView.versions',
+            () => json['versions'] == null ? null : ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>)),
+      );
+
+  final String accountId;
+
+  final bool awaitsDecision;
+
+  final String? connectionId;
+
+  final ImportCountsViewDto counts;
+
+  final bool hasStoredSource;
+
+  final String importId;
+
+  final PageInfoDto page;
+
+  final ReconciliationStatusDto reconciliationStatus;
+
+  final ImportRefusalCodeDto? refusalCode;
+
+  final int reportedErrorCount;
+
+  final List<RowErrorViewDto> rowErrors;
+
+  final ImportStateDto state;
+
+  final int totalErrorCount;
+
+  final ProcessingVersionsViewDto? versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'awaitsDecision': awaitsDecision,
+        'connectionId': connectionId,
+        'counts': counts.toJson(),
+        'hasStoredSource': hasStoredSource,
+        'importId': importId,
+        'page': page.toJson(),
+        'reconciliationStatus': reconciliationStatus.toWire(),
+        'refusalCode': refusalCode?.toWire(),
+        'reportedErrorCount': reportedErrorCount,
+        'rowErrors': rowErrors
+            .map((RowErrorViewDto element) => element.toJson())
+            .toList(growable: false),
+        'state': state.toWire(),
+        'totalErrorCount': totalErrorCount,
+        'versions': versions?.toJson(),
+      };
+
+  @override
+  String toString() => 'StatementImportPreviewViewDto()';
+}
+
+/// The import's state, without its row errors and without `version` (see the operation's description). Deliberately absent, and to stay absent: the stored source's locator, store kind, byte length, algorithm, key version, nonce, auth tag, integrity checksum and file fingerprint; every staged row and every cell; and the row's `tenantId` and `userId`.
+@immutable
+final class StatementImportStatusViewDto {
+  const StatementImportStatusViewDto({
+    required this.accountId,
+    required this.awaitsDecision,
+    this.connectionId,
+    required this.counts,
+    required this.hasStoredSource,
+    required this.importId,
+    required this.reconciliationStatus,
+    this.refusalCode,
+    required this.reportedErrorCount,
+    required this.state,
+    required this.totalErrorCount,
+    this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportStatusViewDto.fromJson(Map<String, Object?> json) => StatementImportStatusViewDto(
+        accountId: decodeField<String>('StatementImportStatusView.accountId',
+            () => json['accountId']! as String),
+        awaitsDecision: decodeField<bool>('StatementImportStatusView.awaitsDecision',
+            () => json['awaitsDecision']! as bool),
+        connectionId: decodeField<String?>('StatementImportStatusView.connectionId',
+            () => json['connectionId'] as String?),
+        counts: decodeField<ImportCountsViewDto>('StatementImportStatusView.counts',
+            () => ImportCountsViewDto.fromJson(json['counts']! as Map<String, Object?>)),
+        hasStoredSource: decodeField<bool>('StatementImportStatusView.hasStoredSource',
+            () => json['hasStoredSource']! as bool),
+        importId: decodeField<String>('StatementImportStatusView.importId',
+            () => json['importId']! as String),
+        reconciliationStatus: decodeField<ReconciliationStatusDto>('StatementImportStatusView.reconciliationStatus',
+            () => ReconciliationStatusDto.fromWire(json['reconciliationStatus']! as String)),
+        refusalCode: decodeField<ImportRefusalCodeDto?>('StatementImportStatusView.refusalCode',
+            () => json['refusalCode'] == null ? null : ImportRefusalCodeDto.fromWire(json['refusalCode']! as String)),
+        reportedErrorCount: decodeField<int>('StatementImportStatusView.reportedErrorCount',
+            () => json['reportedErrorCount']! as int),
+        state: decodeField<ImportStateDto>('StatementImportStatusView.state',
+            () => ImportStateDto.fromWire(json['state']! as String)),
+        totalErrorCount: decodeField<int>('StatementImportStatusView.totalErrorCount',
+            () => json['totalErrorCount']! as int),
+        versions: decodeField<ProcessingVersionsViewDto?>('StatementImportStatusView.versions',
+            () => json['versions'] == null ? null : ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>)),
+      );
+
+  final String accountId;
+
+  final bool awaitsDecision;
+
+  final String? connectionId;
+
+  final ImportCountsViewDto counts;
+
+  final bool hasStoredSource;
+
+  final String importId;
+
+  final ReconciliationStatusDto reconciliationStatus;
+
+  final ImportRefusalCodeDto? refusalCode;
+
+  final int reportedErrorCount;
+
+  final ImportStateDto state;
+
+  final int totalErrorCount;
+
+  final ProcessingVersionsViewDto? versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'awaitsDecision': awaitsDecision,
+        'connectionId': connectionId,
+        'counts': counts.toJson(),
+        'hasStoredSource': hasStoredSource,
+        'importId': importId,
+        'reconciliationStatus': reconciliationStatus.toWire(),
+        'refusalCode': refusalCode?.toWire(),
+        'reportedErrorCount': reportedErrorCount,
+        'state': state.toWire(),
+        'totalErrorCount': totalErrorCount,
+        'versions': versions?.toJson(),
+      };
+
+  @override
+  String toString() => 'StatementImportStatusViewDto()';
+}
+
+/// USER_FILE_UPLOAD is one of the two rails this platform can actually run.
+enum StatementImportViewAvailabilityDto {
+  executable('EXECUTABLE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatementImportViewAvailabilityDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewAvailabilityDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Deliberately absent, and to stay absent: the stored source's locator, store kind, byte length, algorithm, key version, nonce, auth tag, integrity checksum and file fingerprint; every staged row and every cell; the row's `tenantId` and `userId`; and the retention decision's basis, approval reference and pack version, which are internal review artefacts.
+@immutable
+final class StatementImportViewDto {
+  const StatementImportViewDto({
+    required this.accountId,
+    required this.availability,
+    required this.awaitsDecision,
+    this.committedAt,
+    this.connectionId,
+    required this.counts,
+    required this.createdAt,
+    this.erasedAt,
+    required this.hasStoredSource,
+    required this.importId,
+    required this.mediaType,
+    required this.rail,
+    required this.reconciliationStatus,
+    this.refusalCode,
+    required this.retentionState,
+    required this.state,
+    required this.stateChangedAt,
+    this.statedBalance,
+    required this.version,
+    this.versions,
+  });
+
+  /// Decodes the contract representation.
+  factory StatementImportViewDto.fromJson(Map<String, Object?> json) => StatementImportViewDto(
+        accountId: decodeField<String>('StatementImportView.accountId',
+            () => json['accountId']! as String),
+        availability: decodeField<StatementImportViewAvailabilityDto>('StatementImportView.availability',
+            () => StatementImportViewAvailabilityDto.fromWire(json['availability']! as String)),
+        awaitsDecision: decodeField<bool>('StatementImportView.awaitsDecision',
+            () => json['awaitsDecision']! as bool),
+        committedAt: decodeField<DateTime?>('StatementImportView.committedAt',
+            () => json['committedAt'] == null ? null : DateTime.parse(json['committedAt']! as String).toUtc()),
+        connectionId: decodeField<String?>('StatementImportView.connectionId',
+            () => json['connectionId'] as String?),
+        counts: decodeField<ImportCountsViewDto>('StatementImportView.counts',
+            () => ImportCountsViewDto.fromJson(json['counts']! as Map<String, Object?>)),
+        createdAt: decodeField<DateTime>('StatementImportView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        erasedAt: decodeField<DateTime?>('StatementImportView.erasedAt',
+            () => json['erasedAt'] == null ? null : DateTime.parse(json['erasedAt']! as String).toUtc()),
+        hasStoredSource: decodeField<bool>('StatementImportView.hasStoredSource',
+            () => json['hasStoredSource']! as bool),
+        importId: decodeField<String>('StatementImportView.importId',
+            () => json['importId']! as String),
+        mediaType: decodeField<StatementImportViewMediaTypeDto>('StatementImportView.mediaType',
+            () => StatementImportViewMediaTypeDto.fromWire(json['mediaType']! as String)),
+        rail: decodeField<StatementImportViewRailDto>('StatementImportView.rail',
+            () => StatementImportViewRailDto.fromWire(json['rail']! as String)),
+        reconciliationStatus: decodeField<ReconciliationStatusDto>('StatementImportView.reconciliationStatus',
+            () => ReconciliationStatusDto.fromWire(json['reconciliationStatus']! as String)),
+        refusalCode: decodeField<ImportRefusalCodeDto?>('StatementImportView.refusalCode',
+            () => json['refusalCode'] == null ? null : ImportRefusalCodeDto.fromWire(json['refusalCode']! as String)),
+        retentionState: decodeField<StatementImportViewRetentionStateDto>('StatementImportView.retentionState',
+            () => StatementImportViewRetentionStateDto.fromWire(json['retentionState']! as String)),
+        state: decodeField<ImportStateDto>('StatementImportView.state',
+            () => ImportStateDto.fromWire(json['state']! as String)),
+        stateChangedAt: decodeField<DateTime>('StatementImportView.stateChangedAt',
+            () => DateTime.parse(json['stateChangedAt']! as String).toUtc()),
+        statedBalance: decodeField<StatedStatementBalanceDto?>('StatementImportView.statedBalance',
+            () => json['statedBalance'] == null ? null : StatedStatementBalanceDto.fromJson(json['statedBalance']! as Map<String, Object?>)),
+        version: decodeField<int>('StatementImportView.version',
+            () => json['version']! as int),
+        versions: decodeField<ProcessingVersionsViewDto?>('StatementImportView.versions',
+            () => json['versions'] == null ? null : ProcessingVersionsViewDto.fromJson(json['versions']! as Map<String, Object?>)),
+      );
+
+  final String accountId;
+
+  /// USER_FILE_UPLOAD is one of the two rails this platform can actually run.
+  final StatementImportViewAvailabilityDto availability;
+
+  /// Whether this import is waiting for the subject to commit or erase it.
+  final bool awaitsDecision;
+
+  final DateTime? committedAt;
+
+  final String? connectionId;
+
+  final ImportCountsViewDto counts;
+
+  final DateTime createdAt;
+
+  final DateTime? erasedAt;
+
+  /// Whether encrypted source bytes exist. EXISTENCE only: a locator is enough to ask a store for somebody's bank statement, so none is carried.
+  final bool hasStoredSource;
+
+  final String importId;
+
+  final StatementImportViewMediaTypeDto mediaType;
+
+  /// A statement import is a file the SUBJECT uploaded. It is not a bank connection.
+  final StatementImportViewRailDto rail;
+
+  final ReconciliationStatusDto reconciliationStatus;
+
+  final ImportRefusalCodeDto? refusalCode;
+
+  /// Whether an approved retention decision governs this import's durable data. The decision's period, basis, approval reference and pack version stay server-side.
+  final StatementImportViewRetentionStateDto retentionState;
+
+  final ImportStateDto state;
+
+  final DateTime stateChangedAt;
+
+  final StatedStatementBalanceDto? statedBalance;
+
+  final int version;
+
+  final ProcessingVersionsViewDto? versions;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'availability': availability.toWire(),
+        'awaitsDecision': awaitsDecision,
+        'committedAt': committedAt?.toUtc().toIso8601String(),
+        'connectionId': connectionId,
+        'counts': counts.toJson(),
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'erasedAt': erasedAt?.toUtc().toIso8601String(),
+        'hasStoredSource': hasStoredSource,
+        'importId': importId,
+        'mediaType': mediaType.toWire(),
+        'rail': rail.toWire(),
+        'reconciliationStatus': reconciliationStatus.toWire(),
+        'refusalCode': refusalCode?.toWire(),
+        'retentionState': retentionState.toWire(),
+        'state': state.toWire(),
+        'stateChangedAt': stateChangedAt.toUtc().toIso8601String(),
+        'statedBalance': statedBalance?.toJson(),
+        'version': version,
+        'versions': versions?.toJson(),
+      };
+
+  @override
+  String toString() => 'StatementImportViewDto()';
+}
+
+/// Contract enumeration.
+enum StatementImportViewMediaTypeDto {
+  textCsv('text/csv'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatementImportViewMediaTypeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewMediaTypeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// A statement import is a file the SUBJECT uploaded. It is not a bank connection.
+enum StatementImportViewRailDto {
+  userFileUpload('USER_FILE_UPLOAD'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatementImportViewRailDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewRailDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Whether an approved retention decision governs this import's durable data. The decision's period, basis, approval reference and pack version stay server-side.
+enum StatementImportViewRetentionStateDto {
+  decided('DECIDED'),
+  undecided('UNDECIDED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const StatementImportViewRetentionStateDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static StatementImportViewRetentionStateDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Why the platform suggested this pair. One value today, and it is a RULE, not a guess: two amounts equal and opposite, in the same currency, within a stated window.
+enum SuggestionBasisDto {
+  equalAndOppositeSameCurrencyWithinWindow('EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const SuggestionBasisDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static SuggestionBasisDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
 /// Contract object.
 @immutable
 final class TenantChoiceDto {
@@ -3057,9 +7972,12 @@ final class TenantChoiceDto {
 
   /// Decodes the contract representation.
   factory TenantChoiceDto.fromJson(Map<String, Object?> json) => TenantChoiceDto(
-        name: json['name']! as String,
-        roleHint: json['roleHint']! as String,
-        tenantId: json['tenantId']! as String,
+        name: decodeField<String>('TenantChoice.name',
+            () => json['name']! as String),
+        roleHint: decodeField<String>('TenantChoice.roleHint',
+            () => json['roleHint']! as String),
+        tenantId: decodeField<String>('TenantChoice.tenantId',
+            () => json['tenantId']! as String),
       );
 
   final String name;
@@ -3093,11 +8011,16 @@ final class TenantDto {
 
   /// Decodes the contract representation.
   factory TenantDto.fromJson(Map<String, Object?> json) => TenantDto(
-        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
-        id: json['id']! as String,
-        name: json['name']! as String,
-        status: TenantStatusDto.fromWire(json['status']! as String),
-        type: TenantTypeDto.fromWire(json['type']! as String),
+        createdAt: decodeField<DateTime>('Tenant.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        id: decodeField<String>('Tenant.id',
+            () => json['id']! as String),
+        name: decodeField<String>('Tenant.name',
+            () => json['name']! as String),
+        status: decodeField<TenantStatusDto>('Tenant.status',
+            () => TenantStatusDto.fromWire(json['status']! as String)),
+        type: decodeField<TenantTypeDto>('Tenant.type',
+            () => TenantTypeDto.fromWire(json['type']! as String)),
       );
 
   final DateTime createdAt;
@@ -3133,6 +8056,10 @@ enum TenantStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const TenantStatusDto(this.wireValue);
@@ -3142,6 +8069,9 @@ enum TenantStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static TenantStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -3149,7 +8079,7 @@ enum TenantStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -3163,6 +8093,10 @@ enum TenantTypeDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const TenantTypeDto(this.wireValue);
@@ -3172,6 +8106,9 @@ enum TenantTypeDto {
   /// Parses a wire value, falling back to [unknown].
   static TenantTypeDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -3179,8 +8116,514 @@ enum TenantTypeDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Present only when outcome is PARTIALLY_APPLIED.
+enum TransactionDeletionOutcomeViewCodeDto {
+  deletionPartiallyApplied('DELETION_PARTIALLY_APPLIED'),
+  transferMatchErasureIncomplete('TRANSFER_MATCH_ERASURE_INCOMPLETE'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const TransactionDeletionOutcomeViewCodeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static TransactionDeletionOutcomeViewCodeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// The result of a delete, complete or partial, in one shape. `outcome` discriminates and `code` is present only when something was left behind. The count is what was really erased.
+@immutable
+final class TransactionDeletionOutcomeViewDto {
+  const TransactionDeletionOutcomeViewDto({
+    this.code,
+    required this.outcome,
+    required this.transactionId,
+    required this.transferMatchesDeleted,
+  });
+
+  /// Decodes the contract representation.
+  factory TransactionDeletionOutcomeViewDto.fromJson(Map<String, Object?> json) => TransactionDeletionOutcomeViewDto(
+        code: decodeField<TransactionDeletionOutcomeViewCodeDto?>('TransactionDeletionOutcomeView.code',
+            () => json['code'] == null ? null : TransactionDeletionOutcomeViewCodeDto.fromWire(json['code']! as String)),
+        outcome: decodeField<TransactionDeletionOutcomeViewOutcomeDto>('TransactionDeletionOutcomeView.outcome',
+            () => TransactionDeletionOutcomeViewOutcomeDto.fromWire(json['outcome']! as String)),
+        transactionId: decodeField<String>('TransactionDeletionOutcomeView.transactionId',
+            () => json['transactionId']! as String),
+        transferMatchesDeleted: decodeField<int>('TransactionDeletionOutcomeView.transferMatchesDeleted',
+            () => json['transferMatchesDeleted']! as int),
+      );
+
+  /// Present only when outcome is PARTIALLY_APPLIED.
+  final TransactionDeletionOutcomeViewCodeDto? code;
+
+  final TransactionDeletionOutcomeViewOutcomeDto outcome;
+
+  final String transactionId;
+
+  final int transferMatchesDeleted;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        if (code != null) 'code': code?.toWire(),
+        'outcome': outcome.toWire(),
+        'transactionId': transactionId,
+        'transferMatchesDeleted': transferMatchesDeleted,
+      };
+
+  @override
+  String toString() => 'TransactionDeletionOutcomeViewDto()';
+}
+
+/// Contract enumeration.
+enum TransactionDeletionOutcomeViewOutcomeDto {
+  deleted('DELETED'),
+  partiallyApplied('PARTIALLY_APPLIED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const TransactionDeletionOutcomeViewOutcomeDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static TransactionDeletionOutcomeViewOutcomeDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One entry of the append-only history. Revision 1 is what was originally recorded and lists no changed fields. The acting actor reference is deliberately absent: it identifies a principal, and the caller is already the only principal who can read this.
+@immutable
+final class TransactionRevisionViewDto {
+  const TransactionRevisionViewDto({
+    required this.attribution,
+    required this.changedFields,
+    required this.recordedAt,
+    required this.revisionNumber,
+    required this.values,
+  });
+
+  /// Decodes the contract representation.
+  factory TransactionRevisionViewDto.fromJson(Map<String, Object?> json) => TransactionRevisionViewDto(
+        attribution: decodeField<RevisionAttributionDto>('TransactionRevisionView.attribution',
+            () => RevisionAttributionDto.fromWire(json['attribution']! as String)),
+        changedFields: decodeField<List<RevisableFieldDto>>('TransactionRevisionView.changedFields',
+            () => (json['changedFields']! as List<Object?>)
+            .map((Object? element) => RevisableFieldDto.fromWire(element! as String))
+            .toList(growable: false)),
+        recordedAt: decodeField<DateTime>('TransactionRevisionView.recordedAt',
+            () => DateTime.parse(json['recordedAt']! as String).toUtc()),
+        revisionNumber: decodeField<int>('TransactionRevisionView.revisionNumber',
+            () => json['revisionNumber']! as int),
+        values: decodeField<RevisionValuesViewDto>('TransactionRevisionView.values',
+            () => RevisionValuesViewDto.fromJson(json['values']! as Map<String, Object?>)),
+      );
+
+  final RevisionAttributionDto attribution;
+
+  final List<RevisableFieldDto> changedFields;
+
+  final DateTime recordedAt;
+
+  final int revisionNumber;
+
+  final RevisionValuesViewDto values;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'attribution': attribution.toWire(),
+        'changedFields': changedFields
+            .map((RevisableFieldDto element) => element.toWire())
+            .toList(growable: false),
+        'recordedAt': recordedAt.toUtc().toIso8601String(),
+        'revisionNumber': revisionNumber,
+        'values': values.toJson(),
+      };
+
+  @override
+  String toString() => 'TransactionRevisionViewDto()';
+}
+
+/// Contract enumeration.
+enum TransactionStatusDto {
+  posted('POSTED'),
+  voided('VOIDED'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const TransactionStatusDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static TransactionStatusDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// One of the caller's own transactions. `amount` is SIGNED under the canonical convention and `direction` restates it in words, so a client renders an honest arrow without arithmetic.
+/// Deliberately absent, and to stay absent: `tenantId` and `userId`; the dedup fingerprint, its version and the occurrence ordinal; any ciphertext, nonce, auth tag, algorithm or key version; the import reference and the source row reference; and any category confidence.
+@immutable
+final class TransactionViewDto {
+  const TransactionViewDto({
+    required this.accountId,
+    required this.amount,
+    required this.availability,
+    required this.bookingDate,
+    required this.createdAt,
+    required this.description,
+    required this.direction,
+    this.eventOccurredAt,
+    this.merchant,
+    this.note,
+    this.originalAmount,
+    required this.sourceKind,
+    this.sourceTimezone,
+    required this.status,
+    required this.transactionId,
+    this.valueDate,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory TransactionViewDto.fromJson(Map<String, Object?> json) => TransactionViewDto(
+        accountId: decodeField<String>('TransactionView.accountId',
+            () => json['accountId']! as String),
+        amount: decodeField<MinorUnitAmountDto>('TransactionView.amount',
+            () => MinorUnitAmountDto.fromJson(json['amount']! as Map<String, Object?>)),
+        availability: decodeField<RailAvailabilityDto>('TransactionView.availability',
+            () => RailAvailabilityDto.fromWire(json['availability']! as String)),
+        bookingDate: decodeField<String>('TransactionView.bookingDate',
+            () => json['bookingDate']! as String),
+        createdAt: decodeField<DateTime>('TransactionView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        description: decodeField<String>('TransactionView.description',
+            () => json['description']! as String),
+        direction: decodeField<MoneyDirectionDto>('TransactionView.direction',
+            () => MoneyDirectionDto.fromWire(json['direction']! as String)),
+        eventOccurredAt: decodeField<DateTime?>('TransactionView.eventOccurredAt',
+            () => json['eventOccurredAt'] == null ? null : DateTime.parse(json['eventOccurredAt']! as String).toUtc()),
+        merchant: decodeField<String?>('TransactionView.merchant',
+            () => json['merchant'] as String?),
+        note: decodeField<String?>('TransactionView.note',
+            () => json['note'] as String?),
+        originalAmount: decodeField<MinorUnitAmountDto?>('TransactionView.originalAmount',
+            () => json['originalAmount'] == null ? null : MinorUnitAmountDto.fromJson(json['originalAmount']! as Map<String, Object?>)),
+        sourceKind: decodeField<SourceKindDto>('TransactionView.sourceKind',
+            () => SourceKindDto.fromWire(json['sourceKind']! as String)),
+        sourceTimezone: decodeField<String?>('TransactionView.sourceTimezone',
+            () => json['sourceTimezone'] as String?),
+        status: decodeField<TransactionStatusDto>('TransactionView.status',
+            () => TransactionStatusDto.fromWire(json['status']! as String)),
+        transactionId: decodeField<String>('TransactionView.transactionId',
+            () => json['transactionId']! as String),
+        valueDate: decodeField<String?>('TransactionView.valueDate',
+            () => json['valueDate'] as String?),
+        version: decodeField<int>('TransactionView.version',
+            () => json['version']! as int),
+      );
+
+  final String accountId;
+
+  final MinorUnitAmountDto amount;
+
+  final RailAvailabilityDto availability;
+
+  /// The day the institution booked it (ADR-0027).
+  final String bookingDate;
+
+  final DateTime createdAt;
+
+  final String description;
+
+  final MoneyDirectionDto direction;
+
+  /// A true instant, present only when the source stated one.
+  final DateTime? eventOccurredAt;
+
+  final String? merchant;
+
+  final String? note;
+
+  /// The amount as the source stated it, when its currency differed.
+  final MinorUnitAmountDto? originalAmount;
+
+  final SourceKindDto sourceKind;
+
+  final String? sourceTimezone;
+
+  final TransactionStatusDto status;
+
+  final String transactionId;
+
+  final String? valueDate;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'accountId': accountId,
+        'amount': amount.toJson(),
+        'availability': availability.toWire(),
+        'bookingDate': bookingDate,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'description': description,
+        'direction': direction.toWire(),
+        'eventOccurredAt': eventOccurredAt?.toUtc().toIso8601String(),
+        'merchant': merchant,
+        'note': note,
+        'originalAmount': originalAmount?.toJson(),
+        'sourceKind': sourceKind.toWire(),
+        'sourceTimezone': sourceTimezone,
+        'status': status.toWire(),
+        'transactionId': transactionId,
+        'valueDate': valueDate,
+        'version': version,
+      };
+
+  @override
+  String toString() => 'TransactionViewDto()';
+}
+
+/// Deliberately absent, and to stay absent: any amount, total, net or converted figure; any exchange rate (cross-currency movements are not matchable, so there is nothing to convert); any confidence or score; any category; and the row's `tenantId` and `userId`.
+@immutable
+final class TransferMatchViewDto {
+  const TransferMatchViewDto({
+    required this.authoritative,
+    required this.createdAt,
+    required this.firstSuggestedAt,
+    required this.inflow,
+    required this.matchId,
+    required this.outflow,
+    required this.state,
+    this.subjectDecidedAt,
+    required this.suggestionBasis,
+    required this.suggestionWindow,
+    required this.updatedAt,
+    required this.version,
+  });
+
+  /// Decodes the contract representation.
+  factory TransferMatchViewDto.fromJson(Map<String, Object?> json) => TransferMatchViewDto(
+        authoritative: decodeField<bool>('TransferMatchView.authoritative',
+            () => json['authoritative']! as bool),
+        createdAt: decodeField<DateTime>('TransferMatchView.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        firstSuggestedAt: decodeField<DateTime>('TransferMatchView.firstSuggestedAt',
+            () => DateTime.parse(json['firstSuggestedAt']! as String).toUtc()),
+        inflow: decodeField<MatchSideViewDto>('TransferMatchView.inflow',
+            () => MatchSideViewDto.fromJson(json['inflow']! as Map<String, Object?>)),
+        matchId: decodeField<String>('TransferMatchView.matchId',
+            () => json['matchId']! as String),
+        outflow: decodeField<MatchSideViewDto>('TransferMatchView.outflow',
+            () => MatchSideViewDto.fromJson(json['outflow']! as Map<String, Object?>)),
+        state: decodeField<MatchStateDto>('TransferMatchView.state',
+            () => MatchStateDto.fromWire(json['state']! as String)),
+        subjectDecidedAt: decodeField<DateTime?>('TransferMatchView.subjectDecidedAt',
+            () => json['subjectDecidedAt'] == null ? null : DateTime.parse(json['subjectDecidedAt']! as String).toUtc()),
+        suggestionBasis: decodeField<SuggestionBasisDto>('TransferMatchView.suggestionBasis',
+            () => SuggestionBasisDto.fromWire(json['suggestionBasis']! as String)),
+        suggestionWindow: decodeField<String>('TransferMatchView.suggestionWindow',
+            () => json['suggestionWindow']! as String),
+        updatedAt: decodeField<DateTime>('TransferMatchView.updatedAt',
+            () => DateTime.parse(json['updatedAt']! as String).toUtc()),
+        version: decodeField<int>('TransferMatchView.version',
+            () => json['version']! as int),
+      );
+
+  /// True only for CONFIRMED. Stated on the wire so nothing downstream has to decide for itself whether a suggestion counts.
+  final bool authoritative;
+
+  final DateTime createdAt;
+
+  final DateTime firstSuggestedAt;
+
+  final MatchSideViewDto inflow;
+
+  final String matchId;
+
+  final MatchSideViewDto outflow;
+
+  final MatchStateDto state;
+
+  /// When the person decided. Null while they have not.
+  final DateTime? subjectDecidedAt;
+
+  final SuggestionBasisDto suggestionBasis;
+
+  /// The VERSION LABEL of the rule that produced the suggestion, e.g. `equal-and-opposite/same-currency/P3D/v1`. A person can tell later which rule looked at their data.
+  final String suggestionWindow;
+
+  final DateTime updatedAt;
+
+  final int version;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'authoritative': authoritative,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'firstSuggestedAt': firstSuggestedAt.toUtc().toIso8601String(),
+        'inflow': inflow.toJson(),
+        'matchId': matchId,
+        'outflow': outflow.toJson(),
+        'state': state.toWire(),
+        'subjectDecidedAt': subjectDecidedAt?.toUtc().toIso8601String(),
+        'suggestionBasis': suggestionBasis.toWire(),
+        'suggestionWindow': suggestionWindow,
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        'version': version,
+      };
+
+  @override
+  String toString() => 'TransferMatchViewDto()';
+}
+
+/// Contract object.
+@immutable
+final class UpdateOwnFinancialAccountRequestDto {
+  const UpdateOwnFinancialAccountRequestDto({
+    this.accountType,
+    this.currency,
+    this.displayName,
+    required this.expectedVersion,
+    this.institutionId = const Omittable<String>.omitted(),
+    this.mask = const Omittable<String>.omitted(),
+    this.nature,
+    this.status,
+    this.userSuppliedInstitutionLabel = const Omittable<String>.omitted(),
+    this.walletKind = const Omittable<WalletKindDto>.omitted(),
+  });
+
+  /// Decodes the contract representation.
+  factory UpdateOwnFinancialAccountRequestDto.fromJson(Map<String, Object?> json) => UpdateOwnFinancialAccountRequestDto(
+        accountType: decodeField<AccountTypeDto?>('UpdateOwnFinancialAccountRequest.accountType',
+            () => json['accountType'] == null ? null : AccountTypeDto.fromWire(json['accountType']! as String)),
+        currency: decodeField<String?>('UpdateOwnFinancialAccountRequest.currency',
+            () => json['currency'] as String?),
+        displayName: decodeField<String?>('UpdateOwnFinancialAccountRequest.displayName',
+            () => json['displayName'] as String?),
+        expectedVersion: decodeField<int>('UpdateOwnFinancialAccountRequest.expectedVersion',
+            () => json['expectedVersion']! as int),
+        institutionId: decodeField<Omittable<String>>('UpdateOwnFinancialAccountRequest.institutionId',
+            () => json.containsKey('institutionId')
+            ? Omittable<String>.sent(json['institutionId'] as String?)
+            : const Omittable<String>.omitted()),
+        mask: decodeField<Omittable<String>>('UpdateOwnFinancialAccountRequest.mask',
+            () => json.containsKey('mask')
+            ? Omittable<String>.sent(json['mask'] as String?)
+            : const Omittable<String>.omitted()),
+        nature: decodeField<AccountNatureDto?>('UpdateOwnFinancialAccountRequest.nature',
+            () => json['nature'] == null ? null : AccountNatureDto.fromWire(json['nature']! as String)),
+        status: decodeField<AccountStatusDto?>('UpdateOwnFinancialAccountRequest.status',
+            () => json['status'] == null ? null : AccountStatusDto.fromWire(json['status']! as String)),
+        userSuppliedInstitutionLabel: decodeField<Omittable<String>>('UpdateOwnFinancialAccountRequest.userSuppliedInstitutionLabel',
+            () => json.containsKey('userSuppliedInstitutionLabel')
+            ? Omittable<String>.sent(json['userSuppliedInstitutionLabel'] as String?)
+            : const Omittable<String>.omitted()),
+        walletKind: decodeField<Omittable<WalletKindDto>>('UpdateOwnFinancialAccountRequest.walletKind',
+            () => json.containsKey('walletKind')
+            ? Omittable<WalletKindDto>.sent(json['walletKind'] == null ? null : WalletKindDto.fromWire(json['walletKind']! as String))
+            : const Omittable<WalletKindDto>.omitted()),
+      );
+
+  final AccountTypeDto? accountType;
+
+  final String? currency;
+
+  final String? displayName;
+
+  final int expectedVersion;
+
+  final Omittable<String> institutionId;
+
+  final Omittable<String> mask;
+
+  final AccountNatureDto? nature;
+
+  final AccountStatusDto? status;
+
+  final Omittable<String> userSuppliedInstitutionLabel;
+
+  final Omittable<WalletKindDto> walletKind;
+
+  /// Encodes the contract representation.
+  Map<String, Object?> toJson() => <String, Object?>{
+        if (accountType != null) 'accountType': accountType?.toWire(),
+        if (currency != null) 'currency': currency,
+        if (displayName != null) 'displayName': displayName,
+        'expectedVersion': expectedVersion,
+        if (institutionId.isSent) 'institutionId': institutionId.valueOrNull,
+        if (mask.isSent) 'mask': mask.valueOrNull,
+        if (nature != null) 'nature': nature?.toWire(),
+        if (status != null) 'status': status?.toWire(),
+        if (userSuppliedInstitutionLabel.isSent) 'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel.valueOrNull,
+        if (walletKind.isSent) 'walletKind': walletKind.valueOrNull?.toWire(),
+      };
+
+  @override
+  String toString() => 'UpdateOwnFinancialAccountRequestDto()';
 }
 
 /// Contract object.
@@ -3193,8 +8636,10 @@ final class UpdateOwnUserProfileRequestDto {
 
   /// Decodes the contract representation.
   factory UpdateOwnUserProfileRequestDto.fromJson(Map<String, Object?> json) => UpdateOwnUserProfileRequestDto(
-        displayName: json['displayName'] as String?,
-        locale: json['locale'] as String?,
+        displayName: decodeField<String?>('UpdateOwnUserProfileRequest.displayName',
+            () => json['displayName'] as String?),
+        locale: decodeField<String?>('UpdateOwnUserProfileRequest.locale',
+            () => json['locale'] as String?),
       );
 
   /// Trimmed before storage; control characters rejected.
@@ -3205,8 +8650,8 @@ final class UpdateOwnUserProfileRequestDto {
 
   /// Encodes the contract representation.
   Map<String, Object?> toJson() => <String, Object?>{
-        'displayName': displayName,
-        'locale': locale,
+        if (displayName != null) 'displayName': displayName,
+        if (locale != null) 'locale': locale,
       };
 
   @override
@@ -3229,14 +8674,22 @@ final class UserProfileDto {
 
   /// Decodes the contract representation.
   factory UserProfileDto.fromJson(Map<String, Object?> json) => UserProfileDto(
-        createdAt: DateTime.parse(json['createdAt']! as String).toUtc(),
-        displayName: json['displayName']! as String,
-        locale: json['locale']! as String,
-        residencyJurisdictionRef: json['residencyJurisdictionRef'] as String?,
-        status: UserProfileStatusDto.fromWire(json['status']! as String),
-        tenantId: json['tenantId']! as String,
-        updatedAt: DateTime.parse(json['updatedAt']! as String).toUtc(),
-        userId: json['userId']! as String,
+        createdAt: decodeField<DateTime>('UserProfile.createdAt',
+            () => DateTime.parse(json['createdAt']! as String).toUtc()),
+        displayName: decodeField<String>('UserProfile.displayName',
+            () => json['displayName']! as String),
+        locale: decodeField<String>('UserProfile.locale',
+            () => json['locale']! as String),
+        residencyJurisdictionRef: decodeField<String?>('UserProfile.residencyJurisdictionRef',
+            () => json['residencyJurisdictionRef'] as String?),
+        status: decodeField<UserProfileStatusDto>('UserProfile.status',
+            () => UserProfileStatusDto.fromWire(json['status']! as String)),
+        tenantId: decodeField<String>('UserProfile.tenantId',
+            () => json['tenantId']! as String),
+        updatedAt: decodeField<DateTime>('UserProfile.updatedAt',
+            () => DateTime.parse(json['updatedAt']! as String).toUtc()),
+        userId: decodeField<String>('UserProfile.userId',
+            () => json['userId']! as String),
       );
 
   final DateTime createdAt;
@@ -3284,6 +8737,10 @@ enum UserProfileStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const UserProfileStatusDto(this.wireValue);
@@ -3293,6 +8750,9 @@ enum UserProfileStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static UserProfileStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -3300,7 +8760,47 @@ enum UserProfileStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
+  String? toWire() => this == unknown ? null : wireValue;
+}
+
+/// Contract enumeration.
+enum WalletKindDto {
+  eMoney('E_MONEY'),
+  mobileMoney('MOBILE_MONEY'),
+  other('OTHER'),
+  payroll('PAYROLL'),
+  prepaid('PREPAID'),
+  superApp('SUPER_APP'),
+
+  /// A value this build does not know.
+  ///
+  /// The server may add enumeration values at any time; a client that
+  /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
+  unknown('');
+
+  const WalletKindDto(this.wireValue);
+
+  final String wireValue;
+
+  /// Parses a wire value, falling back to [unknown].
+  static WalletKindDto fromWire(String? value) {
+    for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
+      if (candidate.wireValue == value) {
+        return candidate;
+      }
+    }
+    return unknown;
+  }
+
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }
 
@@ -3313,7 +8813,8 @@ final class WithdrawOwnConsentRequestDto {
 
   /// Decodes the contract representation.
   factory WithdrawOwnConsentRequestDto.fromJson(Map<String, Object?> json) => WithdrawOwnConsentRequestDto(
-        grantId: json['grantId']! as String,
+        grantId: decodeField<String>('WithdrawOwnConsentRequest.grantId',
+            () => json['grantId']! as String),
       );
 
   final String grantId;
@@ -3338,9 +8839,12 @@ final class WithdrawOwnConsentResponseDto {
 
   /// Decodes the contract representation.
   factory WithdrawOwnConsentResponseDto.fromJson(Map<String, Object?> json) => WithdrawOwnConsentResponseDto(
-        grantId: json['grantId']! as String,
-        status: WithdrawOwnConsentResponseStatusDto.fromWire(json['status']! as String),
-        withdrawnAt: DateTime.parse(json['withdrawnAt']! as String).toUtc(),
+        grantId: decodeField<String>('WithdrawOwnConsentResponse.grantId',
+            () => json['grantId']! as String),
+        status: decodeField<WithdrawOwnConsentResponseStatusDto>('WithdrawOwnConsentResponse.status',
+            () => WithdrawOwnConsentResponseStatusDto.fromWire(json['status']! as String)),
+        withdrawnAt: decodeField<DateTime>('WithdrawOwnConsentResponse.withdrawnAt',
+            () => DateTime.parse(json['withdrawnAt']! as String).toUtc()),
       );
 
   final String grantId;
@@ -3368,6 +8872,10 @@ enum WithdrawOwnConsentResponseStatusDto {
   ///
   /// The server may add enumeration values at any time; a client that
   /// threw on one would break on a deployment it did not ship with.
+  ///
+  /// It carries NO wire value and is never sent: a client that echoed a
+  /// value it does not understand would be asserting a meaning it does
+  /// not have.
   unknown('');
 
   const WithdrawOwnConsentResponseStatusDto(this.wireValue);
@@ -3377,6 +8885,9 @@ enum WithdrawOwnConsentResponseStatusDto {
   /// Parses a wire value, falling back to [unknown].
   static WithdrawOwnConsentResponseStatusDto fromWire(String? value) {
     for (final candidate in values) {
+      if (candidate == unknown) {
+        continue;
+      }
       if (candidate.wireValue == value) {
         return candidate;
       }
@@ -3384,6 +8895,6 @@ enum WithdrawOwnConsentResponseStatusDto {
     return unknown;
   }
 
-  /// The wire value, or null for [unknown].
+  /// The wire value, or null for [unknown], which has none.
   String? toWire() => this == unknown ? null : wireValue;
 }

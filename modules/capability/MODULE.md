@@ -146,7 +146,7 @@ use case exists to gate. There is no permission that bypasses the consent or lic
 |---|---|---|
 | _none_ | n/a | This module is platform machinery, not a jurisdiction-scoped capability. |
 
-**No capability is available anywhere.** Every entry in the production registry is
+**No capability is available anywhere.** `TRANSACTIONS` is `IMPLEMENTED` because its code exists; every other entry in the production registry is
 `NOT_IMPLEMENTED` and deployed nowhere, so gate 1 denies all seven regardless of any row, pack,
 or entitlement. The tables ship with **no seed rows at all**: deny-by-default means the ground
 state is absence.
@@ -223,7 +223,7 @@ trigger-enforced append-only ledgers, version-increment guards, and TOCTOU pin b
 
 ## Notes and known limitations
 
-**Nothing is available.** Every real capability is `NOT_IMPLEMENTED` and deployed nowhere; the
+**Nothing is available.** `TRANSACTIONS` is `IMPLEMENTED`, every other real capability is `NOT_IMPLEMENTED`, and all are deployed nowhere; the
 positive resolution path is exercised only over SYNTHETIC test registries whose ids
 (`TEST_SYNTH`, `TEST_HIDDEN`) never enter the production union, the production registry, client
 output, or a database row — the write use cases validate ids against the production registry and

@@ -42,7 +42,24 @@ export function isCapabilityId(value: string): value is CapabilityId {
 /** Product lifecycle intent — says nothing about whether code exists. */
 export type CapabilityLifecycle = 'PLANNED' | 'ALPHA' | 'BETA' | 'GA' | 'DEPRECATED' | 'RETIRED';
 
-/** Whether the capability's code exists in this repository. */
+/**
+ * Whether the capability's code exists in this repository. Nothing else.
+ *
+ * It is NOT a claim that the capability is deployed, cleared by a PolicyPack,
+ * entitled, navigable, or available — those are separate dimensions on this
+ * same descriptor and on the resolver, and each denies on its own. `IMPLEMENTED`
+ * GRANTS NOTHING: gate 1 in the resolver reads implementation AND deployment,
+ * and the deployment arm refuses by itself.
+ *
+ * This definition is the one the registry is validated against. A second,
+ * stricter reading once lived in `docs/architecture/capability-registry.md`
+ * ("code exists as something a deployment could expose"), which contradicted
+ * both this comment and that document's own dimension table, and which was used
+ * to keep TRANSACTIONS at NOT_IMPLEMENTED while 27 operations answered for it.
+ * A registry that answers "does the code exist?" with "no" while the code exists
+ * is not being conservative; it is wrong, and it pushes the reader toward
+ * trusting deployment state that is recorded elsewhere.
+ */
 export type CapabilityImplementation = 'NOT_IMPLEMENTED' | 'IMPLEMENTED';
 
 /** Whether the built capability is deployed to an environment. */
@@ -81,21 +98,44 @@ export interface CapabilityDescriptor<Id extends string = CapabilityId> {
    * is not yet available"). Absent means NOT explainable — the fail-closed
    * default: without the opt-in, a provider-pending capability is simply
    * omitted from client output rather than advertised with a reason. No
-   * production descriptor opts in while every capability is unbuilt.
+   * production descriptor opts in, because nothing is deployed.
    */
   readonly providerPendingExplainable?: boolean;
 }
 
 /**
- * The production registry. Every real capability is honestly unbuilt:
- * NOT_IMPLEMENTED, deployed nowhere, and (for the resolver) therefore
- * unresolvable to AVAILABLE regardless of any database row, pack, or
- * entitlement. Zakat additionally carries a non-engineering launch gate
- * (Sharia review) and Amanat declares NO jurisdiction and stays HIDDEN.
+ * The production registry. Six capabilities are honestly unbuilt; one is built
+ * and deployed nowhere; NONE is available anywhere.
+ *
+ * TRANSACTIONS is `IMPLEMENTED` because its code exists — seven bounded
+ * contexts behind migrations 0087-0101, 27 operations mounted from the
+ * composition root, and seven Flutter feature folders calling them. That is the
+ * only question `implementation` asks.
+ *
+ * It changes nothing about availability, and the resolver is where that is
+ * enforced rather than here: `deployment` is empty, so gate 1 still denies with
+ * NOT_DEPLOYED; `declaredJurisdictions` is empty, so the clearance intersection
+ * is empty; `qa/v1` declares `clearedCapabilities: []`; and the availability
+ * tables ship with no rows. Four independent denials, and flipping this field
+ * removes none of them.
+ *
+ * Zakat additionally carries a non-engineering launch gate (Sharia review) and
+ * Amanat declares NO jurisdiction and stays HIDDEN.
  */
 export const CAPABILITY_REGISTRY: Readonly<Record<CapabilityId, CapabilityDescriptor>> =
   Object.freeze({
-    TRANSACTIONS: descriptor('TRANSACTIONS'),
+    // The one built capability. Deployed nowhere, declared nowhere, cleared by
+    // no pack, available nowhere — each recorded in its own field rather than
+    // by understating this one.
+    TRANSACTIONS: Object.freeze({
+      id: 'TRANSACTIONS',
+      lifecycle: 'ALPHA',
+      implementation: 'IMPLEMENTED',
+      deployment: Object.freeze({}),
+      declaredJurisdictions: Object.freeze([]),
+      disclosureBearing: false,
+      clientExposure: 'ACTIONABLE',
+    }),
     BUDGETS: descriptor('BUDGETS'),
     GOALS: descriptor('GOALS'),
     INSIGHTS: descriptor('INSIGHTS'),
@@ -107,6 +147,7 @@ export const CAPABILITY_REGISTRY: Readonly<Record<CapabilityId, CapabilityDescri
     AMANAT: descriptor('AMANAT'),
   });
 
+/** The honest-unbuilt default, for capabilities whose code does not exist. */
 function descriptor(id: CapabilityId): CapabilityDescriptor {
   return Object.freeze({
     id,

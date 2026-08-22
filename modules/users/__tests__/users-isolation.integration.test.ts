@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Clock, TenantId, UserId } from '@karar/shared-kernel';
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -29,6 +30,7 @@ import { GetOwnProfile } from '../application/use-cases/get-own-profile.js';
 import { UpdateOwnProfile } from '../application/use-cases/update-own-profile.js';
 import { RequestAccountDisable } from '../application/use-cases/request-account-disable.js';
 import type { PrincipalActor } from '../application/principal.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // ADVERSARIAL CROSS-TENANT ISOLATION for the users tables (tenancy.md §2
 // layer 4; ADR-0022): two tenants, both NON-EMPTY, and every cross-tenant
@@ -74,6 +76,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('users isolation suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -209,7 +212,7 @@ describe.skipIf(unreachable !== null)('users tables — adversarial isolation (l
     await auditAdapter?.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }

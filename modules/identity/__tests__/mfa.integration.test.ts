@@ -331,6 +331,14 @@ describe.skipIf(unreachable !== null)('MFA lifecycle (live PostgreSQL)', () => {
     expect(account?.mfaRequired).toBe(true);
   });
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('enforces the distributed mfa_verify budget at 10/15m', async () => {
     const limited = await createIdentityHarness({ suite: 'mfarl' });
     try {
@@ -380,5 +388,5 @@ describe.skipIf(unreachable !== null)('MFA lifecycle (live PostgreSQL)', () => {
     } finally {
       await limited.end();
     }
-  });
+  }, 30_000);
 });

@@ -1,0 +1,980 @@
+# statement-imports surface — path-item fragments (ADR-0009: authored by
+# hand, never generated from code). The phase lead merges these into
+# openapi.yaml via $ref per path, e.g.:
+#   /financial/statement-imports:
+#     $ref: './paths/financial-statement-imports.yaml#/~1financial~1statement-imports'
+#
+# CSV STATEMENT INGESTION, AS A SEQUENCE THE SUBJECT DRIVES:
+#   create a draft -> upload the source -> parse it under a stated column
+#   mapping -> review what it produced -> commit, or erase.
+# Parsing NEVER writes a financial record. Only a reviewed commit does, and it
+# does so atomically and idempotently.
+#
+# ON THE MAPPING, STATED PLAINLY. There is no separate "update the mapping"
+# operation, because there is no stored draft mapping to update: the mapping
+# is an ARGUMENT to the parse, and correcting it means parsing again from
+# SOURCE_STORED with the corrected mapping. An endpoint that appeared to save
+# a mapping and changed nothing would be worse than its absence.
+#
+# Contract rules made visible here:
+#   * EVERY operation acts for the AUTHENTICATED principal. No `userId`, no
+#     `tenantId`, anywhere. Another subject's import answers 404.
+#   * THE BYTE BOUND IS THE CENTRAL ONE. The upload route takes its maximum
+#     from `INGESTION_LIMIT_POLICIES.csvStatementImport` in
+#     packages/platform/src/ingestion/limits.ts, checks the declared length
+#     BEFORE reading and the accumulated length WHILE reading, and refuses the
+#     moment either crosses it. Nothing is truncated to fit: a silently
+#     shortened statement is a wrong financial record that looks like a right
+#     one.
+#   * NOTHING FROM THE FILE COMES BACK. No raw row, no raw cell, no header
+#     text — a header can itself carry an account number — no staged amount,
+#     no staged merchant, no staged balance, no staged-row fingerprint. A row
+#     error names a 1-based DATA row number, one field from a CLOSED safe
+#     vocabulary, and one reason code. That is the whole of it.
+#   * NO OBJECT-STORAGE HANDLE AND NO ENCRYPTION METADATA. The stored source's
+#     locator, store kind, byte length, algorithm, key version, nonce, auth
+#     tag and integrity checksum have no field on this surface. Existence is
+#     reported as a boolean, `hasStoredSource`, because a handle is enough to
+#     ask a store for somebody's bank statement.
+#   * A TRUNCATED ERROR REPORT SAYS SO. `reportedErrorCount` and
+#     `totalErrorCount` are separate fields; collapsing them would turn a
+#     truncated report into a complete-looking one.
+#   * Money is exact minor units as a string; `bookingDate`/`valueDate` are
+#     calendar days (ADR-0027) and never appear here as instants.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`,
+#     served under the media type the single writer in
+#     apps/api/src/errors/problem-response.ts emits.
+
+/financial/statement-imports:
+  post:
+    operationId: createOwnStatementImport
+    summary: Create a draft statement import against one of the caller's accounts
+    description: >-
+      Starts the sequence in state DRAFT. The retention decision for the
+      source bytes and the staged rows is resolved HERE, before a single
+      durable source byte can exist: an environment with no approved decision
+      is refused (422) rather than allowed to write and decide later.
+
+      The target account is resolved through a port and must be writable; an
+      archived or closed account refuses the import rather than accepting one
+      that could never be committed.
+
+      A `connectionId`, WHEN ONE IS SUPPLIED, is resolved the same way and is
+      held to the same standard as the account: it must be the caller's own,
+      it must exist, and it must be on the `USER_FILE_UPLOAD` rail. The field
+      is a claim about where a person's statement came from, and an unchecked
+      claim is indistinguishable from a checked one everywhere downstream —
+      so a `MANUAL` connection, which means the person typed their entries, is
+      refused rather than recorded as the route a file arrived through.
+      Supplying no connection stays entirely legal: a person may import a file
+      before any connection exists, and the connection is NOT required to be
+      linked to the target account (one route legitimately feeds many
+      accounts, and the link that would express the relation is derived from
+      the file's own content, which does not exist yet at this step).
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [accountId]
+            properties:
+              accountId:
+                type: string
+                format: uuid
+                description: One of the caller's OWN accounts.
+              connectionId:
+                type: [string, 'null']
+                format: uuid
+                description: >-
+                  The caller's own USER_FILE_UPLOAD connection, when they are
+                  attributing this file to one. Null attributes it to none.
+                  Every word of that is enforced: an id that is not the
+                  caller's own or names nothing answers 404
+                  CONNECTION_NOT_FOUND — one arm for both, so a guessed
+                  identifier is not a membership test — and one of the
+                  caller's own connections on any other rail answers 409
+                  CONNECTION_NOT_USABLE.
+    responses:
+      '201':
+        description: The draft import.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportView'
+      '400':
+        description: Malformed body (code INVALID_REQUEST).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: >-
+          No such account for this principal (code ACCOUNT_NOT_FOUND), or no
+          such connection for this principal (code CONNECTION_NOT_FOUND).
+          Neither distinguishes "does not exist" from "is not yours".
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: >-
+          The account cannot receive an import in its current state (code
+          ACCOUNT_NOT_WRITABLE), or the named connection is the caller's own
+          but carries no files — a MANUAL connection, say (code
+          CONNECTION_NOT_USABLE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '422':
+        $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/statement-imports/{importId}:
+  get:
+    operationId: readOwnStatementImport
+    summary: Read the state of the caller's own statement import
+    description: >-
+      Where the import is in the sequence, what the parse produced, and
+      whether it is waiting for the subject to decide. The stored source is
+      reported as EXISTING or not; its locator is never carried.
+
+      `version` IS NOT ON THIS RESPONSE, and the absence is a stated
+      limitation rather than an omission. The module exposes exactly one read
+      for a single import and it does not carry the optimistic-concurrency
+      token, so a client takes the `expectedVersion` it needs for the commit
+      from the response to the write it last performed — the upload or the
+      parse — which is where the full import row is handed over. Recovering it
+      after that response is lost requires a read the module does not declare.
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/ImportIdParameter'
+    responses:
+      '200':
+        description: The import's state.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportStatusView'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: No such import for this principal (code IMPORT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+  delete:
+    operationId: eraseOwnStatementImport
+    summary: Erase the caller's own statement import, its stored source and its staged rows
+    description: >-
+      Erasure, not cancellation. The encrypted source object and every staged
+      row go; the import row remains in state ERASED so the subject's own
+      history does not silently lose an entry. An import that is mid-commit is
+      refused rather than torn in half.
+
+      Transactions already committed from this import are NOT erased here.
+      They are ordinary financial records of the subject's, with their own
+      deletion path, and removing them as a side effect of tidying an import
+      would delete data the person never asked to lose.
+
+      AN IMPORT THAT PRODUCED TRANSACTIONS CANNOT BE ERASED, and answers 409.
+      The rule belongs to the module: an import may not reach ERASED while it
+      still reports a committed-transaction count, because the count is the
+      only remaining statement that those records came from a file somebody
+      reviewed. The refusal is stated rather than rounded to a 200 — a 200
+      would tell a person their statement is gone when nothing was erased.
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/ImportIdParameter'
+    responses:
+      '200':
+        description: What was erased.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportErasedView'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: No such import for this principal (code IMPORT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: >-
+          The import cannot be erased from its current state (code
+          IMPORT_NOT_IN_EXPECTED_STATE) — it is mid-commit, already erased, or
+          it produced transactions that still exist.
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/statement-imports/{importId}/source:
+  post:
+    operationId: uploadOwnStatementImportSource
+    summary: Upload the CSV bytes for the caller's own draft import
+    description: >-
+      The request body is the file itself, as `text/csv`. It is read as a
+      STREAM and never buffered whole before its size is known: the declared
+      `Content-Length` is checked against the central byte bound before a byte
+      is read, and the accumulated length is checked again on every chunk. The
+      request is refused the moment either crosses the bound
+      (code SOURCE_TOO_LARGE), and nothing is truncated to fit.
+
+      The bytes are stored only as authenticated ciphertext, outside
+      PostgreSQL. Nothing about that storage — its locator, its algorithm, its
+      key version, its nonce, its auth tag, its checksum — appears in any
+      response.
+
+      Re-uploading a file this subject has already committed answers 200 with
+      the import in state DUPLICATE and refusal code SOURCE_ALREADY_IMPORTED,
+      rather than silently importing the same statement twice.
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/ImportIdParameter'
+    requestBody:
+      required: true
+      description: The CSV file. Exactly one media type is accepted.
+      content:
+        text/csv:
+          schema:
+            type: string
+            description: >-
+              The raw CSV bytes, decoded as UTF-8. A malformed sequence is
+              refused rather than replaced with U+FFFD inside somebody's
+              merchant name.
+    responses:
+      '200':
+        description: >-
+          The import, now in SOURCE_STORED — or in DUPLICATE when this subject
+          already committed the same file.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportView'
+      '400':
+        description: The source is refused (code SOURCE_REFUSED; see `reason` for the refusal code).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: No such import for this principal (code IMPORT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: The import is not in DRAFT (code IMPORT_NOT_IN_EXPECTED_STATE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '413':
+        description: >-
+          The body exceeds the declared byte bound for this ingestion path
+          (code SOURCE_TOO_LARGE). The problem names the bound so a client can
+          say what is wrong rather than merely that something is.
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '415':
+        description: The body is not `text/csv` (code UNSUPPORTED_MEDIA_TYPE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '422':
+        $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/statement-imports/{importId}/parse:
+  post:
+    operationId: parseOwnStatementImportSource
+    summary: Parse the stored source under a stated column mapping
+    description: >-
+      Reads the stored ciphertext, parses it under the mapping the caller
+      states, normalizes each row, computes deduplication identities and
+      stages the result for review. NOTHING FINANCIAL IS WRITTEN: the import
+      moves to REVIEW_REQUIRED and waits for a person.
+
+      THE MAPPING IS BY COLUMN INDEX, never by header text. A header is
+      untrusted content from a file, and matching on it is how a column of
+      dates silently becomes a column of amounts.
+
+      CONVENTIONS ARE STATED, NOT GUESSED. A date order, a decimal separator
+      or a direction the file does not make unambiguous produces a typed row
+      error rather than a plausible number. `statedBalance` is what the
+      STATEMENT claims; the parse reconciles against it and reports MATCHED,
+      MISMATCHED or NOT_AVAILABLE, and a mismatch blocks the commit.
+
+      Every bound this parse obeys — rows, columns, field bytes, buffered rows,
+      buffered bytes, the wall-clock deadline and the number of reported errors
+      — comes from `INGESTION_LIMIT_POLICIES.csvStatementImport`. None of them
+      is a request field: a caller cannot raise the ceiling it is being held
+      to.
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/ImportIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [mapping]
+            properties:
+              mapping:
+                $ref: '#/components/StatementColumnMapping'
+              statedBalance:
+                description: >-
+                  The balance the statement itself states, for reconciliation.
+                  Null when the statement states none.
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/StatedStatementBalance'
+    responses:
+      '200':
+        description: The import, now in REVIEW_REQUIRED, with what the parse produced.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportView'
+      '400':
+        description: >-
+          The mapping cannot be used, or the source was refused during the
+          parse (codes MAPPING_UNUSABLE, SOURCE_REFUSED). A mapping refusal
+          names its violation kinds; a source refusal names its refusal code
+          and, where they help, the bounded row errors.
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: >-
+          No such import for this principal, or the account it targets is gone
+          (codes IMPORT_NOT_FOUND, ACCOUNT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: The import is not in SOURCE_STORED (code IMPORT_NOT_IN_EXPECTED_STATE).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/statement-imports/{importId}/preview:
+  get:
+    operationId: listOwnStatementImportPreview
+    summary: List what the parse found, as safe row errors, one page at a time
+    description: >-
+      The review surface. It reports COUNTS and ROW ERRORS, and deliberately
+      no row content: no cell, no amount, no merchant, no balance and no
+      staged fingerprint crosses this boundary. A person deciding whether to
+      commit needs to know how many rows are valid, how many are duplicates
+      and which rows failed and why — none of which requires the file's
+      contents to be echoed back.
+
+      The underlying report is bounded by the central policy's
+      `maxReportedErrors`, and this route pages within that bound. Both counts
+      are carried: `reportedErrorCount` is what the report holds and
+      `totalErrorCount` is what really failed, so a truncated report can never
+      read as a complete one.
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/ImportIdParameter'
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
+    responses:
+      '200':
+        description: The preview, with one page of row errors.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportPreviewView'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: No such import for this principal (code IMPORT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/statement-imports/{importId}/commit:
+  post:
+    operationId: commitOwnStatementImport
+    summary: Commit the reviewed import, writing its valid rows as transactions
+    description: >-
+      The one operation on this surface that creates financial records. It is
+      atomic and idempotent: a retry after a successful commit answers 200
+      with `alreadyCommitted` true and writes nothing.
+
+      `expectedVersion` is required. A blind commit could apply a decision the
+      subject took against a different parse.
+
+      A reconciliation MISMATCH blocks the commit (409). Committing a
+      statement whose own stated balance disagrees with its rows would write
+      records nobody can trust and would be discovered, if at all, months
+      later.
+    tags: [statement-imports]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/ImportIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion: { type: integer, minimum: 1 }
+    responses:
+      '200':
+        description: The commit receipt.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/StatementImportCommittedView'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: >-
+          No such import for this principal, or its account is gone (codes
+          IMPORT_NOT_FOUND, ACCOUNT_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: >-
+          The commit cannot proceed as asked (codes
+          IMPORT_NOT_IN_EXPECTED_STATE, IMPORT_VERSION_CONFLICT,
+          ACCOUNT_NOT_WRITABLE, CURRENCY_MISMATCH, RECONCILIATION_BLOCKED,
+          SOURCE_INTEGRITY_FAILED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '422':
+        $ref: './paths/financial-shared.yaml#/components/RetentionUnresolvedResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        description: >-
+          The commit could not be performed (codes COMMIT_FAILED,
+          SOURCE_STORE_UNAVAILABLE, STORE_UNAVAILABLE). Nothing partial was
+          written — the commit is one unit of work.
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  ImportIdParameter:
+    name: importId
+    in: path
+    required: true
+    description: One of the CALLER'S OWN imports. Any other id answers 404.
+    schema: { type: string, format: uuid }
+  MinorUnitString:
+    type: string
+    pattern: '^-?[0-9]{1,30}$'
+    description: >-
+      An exact integer count of minor units, serialized as CHARACTERS. Never a
+      JSON number: a number is a float, and a float is not a ledger value
+      (ADR-0006).
+  ImportState:
+    type: string
+    enum:
+      [
+        DRAFT,
+        SOURCE_STORED,
+        PARSING,
+        REVIEW_REQUIRED,
+        COMMITTING,
+        COMMITTED,
+        REJECTED,
+        FAILED,
+        DUPLICATE,
+        ERASED,
+      ]
+  ImportRefusalCode:
+    type: string
+    description: Why an import was refused. A closed vocabulary; never free prose from a file.
+    enum:
+      [
+        SOURCE_TOO_LARGE,
+        TOO_MANY_ROWS,
+        TOO_MANY_COLUMNS,
+        FIELD_TOO_LARGE,
+        BUFFERED_ROWS_EXCEEDED,
+        BUFFERED_BYTES_EXCEEDED,
+        DEADLINE_EXCEEDED,
+        CANCELLED,
+        TOO_MANY_ERRORS,
+        UNSUPPORTED_MEDIA_TYPE,
+        INVALID_ENCODING,
+        BINARY_CONTENT,
+        SPREADSHEET_CONTENT,
+        COMPRESSED_CONTENT,
+        MALFORMED_QUOTING,
+        EMPTY_SOURCE,
+        NO_HEADER_ROW,
+        MAPPING_AMBIGUOUS,
+        MULTIPLE_ACCOUNTS_IN_SOURCE,
+        CURRENCY_MISMATCH,
+        RECONCILIATION_MISMATCH,
+        SOURCE_ALREADY_IMPORTED,
+        SOURCE_INTEGRITY_FAILED,
+        SOURCE_UNREADABLE,
+      ]
+  SafeField:
+    type: string
+    description: >-
+      WHICH field of a row failed, from a CLOSED module vocabulary — never the
+      file's own header text, which can itself contain an account number.
+    enum:
+      [
+        ROW,
+        BOOKING_DATE,
+        VALUE_DATE,
+        EVENT_OCCURRED_AT,
+        SOURCE_TIMEZONE,
+        AMOUNT,
+        DEBIT_AMOUNT,
+        CREDIT_AMOUNT,
+        CURRENCY,
+        DESCRIPTION,
+        MERCHANT,
+        SOURCE_BALANCE,
+        SOURCE_REFERENCE,
+        INSTRUMENT_MASK,
+      ]
+  RowErrorReasonCode:
+    type: string
+    enum:
+      [
+        REQUIRED_FIELD_MISSING,
+        UNREADABLE_AMOUNT,
+        AMBIGUOUS_DECIMAL_SEPARATOR,
+        AMBIGUOUS_DATE_ORDER,
+        UNREADABLE_DATE,
+        UNREADABLE_INSTANT,
+        UNKNOWN_TIMEZONE,
+        UNKNOWN_CURRENCY,
+        CURRENCY_MISMATCH,
+        AMBIGUOUS_DIRECTION,
+        DEBIT_AND_CREDIT_BOTH_PRESENT,
+        DEBIT_AND_CREDIT_BOTH_ABSENT,
+        FIELD_TOO_LARGE,
+        TOO_MANY_COLUMNS,
+        COLUMN_COUNT_MISMATCH,
+        INVALID_ENCODING,
+        MALFORMED_QUOTING,
+        AMOUNT_EXCEEDS_RANGE,
+        DECIMAL_PLACES_EXCEED_CURRENCY,
+      ]
+  RowErrorView:
+    type: object
+    additionalProperties: false
+    required: [rowNumber, safeField, reasonCode]
+    description: >-
+      Exactly three fields, and there is never a fourth. `rowNumber` is
+      1-based among DATA rows — never an offset into the file — and no cell
+      value accompanies it.
+    properties:
+      rowNumber: { type: integer, minimum: 1 }
+      safeField:
+        $ref: '#/components/SafeField'
+      reasonCode:
+        $ref: '#/components/RowErrorReasonCode'
+  ReconciliationStatus:
+    type: string
+    description: >-
+      Whether the statement's own stated balance agrees with its rows.
+      NOT_AVAILABLE is a real answer — the statement stated no balance, or
+      there was nothing to compare against — and is not the same as MATCHED.
+    enum: [NOT_AVAILABLE, MATCHED, MISMATCHED]
+  ImportCountsView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        rowCount,
+        validRowCount,
+        invalidRowCount,
+        exactDuplicateCount,
+        probableDuplicateCount,
+        committedTransactionCount,
+      ]
+    description: >-
+      Counts only. `probableDuplicateCount` is present and is 0: probable-
+      duplicate detection is not implemented, and a field that quietly did not
+      exist would read as "none found" rather than "none looked for".
+    properties:
+      rowCount: { type: integer, minimum: 0 }
+      validRowCount: { type: integer, minimum: 0 }
+      invalidRowCount: { type: integer, minimum: 0 }
+      exactDuplicateCount: { type: integer, minimum: 0 }
+      probableDuplicateCount: { type: integer, minimum: 0 }
+      committedTransactionCount: { type: integer, minimum: 0 }
+  StatedStatementBalance:
+    type: object
+    additionalProperties: false
+    required: [minorUnits, kind, currency]
+    description: What the STATEMENT says its balance is, for reconciliation only.
+    properties:
+      minorUnits:
+        $ref: '#/components/MinorUnitString'
+      kind: { type: string, enum: [OPENING, CLOSING, LEDGER, AVAILABLE] }
+      currency: { type: string, pattern: '^[A-Z]{3}$' }
+  AmountColumns:
+    description: >-
+      How the amount is expressed in the file. A signed column needs its SIGN
+      FRAME stated — a bank ledger and an account holder disagree about which
+      way is positive — and a debit/credit pair needs both columns.
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required: [kind, amountColumn, signFrame]
+        properties:
+          kind: { type: string, enum: [SIGNED] }
+          amountColumn: { type: integer, minimum: 0 }
+          signFrame: { type: string, enum: [ACCOUNT_HOLDER, BANK_LEDGER] }
+      - type: object
+        additionalProperties: false
+        required: [kind, debitColumn, creditColumn]
+        properties:
+          kind: { type: string, enum: [DEBIT_CREDIT] }
+          debitColumn: { type: integer, minimum: 0 }
+          creditColumn: { type: integer, minimum: 0 }
+    discriminator:
+      propertyName: kind
+  StatementColumnMapping:
+    type: object
+    additionalProperties: false
+    required: [bookingDateColumn, descriptionColumn, amount, hasHeaderRow]
+    description: >-
+      Column INDEXES, 0-based. Deliberately not header names: a header is
+      untrusted text from a file, and matching on it is how a column of dates
+      becomes a column of amounts.
+
+      `accountIdentifierColumn` exists for DETECTION only — it lets the parse
+      notice that a file covers more than one account and refuse. It never
+      selects an account: the account is the one the draft was created
+      against, and a file cannot redirect itself.
+    properties:
+      bookingDateColumn: { type: integer, minimum: 0 }
+      valueDateColumn: { type: [integer, 'null'], minimum: 0 }
+      eventOccurredAtColumn: { type: [integer, 'null'], minimum: 0 }
+      sourceTimezoneColumn: { type: [integer, 'null'], minimum: 0 }
+      descriptionColumn: { type: integer, minimum: 0 }
+      merchantColumn: { type: [integer, 'null'], minimum: 0 }
+      amount:
+        $ref: '#/components/AmountColumns'
+      currencyColumn:
+        type: [integer, 'null']
+        minimum: 0
+        description: >-
+          Exactly one of `currencyColumn` and `statedCurrency` must be given.
+          Two sources for one currency is an ambiguity, not a fallback.
+      statedCurrency: { type: [string, 'null'], pattern: '^[A-Z]{3}$' }
+      sourceBalanceColumn: { type: [integer, 'null'], minimum: 0 }
+      sourceBalanceKind:
+        type: [string, 'null']
+        enum: [RUNNING, LEDGER, AVAILABLE, CLOSING, null]
+        description: Required when a balance column is given; a balance of unstated kind is unusable.
+      sourceReferenceColumn: { type: [integer, 'null'], minimum: 0 }
+      instrumentMaskColumn: { type: [integer, 'null'], minimum: 0 }
+      accountIdentifierColumn: { type: [integer, 'null'], minimum: 0 }
+      dateOrder:
+        type: [string, 'null']
+        enum: [ISO, DAY_FIRST, MONTH_FIRST, null]
+        description: >-
+          Stated rather than inferred. `03/04` is two different days depending
+          on the answer, and guessing it wrong moves a person's money.
+      hasHeaderRow: { type: boolean }
+  StatementImportView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        importId,
+        accountId,
+        connectionId,
+        state,
+        stateChangedAt,
+        mediaType,
+        rail,
+        availability,
+        hasStoredSource,
+        retentionState,
+        versions,
+        counts,
+        reconciliationStatus,
+        statedBalance,
+        refusalCode,
+        awaitsDecision,
+        committedAt,
+        erasedAt,
+        createdAt,
+        version,
+      ]
+    description: >-
+      Deliberately absent, and to stay absent: the stored source's locator,
+      store kind, byte length, algorithm, key version, nonce, auth tag,
+      integrity checksum and file fingerprint; every staged row and every cell;
+      the row's `tenantId` and `userId`; and the retention decision's basis,
+      approval reference and pack version, which are internal review artefacts.
+    properties:
+      importId: { type: string, format: uuid }
+      accountId: { type: string, format: uuid }
+      connectionId: { type: [string, 'null'], format: uuid }
+      state:
+        $ref: '#/components/ImportState'
+      stateChangedAt: { type: string, format: date-time }
+      mediaType: { type: string, enum: ['text/csv'] }
+      rail:
+        type: string
+        enum: [USER_FILE_UPLOAD]
+        description: A statement import is a file the SUBJECT uploaded. It is not a bank connection.
+      availability:
+        type: string
+        enum: [EXECUTABLE]
+        description: USER_FILE_UPLOAD is one of the two rails this platform can actually run.
+      hasStoredSource:
+        type: boolean
+        description: >-
+          Whether encrypted source bytes exist. EXISTENCE only: a locator is
+          enough to ask a store for somebody's bank statement, so none is
+          carried.
+      retentionState:
+        type: string
+        enum: [UNDECIDED, DECIDED]
+        description: >-
+          Whether an approved retention decision governs this import's durable
+          data. The decision's period, basis, approval reference and pack
+          version stay server-side.
+      versions:
+        oneOf:
+          - type: 'null'
+          - $ref: './paths/financial-shared.yaml#/components/ProcessingVersionsView'
+      counts:
+        $ref: '#/components/ImportCountsView'
+      reconciliationStatus:
+        $ref: '#/components/ReconciliationStatus'
+      statedBalance:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/StatedStatementBalance'
+      refusalCode:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/ImportRefusalCode'
+      awaitsDecision:
+        type: boolean
+        description: Whether this import is waiting for the subject to commit or erase it.
+      committedAt: { type: [string, 'null'], format: date-time }
+      erasedAt: { type: [string, 'null'], format: date-time }
+      createdAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }
+  StatementImportStatusView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        importId,
+        state,
+        accountId,
+        connectionId,
+        hasStoredSource,
+        counts,
+        reconciliationStatus,
+        versions,
+        refusalCode,
+        awaitsDecision,
+        reportedErrorCount,
+        totalErrorCount,
+      ]
+    description: >-
+      The import's state, without its row errors and without `version` (see
+      the operation's description). Deliberately absent, and to stay absent:
+      the stored source's locator, store kind, byte length, algorithm, key
+      version, nonce, auth tag, integrity checksum and file fingerprint; every
+      staged row and every cell; and the row's `tenantId` and `userId`.
+    properties:
+      importId: { type: string, format: uuid }
+      state:
+        $ref: '#/components/ImportState'
+      accountId: { type: string, format: uuid }
+      connectionId: { type: [string, 'null'], format: uuid }
+      hasStoredSource: { type: boolean }
+      counts:
+        $ref: '#/components/ImportCountsView'
+      reconciliationStatus:
+        $ref: '#/components/ReconciliationStatus'
+      versions:
+        oneOf:
+          - type: 'null'
+          - $ref: './paths/financial-shared.yaml#/components/ProcessingVersionsView'
+      refusalCode:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/ImportRefusalCode'
+      awaitsDecision: { type: boolean }
+      reportedErrorCount: { type: integer, minimum: 0 }
+      totalErrorCount: { type: integer, minimum: 0 }
+  StatementImportPreviewView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        importId,
+        state,
+        accountId,
+        connectionId,
+        hasStoredSource,
+        counts,
+        reconciliationStatus,
+        versions,
+        refusalCode,
+        awaitsDecision,
+        reportedErrorCount,
+        totalErrorCount,
+        rowErrors,
+        page,
+      ]
+    description: >-
+      The review surface. `rowErrors` is one PAGE of the bounded report;
+      `reportedErrorCount` is how many the report holds and `totalErrorCount`
+      is how many rows really failed. Both are carried because collapsing them
+      turns a truncated report into a complete-looking one.
+    properties:
+      importId: { type: string, format: uuid }
+      state:
+        $ref: '#/components/ImportState'
+      accountId: { type: string, format: uuid }
+      connectionId: { type: [string, 'null'], format: uuid }
+      hasStoredSource: { type: boolean }
+      counts:
+        $ref: '#/components/ImportCountsView'
+      reconciliationStatus:
+        $ref: '#/components/ReconciliationStatus'
+      versions:
+        oneOf:
+          - type: 'null'
+          - $ref: './paths/financial-shared.yaml#/components/ProcessingVersionsView'
+      refusalCode:
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/ImportRefusalCode'
+      awaitsDecision: { type: boolean }
+      reportedErrorCount: { type: integer, minimum: 0 }
+      totalErrorCount: { type: integer, minimum: 0 }
+      rowErrors:
+        type: array
+        items:
+          $ref: '#/components/RowErrorView'
+      page:
+        $ref: './paths/financial-shared.yaml#/components/PageInfo'
+  StatementImportCommittedView:
+    type: object
+    additionalProperties: false
+    required: [importId, committedTransactionCount, alreadyCommitted, transactionIds]
+    description: >-
+      What the commit wrote. `alreadyCommitted` true means this was an
+      idempotent retry and nothing was written a second time.
+    properties:
+      importId: { type: string, format: uuid }
+      committedTransactionCount: { type: integer, minimum: 0 }
+      alreadyCommitted: { type: boolean }
+      transactionIds:
+        type: array
+        description: The caller's own new transactions, addressable on the transactions surface.
+        items: { type: string, format: uuid }
+  StatementImportErasedView:
+    type: object
+    additionalProperties: false
+    required: [importId, storedObjectDeleted, rowsDeleted]
+    properties:
+      importId: { type: string, format: uuid }
+      storedObjectDeleted: { type: boolean }
+      rowsDeleted: { type: boolean }

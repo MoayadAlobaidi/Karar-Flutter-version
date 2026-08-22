@@ -6,7 +6,7 @@
 
 Phase 4 built a Flutter client, and a reader could reasonably assume a client implies an endpoint. It does not. **No environment was provisioned, no record was created, and no API host exists.** The client's build guard *refuses* to produce a DEV, STAGING or PRODUCTION package without an explicit HTTPS endpoint that is not a developer-machine address, which is the opposite of a deployment: the only packages this repository can currently build are LOCAL ones ([`../architecture/flutter.md` §8a](../architecture/flutter.md)).
 
-**Phase 4 is COMPLETE and merged; Phase 5 is NOT STARTED** ([`../phases/phase-04.md`](../phases/phase-04.md)). **Nothing in this runbook changed during Phase 4 or at its merge: no DNS record, proxy setting, WAF rule, Pages, Workers or Access configuration, or hosting configuration was created, altered, or verified.** EV-427 therefore remains `PENDING` and is now overdue — its target was the Phase 4 gate, all seven §3 hardening rows are still `TO_VERIFY`, and the Security Owner must discharge it against the registrar account itself rather than against this document.
+**Phase 4 is COMPLETE and merged; Phase 5 is IN PROGRESS and has produced no deployable surface** ([`../phases/phase-04.md`](../phases/phase-04.md), [`../phases/phase-05.md`](../phases/phase-05.md)). **Nothing in this runbook changed during Phase 4 or at its merge: no DNS record, proxy setting, WAF rule, Pages, Workers or Access configuration, or hosting configuration was created, altered, or verified.** EV-427 therefore remains `PENDING` and is now overdue — its target was the Phase 4 gate, all seven §3 hardening rows are still `TO_VERIFY`, and the Security Owner must discharge it against the registrar account itself rather than against this document.
 
 The operational companion to the `kararfinance.com` row in the
 [asset inventory](../compliance/asset-inventory.md) and the Cloudflare row in
@@ -64,19 +64,29 @@ project-ending single point of failure if the account is lost, and it is
 governed by exactly the same key-person concentration as everything else
 (KAR-RSK-001).
 
-## 3. Hardening checklist — every row TO_VERIFY
+## 3. Hardening checklist — two rows now observed, five still TO_VERIFY
 
-None of the rows below can be verified from this repository. There is no
-export, no API response, and no run record in-repo that demonstrates any of
-them, so every row is **TO_VERIFY** and must stay TO_VERIFY until someone
-checks the registrar and DNS account and records the observed value with a
-date, the way the repository-settings rows are recorded.
+None of these rows can be verified from *this repository*, and that has not
+changed. Two of them, however, are verifiable from **outside** it: the registry
+and the public DNS answer for a domain are authoritative statements by parties
+other than us, and D2 and D3 already named those exact sources as acceptable.
+So D2 and D3 now carry an observed value and the date it was observed, taken
+from the registry's own WHOIS record and from a live DNS query — not from
+anything written here.
+
+**The other five need the registrar account itself and are unchanged.** MFA,
+auto-renew, recovery methods, role separation and notification delivery are
+settings inside an account, visible to whoever holds it and to nobody else. No
+external query can see them, and no amount of repository prose can substitute.
+
+**One of the two observed rows is a FAILURE, and it is recorded as one.**
+Verifying a control is not the same as passing it; D2 is verified and not met.
 
 | # | Control | Required state | Current status | Owner | How it gets verified |
 |---|---|---|---|---|---|
 | D1 | Multi-factor authentication on the registrar / DNS account | Enforced, with a phishing-resistant factor preferred | **TO_VERIFY** | Security Owner | Observe the account's security settings and record the observed value and date here |
-| D2 | DNSSEC | Enabled at the zone, with the DS record published at the registry | **TO_VERIFY** | Operations Owner | Observe the zone's DNSSEC state; an independent `dig +dnssec` result may be recorded as a summary (no zone dump) |
-| D3 | Registrar lock (transfer lock / `clientTransferProhibited`) | Enabled | **TO_VERIFY** | Operations Owner | Observe the domain's lock state; a public WHOIS/RDAP status summary may be recorded |
+| D2 | DNSSEC | Enabled at the zone, with the DS record published at the registry | **VERIFIED NOT MET, 2026-08-22** — the registry's WHOIS record for `kararfinance.com` reads `DNSSEC: unsigned`, and `dig DS kararfinance.com` returns no delegation-signer record. The zone is not signed and no DS is published | Operations Owner | Observe the zone's DNSSEC state; an independent `dig +dnssec` result may be recorded as a summary (no zone dump) |
+| D3 | Registrar lock (transfer lock / `clientTransferProhibited`) | Enabled | **VERIFIED MET, 2026-08-22** — the registry's WHOIS record carries exactly one status, `clientTransferProhibited`. The transfer lock is on | Operations Owner | Observe the domain's lock state; a public WHOIS/RDAP status summary may be recorded |
 | D4 | Auto-renew | Enabled, with a funded payment method | **TO_VERIFY** | Operations Owner | Observe the renewal setting. **Never record the payment method, its identifiers, or any billing artefact** |
 | D5 | Account recovery methods | At least two independent recovery paths, both under the Platform Owner's control, neither dependent on the other | **TO_VERIFY** | Platform Owner | Observe and record *that* recovery paths exist and are independent — never *what* they are |
 | D6 | Role separation within the registrar / DNS account | Administrative and day-to-day roles separated once more than one person exists; single-person reality recorded until then | **TO_VERIFY** | Platform Owner | Observe the account's member/role list; separation is blocked by headcount, not by configuration (EXC-001) |
@@ -86,8 +96,31 @@ A row moves out of TO_VERIFY only by being checked, and the check is recorded
 as the observed state plus a date in the **Current status** column — the
 pattern [`repository-security-settings.md`](repository-security-settings.md)
 already uses. Evidence for this checklist is **EV-427** in the
-[evidence register](../compliance/evidence-register.md), which is `PENDING`
-precisely because none of these verifications has happened.
+[evidence register](../compliance/evidence-register.md). It stays `PENDING`:
+its closure condition is **all seven** rows carrying an observed value, and
+five of them still have none. Two rows moving is progress on that row, not
+that row.
+
+### What the registry actually said, 2026-08-22
+
+Recorded because a status cell is a conclusion and this is what it was drawn
+from. Public registry and DNS data only; no account was accessed and no
+credential was used.
+
+| Observation | Value | Bears on |
+|---|---|---|
+| Registrar of record | Cloudflare, Inc. | §1 — was Platform Owner confirmation, now independently corroborated |
+| Authoritative nameservers | `eric.ns.cloudflare.com`, `lucy.ns.cloudflare.com` | §1 — DNS provider corroborated |
+| Domain status | `clientTransferProhibited` (and no other status) | D3 |
+| DNSSEC | `unsigned`; no DS record at the registry | D2 |
+| Registry expiry | 2027-08-15 | §5 renewal cadence — a real date now exists, so D4's 90-day pre-expiry check has something to count from. It does **not** tell us auto-renew is on |
+| `A` record for `kararfinance.com` | none | §1 — corroborates `NOT_CONFIGURED`; nothing is published on this name |
+
+**Registration status is no longer only `USER_CONFIRMED`.** The registry
+answers that the name exists, is held at Cloudflare, and is paid through
+2027-08-15. That corroborates the Platform Owner's statement from a source
+outside this project. It says nothing about who controls the account, which is
+what D1 and D5 are for.
 
 **D7's second clause is not pedantry.** A domain whose renewal warnings are
 delivered to a mailbox on that domain loses its warning channel at the same

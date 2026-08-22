@@ -23,6 +23,8 @@ import {
   PLATFORM_DIAGNOSTIC_ECHO,
 } from './registry.js';
 import { JobPayloadTooLargeError } from './queue.js';
+import { dropScratchDatabase } from '../db/scratch-database.js';
+import { skipUnlessDatabaseRequired } from '../db/connection-budget.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -48,6 +50,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('platform jobs.contract suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -109,7 +112,7 @@ describe.skipIf(unreachable !== null)('job foundation (live PostgreSQL)', () => 
     await app?.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, dbName);
     } finally {
       await maintenance.end();
     }

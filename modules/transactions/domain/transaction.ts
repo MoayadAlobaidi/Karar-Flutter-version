@@ -1,0 +1,303 @@
+/**
+ * `Transaction` — the canonical record of one movement of money on one
+ * account, as the subject entered it or as a reviewed import committed it.
+ *
+ * Pure: no framework, no ORM, no clock, no randomness, no I/O. Time and
+ * identity arrive as arguments (architecture test 11).
+ *
+ * Three properties this shape exists to guarantee:
+ *
+ *  1. **Exactness.** The amount is `Money` — BIGINT minor units plus a
+ *     `Currency` carrying its own ISO 4217 exponent (ADR-0006). No `number`
+ *     appears in any monetary position, here or in the row that stores it.
+ *
+ *  2. **One sign convention.** See `sign-convention.ts`. Money out of the
+ *     account is negative; the source's own debit/credit wording is preserved
+ *     in provenance instead of being dissolved into the sign.
+ *
+ *  3. **Nothing unexplainable.** Every transaction has provenance
+ *     (`provenance.ts`) naming either manual input or an exact source row, and
+ *     every later correction becomes a revision (`revision.ts`) rather than an
+ *     overwrite.
+ *
+ *  4. **A date is not an instant** (ADR-0027). `bookingDate` and `valueDate`
+ *     are `CalendarDay`: what the institution wrote on its books, with no
+ *     time and therefore no timezone. `eventOccurredAt` is a `Date` — a real
+ *     moment — and exists only when the source actually supplied one. The two
+ *     are never derived from each other in either direction. Modelling the
+ *     first pair as instants would move a purchase to the previous day, and
+ *     at a month boundary to the previous MONTH, for any reader at a negative
+ *     offset; modelling the third as a day would discard the ordering that a
+ *     time-of-day question depends on.
+ *
+ * The three free-text fields are `HsfField` values: plaintext in memory,
+ * inside a wrapper that redacts on every accidental rendering path, encrypted
+ * at rest behind the `HsfFieldEncryption` port. The domain never sees a key.
+ */
+
+import { CalendarDay } from '@karar/shared-kernel';
+import type { Currency, Money } from '@karar/shared-kernel';
+
+import type { HsfField } from './hsf-field.js';
+import type { AccountRef, TransactionId } from './refs.js';
+
+/** How the record came into existence. `CSV` covers reviewed statement import. */
+export const SOURCE_KINDS = ['MANUAL', 'CSV'] as const;
+export type SourceKind = (typeof SOURCE_KINDS)[number];
+
+/**
+ * Lifecycle state.
+ *
+ * `POSTED` is the ordinary state of a committed fact. `VOIDED` marks a record
+ * a subject withdrew without deleting it — kept distinct from deletion
+ * because a voided transaction still has provenance worth keeping while a
+ * deleted one is gone under `CASCADE_DELETE` (MODULE.md). No state means
+ * "pending review": staged rows live in the import tables the ingestion
+ * workstream owns and only reach this table once committed.
+ */
+export const TRANSACTION_STATUSES = ['POSTED', 'VOIDED'] as const;
+export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
+
+export class InvalidTransactionError extends Error {
+  override readonly name = 'InvalidTransactionError';
+}
+
+/**
+ * The amount a source stated in ITS currency, when that differs from the
+ * account's — an **all-or-nothing pair**.
+ *
+ * Both members or neither. A currency without an amount says nothing, and an
+ * amount without a currency is the classic corruption: a bare number that
+ * later reads as the account currency and is wrong by a factor of the
+ * exchange rate.
+ *
+ * **No derived exchange rate is computed or stored, ever.** Dividing the
+ * booked amount by the original amount yields a number that looks like a rate
+ * and is not one: it silently absorbs the institution's spread, its fees, its
+ * rounding, and any partial settlement, and it changes with the exponents of
+ * two currencies. Storing that quotient would create a figure this platform
+ * did not observe and cannot defend, which is precisely the class of
+ * fabricated financial fact the product refuses. If a source states a rate
+ * explicitly, that is a source-stated fact and belongs with the import
+ * evidence — still not something computed here.
+ */
+export interface OriginalAmount {
+  readonly amount: Money;
+  readonly currency: Currency;
+}
+
+export const OriginalAmount = {
+  /**
+   * Builds the pair, or `null` when both members are absent. A half-supplied
+   * pair throws: it is a defect at the call site, not a business outcome.
+   */
+  of(amount: Money | null | undefined, currency: Currency | null | undefined): OriginalAmount | null {
+    const hasAmount = amount !== null && amount !== undefined;
+    const hasCurrency = currency !== null && currency !== undefined;
+    if (!hasAmount && !hasCurrency) return null;
+    if (!hasAmount || !hasCurrency) {
+      throw new InvalidTransactionError(
+        'originalAmount is an all-or-nothing pair: supply both the amount and its currency, or neither — ' +
+          'a lone amount is a number whose meaning depends on a currency nobody recorded',
+      );
+    }
+    if (amount.currency.code !== currency.code) {
+      throw new InvalidTransactionError(
+        `originalAmount currency mismatch: the amount is denominated in ${amount.currency.code} but the pair declares ${currency.code}`,
+      );
+    }
+    return Object.freeze({ amount, currency });
+  },
+};
+
+/**
+ * The canonical transaction.
+ *
+ * `version` is an optimistic-concurrency counter, incremented by exactly one
+ * per accepted correction. It is what makes "update this transaction" safe
+ * under two concurrent editors without either silently winning.
+ */
+export interface Transaction {
+  readonly id: TransactionId;
+  readonly tenantId: string;
+  readonly userId: string;
+  readonly accountRef: AccountRef;
+  /** Exact, signed under the canonical convention. */
+  readonly amount: Money;
+  /**
+   * The calendar day the movement is booked to the account. Required — a
+   * transaction with no date is not a transaction.
+   *
+   * A `CalendarDay` and not a `Date`: this is what the institution wrote, not
+   * a moment in time, and it must read as the same day for every reader
+   * (ADR-0027).
+   */
+  readonly bookingDate: CalendarDay;
+  /** The calendar day value is applied, where a source distinguishes it. Optional; never inferred from bookingDate. */
+  readonly valueDate: CalendarDay | null;
+  /**
+   * The instant the movement happened, present ONLY when the source stated
+   * one. A genuine moment, so a `Date`.
+   *
+   * Never inferred from `bookingDate`. Midnight on a booked day is a moment
+   * nobody observed, and manufacturing it would put a fabricated financial
+   * fact where an honest absence belongs. Most CSV statements carry no time
+   * at all, so `null` is the ordinary value.
+   */
+  readonly eventOccurredAt: Date | null;
+  /**
+   * The IANA zone the source itself stated for `eventOccurredAt`, when it
+   * stated one.
+   *
+   * Never guessed — not from the account's country, not from the issuer, and
+   * above all not from the server or the device this code happens to run on.
+   * A guessed zone is indistinguishable from a stated one once stored, and it
+   * would silently move every local time derived from the instant. Only
+   * meaningful alongside `eventOccurredAt`, which `createTransaction`
+   * enforces.
+   */
+  readonly sourceTimezone: string | null;
+  readonly merchant: HsfField | null;
+  readonly description: HsfField;
+  readonly note: HsfField | null;
+  /** Source-stated amount in the source's own currency, all-or-nothing. */
+  readonly originalAmount: OriginalAmount | null;
+  readonly sourceKind: SourceKind;
+  readonly status: TransactionStatus;
+  readonly createdAt: Date;
+  readonly version: number;
+}
+
+/**
+ * Validates and freezes a transaction. Throws rather than returning a
+ * `Result`: a malformed transaction reaching this constructor is a defect in
+ * the calling use case, and every expected refusal (a bad date from a
+ * request, an unknown currency code) is already a typed outcome upstream.
+ */
+export function createTransaction(fields: Transaction): Transaction {
+  if (!Number.isInteger(fields.version) || fields.version < 1) {
+    throw new InvalidTransactionError(
+      `version must be a positive integer, got ${String(fields.version)}`,
+    );
+  }
+  requireCalendarDay('bookingDate', fields.bookingDate);
+  requireInstant('createdAt', fields.createdAt);
+  if (fields.valueDate !== null) requireCalendarDay('valueDate', fields.valueDate);
+  if (fields.eventOccurredAt !== null) requireInstant('eventOccurredAt', fields.eventOccurredAt);
+  if (fields.sourceTimezone !== null) {
+    // A zone with no instant qualifies nothing: there is no moment for it to
+    // apply to, so the value can only be a leftover or a guess. The same
+    // rule is a CHECK constraint in migration 0090, because the schema must
+    // hold it against every writer and not only against this constructor.
+    if (fields.eventOccurredAt === null) {
+      throw new InvalidTransactionError(
+        `sourceTimezone '${fields.sourceTimezone}' was supplied without an eventOccurredAt; ` +
+          'a timezone with no instant to qualify describes nothing, and keeping it would leave a ' +
+          'zone that later reads as if the source had stated a time it never stated',
+      );
+    }
+    requireIanaTimeZone(fields.sourceTimezone);
+  }
+  if (
+    fields.originalAmount !== null &&
+    fields.originalAmount.currency.code === fields.amount.currency.code
+  ) {
+    throw new InvalidTransactionError(
+      `originalAmount is for a source currency that differs from the booked currency; ` +
+        `both are ${fields.amount.currency.code}, which records nothing and invites a redundant second copy of the same figure`,
+    );
+  }
+  return Object.freeze({ ...fields });
+}
+
+function requireInstant(field: string, value: Date): void {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    throw new InvalidTransactionError(`${field} must be a valid Date`);
+  }
+}
+
+/**
+ * A `Date` in a calendar-day position is the exact confusion ADR-0027 exists
+ * to stop, and it is one that type erasure at a boundary (a JSON body, a
+ * driver row, an `any` from a test fixture) lets through. So it is checked at
+ * runtime rather than trusted to the compiler.
+ */
+function requireCalendarDay(field: string, value: unknown): void {
+  if (!(value instanceof CalendarDay)) {
+    throw new InvalidTransactionError(
+      `${field} must be a CalendarDay, not ${value instanceof Date ? 'a Date' : typeof value}; ` +
+        'a booked date is what the institution wrote, and an instant in its place acquires a ' +
+        'timezone nobody chose and reads as a different day for readers at different offsets',
+    );
+  }
+}
+
+/**
+ * Refuses a zone the platform cannot resolve. A zone string that names no
+ * zone is worse than none: it survives storage, reads as a source-stated
+ * fact, and fails only much later at the point that tries to use it.
+ */
+function requireIanaTimeZone(zone: string): void {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: zone });
+  } catch {
+    throw new InvalidTransactionError(
+      `sourceTimezone '${zone}' is not a known IANA timezone; a source-stated zone that names no ` +
+        'zone cannot be used to render the instant it qualifies, and storing it would defer the ' +
+        'failure to whoever reads the record',
+    );
+  }
+}
+
+/**
+ * The fields a correction may change. Deliberately narrow: identity, owner,
+ * account anchor, source kind, and creation instant are NOT correctable —
+ * changing any of them would make the record a different record wearing the
+ * same id, and the honest operation for that is a delete plus a new entry.
+ *
+ * `eventOccurredAt` and `sourceTimezone` are not correctable either, for a
+ * different reason: they are what the SOURCE said about when the movement
+ * happened. A person may correct the amount they were charged; letting them
+ * restate the source's own instant would erase the one fact those columns
+ * exist to preserve, and letting them add one where the source stated none
+ * would fabricate it outright. Both stay exactly as committed, which is why
+ * every revision of one transaction repeats the same pair.
+ */
+export interface TransactionCorrection {
+  readonly amount?: Money;
+  readonly bookingDate?: CalendarDay;
+  readonly valueDate?: CalendarDay | null;
+  readonly merchant?: HsfField | null;
+  readonly description?: HsfField;
+  readonly note?: HsfField | null;
+  readonly status?: TransactionStatus;
+}
+
+/**
+ * Applies a correction, returning the next version. Pure — the caller pairs
+ * the result with the `TransactionRevision` that records what changed, and
+ * persists both in one transaction.
+ */
+export function applyCorrection(
+  current: Transaction,
+  correction: TransactionCorrection,
+): Transaction {
+  const next: Transaction = {
+    ...current,
+    ...(correction.amount !== undefined ? { amount: correction.amount } : {}),
+    ...(correction.bookingDate !== undefined ? { bookingDate: correction.bookingDate } : {}),
+    ...(correction.valueDate !== undefined ? { valueDate: correction.valueDate } : {}),
+    ...(correction.merchant !== undefined ? { merchant: correction.merchant } : {}),
+    ...(correction.description !== undefined ? { description: correction.description } : {}),
+    ...(correction.note !== undefined ? { note: correction.note } : {}),
+    ...(correction.status !== undefined ? { status: correction.status } : {}),
+    version: current.version + 1,
+  };
+  if (correction.amount !== undefined && correction.amount.currency.code !== current.amount.currency.code) {
+    throw new InvalidTransactionError(
+      `a correction may not change the currency of a booked transaction (${current.amount.currency.code} -> ${correction.amount.currency.code}); ` +
+        're-denominating a record in place would silently rewrite history, so the honest operation is a delete plus a new entry',
+    );
+  }
+  return createTransaction(next);
+}

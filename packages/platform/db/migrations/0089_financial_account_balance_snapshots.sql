@@ -1,0 +1,301 @@
+-- 0089_financial_account_balance_snapshots
+--
+-- public.financial_account_balance_snapshots — balances AS A SOURCE
+-- REPORTED THEM at a stated moment, never a figure this platform computed
+-- (modules/financial-accounts/MODULE.md). SUBJECT_OWNED, classified
+-- HIGHLY_SENSITIVE_FINANCIAL, erasure strategy CASCADE_DELETE.
+--
+-- THE ONE RULE THIS TABLE EXISTS TO KEEP. A balance here is a FACT SOMEONE
+-- ELSE ASSERTED — the figure printed on a statement, or the figure the user
+-- typed — recorded with WHO said it (source_kind), WHICH artefact said it
+-- (source_reference), WHICH BALANCE they were quoting (balance_kind), WHEN
+-- it was true (as_of), and WHEN this platform learned it (captured_at). It
+-- is never derived by summing transactions. Summing transactions produces a
+-- number that looks authoritative and is wrong the moment a single
+-- transaction is missing, misdated, or duplicated, and the user cannot tell
+-- the difference — so a computed running balance is a different concept that
+-- must arrive with its own name, its own column, and its own honest label,
+-- rather than being silently written into this table. Nothing in this module
+-- computes one, and a test asserts that this module contains no summation
+-- over amounts at all.
+--
+-- WHICH BALANCE, AND WHY THE COLUMN IS NOT OPTIONAL. A source does not
+-- report "the balance". It reports a SPECIFIC one, and the figures differ by
+-- amounts that matter: BOOKED is what has settled, AVAILABLE is what can be
+-- spent right now, CURRENT is what a statement calls the running figure,
+-- OUTSTANDING is what is owed on a card, CREDIT_LIMIT is not a balance the
+-- person holds at all, and OTHER_SOURCE_REPORTED is the honest home for a
+-- figure that is none of these. A pending card authorisation makes BOOKED
+-- and AVAILABLE disagree for days; a card statement's OUTSTANDING and
+-- CREDIT_LIMIT are different numbers with opposite meanings. Until this
+-- column existed all of them landed in one undifferentiated set of rows, so
+-- "the latest balance" meant whichever kind happened to be reported last —
+-- which is the same defect as computing a figure, arrived at by a different
+-- route.
+--
+-- NOT NULL AND NO DEFAULT, deliberately. A DEFAULT would be a GUESS written
+-- by the schema on a caller's behalf, and the guess would be invisible: rows
+-- would claim BOOKED with nobody having said so. A snapshot whose kind
+-- nobody stated is a figure nobody can interpret, so the honest outcome is
+-- that the INSERT fails and the caller states which balance they were given.
+-- The application side matches exactly — the kind is a required field of
+-- RecordReportedBalanceInput, nothing coalesces it, and a test asserts that
+-- no balance-kind literal appears anywhere in this module's production code
+-- outside the one file that declares the vocabulary.
+--
+-- NO KIND IS EVER INFERRED FROM ANOTHER. Nothing derives AVAILABLE from
+-- BOOKED by subtracting pending amounts, derives BOOKED from AVAILABLE, or
+-- reads a CREDIT_LIMIT as though it were money the person has. Each kind is
+-- recorded only because a source stated it, and a kind nobody stated simply
+-- does not exist for that account. This is enforced by absence — there is no
+-- derivation function, no view, no generated column, and no trigger that
+-- writes a second row — and asserted by test in both the domain and the
+-- database, because an inference rule is exactly the kind of convenience
+-- someone adds later to fill a gap in a screen.
+--
+-- source_reference IS A UUID, AND THE ALTERNATIVE WAS CONSIDERED AND
+-- REJECTED. This column used to be `text` bounded at 200 characters, on a
+-- table classified HIGHLY_SENSITIVE_FINANCIAL. Nothing stopped a caller
+-- putting a statement line, an account number, or an explanatory sentence
+-- into a field whose stated job is to NAME an artefact — so it was
+-- arbitrary subject narrative sitting in plaintext beside a balance and a
+-- date, which is the precise combination 0088's ciphertext columns exist to
+-- prevent. A field like that on an HSF table has exactly two honest
+-- outcomes: encrypt it, or make it structurally incapable of holding
+-- narrative.
+--
+-- It is now a uuid. The reasons, in order of weight:
+--   1. The only legitimate content was ALWAYS an identifier — the import
+--      that produced the figure, or the manual entry that recorded it — and
+--      source_kind already says which KIND of artefact it is, so the
+--      reference never had to carry a word of prose.
+--   2. Encryption would have HIDDEN the narrative rather than made it
+--      unrepresentable. The column would still accept a sentence; nobody
+--      could read it, and nobody could tell it was there either. A uuid
+--      cannot hold a sentence at all, and 22P02 from the driver is a better
+--      outcome than a successful insert of the wrong thing.
+--   3. The column's one operation is equality — "which balances came from
+--      this import?" — and encrypting a value that is only ever compared
+--      would either break the operation or require deterministic
+--      encryption, which over a small guessable input is a confirmation
+--      oracle. Neither is acceptable, and neither is necessary for an
+--      opaque identifier that reveals nothing on its own.
+-- The domain states the same rule (isValidSourceReference) so a caller gets
+-- an answer in its own vocabulary; the column is what makes it true.
+--
+-- MONEY IS BIGINT MINOR UNITS, ALWAYS (ADR-0006; data-model.md §1).
+-- amount_minor_units is BIGINT and currency_code names the currency whose
+-- ISO 4217 exponent scales it — 1000 minor units is ten QAR or one KWD
+-- depending on that code, so the code travels with every amount and the
+-- exponent is never assumed. NUMERIC, DOUBLE PRECISION, and FLOAT appear
+-- nowhere on a money path in this module; a binary float cannot represent
+-- 0.10 exactly and a money path that rounds implicitly is the defect
+-- ADR-0006 exists to prevent. The value is deliberately signed: a credit
+-- card reports a negative balance, and forcing it positive would make the
+-- schema lie about debt.
+--
+-- THE COMPOSITE FOREIGN KEY IS DOING TWO JOBS. (account_id, currency_code)
+-- references financial_accounts (id, currency_code), so:
+--   1. a snapshot can never carry a currency its account does not have —
+--      a mismatched pair has no parent row to point at; and
+--   2. an account's currency cannot change once any record exists — the
+--      UPDATE has referencing rows and referential integrity refuses it.
+-- That second effect is how the module's currency-immutability invariant
+-- becomes true rather than merely stated. ON DELETE CASCADE carries the
+-- module's declared CASCADE_DELETE erasure strategy: deleting an account
+-- takes its balance history with it, by the database, whether or not
+-- application code remembers.
+--
+-- as_of AND captured_at ARE BOTH REQUIRED and are deliberately not
+-- constrained relative to each other. as_of is when the balance was true;
+-- captured_at is when this platform recorded it. The obvious CHECK
+-- (captured_at >= as_of) was considered and rejected: forward value dates
+-- are real, and a constraint that rejects legitimate data teaches callers
+-- to work around the schema. The ordering semantics are documented instead.
+--
+-- APPEND-ONLY, by two mechanisms (data-model.md §10). A reported fact does
+-- not change: if a source reports a different figure, that is a NEW
+-- snapshot at a new as_of, and the history of what was believed when stays
+-- readable. karar_app therefore holds NO UPDATE grant, and the immutability
+-- trigger raises on UPDATE and TRUNCATE even for the table owner. DELETE is
+-- granted, exactly as on 0088 and for the same reason: erasure is
+-- CASCADE_DELETE and the subject may delete their own records.
+--
+-- RLS decision — SUBJECT RECORDS, the same shape as 0088: RLS ENABLED and
+-- FORCEd, one policy keyed on BOTH app.tenant_id AND app.user_id
+-- (transaction-local GUCs bound by withPrincipalContext, never from client
+-- input — tenancy.md §2), USING and WITH CHECK alike. NULLIF makes an unset
+-- GUC a NULL predicate: no principal context, no rows — fail closed. The
+-- tenant_id and user_id columns are carried on this table rather than only
+-- reached through the account, so the policy is a predicate on the row
+-- itself and does not depend on a join staying correct.
+--
+-- Data lifecycle (ADR-0026; canonical in
+-- modules/financial-accounts/MODULE.md, mirrored in DATA_LIFECYCLE.md):
+--   public.financial_account_balance_snapshots
+--     Subject relationship: SUBJECT_OWNED — the subject's own balances.
+--     Purpose: balances as a source reported them at a stated moment, with
+--       the provenance that makes each figure explainable; never a figure
+--       this platform computed.
+--     Classification: HIGHLY_SENSITIVE_FINANCIAL.
+--     Retention: UNRESOLVED — the financial-data retention decision is a
+--       legal one and has not been taken, so no period is written here.
+--       Non-local ingestion fails closed until a PolicyPack decision
+--       exists; LOCAL and TEST run on clearly synthetic fixtures with no
+--       legal effect. ENFORCED, not merely declared: RecordReportedBalance
+--       gates every append on FinancialAccountRetentionDecisionPort and
+--       refuses before the first statement reaches this table (0088
+--       header).
+--     Export treatment: included — alongside the account.
+--     Erasure strategy: CASCADE_DELETE.
+--
+-- rollback: forward-only (README.md). A failed apply leaves nothing — one
+-- transaction. Deliberate reversal would be DROP the trigger and function,
+-- DROP POLICY, then DROP TABLE
+-- public.financial_account_balance_snapshots — destroying every balance
+-- every subject recorded, and releasing the referential guarantee that
+-- currently makes an account's currency immutable while records exist. That
+-- is a restore-from-backup decision, not a migration.
+
+CREATE TABLE public.financial_account_balance_snapshots (
+  id                 uuid        PRIMARY KEY,
+  -- Cross-module references (raw UUIDs, no FK across module boundaries —
+  -- data-model.md §2): tenant_id -> tenancy.tenants, user_id -> identity
+  -- accounts. Carried on the row so the RLS predicate needs no join.
+  tenant_id          uuid        NOT NULL,
+  user_id            uuid        NOT NULL,
+  account_id         uuid        NOT NULL,
+  -- Exact integer minor units, signed (a credit card owes money).
+  amount_minor_units bigint      NOT NULL,
+  -- The currency whose ISO 4217 exponent scales the minor units. Closed at
+  -- the database, mirroring the shared-kernel Currency registry and 0088.
+  currency_code      text        NOT NULL
+    CONSTRAINT financial_account_balance_snapshots_currency_code_check
+    CHECK (currency_code IN
+      ('QAR', 'SAR', 'AED', 'OMR', 'KWD', 'BHD', 'USD', 'EUR', 'GBP')),
+  -- When the balance was true, per the source.
+  as_of              timestamptz NOT NULL,
+  -- Who reported it. EXTERNAL_PROVIDER is modelled and unreachable in Phase
+  -- 5, exactly as on the account (0088).
+  source_kind        text        NOT NULL
+    CONSTRAINT financial_account_balance_snapshots_source_kind_check
+    CHECK (source_kind IN ('MANUAL', 'CSV', 'EXTERNAL_PROVIDER')),
+  -- WHICH balance the source was quoting. NOT NULL with NO DEFAULT: a
+  -- default would be a guess the schema writes on the caller's behalf, and
+  -- a figure whose kind nobody stated cannot be interpreted. Never inferred
+  -- from another kind — see the header.
+  balance_kind       text        NOT NULL
+    CONSTRAINT financial_account_balance_snapshots_balance_kind_check
+    CHECK (balance_kind IN
+      ('BOOKED', 'AVAILABLE', 'CURRENT', 'OUTSTANDING', 'CREDIT_LIMIT',
+       'OTHER_SOURCE_REPORTED')),
+  -- WHICH artefact reported it: the identifier of the statement import or
+  -- the manual entry that produced the figure. Required, because a balance
+  -- whose origin is unrecorded cannot be explained to the person it belongs
+  -- to. A uuid and nothing else — see the header for why this is not
+  -- bounded text and not an encrypted field.
+  source_reference   uuid        NOT NULL,
+  -- When this platform learned it. Deliberately unconstrained against
+  -- as_of; see the header.
+  captured_at        timestamptz NOT NULL,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  -- Two guarantees in one constraint: a snapshot's currency always matches
+  -- its account's, and an account's currency cannot change while any
+  -- snapshot exists. CASCADE carries the declared CASCADE_DELETE erasure.
+  CONSTRAINT financial_account_balance_snapshots_account_fkey
+    FOREIGN KEY (account_id, currency_code)
+    REFERENCES public.financial_accounts (id, currency_code)
+    ON DELETE CASCADE
+);
+
+COMMENT ON TABLE public.financial_account_balance_snapshots IS
+  'HIGHLY_SENSITIVE_FINANCIAL, SUBJECT_OWNED. Balances AS A SOURCE REPORTED '
+  'THEM, with provenance (source_kind, source_reference), WHICH balance was '
+  'quoted (balance_kind), the instant they '
+  'were true (as_of), and the instant this platform learned them '
+  '(captured_at). balance_kind is NOT NULL with NO DEFAULT — a default would '
+  'be a guess written on the caller''s behalf — and no kind is ever inferred '
+  'from another: nothing derives AVAILABLE from BOOKED or reads a '
+  'CREDIT_LIMIT as money the person holds. Two kinds for one account at one '
+  'as_of are two legitimate rows; no unique constraint collapses them. '
+  'NEVER computed by summing transactions — a derived '
+  'running balance is a different concept and has no column here. Money is '
+  'BIGINT minor units plus its currency code; no NUMERIC, DOUBLE PRECISION, '
+  'or FLOAT exists on any money path. The composite FK to '
+  '(financial_accounts.id, currency_code) makes a currency mismatch '
+  'unrepresentable AND freezes an account''s currency while records exist; '
+  'ON DELETE CASCADE carries the declared CASCADE_DELETE erasure. '
+  'Append-only by both mechanisms: no UPDATE grant, plus a trigger raising '
+  'on UPDATE/TRUNCATE even for the owner. RLS FORCEd on BOTH principal '
+  'GUCs. Lifecycle: 0089 header + DATA_LIFECYCLE.md.';
+
+COMMENT ON COLUMN public.financial_account_balance_snapshots.amount_minor_units IS
+  'Exact signed integer minor units; scale is 10^exponent of currency_code '
+  '(ADR-0006). Never a float, never assumed to be cents.';
+
+COMMENT ON COLUMN public.financial_account_balance_snapshots.balance_kind IS
+  'WHICH balance the source quoted: BOOKED (settled), AVAILABLE (spendable '
+  'now), CURRENT (the statement''s running figure), OUTSTANDING (owed on a '
+  'card), CREDIT_LIMIT (not a balance the person holds at all), or '
+  'OTHER_SOURCE_REPORTED. NOT NULL with NO DEFAULT: a snapshot whose kind '
+  'nobody stated is a figure nobody can interpret, and a default would write '
+  'that claim invisibly. NEVER inferred from another kind — no derivation '
+  'exists in the schema or in this module, and a kind nobody reported simply '
+  'has no row.';
+
+COMMENT ON COLUMN public.financial_account_balance_snapshots.source_reference IS
+  'The artefact that reported the figure, by identifier. A uuid so the '
+  'column is structurally incapable of holding a statement line, an account '
+  'number, or an explanation — arbitrary plaintext narrative has no place '
+  'on a HIGHLY_SENSITIVE_FINANCIAL table. source_kind says what KIND of '
+  'artefact this identifies. Opaque; equality only.';
+
+-- The read this module serves: one owner's snapshots for one account, in
+-- balance-date order. NOT UNIQUE, and the balance kind is deliberately not
+-- part of any unique key: an AVAILABLE and a BOOKED figure for one account
+-- at ONE as_of are two different facts a source stated, and a constraint
+-- that collapsed them would force one to overwrite the other — silently
+-- answering a question about spendable money with a settled figure, which is
+-- the inference this column exists to prevent. Two kinds at one instant are
+-- two rows.
+CREATE INDEX financial_account_balance_snapshots_owner_idx
+  ON public.financial_account_balance_snapshots (tenant_id, user_id, account_id, as_of);
+
+ALTER TABLE public.financial_account_balance_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.financial_account_balance_snapshots FORCE ROW LEVEL SECURITY;
+
+-- Same subject-record shape as 0088: BOTH principal GUCs, USING and WITH
+-- CHECK, unset GUCs failing closed through NULLIF.
+CREATE POLICY financial_account_balance_snapshots_subject
+  ON public.financial_account_balance_snapshots
+  FOR ALL
+  USING (
+    tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+    AND user_id = NULLIF(current_setting('app.user_id', true), '')::uuid
+  )
+  WITH CHECK (
+    tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
+    AND user_id = NULLIF(current_setting('app.user_id', true), '')::uuid
+  );
+
+-- Immutability: mechanism two (mechanism one is the absent UPDATE grant).
+-- FOR EACH STATEMENT so a zero-row UPDATE raises too — an UPDATE that
+-- silently matched nothing is still an attempt to rewrite a reported fact.
+CREATE FUNCTION public.financial_account_balance_snapshots_immutable() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'financial_account_balance_snapshots rows are reported facts: % is not permitted, even for the table owner — a corrected figure is a NEW snapshot (data-model.md §10)',
+    TG_OP USING ERRCODE = 'raise_exception';
+END;
+$$;
+
+CREATE TRIGGER financial_account_balance_snapshots_immutable
+  BEFORE UPDATE OR TRUNCATE ON public.financial_account_balance_snapshots
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION public.financial_account_balance_snapshots_immutable();
+
+-- No UPDATE: a reported fact is never edited. DELETE for the same reason as
+-- 0088 — CASCADE_DELETE erasure, and the subject may delete their own
+-- records; the FK cascade covers the account-deleted path besides.
+GRANT SELECT, INSERT, DELETE ON public.financial_account_balance_snapshots TO karar_app;

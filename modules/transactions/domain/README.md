@@ -12,4 +12,11 @@ Imported by `application/` and `infrastructure/` within this module. **Never by 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 5: implemented. `refs.ts` declares the cross-module reference types (an
+`AccountRef` is a raw UUID plus a locally-declared kind — never the
+financial-accounts module's own identifier type). `sign-convention.ts` states
+the one canonical sign rule and why it was chosen. `transaction.ts`,
+`revision.ts`, `provenance.ts`, `category-catalogue.ts` and
+`category-assignment.ts` carry the rest. `hsf-field.ts` holds
+`HIGHLY_SENSITIVE_FINANCIAL` text as a value that redacts on every accidental
+rendering path; encryption at rest is an infrastructure concern behind a port._

@@ -1,0 +1,97 @@
+// transfer-matching module mapping (migration 0099_transfer_matches.sql).
+// Prisma maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma); `make prisma-drift` is what keeps this file honest.
+//
+// THIS MODEL HOLDS NO MONEY, and that is its defining property. A transfer
+// match is a RELATIONSHIP between two of one subject's transactions that are
+// two sides of one movement of their own money (ADR-0028) — a wallet top-up
+// read once as an expense and once as an income. Neither transaction is
+// rewritten and no figure is computed: there is no amount, no net, no total,
+// no category and no score field, because there is no such column. The only
+// Int is `version`, the optimistic-concurrency token, which counts writes and
+// not money. No Decimal, no Float, no BigInt appears anywhere near this
+// model, and the owning module's no-money-arithmetic suite scans its own
+// source for a sum, a reduce or an aggregate over amounts.
+//
+// The two currency codes ARE here, as two separate String fields rather than
+// one shared field, and the duplication is the mechanism: migration 0099's
+// `transfer_matches_same_currency_only` CHECKS that two independent facts
+// AGREE, which one shared column would assert instead of checking. A currency
+// code is a denomination, never an amount — nothing sums or converts it.
+// CROSS-CURRENCY CANNOT BE SUGGESTED, because no source-stated FX
+// relationship exists anywhere in this platform.
+//
+// Deliberately NOT expressed here, enforced by the migration and its tests
+// instead: every CHECK constraint — above all the two carrying this module's
+// central guarantees, `transfer_matches_confirmed_requires_subject_decision`
+// (a match is authoritative only when the subject decided, AT THE DATABASE,
+// so no direct SQL, fixture or backfill can confirm one on a person's behalf)
+// and `transfer_matches_same_currency_only` — plus the distinct-transactions
+// and distinct-accounts rules, the state/decision-instant pairing, the
+// identity trigger (SQLSTATE KAR40), the version discipline (KAR41), the
+// one-live-match-per-transaction guard across both sides (KAR42), the
+// state-transition rule (KAR43), RLS enable/force with the tenant+user
+// principal policy, and the grants.
+//
+// The two PARTIAL unique indexes are also not expressible in Prisma: they are
+// unique only over the non-REJECTED rows, because a rejection is history and
+// excluding it is what lets a person reject one pairing and later accept
+// another. They exist in the database, they are what settles a concurrent
+// race, and `prisma db pull` reports them as plain indexes — which is why the
+// module's schema suite asserts the live `pg_indexes` definitions rather than
+// trusting this file for them.
+//
+// tenant_id, user_id, both transaction ids and both account ids are plain
+// scalars by design (data-model.md §2): no relation crosses a module
+// boundary, and the reference-type fields declare what those uuids point at
+// without importing another module's types.
+
+model TransferMatch {
+  id                     String   @id @db.Uuid
+  // ONE subject, both sides. Two subjects are not expressible: there is one
+  // pair of columns, and each transaction is resolved under the caller's own
+  // principal context.
+  tenantId               String   @map("tenant_id") @db.Uuid
+  userId                 String   @map("user_id") @db.Uuid
+
+  // The side money LEFT.
+  outflowTransactionId            String @map("outflow_transaction_id") @db.Uuid
+  outflowTransactionReferenceType String @map("outflow_transaction_reference_type")
+  // Copied from a column public.transactions freezes by trigger, so it cannot
+  // drift; it is what makes the different-accounts rule a CHECK and lets
+  // account erasure reach these rows without enumerating transactions.
+  outflowAccountId                String @map("outflow_account_id") @db.Uuid
+  outflowCurrencyCode             String @map("outflow_currency_code")
+
+  // The side money ARRIVED.
+  inflowTransactionId             String @map("inflow_transaction_id") @db.Uuid
+  inflowTransactionReferenceType  String @map("inflow_transaction_reference_type")
+  inflowAccountId                 String @map("inflow_account_id") @db.Uuid
+  inflowCurrencyCode              String @map("inflow_currency_code")
+
+  // SUGGESTED | CONFIRMED | REJECTED. SUGGESTED changes nothing.
+  matchState             String   @map("match_state")
+  // EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW — one member today, so a
+  // second basis is a reviewed migration rather than a new string appearing
+  // in production rows.
+  suggestionBasis        String   @map("suggestion_basis")
+  // WHICH declared window produced the suggestion, as a version label rather
+  // than a bare number of hours.
+  suggestionWindow       String   @map("suggestion_window")
+  // The instant the SUBJECT decided. Never written by a rule, a heuristic, a
+  // default or a backfill; required for CONFIRMED and forbidden for
+  // SUGGESTED, by CHECK.
+  subjectDecidedAt       DateTime? @map("subject_decided_at") @db.Timestamptz(6)
+
+  firstSuggestedAt       DateTime @map("first_suggested_at") @db.Timestamptz(6)
+
+  // The only Int on this model. It counts writes, not money.
+  version                Int      @default(1)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId, userId, matchState, createdAt], map: "transfer_matches_owner_idx")
+  @@index([tenantId, userId, outflowAccountId], map: "transfer_matches_outflow_account_idx")
+  @@index([tenantId, userId, inflowAccountId], map: "transfer_matches_inflow_account_idx")
+  @@map("transfer_matches")
+}
