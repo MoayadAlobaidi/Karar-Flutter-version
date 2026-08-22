@@ -868,6 +868,180 @@ function currentStateFiles(root) {
   return out;
 }
 
+/**
+ * KAR-CTL-116, as a check rather than as a sweep somebody remembers to run.
+ *
+ * The control has read DESIGNED since Phase 3.5, where the sweep was run BY
+ * HAND and found nothing. Closing a nonconformity on a clean hand-run is
+ * closing it on the correction rather than on the corrective action, and
+ * CI-006 did exactly that; CI-011 then recorded the same mechanism missing at
+ * Phase 4, and again at Phase 5. This is the third target, and a third miss
+ * would have opened a nonconformity of its own — so it is built.
+ *
+ * THREE PROPERTIES, and each is a different way a register goes quiet:
+ *
+ *   1. EVERY CITED ID EXISTS. A document that cites `EV-511` when the register
+ *      stops at EV-510 reads as evidence to anyone who does not open the
+ *      register. This is the fork that a hand-run sweep is good at finding
+ *      once and useless at finding continuously.
+ *
+ *   2. EVERY PATH AN EVIDENCE ROW CITES EXISTS ON DISK. An evidence row whose
+ *      location cell names a file that was renamed points at nothing, and the
+ *      row still says COLLECTED.
+ *
+ *   3. EVERY QUOTED STATUS MATCHES ITS REGISTER. "EV-427 is `COLLECTED`" in a
+ *      gate record while the register says `PENDING` is the shape that let a
+ *      corpus disagree with itself for four phases. Historical blocks are
+ *      exempt by the same per-block rule everything else here uses — a dated
+ *      record quoting the status it saw is history, not a fork.
+ */
+function readRegisterRows(root, file, idPattern, statuses) {
+  const full = path.join(root, 'docs', 'compliance', file);
+  if (!fs.existsSync(full)) return null;
+  const text = fs.readFileSync(full, 'utf8');
+  const rows = new Map();
+  for (const m of text.matchAll(new RegExp(`^\\|\\s*(${idPattern})\\s*\\|(.*)$`, 'gm'))) {
+    if (rows.has(m[1])) continue;
+    // The status is the LAST cell that is one of the vocabulary's words, not
+    // the first: a row's narrative routinely names the status it used to have
+    // ("PENDING → COLLECTED"), and the authoritative one is the column at the
+    // end of the row.
+    const cells = m[2].split('|').map((c) => c.trim());
+    let status = null;
+    for (const cell of cells) {
+      const bare = cell.replace(/\*/g, '').trim();
+      const hit = statuses.find((s) => new RegExp(`^${s}\\b`).test(bare));
+      if (hit !== undefined) status = hit;
+    }
+    rows.set(m[1], status);
+  }
+  return rows;
+}
+
+function checkRegisterTraceability(root = REPO_ROOT) {
+  const problems = [];
+  const registers = [
+    {
+      id: 'EV',
+      pattern: 'EV-\\d+',
+      rows: readRegisterRows(root, 'evidence-register.md', 'EV-\\d+', [
+        'PENDING',
+        'COLLECTED',
+        'REVIEWED',
+      ]),
+      file: 'docs/compliance/evidence-register.md',
+      statuses: ['PENDING', 'COLLECTED', 'REVIEWED'],
+    },
+    {
+      id: 'KAR-CTL',
+      pattern: 'KAR-CTL-\\d+',
+      rows: readRegisterRows(root, 'control-matrix.md', 'KAR-CTL-\\d+', [
+        'DESIGNED',
+        'IMPLEMENTED',
+        'OPERATING',
+        'EVIDENCED',
+        'DEFERRED',
+        'EXCEPTION',
+      ]),
+      file: 'docs/compliance/control-matrix.md',
+      statuses: ['DESIGNED', 'IMPLEMENTED', 'OPERATING', 'EVIDENCED', 'DEFERRED', 'EXCEPTION'],
+    },
+    {
+      id: 'KAR-RSK',
+      pattern: 'KAR-RSK-\\d+',
+      rows: readRegisterRows(root, 'risk-register.md', 'KAR-RSK-\\d+', [
+        'OPEN',
+        'CLOSED',
+        'ACCEPTED',
+      ]),
+      file: 'docs/compliance/risk-register.md',
+      statuses: ['OPEN', 'CLOSED', 'ACCEPTED'],
+    },
+  ];
+  for (const register of registers) {
+    if (register.rows === null || register.rows.size === 0) {
+      problems.push(
+        `${register.file} defines no ${register.id} rows — traceability is underivable`,
+      );
+    }
+  }
+  if (problems.length > 0) return problems;
+
+  const files = currentStateFiles(root);
+  const currentPhase = readDeclaredPhase(root)?.phase ?? null;
+
+  for (const file of files) {
+    const rel = path.relative(root, file);
+    const text = fs.readFileSync(file, 'utf8');
+
+    // --- 1. every cited id resolves.
+    for (const register of registers) {
+      const cited = new Map();
+      for (const m of text.matchAll(new RegExp(`\\b(${register.pattern})\\b`, 'g'))) {
+        if (register.rows.has(m[1]) || cited.has(m[1])) continue;
+        cited.set(m[1], text.slice(0, m.index).split('\n').length);
+      }
+      for (const [id, line] of cited) {
+        // A RANGE endpoint is a citation of the range, not of a row: "EV-501–EV-510"
+        // names ten rows and the register defines each of them. Only an id that
+        // resolves nowhere is a fork.
+        problems.push(`${rel}:${line} cites ${id}, which has no defining row in ${register.file}`);
+      }
+    }
+
+    // --- 3. every quoted status matches. Scoped per block, so a dated record
+    // quoting what it saw stays history rather than becoming a fork.
+    for (const block of markdownBlocks(text, currentPhase).filter((b) => !isHistoricalBlock(b))) {
+      for (const register of registers) {
+        const quoted = new RegExp(
+          `\\b(${register.pattern})\\b[^.|\\n]{0,80}?\\bis\\s+\\**\`?(${register.statuses.join('|')})\`?\\**`,
+          'g',
+        );
+        for (const m of block.text.matchAll(quoted)) {
+          const actual = register.rows.get(m[1]);
+          if (actual === undefined || actual === null || actual === m[2]) continue;
+          problems.push(
+            `${rel}:${block.line} says ${m[1]} is ${m[2]}, but ${register.file} records ${actual}`,
+          );
+        }
+      }
+    }
+  }
+
+  // --- 2. every repository path an evidence row cites exists on disk.
+  const evidence = path.join(root, 'docs', 'compliance', 'evidence-register.md');
+  if (fs.existsSync(evidence)) {
+    const text = fs.readFileSync(evidence, 'utf8');
+    for (const m of text.matchAll(/^\|\s*(EV-\d+)\s*\|(.*)$/gm)) {
+      const line = text.slice(0, m.index).split('\n').length;
+      // Only backticked strings that LOOK like repository paths: a slash, no
+      // spaces, and a leading segment that exists as a top-level entry. A row
+      // routinely backticks a status word, a SQL fragment or a URL, and none
+      // of those is a path claim.
+      for (const p of m[2].matchAll(/`([^`\s]+\/[^`\s]*)`/g)) {
+        // A `path:line` citation is a citation of the path. The line number
+        // is not part of the name and is routinely how an evidence row points
+        // at the exact assertion it rests on.
+        const candidate = p[1]
+          .replace(/[.,;:]+$/, '')
+          .split('#')[0]
+          .replace(/:\d+(-\d+)?$/, '');
+        if (/^[a-z]+:\/\//i.test(candidate)) continue;
+        const top = candidate.split('/')[0];
+        if (!fs.existsSync(path.join(root, top))) continue;
+        if (candidate.includes('*')) continue;
+        if (fs.existsSync(path.join(root, candidate))) continue;
+        problems.push(
+          `docs/compliance/evidence-register.md:${line} ${m[1]} cites \`${candidate}\`, which is not in the repository`,
+        );
+      }
+    }
+  }
+  // One fork reported once: the same path can be cited twice in a row's own
+  // narrative, and a reader does not need to be told twice.
+  return [...new Set(problems)];
+}
+
 function checkComplianceCurrentState(root = REPO_ROOT) {
   const problems = [];
   const capabilities = readCapabilityRegistry(root);
@@ -2130,13 +2304,117 @@ const COMPLIANCE_MUTATION_CASES = [
  * because the report is written AFTER the checks run — reading it would compare
  * today's prose against yesterday's number.
  */
+
+/**
+ * The fixture for KAR-CTL-116's check. Three tiny registers, one document that
+ * cites them, and one file on disk for a path citation to resolve against.
+ *
+ * `options` seeds each of the three properties independently, so a mutation
+ * can prove one rule is reading its register without disturbing the others.
+ */
+function buildTraceabilityFixture(options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'karar-traceability-selftest-'));
+  const write = (relPath, content) => {
+    const full = path.join(root, relPath);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
+  };
+  const evStatus = options.evStatus ?? 'PENDING';
+  const evPath = options.evPath ?? 'src/real.ts';
+
+  write('README.md', ['# R', '', '| Current phase | **5 — IN PROGRESS** |', ''].join('\n'));
+  write('src/real.ts', 'export const real = 1;\n');
+  write(
+    'docs/compliance/evidence-register.md',
+    [
+      '# Evidence',
+      '',
+      '| id | what | status |',
+      '| --- | --- | --- |',
+      `| EV-001 | a row that cites \`${evPath}\` | ${evStatus} |`,
+      '',
+    ].join('\n'),
+  );
+  write(
+    'docs/compliance/control-matrix.md',
+    ['# Controls', '', '| KAR-CTL-001 | a control | IMPLEMENTED |', ''].join('\n'),
+  );
+  write(
+    'docs/compliance/risk-register.md',
+    ['# Risks', '', '| KAR-RSK-001 | a risk | OPEN |', ''].join('\n'),
+  );
+  write(
+    'docs/citing.md',
+    [
+      '# Citing',
+      '',
+      // TRUE citations: every id resolves and the quoted status matches.
+      'KAR-CTL-001 is IMPLEMENTED and KAR-RSK-001 is OPEN.',
+      '',
+      `EV-001 is \`${options.quotedEvStatus ?? evStatus}\`.`,
+      '',
+      ...(options.citeMissing === true
+        ? ['A fork: EV-404 and KAR-CTL-404 and KAR-RSK-404.', '']
+        : []),
+      // A dated block quoting what it saw: history, not a fork, and the
+      // per-block exemption everything else here uses must cover it too.
+      '**2026-01-01 (HISTORICAL):** EV-001 is `COLLECTED` at that checkpoint.',
+      '',
+    ].join('\n'),
+  );
+  return root;
+}
+
+const TRACEABILITY_CASES = [
+  {
+    name: 'an id nothing defines',
+    options: { citeMissing: true },
+    expect: [
+      /citing\.md:\d+ cites EV-404, which has no defining row/,
+      /citing\.md:\d+ cites KAR-CTL-404, which has no defining row/,
+      /citing\.md:\d+ cites KAR-RSK-404, which has no defining row/,
+    ],
+    why: 'a document citing an id no register defines reads as evidence to anyone who does not open the register',
+  },
+  {
+    name: 'an evidence row citing a path that is not there',
+    options: { evPath: 'src/renamed.ts' },
+    expect: [/EV-001 cites `src\/renamed\.ts`, which is not in the repository/],
+    why: 'a row whose location cell was left behind by a rename still says COLLECTED',
+  },
+  {
+    name: 'a quoted status the register does not hold',
+    options: { evStatus: 'PENDING', quotedEvStatus: 'COLLECTED' },
+    expect: [
+      /citing\.md:\d+ says EV-001 is COLLECTED, but .*evidence-register\.md records PENDING/,
+    ],
+    why: 'a corpus quoting a status its register does not hold is the fork this control exists for',
+  },
+  {
+    name: 'the clean tree',
+    options: {},
+    expect: [],
+    forbid: /./,
+    why: 'every id resolves, the path exists, the quoted status matches, and the dated block is history',
+  },
+  {
+    name: 'the register moves and the quote does not',
+    options: { evStatus: 'COLLECTED', quotedEvStatus: 'PENDING' },
+    expect: [/says EV-001 is PENDING, but .*records COLLECTED/],
+    why:
+      'MUTATION: the same prose that passed against PENDING must fail against COLLECTED, which ' +
+      'is what proves the rule reads the register rather than a constant',
+  },
+];
+
 function selfTestCaseCount() {
   return (
     SELF_TEST_CASES.length +
     NEGATIVE_SELF_TEST_CASES.length +
     COMPLIANCE_SELF_TEST_CASES.length +
     COMPLIANCE_NEGATIVE_CASES.length +
-    COMPLIANCE_MUTATION_CASES.length
+    COMPLIANCE_MUTATION_CASES.length +
+    TRACEABILITY_CASES.length
   );
 }
 
@@ -2208,6 +2486,28 @@ function runSelfTest() {
     fs.rmSync(complianceRoot, { recursive: true, force: true });
   }
 
+  for (const { name, options, expect, forbid, why } of TRACEABILITY_CASES) {
+    const traceRoot = buildTraceabilityFixture(options);
+    try {
+      const problems = checkRegisterTraceability(traceRoot);
+      for (const pattern of expect) {
+        if (!problems.some((p) => pattern.test(p))) {
+          failures.push(
+            `register-traceability "${name}": did not report ${pattern} (${why}); ` +
+              `got: ${problems.join(' | ') || '<nothing>'}`,
+          );
+        }
+      }
+      if (forbid && problems.some((p) => forbid.test(p))) {
+        failures.push(
+          `register-traceability "${name}": flagged a legitimate shape (${why}): ${problems.join(' | ')}`,
+        );
+      }
+    } finally {
+      fs.rmSync(traceRoot, { recursive: true, force: true });
+    }
+  }
+
   for (const { name, options, forbid, expect, why } of COMPLIANCE_MUTATION_CASES) {
     const mutatedRoot = buildComplianceFixture(options);
     try {
@@ -2229,15 +2529,12 @@ function runSelfTest() {
     }
   }
 
-  return {
-    cases:
-      SELF_TEST_CASES.length +
-      NEGATIVE_SELF_TEST_CASES.length +
-      COMPLIANCE_SELF_TEST_CASES.length +
-      COMPLIANCE_NEGATIVE_CASES.length +
-      COMPLIANCE_MUTATION_CASES.length,
-    failures,
-  };
+  // ONE expression for the count, not two. These two figures were separate
+  // and drifted apart the moment a case list was added: the runner announced
+  // 36 while `selfTestCaseCount` — the number the corpus is checked against —
+  // read 41. A checker that reports its own coverage inconsistently is the
+  // exact defect it exists to catch.
+  return { cases: selfTestCaseCount(), failures };
 }
 
 function main() {
@@ -2270,6 +2567,7 @@ function main() {
     { name: 'phase-status-consistency', problems: checkPhaseStatusConsistency(files) },
     { name: 'derived-facts', problems: checkDerivedFacts() },
     { name: 'compliance-current-state', problems: checkComplianceCurrentState() },
+    { name: 'register-traceability', problems: checkRegisterTraceability() },
     { name: 'adr-references', problems: checkAdrReferences(files) },
     { name: 'module-docs', problems: checkModuleDocs() },
     { name: 'mermaid-sanity', problems: checkMermaid(files) },
