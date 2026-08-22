@@ -1029,6 +1029,28 @@ function checkRegisterTraceability(root = REPO_ROOT) {
       file: 'docs/compliance/risk-register.md',
       statuses: ['OPEN', 'CLOSED', 'ACCEPTED'],
     },
+    // THE FOURTH REGISTER, and the reason it is here.
+    //
+    // This rule shipped covering three registers and stating the class. The
+    // continual-improvement log is the fourth — it has ids, a status column
+    // and the same authority — and it had no rule at all. The next cycle's
+    // BLOCKING finding landed in exactly that gap: CI-020 was re-opened in the
+    // log and left reading CLOSED in four other live documents, two of which
+    // discharge a Phase 6 entry criterion on it. Nothing could see it.
+    //
+    // Building a rule for the instance and describing the class is the defect
+    // this corpus has now reproduced in four consecutive review cycles. This
+    // entry is the class.
+    {
+      id: 'CI',
+      pattern: 'CI-\\d{3}',
+      rows: readRegisterRows(root, 'iso27001/continual-improvement.md', 'CI-\\d{3}', [
+        'OPEN',
+        'CLOSED',
+      ]),
+      file: 'docs/compliance/iso27001/continual-improvement.md',
+      statuses: ['OPEN', 'CLOSED'],
+    },
   ];
   for (const register of registers) {
     if (register.rows === null || register.rows.size === 0) {
@@ -2279,6 +2301,20 @@ function buildComplianceFixture(options = {}) {
       '',
       'Outcome recorded before the pull request exists.',
       '',
+      // THE OUTCOME, in the two shapes the corpus actually uses. Without
+      // these the fixture's outcome map was EMPTY, so `recorded === undefined`
+      // short-circuited the whole gate-outcome rule and every self-test case
+      // passed with the rule deleted — on the rule that exists because a
+      // compliance index reported a PASS for a gate that FAILED. A delta
+      // reviewer deleted all thirty-two lines of it and the suite stayed
+      // green.
+      '**Outcome: FAIL_WITH_BLOCKING_FINDINGS.**',
+      '',
+      // Phase 1 carries its outcome in the HEADING and nowhere else.
+      '## Phase 1 gate record — PASSED, 2026-08-15',
+      '',
+      'The first gate.',
+      '',
     ].join('\n'),
   );
 
@@ -2296,6 +2332,17 @@ function buildComplianceFixture(options = {}) {
       'Every registry entry is NOT_IMPLEMENTED and deployed nowhere.',
       '',
       'TRANSACTIONS is deployed to production and available to callers.',
+      '',
+      // The gate-outcome fork, in the shape it took in the live corpus.
+      'The Phase 5 gate closed with outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS.',
+      '',
+      // The SAME paragraph, correct sentence first: the rule stopped at the
+      // first match and this second mention was invisible.
+      'The Phase 5 gate outcome FAIL_WITH_BLOCKING_FINDINGS stands. ' +
+        'Restating: the Phase 5 gate recorded an outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS.',
+      '',
+      // Phase 1's outcome lives in its heading; a fork against it must report.
+      'The Phase 1 gate reported an outcome FAIL_WITH_BLOCKING_FINDINGS.',
       '',
       'No Phase 4 compliance GATE has been executed.',
       '',
@@ -2397,6 +2444,15 @@ function buildComplianceFixture(options = {}) {
 // and keeps its line, because WHICH of its two dated sections a finding lands
 // in is exactly the property that case exists to hold.
 const COMPLIANCE_SELF_TEST_CASES = [
+  {
+    expect:
+      /seed-stale\.md:\d+ attributes outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS to the Phase 5 gate/,
+    why: 'a document attributing the wrong outcome to a gate is the shape of the corpus index that reported a PASS for a gate that FAILED',
+  },
+  {
+    expect: /seed-stale\.md:\d+ attributes outcome FAIL_WITH_BLOCKING_FINDINGS to the Phase 1 gate/,
+    why: 'Phase 1 carries its outcome in the heading and nowhere else, so the map had no entry for it and a fabricated Phase 1 outcome went unreported',
+  },
   {
     expect: /seed-stale\.md:\d+ says TRANSACTIONS is NOT_IMPLEMENTED/,
     why: 'the exact stale sentence found in the Phase 5 report',
@@ -2544,12 +2600,19 @@ function buildTraceabilityFixture(options = {}) {
     ['# Risks', '', '| KAR-RSK-001 | a risk | OPEN |', ''].join('\n'),
   );
   write(
+    'docs/compliance/iso27001/continual-improvement.md',
+    ['# Improvement', '', '| CI-001 | an entry | OPEN |', ''].join('\n'),
+  );
+  write(
     'docs/citing.md',
     [
       '# Citing',
       '',
       // TRUE citations: every id resolves and the quoted status matches.
       'KAR-CTL-001 is IMPLEMENTED and KAR-RSK-001 is OPEN.',
+      '',
+      // The fourth register, cited the way the corpus cites it.
+      `CI-001 is \`${options.quotedCiStatus ?? 'OPEN'}\`.`,
       '',
       `EV-001 ${options.verb ?? 'is'} \`${options.quotedEvStatus ?? evStatus}\`.`,
       '',
@@ -2663,6 +2726,16 @@ const TRACEABILITY_CASES = [
     expect: [],
     forbid: /./,
     why: 'every id resolves, the path exists, the quoted status matches, and the dated block is history',
+  },
+  {
+    name: 'the FOURTH register — an improvement entry quoted against its log',
+    options: { quotedCiStatus: 'CLOSED' },
+    expect: [/says CI-001 is CLOSED, but .*continual-improvement\.md records OPEN/],
+    why:
+      'the rule shipped covering three registers and describing the class, and the next ' +
+      "cycle's BLOCKING finding landed in the fourth: an entry re-opened in the log and " +
+      'left reading CLOSED in four live documents, two of which discharged a Phase 6 entry ' +
+      'criterion on it',
   },
   {
     name: 'the register moves and the quote does not',
