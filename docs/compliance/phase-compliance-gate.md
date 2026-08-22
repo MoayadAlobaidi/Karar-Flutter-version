@@ -496,11 +496,11 @@ The matrix tally is re-derived by counting its own rows and is **17 DESIGNED / 8
 
 ### 3. Risk register review and deltas
 
-Every row re-read. **Nine added: KAR-RSK-042–050. Three closed: KAR-RSK-047, KAR-RSK-048 and KAR-RSK-049. One accepted with a recorded residual: KAR-RSK-046.**
+Every row re-read. **Nine added: KAR-RSK-042–050. Four closed: KAR-RSK-042, KAR-RSK-047, KAR-RSK-048 and KAR-RSK-049. One accepted with a recorded residual: KAR-RSK-046.**
 
 *(This §3 said four and listed 042–045, which was the set at the moment the record was frozen — before the independent reviews ran. The reviews added four more, the first CI run the phase ever had added a ninth, and a gate record that claims to incorporate its reviews' findings has to carry them. It then said "no row closed", which was true when written and stopped being true when the remediation ran. The register and this section now agree on the same nine rows AND the same nine statuses.)*
 
-- **042** — the client, executed on a runtime for the first time, does not reach a screen. 16 High.
+- **042** — the client, executed on a runtime for the first time, did not reach a screen. 16 High. **CLOSED** — and closed with a **retraction inside it**, which is the part worth reading. The row held two findings. Unbounded platform I/O was real, is fixed, and has 13 tests including a mutation that removes the bound. "The UI thread stops producing frames" is **withdrawn**: it was measured on a simulator that has since been shown to hang `xcrun simctl terminate` against a bundle identifier that does not exist, on a device carrying several stale installs of the app. Re-run on a **freshly wiped** Pixel-7 emulator (API 36) and a **freshly created** iPhone 17 simulator (iOS 26.5), the client reaches the sign-in screen on both; a tap focuses the e-mail field and raises the keyboard on each; and `tool/startup_smoke.sh` passes on both. The check that says so no longer decides from pixels, because pixels cannot tell a frozen indicator from a screen reached before the first sample — it asks the UI isolate for its widget tree, and an isolate whose event loop has stopped cannot answer. Held at `SIGSTOP`, it does not.
 - **043** — the statement-import picker is unreachable end to end by anyone today, because the surface is gated on a capability nothing deploys. 15 High.
 - **044** — a verification control can pass without having verified anything; two did. 12 Moderate.
 - **045** — a CI lane can stay broken for an arbitrary number of commits when no pull request is open to run it. 12 Moderate.
@@ -553,7 +553,7 @@ Architecture test 26 passes over 35 parsed rows: every technical claim resolves 
 
 Concretely, and in the order a reader should weigh them:
 
-1. **The client has never been seen to work.** It does not reach a screen on the one runtime tried, and the financial surface it carries has therefore never been reached by anything (042).
+1. **The client has now been seen to work, on two emulated runtimes and no physical device.** It reaches its sign-in screen on a freshly wiped Pixel-7 emulator and a freshly created iPhone 17 simulator, and `tool/startup_smoke.sh` passes on both (042, CLOSED). *(This item read "has never been seen to work", which was true of the evidence then available and false of the artifact — the run that produced it was on a simulator that hangs `simctl` calls touching no application code.)* The residual is the DEVICE gap, which is 031/032/033's.
 2. **No capability is available anywhere**, so every positive path above the platform is exercised against synthetic fixtures and a LOCAL-only seed (043).
 3. **The retention decision does not exist**, and failing closed is correct behaviour rather than a substitute for it.
 4. **All compliance evidence sits in one vendor account under one credential with no independent custodian**, twice past its deadline, which is why no evidence row is `REVIEWED` (CI-016).
@@ -565,7 +565,7 @@ None of these is accepted as closed. Each has an owner, a trigger and a written 
 
 Phase 6 begins only after this phase's pull request merges and a new branch starts from the merge commit. In addition, and stated as gate conditions rather than aspirations:
 
-- **KAR-RSK-042 has a reproduction on a second runtime and a fix, with an automated check that launches the built artifact and asserts a terminal startup state.** Phase 6 builds a financial engine whose output the client renders; starting it while the client cannot start is building on something unverified.
+- ~~**KAR-RSK-042 has a reproduction on a second runtime and a fix, with an automated check that launches the built artifact and asserts a terminal startup state.**~~ **DISCHARGED at this gate, not carried into Phase 6.** The second runtime was run and did not reproduce; `tool/startup_smoke.sh` passes on iOS and Android; KAR-RSK-042 and CI-020 are CLOSED. The condition is struck through rather than deleted because a condition that was set and then met is part of the record.
 - **CI-019's process half is in force**: the Phase 6 pull request is open within the first working session of the phase, so required checks run against the branch as it develops. Phase 5 ran 101 commits without one and carried a broken required lane the whole way.
 - **CI-011 discharges or opens a nonconformity of its own** — KAR-CTL-116's merge-blocking register sweep has now missed two targets.
 - **CI-016's hard deadline stands**: the evidence-store decision exists before the Phase 6 gate report is written.

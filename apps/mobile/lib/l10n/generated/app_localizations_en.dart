@@ -92,9 +92,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String fieldCharacterCount(int used, int limit) {
-    final intl.NumberFormat usedNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat usedNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
     final String usedString = usedNumberFormat.format(used);
-    final intl.NumberFormat limitNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String limitString = limitNumberFormat.format(limit);
 
     return '$usedString of $limitString characters';
@@ -135,7 +138,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stateEmptyTitle => 'Nothing here yet';
 
   @override
-  String get stateEmptyDescription => 'There is nothing to show on this screen right now.';
+  String get stateEmptyDescription =>
+      'There is nothing to show on this screen right now.';
 
   @override
   String get stateErrorTitle => 'Something went wrong';
@@ -148,7 +152,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stateOfflineTitle => 'You are offline';
 
   @override
-  String get stateOfflineDescription => 'Reconnect to load the latest information.';
+  String get stateOfflineDescription =>
+      'Reconnect to load the latest information.';
 
   @override
   String stateErrorReference(String reference) {
@@ -169,9 +174,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String a11yTabPosition(int position, int total) {
-    final intl.NumberFormat positionNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat positionNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String positionString = positionNumberFormat.format(position);
-    final intl.NumberFormat totalNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat totalNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String totalString = totalNumberFormat.format(total);
 
     return 'Tab $positionString of $totalString';
@@ -208,7 +215,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String selectionCount(int count) {
-    final intl.NumberFormat countNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
     String _temp0 = intl.Intl.pluralLogic(
@@ -223,9 +231,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String paginationPosition(int page, int total) {
-    final intl.NumberFormat pageNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat pageNumberFormat = intl.NumberFormat.decimalPattern(
+      localeName,
+    );
     final String pageString = pageNumberFormat.format(page);
-    final intl.NumberFormat totalNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat totalNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String totalString = totalNumberFormat.format(total);
 
     return 'Page $pageString of $totalString';
@@ -233,7 +244,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String retryCountdown(int seconds) {
-    final intl.NumberFormat secondsNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat secondsNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String secondsString = secondsNumberFormat.format(seconds);
 
     String _temp0 = intl.Intl.pluralLogic(
@@ -247,7 +259,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String lastUpdatedAt(DateTime timestamp) {
-    final intl.DateFormat timestampDateFormat = intl.DateFormat('yMMMd Hm', localeName);
+    final intl.DateFormat timestampDateFormat = intl.DateFormat(
+      'yMMMd Hm',
+      localeName,
+    );
     final String timestampString = timestampDateFormat.format(timestamp);
 
     return 'Last updated $timestampString';
@@ -271,13 +286,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get legalDocumentUnavailable => 'This document is not available right now.';
+  String get legalDocumentUnavailable =>
+      'This document is not available right now.';
 
   @override
   String get signInTitle => 'Sign in';
 
   @override
-  String get signInSubtitle => 'Use the email address and password for your Karar account.';
+  String get signInSubtitle =>
+      'Use the email address and password for your Karar account.';
 
   @override
   String get signInAction => 'Sign in';
@@ -320,7 +337,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get registerTitle => 'Create an account';
 
   @override
-  String get registerSubtitle => 'We will email a verification code to the address you enter.';
+  String get registerSubtitle =>
+      'We will email a verification code to the address you enter.';
 
   @override
   String get registerAction => 'Create account';
@@ -435,13 +453,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changePasswordAction => 'Change password';
 
   @override
-  String get changePasswordIncorrectCurrent => 'That did not match your current password.';
+  String get changePasswordIncorrectCurrent =>
+      'That did not match your current password.';
 
   @override
   String get changePasswordSuccessTitle => 'Password changed';
 
   @override
-  String get changePasswordSuccessMessage => 'Every other device has been signed out.';
+  String get changePasswordSuccessMessage =>
+      'Every other device has been signed out.';
 
   @override
   String get confirmPasswordMismatch => 'The two passwords do not match.';
@@ -451,7 +471,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String passwordTooShort(int count) {
-    final intl.NumberFormat countNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
     return 'Use at least $countString characters.';
@@ -459,7 +480,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String passwordTooLong(int count) {
-    final intl.NumberFormat countNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
     return 'Use no more than $countString characters.';
@@ -492,7 +514,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add this key to an authenticator app. It is shown once and cannot be retrieved again.';
 
   @override
-  String get mfaEnrolStepConfirm => 'Enter the 6-digit code your app shows now.';
+  String get mfaEnrolStepConfirm =>
+      'Enter the 6-digit code your app shows now.';
 
   @override
   String get mfaEnrolSecretLabel => 'Setup key';
@@ -518,10 +541,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'That code did not verify. Check your authenticator app and try again.';
 
   @override
-  String get mfaAlreadyEnrolled => 'Two-step verification is already set up on this account.';
+  String get mfaAlreadyEnrolled =>
+      'Two-step verification is already set up on this account.';
 
   @override
-  String get mfaNoPendingEnrolment => 'That setup is no longer pending. Start again.';
+  String get mfaNoPendingEnrolment =>
+      'That setup is no longer pending. Start again.';
 
   @override
   String get mfaRecoveryCodesTitle => 'Your recovery codes';
@@ -531,13 +556,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'These codes are shown once and never again. Each one signs you in a single time if you lose your authenticator app. Write them down and keep them somewhere only you can reach.';
 
   @override
-  String get mfaRecoveryCodesAcknowledge => 'I have saved these codes somewhere safe';
+  String get mfaRecoveryCodesAcknowledge =>
+      'I have saved these codes somewhere safe';
 
   @override
   String get mfaChallengeTitle => 'Enter your code';
 
   @override
-  String get mfaChallengeSubtitle => 'Open your authenticator app and enter the 6-digit code.';
+  String get mfaChallengeSubtitle =>
+      'Open your authenticator app and enter the 6-digit code.';
 
   @override
   String get mfaChallengeUseRecovery => 'Use a recovery code instead';
@@ -579,7 +606,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mfaDisableSuccess => 'Two-step verification is off.';
 
   @override
-  String get mfaNotEnrolled => 'Two-step verification is not set up on this account.';
+  String get mfaNotEnrolled =>
+      'Two-step verification is not set up on this account.';
 
   @override
   String get sessionsTitle => 'Active sessions';
@@ -640,7 +668,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String sessionsRevokedOthersNotice(int count) {
-    final intl.NumberFormat countNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
     return 'Other devices signed out ($countString).';
@@ -711,14 +740,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Karar could not save that change on this device, so the app lock is still on. Try again, or use your password on the lock screen if you cannot unlock.';
 
   @override
-  String get securityStateUnavailableTitle => 'Karar cannot check its security settings';
+  String get securityStateUnavailableTitle =>
+      'Karar cannot check its security settings';
 
   @override
   String get securityStateUnavailableMessage =>
       'This device did not report whether your app lock is on. Karar will not open your account until it can tell, so nothing is shown for now. Try again, and restart the device if it keeps happening.';
 
   @override
-  String get securityRecoveryBlockedTitle => 'That session could not be removed';
+  String get securityRecoveryBlockedTitle =>
+      'That session could not be removed';
 
   @override
   String get securityRecoveryBlockedMessage =>
@@ -728,7 +759,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sessionEndedTitle => 'You have been signed out';
 
   @override
-  String get sessionEndedExpired => 'Your session expired. Sign in again to continue.';
+  String get sessionEndedExpired =>
+      'Your session expired. Sign in again to continue.';
 
   @override
   String get sessionEndedRevoked =>
@@ -749,20 +781,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sessionEndedAction => 'Sign in';
 
   @override
-  String get failureOffline => 'You appear to be offline. Check your connection and try again.';
+  String get failureOffline =>
+      'You appear to be offline. Check your connection and try again.';
 
   @override
-  String get failureTimeout => 'That took too long to answer. Check your connection and try again.';
+  String get failureTimeout =>
+      'That took too long to answer. Check your connection and try again.';
 
   @override
-  String get failureRateLimited => 'Too many attempts. Wait a little and try again.';
+  String get failureRateLimited =>
+      'Too many attempts. Wait a little and try again.';
 
   @override
   String get failureServiceUnavailable =>
       'Karar could not complete that request. Try again in a moment.';
 
   @override
-  String get failureInvalidRequest => 'Check the details you entered and try again.';
+  String get failureInvalidRequest =>
+      'Check the details you entered and try again.';
 
   @override
   String get failureNotPermitted => 'You do not have permission to do that.';
@@ -771,7 +807,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get failureNotFound => 'That is no longer available.';
 
   @override
-  String get failureConflict => 'That has already changed. Reload and try again.';
+  String get failureConflict =>
+      'That has already changed. Reload and try again.';
 
   @override
   String get failureSecureStorage =>
@@ -788,13 +825,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get failureRetrySafe => 'Your session was renewed. Try that again.';
 
   @override
-  String get failureSessionEnded => 'Your session ended. Sign in again to continue.';
+  String get failureSessionEnded =>
+      'Your session ended. Sign in again to continue.';
 
   @override
-  String get failureConsentRequired => 'There is an agreement to review before continuing.';
+  String get failureConsentRequired =>
+      'There is an agreement to review before continuing.';
 
   @override
-  String get failureTenantSelection => 'Choose an organisation before continuing.';
+  String get failureTenantSelection =>
+      'Choose an organisation before continuing.';
 
   @override
   String get failureConfiguration =>
@@ -805,7 +845,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String a11yPasswordRules(int count) {
-    final intl.NumberFormat countNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String countString = countNumberFormat.format(count);
 
     return 'Password. At least $countString characters.';
@@ -813,9 +854,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String a11yRecoveryCodePosition(int position, int total) {
-    final intl.NumberFormat positionNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat positionNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String positionString = positionNumberFormat.format(position);
-    final intl.NumberFormat totalNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat totalNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String totalString = totalNumberFormat.format(total);
 
     return 'Recovery code $positionString of $totalString';
@@ -839,7 +882,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get consentStateRequired => 'Your agreement is needed';
 
   @override
-  String get consentStateReconsentRequired => 'A new version needs your agreement';
+  String get consentStateReconsentRequired =>
+      'A new version needs your agreement';
 
   @override
   String get consentStateActive => 'In force';
@@ -869,7 +913,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'A materially changed version is in force. Your earlier agreement no longer covers it.';
 
   @override
-  String get consentDescribeActive => 'The platform holds your agreement to the version shown.';
+  String get consentDescribeActive =>
+      'The platform holds your agreement to the version shown.';
 
   @override
   String get consentDescribeWithdrawn =>
@@ -888,7 +933,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The platform cannot record an agreement for this purpose yet, so no control is offered.';
 
   @override
-  String get consentNothingToAgreeTitle => 'Nothing is waiting for your agreement';
+  String get consentNothingToAgreeTitle =>
+      'Nothing is waiting for your agreement';
 
   @override
   String get consentNothingToAgreeDescription =>
@@ -934,10 +980,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get consentWithdrawAction => 'Withdraw agreement';
 
   @override
-  String get consentAcceptedConfirmation => 'The platform recorded your agreement.';
+  String get consentAcceptedConfirmation =>
+      'The platform recorded your agreement.';
 
   @override
-  String get consentWithdrawnConfirmation => 'The platform recorded your withdrawal.';
+  String get consentWithdrawnConfirmation =>
+      'The platform recorded your withdrawal.';
 
   @override
   String get consentHistoryPreservedNote =>
@@ -1015,7 +1063,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your account is in order. The platform has confirmed that no service is enabled for it yet, so there is nothing here to open.';
 
   @override
-  String get platformCapabilitiesUnresolvedTitle => 'Services could not be checked';
+  String get platformCapabilitiesUnresolvedTitle =>
+      'Services could not be checked';
 
   @override
   String get platformCapabilitiesUnresolvedDescription =>
@@ -1039,7 +1088,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformProfileRowTitle => 'Profile';
 
   @override
-  String get platformProfileRowSubtitle => 'Your name, language and account status';
+  String get platformProfileRowSubtitle =>
+      'Your name, language and account status';
 
   @override
   String get platformSessionActive => 'Signed in on this device';
@@ -1051,10 +1101,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformUserReferenceLabel => 'Account reference';
 
   @override
-  String get platformOrganisationRowSubtitle => 'The organisation this session is bound to';
+  String get platformOrganisationRowSubtitle =>
+      'The organisation this session is bound to';
 
   @override
-  String get platformOrganisationUnbound => 'This session is not bound to an organisation';
+  String get platformOrganisationUnbound =>
+      'This session is not bound to an organisation';
 
   @override
   String get platformRoleHintLabel => 'Role';
@@ -1069,10 +1121,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformJurisdictionVerified => 'Verified';
 
   @override
-  String get platformJurisdictionUnrecognised => 'Not recognised by this version';
+  String get platformJurisdictionUnrecognised =>
+      'Not recognised by this version';
 
   @override
-  String get platformJurisdictionRowSubtitle => 'The regime that governs your account';
+  String get platformJurisdictionRowSubtitle =>
+      'The regime that governs your account';
 
   @override
   String get platformJurisdictionScreenTitle => 'Jurisdiction';
@@ -1109,7 +1163,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformLegalScreenTitle => 'Legal';
 
   @override
-  String get platformLegalRowSubtitle => 'Who you contracted with, and the documents that apply';
+  String get platformLegalRowSubtitle =>
+      'Who you contracted with, and the documents that apply';
 
   @override
   String get platformOperatingEntityHeading => 'Operating entity';
@@ -1128,21 +1183,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is the legal person you contracted with, as recorded by the platform.';
 
   @override
-  String get platformOperatingEntityUnassignedTitle => 'No operating entity is assigned';
+  String get platformOperatingEntityUnassignedTitle =>
+      'No operating entity is assigned';
 
   @override
   String get platformOperatingEntityUnassignedDescription =>
       'No contracting entity is recorded for your account yet.';
 
   @override
-  String get platformOperatingEntityUnavailableTitle => 'The operating entity could not be read';
+  String get platformOperatingEntityUnavailableTitle =>
+      'The operating entity could not be read';
 
   @override
   String get platformOperatingEntityUnavailableDescription =>
       'The platform could not confirm which legal person you contracted with, so none is shown.';
 
   @override
-  String get platformOperatingEntityUnrecognisedTitle => 'The operating entity is not recognised';
+  String get platformOperatingEntityUnrecognisedTitle =>
+      'The operating entity is not recognised';
 
   @override
   String get platformOperatingEntityUnrecognisedDescription =>
@@ -1161,7 +1219,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformPolicyPackAbsent => 'None in effect';
 
   @override
-  String get platformConsentRowSubtitle => 'What you have agreed to, and what is outstanding';
+  String get platformConsentRowSubtitle =>
+      'What you have agreed to, and what is outstanding';
 
   @override
   String get platformSettingsRowSubtitle => 'Language, appearance and account';
@@ -1173,7 +1232,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileDisplayNameLabel => 'Display name';
 
   @override
-  String get profileDisplayNameHelper => 'The name shown to people in your organisation.';
+  String get profileDisplayNameHelper =>
+      'The name shown to people in your organisation.';
 
   @override
   String get profileLanguageLabel => 'Language recorded on your account';
@@ -1235,7 +1295,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileUnavailableTitle => 'Your profile could not be loaded';
 
   @override
-  String get profileUnavailableDescription => 'The platform did not answer. Nothing has changed.';
+  String get profileUnavailableDescription =>
+      'The platform did not answer. Nothing has changed.';
 
   @override
   String get profileNotStated => 'Not stated';
@@ -1319,7 +1380,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your account belongs to more than one organisation. Choose the one to use for this session. Only the organisations the platform listed for you appear here.';
 
   @override
-  String get tenantNoMembershipTitle => 'You do not belong to an organisation yet';
+  String get tenantNoMembershipTitle =>
+      'You do not belong to an organisation yet';
 
   @override
   String get tenantNoMembershipDescription =>
@@ -1340,7 +1402,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get tenantUnboundTitle => 'This session is not bound to an organisation';
+  String get tenantUnboundTitle =>
+      'This session is not bound to an organisation';
 
   @override
   String get tenantUnboundDescription =>
@@ -1364,28 +1427,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'The platform lists no other membership for your account, so there is nothing to switch to.';
 
   @override
-  String get tenantBoundConfirmation => 'This session is now bound to the organisation.';
+  String get tenantBoundConfirmation =>
+      'This session is now bound to the organisation.';
 
   @override
   String get tenantSwitchedConfirmation =>
       'You are now in the other organisation, in a new session. The previous session has ended.';
 
   @override
-  String get tenantSelectionFailedTitle => 'The organisation could not be selected';
+  String get tenantSelectionFailedTitle =>
+      'The organisation could not be selected';
 
   @override
   String get tenantSelectionFailedDescription =>
       'The platform refused the selection. Nothing changed.';
 
   @override
-  String get tenantMembershipChangedTitle => 'Your membership changed during the switch';
+  String get tenantMembershipChangedTitle =>
+      'Your membership changed during the switch';
 
   @override
   String get tenantMembershipChangedDescription =>
       'Your access to that organisation changed while the switch was in progress, so the session was ended rather than left without a membership. Sign in again.';
 
   @override
-  String get tenantMembershipRefusedTitle => 'That organisation is not available to you';
+  String get tenantMembershipRefusedTitle =>
+      'That organisation is not available to you';
 
   @override
   String get tenantMembershipRefusedDescription =>
@@ -1412,7 +1479,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The invitation was redeemed. Your memberships are being re-checked.';
 
   @override
-  String get tenantInvitationFailedTitle => 'The invitation could not be redeemed';
+  String get tenantInvitationFailedTitle =>
+      'The invitation could not be redeemed';
 
   @override
   String get tenantInvitationFailedDescription =>
@@ -1441,19 +1509,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountsEmptyTitle => 'No accounts yet';
 
   @override
-  String get accountsEmptyDescription => 'Add an account by hand to start keeping track of it.';
+  String get accountsEmptyDescription =>
+      'Add an account by hand to start keeping track of it.';
 
   @override
   String get accountsFilteredEmptyTitle => 'Nothing matches these filters';
 
   @override
-  String get accountsFilteredEmptyDescription => 'Clear the filters to see everything you hold.';
+  String get accountsFilteredEmptyDescription =>
+      'Clear the filters to see everything you hold.';
 
   @override
   String get accountsUnavailableTitle => 'Accounts could not be loaded';
 
   @override
-  String get accountsUnavailableDescription => 'Karar could not read your accounts just now.';
+  String get accountsUnavailableDescription =>
+      'Karar could not read your accounts just now.';
 
   @override
   String get accountsGroupByLabel => 'Group by';
@@ -1634,7 +1705,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountMaskWithheld => 'Withheld';
 
   @override
-  String get accountMaskNeverFullNumber => 'Karar never shows a full account, card or IBAN number.';
+  String get accountMaskNeverFullNumber =>
+      'Karar never shows a full account, card or IBAN number.';
 
   @override
   String get balancesSectionTitle => 'Balances reported by sources';
@@ -1643,7 +1715,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balancesEmptyTitle => 'No balance reported';
 
   @override
-  String get balancesEmptyDescription => 'No source has reported a figure for this account yet.';
+  String get balancesEmptyDescription =>
+      'No source has reported a figure for this account yet.';
 
   @override
   String get balancesNoTotalNotice =>
@@ -1850,7 +1923,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountDetailUnavailableTitle => 'Account could not be loaded';
 
   @override
-  String get accountDetailUnavailableDescription => 'Karar could not read this account just now.';
+  String get accountDetailUnavailableDescription =>
+      'Karar could not read this account just now.';
 
   @override
   String get accountCurrencyLabel => 'Currency';
@@ -1948,10 +2022,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountFormErrorWalletKindRequired => 'Choose a wallet kind.';
 
   @override
-  String get accountFormErrorWalletKindNotAllowed => 'Only a wallet has a wallet kind.';
+  String get accountFormErrorWalletKindNotAllowed =>
+      'Only a wallet has a wallet kind.';
 
   @override
-  String get accountFormErrorIssuerNamedTwice => 'Choose a reviewed issuer or type one, not both.';
+  String get accountFormErrorIssuerNamedTwice =>
+      'Choose a reviewed issuer or type one, not both.';
 
   @override
   String get accountFormSaved => 'Saved.';
@@ -1977,7 +2053,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transactionsEmptyTitle => 'No transactions yet';
 
   @override
-  String get transactionsEmptyDescription => 'Record a transaction to start keeping track.';
+  String get transactionsEmptyDescription =>
+      'Record a transaction to start keeping track.';
 
   @override
   String get transactionsFilteredEmptyTitle => 'Nothing matches these filters';
@@ -2003,7 +2080,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transactionDetailTitle => 'Transaction';
 
   @override
-  String get transactionDetailUnavailableTitle => 'Transaction could not be loaded';
+  String get transactionDetailUnavailableTitle =>
+      'Transaction could not be loaded';
 
   @override
   String get transactionDetailUnavailableDescription =>
@@ -2142,13 +2220,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transactionProvenanceTitle => 'Provenance';
 
   @override
-  String get transactionProvenanceUnavailable => 'Provenance could not be loaded';
+  String get transactionProvenanceUnavailable =>
+      'Provenance could not be loaded';
 
   @override
   String get provenanceImportedFromStatement => 'Came from a statement file';
 
   @override
-  String get provenanceNotImportedFromStatement => 'Did not come from a statement file';
+  String get provenanceNotImportedFromStatement =>
+      'Did not come from a statement file';
 
   @override
   String get provenanceSourceDirectionLabel => 'Direction the source stated';
@@ -2172,10 +2252,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get directionMappingManualEntry => 'Entered by hand';
 
   @override
-  String get directionMappingSourceDirectionWord => 'From the wording used by the source';
+  String get directionMappingSourceDirectionWord =>
+      'From the wording used by the source';
 
   @override
-  String get directionMappingSourceSignedAmount => 'From the sign used by the source';
+  String get directionMappingSourceSignedAmount =>
+      'From the sign used by the source';
 
   @override
   String get directionMappingSourceSignedAmountInverted =>
@@ -2230,7 +2312,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'An identical transaction is already recorded for this account on this date. If you really did buy this twice, record it as a separate purchase.';
 
   @override
-  String get transactionDuplicateConfirmAction => 'Record as a separate purchase';
+  String get transactionDuplicateConfirmAction =>
+      'Record as a separate purchase';
 
   @override
   String get transactionDeleteAction => 'Delete transaction';
@@ -2296,13 +2379,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transactionFormErrorDescription => 'Enter a description.';
 
   @override
-  String get transactionFormErrorDirection => 'Choose whether money came in or went out.';
+  String get transactionFormErrorDirection =>
+      'Choose whether money came in or went out.';
 
   @override
   String get transactionFormErrorMagnitude => 'Enter a positive amount.';
 
   @override
-  String get transactionFormErrorBookingDate => 'Enter the day it was booked, as YYYY-MM-DD.';
+  String get transactionFormErrorBookingDate =>
+      'Enter the day it was booked, as YYYY-MM-DD.';
 
   @override
   String get transactionFormErrorValueDate =>
@@ -2312,7 +2397,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transactionFormSaved => 'Recorded.';
 
   @override
-  String get transactionFormNoAccounts => 'Add an account before recording a transaction.';
+  String get transactionFormNoAccounts =>
+      'Add an account before recording a transaction.';
 
   @override
   String get transactionFiltersTitle => 'Filters';
@@ -2411,17 +2497,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'You choose the account before the file is read. Nothing in the file can change where its rows land.';
 
   @override
-  String get statementImportNoAccounts => 'You need an account before you can import a statement.';
+  String get statementImportNoAccounts =>
+      'You need an account before you can import a statement.';
 
   @override
   String get statementImportChooseFile => 'Choose a CSV file';
 
   @override
-  String get statementImportChooseFileSemantics => 'Choose a CSV statement file from your device';
+  String get statementImportChooseFileSemantics =>
+      'Choose a CSV statement file from your device';
 
   @override
   String statementImportFileRules(int megabytes) {
-    final intl.NumberFormat megabytesNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat megabytesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String megabytesString = megabytesNumberFormat.format(megabytes);
 
     return 'CSV only, up to $megabytesString MB.';
@@ -2434,21 +2523,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportActionUpload => 'Upload and continue';
 
   @override
-  String get statementImportPickerUnavailableTitle => 'No file picker is available here';
+  String get statementImportPickerUnavailableTitle =>
+      'No file picker is available here';
 
   @override
   String get statementImportPickerUnavailableDetail =>
       'This device offered no document picker, so a statement cannot be chosen on it. Nothing else about the import has changed — where a picker is available, Karar asks for the one file you choose and never for access to your storage.';
 
   @override
-  String get statementImportPickerUnreadable => 'That file could not be read from your device.';
+  String get statementImportPickerUnreadable =>
+      'That file could not be read from your device.';
 
   @override
   String get statementImportSourceEmpty => 'That file is empty.';
 
   @override
   String statementImportSourceTooLarge(int megabytes) {
-    final intl.NumberFormat megabytesNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat megabytesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String megabytesString = megabytesNumberFormat.format(megabytes);
 
     return 'That file is larger than the $megabytesString MB this import accepts.';
@@ -2479,7 +2571,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String statementImportColumnNumber(int number) {
-    final intl.NumberFormat numberNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat numberNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String numberString = numberNumberFormat.format(number);
 
     return 'Column $numberString';
@@ -2489,7 +2582,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportColumnNotMapped => 'Not mapped';
 
   @override
-  String get statementImportPreviewCaption => 'The first rows of your file, shown as plain text.';
+  String get statementImportPreviewCaption =>
+      'The first rows of your file, shown as plain text.';
 
   @override
   String get statementImportPreviewInertNote =>
@@ -2541,7 +2635,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportFieldRow => 'Whole row';
 
   @override
-  String get statementImportFieldUnrecognised => 'A field this version does not recognise';
+  String get statementImportFieldUnrecognised =>
+      'A field this version does not recognise';
 
   @override
   String get statementImportAccountIdentifierHelper =>
@@ -2554,23 +2649,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportAmountShapeSigned => 'One column, with a sign';
 
   @override
-  String get statementImportAmountShapeDebitCredit => 'Separate debit and credit columns';
+  String get statementImportAmountShapeDebitCredit =>
+      'Separate debit and credit columns';
 
   @override
-  String get statementImportSignFrameLabel => 'Whose point of view do the signs use?';
+  String get statementImportSignFrameLabel =>
+      'Whose point of view do the signs use?';
 
   @override
-  String get statementImportSignFrameAccountHolder => 'Mine, so money I spend is negative';
+  String get statementImportSignFrameAccountHolder =>
+      'Mine, so money I spend is negative';
 
   @override
-  String get statementImportSignFrameBankLedger => 'The bank ledger, so a deposit is a credit';
+  String get statementImportSignFrameBankLedger =>
+      'The bank ledger, so a deposit is a credit';
 
   @override
   String get statementImportSignFrameHelper =>
       'There is no default. Reading the signs the wrong way turns every payment in the file into income.';
 
   @override
-  String get statementImportDateOrderLabel => 'How are ambiguous dates written?';
+  String get statementImportDateOrderLabel =>
+      'How are ambiguous dates written?';
 
   @override
   String get statementImportDateOrderNotStated => 'Not stated';
@@ -2579,23 +2679,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportDateOrderIso => 'Year first, as in 2026-04-03';
 
   @override
-  String get statementImportDateOrderDayFirst => 'Day first, so 03/04 is 3 April';
+  String get statementImportDateOrderDayFirst =>
+      'Day first, so 03/04 is 3 April';
 
   @override
-  String get statementImportDateOrderMonthFirst => 'Month first, so 03/04 is 4 March';
+  String get statementImportDateOrderMonthFirst =>
+      'Month first, so 03/04 is 4 March';
 
   @override
   String get statementImportDateOrderHelper =>
       'If you do not state one, Karar refuses the rows it cannot read without guessing rather than picking a reading for you.';
 
   @override
-  String get statementImportCurrencySourceLabel => 'Where does the currency come from?';
+  String get statementImportCurrencySourceLabel =>
+      'Where does the currency come from?';
 
   @override
   String get statementImportCurrencyFromColumn => 'A column in the file';
 
   @override
-  String get statementImportCurrencyStatedForFile => 'The whole file is in one currency';
+  String get statementImportCurrencyStatedForFile =>
+      'The whole file is in one currency';
 
   @override
   String get statementImportStatedCurrencyLabel => 'Currency of the file';
@@ -2605,7 +2709,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'One or the other, never both. Two sources for one currency can disagree, and resolving that would mean choosing on your behalf.';
 
   @override
-  String get statementImportBalanceKindLabel => 'What does the balance column hold?';
+  String get statementImportBalanceKindLabel =>
+      'What does the balance column hold?';
 
   @override
   String get statementImportBalanceKindRunning => 'Running balance';
@@ -2620,7 +2725,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportBalanceKindClosing => 'Closing balance';
 
   @override
-  String get statementImportStatedBalanceLabel => 'Balance the statement states';
+  String get statementImportStatedBalanceLabel =>
+      'Balance the statement states';
 
   @override
   String get statementImportStatedBalanceHelper =>
@@ -2646,7 +2752,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter the balance as digits, with at most the decimal places this currency uses.';
 
   @override
-  String get statementImportMappingColumnIndexInvalid => 'A chosen column is not in this file.';
+  String get statementImportMappingColumnIndexInvalid =>
+      'A chosen column is not in this file.';
 
   @override
   String get statementImportMappingColumnUsedTwice =>
@@ -2724,7 +2831,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String statementImportRowNumber(int number) {
-    final intl.NumberFormat numberNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat numberNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String numberString = numberNumberFormat.format(number);
 
     return 'Row $numberString';
@@ -2732,9 +2840,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String statementImportIssuesTruncated(int shown, int total) {
-    final intl.NumberFormat shownNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat shownNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String shownString = shownNumberFormat.format(shown);
-    final intl.NumberFormat totalNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat totalNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String totalString = totalNumberFormat.format(total);
 
     return 'Showing $shownString of $totalString refused rows.';
@@ -2749,23 +2859,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'State the convention and read the file again.';
 
   @override
-  String get statementImportRemedyCorrectTheMapping => 'Correct which column holds what.';
+  String get statementImportRemedyCorrectTheMapping =>
+      'Correct which column holds what.';
 
   @override
-  String get statementImportRemedyCorrectTheFile => 'Export the statement from your bank again.';
+  String get statementImportRemedyCorrectTheFile =>
+      'Export the statement from your bank again.';
 
   @override
   String get statementImportRemedyRespectABound =>
       'This line is past a limit this import enforces.';
 
   @override
-  String get statementImportRemedyUnknown => 'This version does not know what to suggest here.';
+  String get statementImportRemedyUnknown =>
+      'This version does not know what to suggest here.';
 
   @override
-  String get statementImportReasonRequiredFieldMissing => 'A required field was empty.';
+  String get statementImportReasonRequiredFieldMissing =>
+      'A required field was empty.';
 
   @override
-  String get statementImportReasonUnreadableAmount => 'The amount is not a number Karar can read.';
+  String get statementImportReasonUnreadableAmount =>
+      'The amount is not a number Karar can read.';
 
   @override
   String get statementImportReasonAmbiguousDecimalSeparator =>
@@ -2776,7 +2891,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The date could be read two ways, and neither was stated.';
 
   @override
-  String get statementImportReasonUnreadableDate => 'The date is not in a shape Karar accepts.';
+  String get statementImportReasonUnreadableDate =>
+      'The date is not in a shape Karar accepts.';
 
   @override
   String get statementImportReasonUnreadableInstant =>
@@ -2807,7 +2923,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The debit and credit columns were both empty.';
 
   @override
-  String get statementImportReasonFieldTooLarge => 'A field is larger than this import accepts.';
+  String get statementImportReasonFieldTooLarge =>
+      'A field is larger than this import accepts.';
 
   @override
   String get statementImportReasonTooManyColumns =>
@@ -2818,13 +2935,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'This row has a different number of columns from the heading row.';
 
   @override
-  String get statementImportReasonInvalidEncoding => 'This row is not valid UTF-8 text.';
+  String get statementImportReasonInvalidEncoding =>
+      'This row is not valid UTF-8 text.';
 
   @override
-  String get statementImportReasonMalformedQuoting => 'A quoted value in this row is never closed.';
+  String get statementImportReasonMalformedQuoting =>
+      'A quoted value in this row is never closed.';
 
   @override
-  String get statementImportReasonAmountExceedsRange => 'The amount is too large to hold exactly.';
+  String get statementImportReasonAmountExceedsRange =>
+      'The amount is too large to hold exactly.';
 
   @override
   String get statementImportReasonDecimalPlacesExceedCurrency =>
@@ -2835,7 +2955,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'This version does not recognise the reason this row was refused.';
 
   @override
-  String get statementImportRefusalSourceTooLarge => 'The file is larger than this import accepts.';
+  String get statementImportRefusalSourceTooLarge =>
+      'The file is larger than this import accepts.';
 
   @override
   String get statementImportRefusalTooManyRows =>
@@ -2862,17 +2983,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reading the file took longer than this import allows.';
 
   @override
-  String get statementImportRefusalCancelled => 'Reading the file was cancelled.';
+  String get statementImportRefusalCancelled =>
+      'Reading the file was cancelled.';
 
   @override
   String get statementImportRefusalTooManyErrors =>
       'Too many rows were refused for the file to be read any further.';
 
   @override
-  String get statementImportRefusalUnsupportedMediaType => 'The file was not sent as CSV.';
+  String get statementImportRefusalUnsupportedMediaType =>
+      'The file was not sent as CSV.';
 
   @override
-  String get statementImportRefusalInvalidEncoding => 'The file is not valid UTF-8 text.';
+  String get statementImportRefusalInvalidEncoding =>
+      'The file is not valid UTF-8 text.';
 
   @override
   String get statementImportRefusalBinaryContent => 'The file is not text.';
@@ -2921,7 +3045,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'The stored file no longer matches what was uploaded, so it was not read.';
 
   @override
-  String get statementImportRefusalSourceUnreadable => 'The stored file could not be read.';
+  String get statementImportRefusalSourceUnreadable =>
+      'The stored file could not be read.';
 
   @override
   String get statementImportRefusalUnrecognised =>
@@ -2958,7 +3083,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportStateErased => 'Erased';
 
   @override
-  String get statementImportStateUnrecognised => 'A state this version does not recognise';
+  String get statementImportStateUnrecognised =>
+      'A state this version does not recognise';
 
   @override
   String get statementImportActionCommit => 'Import these transactions';
@@ -3009,7 +3135,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statementImportHeaderRowNo => 'No, the first row is a transaction';
 
   @override
-  String get transferMatchesScreenTitle => 'Transfers between your own accounts';
+  String get transferMatchesScreenTitle =>
+      'Transfers between your own accounts';
 
   @override
   String get transferMatchesIntro =>
@@ -3037,7 +3164,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transferMatchStateRejected => 'Kept separate';
 
   @override
-  String get transferMatchStateUnrecognised => 'A state this version does not know';
+  String get transferMatchStateUnrecognised =>
+      'A state this version does not know';
 
   @override
   String get transferMatchNothingChangedNote =>
@@ -3156,20 +3284,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Karar has not proposed any transfers between your own accounts.';
 
   @override
-  String get transferMatchesEmptyConfirmedTitle => 'You have not confirmed a pair yet';
+  String get transferMatchesEmptyConfirmedTitle =>
+      'You have not confirmed a pair yet';
 
   @override
-  String get transferMatchesEmptyConfirmedDescription => 'Pairs you confirm are kept here.';
+  String get transferMatchesEmptyConfirmedDescription =>
+      'Pairs you confirm are kept here.';
 
   @override
-  String get transferMatchesEmptyRejectedTitle => 'You have not kept a pair separate yet';
+  String get transferMatchesEmptyRejectedTitle =>
+      'You have not kept a pair separate yet';
 
   @override
   String get transferMatchesEmptyRejectedDescription =>
       'Pairs you keep separate are remembered here, so Karar does not ask about them again.';
 
   @override
-  String get transferMatchesUnavailableTitle => 'Proposed transfers cannot be shown';
+  String get transferMatchesUnavailableTitle =>
+      'Proposed transfers cannot be shown';
 
   @override
   String get transferMatchesUnavailableDescription =>
@@ -3180,7 +3312,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'This pair changed while it was on your screen. Reload it and answer again.';
 
   @override
-  String get transferMatchRefusalGone => 'This pair is no longer here. Nothing was changed.';
+  String get transferMatchRefusalGone =>
+      'This pair is no longer here. Nothing was changed.';
 
   @override
   String get transferMatchRefusalNotAvailable =>
@@ -3191,7 +3324,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Karar cannot pair two movements in different currencies.';
 
   @override
-  String get transferMatchRefusalGeneric => 'Your answer was not recorded. Nothing was changed.';
+  String get transferMatchRefusalGeneric =>
+      'Your answer was not recorded. Nothing was changed.';
 
   @override
   String get transferMatchMovementUnavailable =>
@@ -3259,7 +3393,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose “All” to see every data source you hold.';
 
   @override
-  String get dataSourcesUnavailableTitle => 'Your data sources could not be read';
+  String get dataSourcesUnavailableTitle =>
+      'Your data sources could not be read';
 
   @override
   String get dataSourcesUnavailableDescription =>
@@ -3281,7 +3416,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionStatusFieldLabel => 'State of this record';
 
   @override
-  String get connectionAvailabilityFieldLabel => 'Can Karar run this way of receiving data';
+  String get connectionAvailabilityFieldLabel =>
+      'Can Karar run this way of receiving data';
 
   @override
   String get connectionAddedAtLabel => 'Added';
@@ -3309,10 +3445,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionRailOpenFinanceApi => 'Open finance interface';
 
   @override
-  String get connectionRailDirectBankOrWalletApi => 'Direct bank or wallet interface';
+  String get connectionRailDirectBankOrWalletApi =>
+      'Direct bank or wallet interface';
 
   @override
-  String get connectionRailLicensedAggregatorApi => 'Licensed aggregator interface';
+  String get connectionRailLicensedAggregatorApi =>
+      'Licensed aggregator interface';
 
   @override
   String get connectionRailHostToHostSftp => 'Host-to-host file transfer';
@@ -3339,7 +3477,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionRailDeviceSignal => 'Signal from this device';
 
   @override
-  String get connectionRailUnrecognised => 'A way of receiving data this version does not know';
+  String get connectionRailUnrecognised =>
+      'A way of receiving data this version does not know';
 
   @override
   String get railStandingBadgeYouEnterIt => 'You enter it';
@@ -3376,16 +3515,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get railAvailabilityNotImplemented => 'No, Karar has never built it';
 
   @override
-  String get railAvailabilityUnrecognised => 'An answer this version of Karar does not know';
+  String get railAvailabilityUnrecognised =>
+      'An answer this version of Karar does not know';
 
   @override
   String get connectionStatusAcceptsWhatYouSupply => 'Accepts what you supply';
 
   @override
-  String get connectionStatusNotConfigured => 'Nothing has been set up on this yet';
+  String get connectionStatusNotConfigured =>
+      'Nothing has been set up on this yet';
 
   @override
-  String get connectionStatusUnavailable => 'Set up, and not usable at the moment';
+  String get connectionStatusUnavailable =>
+      'Set up, and not usable at the moment';
 
   @override
   String get connectionStatusRetired =>
@@ -3396,13 +3538,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'The way of receiving data this names was never built';
 
   @override
-  String get connectionStatusUnrecognised => 'A state this version of Karar does not know';
+  String get connectionStatusUnrecognised =>
+      'A state this version of Karar does not know';
 
   @override
-  String get dataSourcesBuiltRailsHeading => 'The only two ways data reaches Karar';
+  String get dataSourcesBuiltRailsHeading =>
+      'The only two ways data reaches Karar';
 
   @override
-  String get dataSourcesRailsHeading => 'Ways of receiving data Karar has not built';
+  String get dataSourcesRailsHeading =>
+      'Ways of receiving data Karar has not built';
 
   @override
   String get dataSourcesRailsExplanation =>
@@ -3412,7 +3557,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataSourcesAccountsHeading => 'Which sources feed each account';
 
   @override
-  String get dataSourcesAccountsEmpty => 'You hold no accounts yet, so nothing feeds anything.';
+  String get dataSourcesAccountsEmpty =>
+      'You hold no accounts yet, so nothing feeds anything.';
 
   @override
   String get dataSourcesAccountsUnavailable =>
@@ -3474,7 +3620,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sourceArrivalNone => 'Nothing has arrived through this source yet.';
+  String get sourceArrivalNone =>
+      'Nothing has arrived through this source yet.';
 
   @override
   String get accountSourcesArrivalNote =>
@@ -3507,24 +3654,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceMatchBasisExact => 'The reference matched exactly';
 
   @override
-  String get sourceMatchBasisProbable => 'A probable match, waiting for you to say';
+  String get sourceMatchBasisProbable =>
+      'A probable match, waiting for you to say';
 
   @override
-  String get sourceMatchBasisUnrecognised => 'A reason this version of Karar does not know';
+  String get sourceMatchBasisUnrecognised =>
+      'A reason this version of Karar does not know';
 
   @override
   String get accountSourcesNoScoreNote =>
       'Karar gives a source no confidence score. Either the reference matched exactly, or you are asked.';
 
   @override
-  String get accountSourcesCapabilitiesHeading => 'What this source was seen to supply';
+  String get accountSourcesCapabilitiesHeading =>
+      'What this source was seen to supply';
 
   @override
   String get accountSourcesCapabilitiesNote =>
       'Seen, not supported. A thing nobody looked for is not the same answer as a thing looked for and absent.';
 
   @override
-  String get dataSourcesRefusalGone => 'This is no longer there. Nothing about your data changed.';
+  String get dataSourcesRefusalGone =>
+      'This is no longer there. Nothing about your data changed.';
 
   @override
   String get dataSourcesRefusalOffline =>

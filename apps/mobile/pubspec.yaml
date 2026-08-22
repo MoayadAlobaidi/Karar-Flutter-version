@@ -95,6 +95,15 @@ dev_dependencies:
   yaml: 3.1.3
   path: 1.9.1
 
+  # Used only by tool/startup_probe.dart, which asks the running app's UI
+  # isolate a question the frame watch in tool/startup_smoke.sh cannot answer:
+  # a run of identical frames looks the same whether the app froze on the
+  # transient indicator or reached a screen before the first sample. A service
+  # extension is dispatched on the isolate's own event loop, so an answer is
+  # proof the loop is turning. Declared rather than suppressed, on the same
+  # rule as the platform interfaces below, and pinned like everything else.
+  vm_service: 15.2.0
+
   # The federated platform interface behind shared_preferences. Declared here
   # rather than suppressed with `depend_on_referenced_packages`: the security-
   # state adapter's tests register a fake platform to make a real platform
