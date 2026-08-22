@@ -266,7 +266,7 @@ cd apps/mobile && flutter pub get && flutter analyze && flutter test --exclude-t
 dart run tool/generate_api_client.dart --check
 ```
 
-**Every step exited 0.** Migrations: **53 applied from zero**, `db:verify` `status: clean`. Prisma mapping: **61 mapped tables match the live database**. Workspace: **3146 passed / 12 skipped** across 222 files. Readiness: **12/12**. `flutter analyze`: no issues. Generated client: in sync at **62 operations / 203 schemas**.
+**Every step exited 0**, at the final head, from a checkout made after it was pushed. Migrations: **53 applied from zero**, `db:verify` `status: clean`. Prisma mapping: **61 mapped tables match the live database**. Workspace: **3153 passed / 12 skipped** across 222 files. Readiness: **12/12**. `flutter analyze`: no issues. Generated client: in sync at **62 operations / 203 schemas**.
 
 **The Flutter figure in the clean clone is 2051 passed / 19 skipped, and that is the expected number rather than a discrepancy.** A fresh checkout holds no build artifacts, so the eighteen artifact-gated assertions plus the deployed-rules case mark themselves skipped — the same shape CI's `mobile` lane runs, and the same eighteen that **fail rather than skip** on `mobile-android` and `mobile-ios`. A clean clone reporting 2069 would have meant it was reading artifacts it should not have had.
 ## The second independent review
