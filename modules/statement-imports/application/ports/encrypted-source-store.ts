@@ -166,6 +166,15 @@ export interface EncryptedSourceStorePort {
    * its revalidations, before it decides to proceed at all. Doing it through
    * a decrypt would mean the check and the read were the same act, and a
    * caller could not verify without also holding the plaintext.
+   *
+   * THE AAD RULE BINDS THIS OPERATION TOO. It is stated in full on `open`, and
+   * a delta reviewer pointed out that stating it there alone is how it gets
+   * read as `open`'s rule: this operation must reconstruct the expected
+   * binding from caller-owned context and must not treat anything stored
+   * beside the ciphertext as authoritative. The reference adapter compares
+   * against its own in-memory copy, which is safe only because that map is
+   * process memory; a store keeping associated data in object metadata would
+   * hand the same attacker both halves.
    */
   verify(
     actor: ImportsPrincipal,
@@ -215,6 +224,15 @@ export interface EncryptedSourceStorePort {
    * object; it cannot reach a byte the database does not hold, and a dangling
    * ciphertext nobody can name is still a subject's bank statement sitting in
    * a store.
+   *
+   * THE AAD RULE BINDS THIS OPERATION TOO. It is stated in full on `open`, and
+   * a delta reviewer pointed out that stating it there alone is how it gets
+   * read as `open`'s rule: this operation must reconstruct the expected
+   * binding from caller-owned context and must not treat anything stored
+   * beside the ciphertext as authoritative. The reference adapter compares
+   * against its own in-memory copy, which is safe only because that map is
+   * process memory; a store keeping associated data in object metadata would
+   * hand the same attacker both halves.
    */
   erase(
     actor: ImportsPrincipal,

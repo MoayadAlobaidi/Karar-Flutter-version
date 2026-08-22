@@ -817,6 +817,7 @@ function readGateRecordPhases(root) {
   // which gates EXIST and never what any of them DECIDED, so the one number a
   // reader takes away from a gate was the one number no rule compared.
   const outcomes = new Map();
+  const fromOutcomeLine = new Set();
   const lines = text.split('\n');
   let section = null;
   for (const line of lines) {
@@ -824,11 +825,24 @@ function readGateRecordPhases(root) {
     if (heading !== null) {
       gates.add(heading[2]);
       section = heading[2];
+      // PHASE 1 CARRIES ITS OUTCOME IN THE HEADING — `## Phase 1 gate record —
+      // PASSED, 2026-08-15` — and nowhere else, so the map had no entry for it
+      // and a fabricated Phase 1 outcome went unreported. A delta reviewer
+      // found the gap. An explicit `**Outcome:` line inside the section still
+      // wins, because that is the shape every later record uses.
+      const inHeading = /gate record\s*[—-]\s*([A-Z][A-Z_]{3,})/.exec(line);
+      if (inHeading !== null) outcomes.set(section, inHeading[1]);
       continue;
     }
-    if (section !== null && !outcomes.has(section)) {
+    if (section !== null && !fromOutcomeLine.has(section)) {
       const outcome = /^\*\*Outcome:\s*`?([A-Z_]+)`?\.?\*\*/.exec(line.trim());
-      if (outcome !== null) outcomes.set(section, outcome[1]);
+      if (outcome !== null) {
+        // An explicit `**Outcome:` line WINS over one read from the heading:
+        // it is the shape every record after Phase 1 uses, and Phase 1's
+        // heading is the fallback rather than the rule.
+        outcomes.set(section, outcome[1]);
+        fromOutcomeLine.add(section);
+      }
     }
     // A later top-level heading that is not a phase gate record ends the
     // section, so a pull request named under Phase 4 is not attributed to
@@ -1092,9 +1106,31 @@ function checkRegisterTraceability(root = REPO_ROOT) {
         // history, and "KAR-CTL-113 was DESIGNED … it moved to IMPLEMENTED" is
         // a correct sentence that a rule matching `was` would report.
         const verbs = 'is|stays|remains|reads|records|holds at|is still';
+        // THE SENTENCE BOUNDARY WENT MISSING WHEN THE SEPARATION WAS WIDENED.
+        //
+        // The original pattern used `[^.|\n]`, which could not cross a full
+        // stop. Replacing it with a negative lookahead for `;`, `|`, newline
+        // and other ids dropped the `.` silently, and a delta reviewer found
+        // what that admits: "EV-506 records the CI run. Nothing is `REVIEWED`
+        // anywhere." reported as EV-506 being REVIEWED. That is a NEGATION,
+        // and it is this corpus's house sentence — it appears verbatim in the
+        // evidence register and in three gate records.
+        //
+        // The period is back. The known cost, stated rather than discovered
+        // later: a fork written across a semicolon — "EV-506 waits on the
+        // final head; it is COLLECTED" — is not matched, because the semicolon
+        // is also where the subject changes and excluding it is what stops
+        // "…(KAR-CTL-056); this row stays DEFERRED" from being read as a claim
+        // about 056. Precision was chosen over reach at that one shape.
+        // A NEGATION IS NOT AN ASSERTION. "…and no evidence row anywhere is
+        // REVIEWED" is a true sentence about the corpus, and the rule read it
+        // as EV-506 being REVIEWED. The sentence boundary does not help here —
+        // the negation is in the same clause — so the negators are excluded
+        // from the span between the id and the verb.
+        const negators = '\\bno\\b|\\bnothing\\b|\\bnone\\b|\\bnever\\b|\\bneither\\b';
         const anyId = registers.map((r) => r.pattern).join('|');
         const quoted = new RegExp(
-          `\\b(${register.pattern})\\b(?:(?!;|\\||\\n|${anyId}).){0,90}?` +
+          `\\b(${register.pattern})\\b(?:(?!\\.|;|\\||\\n|${negators}|${anyId}).){0,90}?` +
             `\\b(?:${verbs})\\s+\\**\`?(${register.statuses.join('|')})\\b`,
           'g',
         );
@@ -1383,20 +1419,33 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
       // a dated record quoting the outcome it saw stays history.
       const recorded = gatePhases.outcomes.get(phase);
       if (recorded !== undefined) {
+        // EVERY MENTION IN THE BLOCK, not the first one.
+        //
+        // `exec` on a non-global regex returns one match, and a delta reviewer
+        // showed what that costs: seed the false PASS into the SAME paragraph,
+        // after the corrected sentence, and it is invisible — which is the one
+        // paragraph in the corpus where this defect actually happened, because
+        // that paragraph now opens with the correction. A rule that stops at
+        // the first mention stops exactly where the fix put a right answer.
+        //
+        // The status token must be UPPERCASE, so the `i` flag is gone: under
+        // it, `[A-Z_]{4,}` matched ordinary words and "the outcome section is
+        // unchanged" was reported as an outcome of `section`.
         const quoted = new RegExp(
-          `Phase ${escaped}\\s+gate\\b[^.\\n]{0,120}?\\boutcome\\s+\`?([A-Z_]{4,})\`?`,
-          'i',
+          `[Pp]hase ${escaped}\\s+gate\\b[^.\\n]{0,120}?\\boutcome\\s+\\**\`?([A-Z][A-Z_]{3,})\`?`,
+          'g',
         );
         for (const { rel, blocks } of blocksByFile) {
           for (const block of blocks) {
-            const m = quoted.exec(block.text);
-            if (m === null || m[1] === recorded) continue;
-            report(
-              rel,
-              block,
-              `attributes outcome ${m[1]} to the Phase ${phase} gate, but its record in ` +
-                `docs/compliance/phase-compliance-gate.md says ${recorded}`,
-            );
+            for (const m of block.text.matchAll(quoted)) {
+              if (m === null || m[1] === recorded) continue;
+              report(
+                rel,
+                block,
+                `attributes outcome ${m[1]} to the Phase ${phase} gate, but its record in ` +
+                  `docs/compliance/phase-compliance-gate.md says ${recorded}`,
+              );
+            }
           }
         }
       }
@@ -2502,8 +2551,9 @@ function buildTraceabilityFixture(options = {}) {
       // TRUE citations: every id resolves and the quoted status matches.
       'KAR-CTL-001 is IMPLEMENTED and KAR-RSK-001 is OPEN.',
       '',
-      `EV-001 is \`${options.quotedEvStatus ?? evStatus}\`.`,
+      `EV-001 ${options.verb ?? 'is'} \`${options.quotedEvStatus ?? evStatus}\`.`,
       '',
+      ...(options.extraLine === undefined ? [] : [options.extraLine, '']),
       ...(options.citeMissing === true
         ? ['A fork: EV-404 and KAR-CTL-404 and KAR-RSK-404.', '']
         : []),
@@ -2579,6 +2629,33 @@ const TRACEABILITY_CASES = [
     why:
       '`git ls-files` lists files, and an evidence row routinely cites a directory. Treating a ' +
       'tracked directory as missing would report every such row',
+  },
+  {
+    name: 'a WIDENED verb form — "remains" rather than "is"',
+    options: { evStatus: 'PENDING', quotedEvStatus: 'COLLECTED', verb: 'remains' },
+    expect: [/says EV-001 is COLLECTED, but .*records PENDING/],
+    why:
+      'the rule matched `is` alone and reached 16 of 42 status assertions in the corpus, ' +
+      'which is how four documents went on naming a status that had moved',
+  },
+  {
+    name: 'a NEGATION is not an assertion',
+    options: { extraLine: 'EV-001 records the run, and no evidence row anywhere is REVIEWED.' },
+    expect: [],
+    forbid: /says EV-001 is REVIEWED/,
+    why:
+      '"no evidence row anywhere is REVIEWED" is a true sentence about the corpus and this ' +
+      "corpus's house phrasing; reading it as a claim ABOUT the nearest id is how widening " +
+      'the verb set bought false positives',
+  },
+  {
+    name: 'a status in the NEXT SENTENCE belongs to the next sentence',
+    options: { extraLine: 'EV-001 records the run. The whole family stays COLLECTED.' },
+    expect: [],
+    forbid: /says EV-001 is COLLECTED/,
+    why:
+      'the original pattern could not cross a full stop and the widened one silently could, ' +
+      'so a sentence about something else became a claim about the id before it',
   },
   {
     name: 'the clean tree',

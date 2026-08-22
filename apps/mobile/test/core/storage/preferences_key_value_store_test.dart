@@ -100,9 +100,29 @@ void main() {
       final store = await PreferencesKeyValueStore.open(logger: logger);
 
       expect(store.readString(PreferenceKey('locale')), 'ar');
-      // The snapshot is namespaced: another plugin's key is not this store's to
-      // hold, and reading it would make the namespace decorative.
-      expect(store.readString(PreferenceKey('elses.key')), isNull);
+
+      // THE NAMESPACE FILTER, ASSERTED WHERE IT CAN ACTUALLY FAIL.
+      //
+      // This used to be `readString(PreferenceKey('elses.key'))` expecting
+      // null, which `readString` guarantees on its own: it re-qualifies every
+      // key with the namespace before looking it up, so a foreign key is
+      // unreachable through it whether or not `open` filtered. A delta
+      // reviewer removed the filter entirely and all four tests still passed.
+      //
+      // The filter's real consequence is `clear()`, which iterates the
+      // snapshot's own keys and removes each one from the platform. An
+      // unfiltered snapshot would make `clear()` delete ANOTHER PLUGIN'S data.
+      // That is observable, and it is what is asserted.
+      await store.clear();
+      expect(
+        await platform.getString(
+          'someone.elses.key',
+          const SharedPreferencesOptions(),
+        ),
+        'x',
+        reason: 'clear() must not reach outside this store\'s namespace',
+      );
+      expect(store.readString(PreferenceKey('locale')), isNull);
     },
   );
 

@@ -4673,14 +4673,29 @@ function main() {
         // with the self-test green. The instance was fixed; the class was not,
         // and the register stated the class.
         //
-        // It is structural now, at the ONE place every numbered check's status
-        // is decided, so it cannot be forgotten by a check written later. A
-        // check with a genuinely empty window declares that by returning
-        // `applicable: false` and is reported N/A — which is a third status
-        // excluded from the pass count, not a pass.
-        const scannedNothing = result.applicable !== false && result.scanned === 0;
-        const status = result.violations.length === 0 && !scannedNothing ? 'PASS' : 'FAIL';
-        if (scannedNothing) {
+        // THIS COMMENT CLAIMED "the ONE place every numbered check's status is
+        // decided" WHILE DUPLICATING THE DECISION INLINE. `statusForResult`
+        // was called only from `tallySupplementary`, so the two self-test cases
+        // added to protect the rule reached the supplementary path — which had
+        // a guard already — and not this one. Deleting the rule here left the
+        // 88-case self-test entirely green. A delta reviewer measured that on
+        // the commit that introduced the sentence.
+        //
+        // It calls the shared decision now, which is what the sentence said.
+        const status = statusForResult(result);
+        if (status === 'N/A') {
+          // A numbered check that declares an empty window is N/A, and N/A is
+          // counted nowhere near `passed`. The inline version had no N/A arm
+          // at all, so such a check reported PASS — reproducing, on the fixing
+          // commit, the exact headline the fix was written to make impossible.
+          naCount += 1;
+          console.log(
+            `N/A     ${label} ${test.name} — ${result.reason ?? 'the check declared its window empty'}`,
+          );
+          results.push({ id: test.id, name: test.name, status, scanned: result.scanned });
+          continue;
+        }
+        if (status === 'FAIL' && result.violations.length === 0) {
           console.log(
             `          scanned 0 files inside its own window — a control that ` +
               `examined nothing did not hold anything. If the window is legitimately ` +
