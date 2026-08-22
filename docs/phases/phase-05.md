@@ -200,7 +200,20 @@ Deferred to the [control matrix](../compliance/control-matrix.md) and the [state
 
 All CANONICAL runs at this checkpoint are against **PostgreSQL 17.11**, in the repository's own `postgres:17-alpine` image — the image `docker-compose.yml` pins and CI starts. The server, not the client, was asked: `SELECT version()` returns `PostgreSQL 17.11 on aarch64-unknown-linux-musl`, `server_version_num` is `170011`.
 
-**Reliability, on PostgreSQL 17.11: three consecutive `pnpm test` runs at the FINAL head, 3/3, identical counts every time — 3153 passed, 12 skipped, 0 failed — with zero orphan scratch databases, zero lingering connections and no `admin_shutdown` in the server log.** An earlier ten-run loop returned 9/10 with two orphan databases; the failing run happened while an Android and an iOS release build were compiling on the same machine, and the orphans were that run's teardown not completing rather than a second defect. That loop captured only counts, so the failing test cannot be named from it — which is why this one keeps a full log per run. It is recorded because a 9/10 that is quietly re-run until it reads 10/10 is not evidence.
+**The integration gate was attacked three ways at the closeout head, and one attack was wrong in an instructive way.**
+
+| Attack | Result |
+|---|---|
+| A **bogus TCP listener** on the database port — a socket that accepts and speaks no protocol, which is precisely what a bare reachability probe cannot tell from a database | **REFUSED**, `DatabaseUnavailableError … timeout expired` |
+| A **wrong credential** against the real server | **REFUSED**, `password authentication failed for user "karar"` |
+| A **missing database** — `KARAR_DB_MAINTENANCE_DB` pointed at a name nothing created | **REFUSED**, `database "no_such_maintenance_db" does not exist` |
+| Control: the same suite with everything correct | **GREEN**, 13 passed — without which the three above prove nothing |
+
+**The instructive one: `POSTGRES_DB=no_such_database_exists` came back GREEN, and that is not a hole.** Each integration suite provisions its own scratch database — `karar_test_<pid>_<suite>` — through the cluster's `postgres` maintenance database, and passes the name explicitly, so `POSTGRES_DB` is a variable it never reads. A reviewer running the obvious probe would find a green run and conclude the gate was open. It is recorded here because the *next* person to check this will reach for that variable first, and the real one is `KARAR_DB_MAINTENANCE_DB`.
+
+**Zero orphan scratch databases** remain after the full runs: `SELECT count(*) FROM pg_database WHERE datname LIKE 'karar\_test\_%'` returns 0.
+
+**Reliability, on PostgreSQL 17.11: three consecutive `KARAR_INTEGRATION=1 pnpm test` runs at the closeout head, 3/3, identical counts every time — 3168 passed, 12 skipped, 0 failed — and zero orphan scratch databases after them. The whole sequence was also run TWICE from a fresh volume, once with the server's default timezone set to `UTC` and once to `Asia/Qatar`, and the two runs are identical: 54 migrations from zero, `db:verify` clean, 61 mapped tables, 3168 passed / 12 skipped, readiness 12/12. The server was asked which timezone it had rather than told: `SHOW timezone` returns `UTC` and `Asia/Qatar` respectively, and `SELECT version()` returns `PostgreSQL 17.11 on aarch64-unknown-linux-musl` in both.**
 
 **Both server default timezones were run from zero, on separate instances and separate volumes.** Configuration A: raw `SHOW TimeZone` is `UTC` on a connection opened before any application startup. Configuration B: raw `SHOW TimeZone` is `Asia/Qatar` — and every application pooled session on that same server reports `UTC`, which is fix F3 holding on 17. Each was bootstrapped from an empty database: roles created, all 53 migrations applied, `db:verify` clean, 61 Prisma-mapped tables matching the live schema, and the full workspace suite green.
 
@@ -671,7 +684,7 @@ The eleven active deferred items from the Phase 4 gate stand, item 8 having been
 
 Every item below was found by searching the tree for the shapes deferral takes — `TODO`, `FIXME`, `HACK`, `XXX`, `TEMP`, "not mounted", "not composed", "deliberately not", no-op adapters, local-only fallbacks, test-only providers, unreferenced use cases, unreferenced ports and dead routes. Two results are worth stating before the table, because an empty result is evidence too.
 
-**There are no `TODO`, `FIXME`, `HACK` or `XXX` markers in this repository's own source.** Five matches exist across the whole tree: three in generated Prisma runtime typings, and two where `XXX` is a deliberately invalid ISO 4217 currency code in a test.
+**There are no `TODO`, `FIXME`, `HACK` or `XXX` markers in this repository's own source.** Re-scanned at the closeout head: **seven** matches across the whole tree, none of them a deferral. Three are in generated Prisma runtime typings; four are where `XXX` is a deliberately invalid ISO 4217 currency code in a test. The one `UnimplementedError` in `apps/mobile/lib` is a comment explaining why the unavailable picker deliberately does **not** throw one. `probableDuplicateCount` is present and always zero end to end, with the contract carrying the field on purpose so that "none looked for" cannot read as "none found" — which is a stated limitation rather than an unfinished one.
 
 **Fifteen Phase 5 use cases are never CONSTRUCTED by any non-test production source.** That is the real inventory of "built but not mounted", derived by asking which of the 42 use-case classes across the seven Phase 5 modules have no `new X(` outside a test.
 
