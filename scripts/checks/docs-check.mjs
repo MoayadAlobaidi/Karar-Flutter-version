@@ -1945,6 +1945,12 @@ function buildComplianceFixture(options = {}) {
       // that merely MENTIONS other markers from being attributed to them.
       '**[P4] contingency note:** this marker is unresolved — no pull request exists.',
       '',
+      // The PLAIN-SENTENCE form of the same denial, which is how it actually
+      // appeared in the corpus: not behind a phase marker, just a reason cell
+      // in a deferred-items list that nobody re-read after the pull request
+      // was opened. The marker case above would not have caught it.
+      'Reason: no Phase 4 pull request exists when this record is frozen.',
+      '',
     ].join('\n'),
   );
   write(
@@ -2061,6 +2067,14 @@ const COMPLIANCE_SELF_TEST_CASES = [
   {
     expect: /seed-stale\.md:\d+ carries the \[P4\] marker and says no pull request exists/,
     why: 'the gate document names a Phase 4 pull request, so denying it is stale',
+  },
+  {
+    expect: /seed-stale\.md:\d+ denies a Phase 4 gate/,
+    why:
+      'the plain-sentence denial — "no Phase 4 pull request exists" with no phase marker in ' +
+      'front of it — is the shape the real corpus carried, in a deferred-item reason cell ' +
+      'nobody revisited after the draft was opened. The marker-scoped case above does not ' +
+      'reach it',
   },
   {
     expect: /seed-stale\.md:\d+ denies that Phase 5 evidence exists/,
