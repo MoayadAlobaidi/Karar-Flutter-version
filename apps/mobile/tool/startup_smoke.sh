@@ -63,27 +63,48 @@ case "$RUNTIME" in
     raw_shot()      { xcrun simctl io "$DEVICE" screenshot "$1" >/dev/null 2>&1; }
     # The simulator runs the app as a HOST process, so the port it announces is
     # already a host port and needs no forwarding. The announcement is read
-    # from the simulator's own log rather than from the app's console:
-    # `--console-pty` writes to a pseudo-terminal and produced an empty file
-    # under redirection, and `--console` would hold the launch open for the
-    # life of the app. The platform log is the same channel the Android branch
-    # reads, which keeps the two runtimes on one mechanism.
-    # The announcement is captured LIVE, from a stream opened before the launch.
-    # `--console-pty` writes to a pseudo-terminal and produced an empty file
-    # under redirection; `--console` holds the launch open for the life of the
-    # app; and `log show` after the fact took fifty seconds to scan the archive
-    # on a simulator that had been running a while. A stream started first
-    # costs nothing and cannot miss a line that has not been printed yet.
+    # from the simulator's own log, which is the same channel the Android
+    # branch reads: `--console-pty` writes to a pseudo-terminal and produced an
+    # empty file under redirection, and `--console` holds the launch open for
+    # the life of the app.
+    #
+    # TWO WAYS OF READING IT, because one was not enough. A live `log stream`
+    # opened before the launch is fast and cannot miss a line that has not been
+    # printed yet — but it has to ATTACH first, and on the third CI run it had
+    # not attached in the two seconds allowed. The check did the right thing
+    # with that (it refused to guess and failed) and the wrong thing overall: a
+    # control that fails intermittently for its own reasons is a control people
+    # learn to ignore.
+    #
+    # So the stream is now waited for rather than slept at, and if it still
+    # comes back empty the archive is scanned instead. `log show` is slow —
+    # fifty seconds on a simulator that has been running a while — which is why
+    # it is the fallback and not the mechanism.
     start_app_logged() {
       xcrun simctl spawn "$DEVICE" log stream --style syslog \
         --predicate 'eventMessage CONTAINS "Dart VM service"' > "$SHOTS/app.log" 2>/dev/null &
       APP_LOG_PID=$!
-      sleep 2
+      # Wait for the stream to say it has attached — it prints a filter banner
+      # first — rather than assuming it has. Bounded, so a stream that never
+      # attaches falls through to the archive instead of hanging.
+      local waited=0
+      while (( waited < 20 )) && [[ ! -s "$SHOTS/app.log" ]]; do
+        sleep 1
+        waited=$(( waited + 1 ))
+      done
       start_app
     }
     stop_app_logged() { [[ -n "${APP_LOG_PID:-}" ]] && kill "$APP_LOG_PID" 2>/dev/null || true; }
     service_uri() {
-      grep -m1 -o 'http://127.0.0.1:[0-9]*/[A-Za-z0-9_=-]*=*/' "$SHOTS/app.log" 2>/dev/null || true
+      local uri
+      uri="$(grep -m1 -o 'http://127.0.0.1:[0-9]*/[A-Za-z0-9_=-]*=*/' "$SHOTS/app.log" 2>/dev/null || true)"
+      if [[ -n "$uri" ]]; then
+        printf '%s' "$uri"
+        return 0
+      fi
+      xcrun simctl spawn "$DEVICE" log show --last 5m --style syslog \
+        --predicate 'eventMessage CONTAINS "Dart VM service"' 2>/dev/null \
+        | grep -m1 -o 'http://127.0.0.1:[0-9]*/[A-Za-z0-9_=-]*=*/' || true
     }
     ;;
   android)

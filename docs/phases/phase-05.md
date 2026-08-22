@@ -294,6 +294,21 @@ dart run tool/generate_api_client.dart --check
 **Every step exited 0**, at the final head, from a checkout made after it was pushed, depending on no ignored artifact — the only ignored file in the clone is the `.env` the run needs for credentials. **Eighteen steps, zero failures**: lockfile install, format, lint, typecheck, build, `arch:test`, `docs:check`, `db:canonical-check`, create, migrate, verify, the Prisma mapping check, the workspace suite, the readiness lane, `flutter pub get`, `flutter analyze`, `flutter test --exclude-tags golden`, and the generated-client drift check. Migrations: **54 applied from zero** against a volume dropped immediately before the run, `db:verify` `status: clean`. Prisma mapping: **61 mapped tables**. Workspace: **3168 passed / 12 skipped**. Readiness: **12/12**. Contract: **in sync, 62 operations / 203 schemas**.
 
 **The Flutter figure in the clean clone is 2089 passed / 19 skipped against 2111 passed / 1 skipped in the working tree, and that is the expected difference rather than a discrepancy.** A fresh checkout holds no build artifacts, so the eighteen artifact-gated assertions plus the deployed-rules case mark themselves skipped — the same shape CI's `mobile` lane runs, and the same eighteen that **fail rather than skip** on `mobile-android` and `mobile-ios`. A clean clone reporting 2069 would have meant it was reading artifacts it should not have had.
+## The new CI control failed for its own reason, on its third run
+
+**`mobile-ios` went red on head `822a2f4`, and the app was not the reason.** The step launched the artifact, the screen settled — *15 samples over 46s, 1 distinct frame* — and then:
+
+```
+startup-smoke: FAIL on ios — no Dart VM service was announced, so the
+question that decides this cannot be asked.
+```
+
+The check could not capture the VM-service announcement, so it refused to guess and exited 1. **That half is the design working**: an unanswerable question is a failure, not a pass, and this is exactly the rule that stops it reporting a screen it never observed. The other half is a defect in the control: it read the announcement from a live `log stream` opened two seconds before the launch, and on a slower runner the stream had not attached in two seconds. A control that fails intermittently for its own reasons is one people learn to ignore, which is how a required check becomes decorative.
+
+**Fixed by waiting for the stream rather than sleeping at it**, bounded at twenty seconds, with the log archive scanned as a fallback if the stream still comes back empty. The archive is slow — fifty seconds on a simulator that has been running a while — which is why it is the fallback and not the mechanism.
+
+**It is recorded here rather than retried into silence.** The check had passed on two CI runs before this one; a third run failing on its own machinery is precisely the flake this phase's own rule says not to paper over, and the local reproduction was unavailable because this host's simulator tooling wedges on `simctl` calls that touch no application code.
+
 ## Four review cycles, and what the fourth one settles
 
 **Each cycle found real defects in the previous cycle's fixes, and by the third they were inside the checks themselves.** That is the most important fact in this report and it is stated before the detail.
