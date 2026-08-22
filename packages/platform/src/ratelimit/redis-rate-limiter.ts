@@ -37,12 +37,47 @@ export class RateLimitStoreError extends Error {
 
 // KEYS[1] window zset; ARGV: now-ms, window-ms, limit, member.
 // Returns {allowed(1|0), remaining, retryAfterMs}.
-const SLIDING_WINDOW_LUA = `
+/**
+ * WHOSE CLOCK DECIDES THE WINDOW, and why it cannot be the caller's.
+ *
+ * The script took `now` as an argument from the calling process. Every
+ * application instance therefore pruned the SHARED sorted set by its own
+ * reckoning of the time, and the prune is destructive — `ZREMRANGEBYSCORE`
+ * deletes, for everyone. An instance whose clock has drifted forward does not
+ * merely mis-decide its own request; it erases the history the correctly-clocked
+ * instances were counting.
+ *
+ * Reproduced against live Redis, five entries aged 45s in a 60s window with a
+ * limit of 5:
+ *
+ * ```
+ *   correct clock  -> refused,  zcard 5
+ *   clock +20s     -> ADMITTED, zcard 5 -> 1     (four entries destroyed)
+ *   correct again  -> ADMITTED, zcard 2          (…for everyone)
+ * ```
+ *
+ * At a drift of one full window the ceiling collapses entirely. One pod with a
+ * failed NTP sync, a resumed VM snapshot or a stepped host clock is enough, and
+ * the damage outlives the request that caused it.
+ *
+ * So the script asks REDIS for the time. `redis.call('TIME')` is evaluated once,
+ * inside the same atomic script that prunes, counts and admits, so there is no
+ * window between reading the clock and acting on it, and every instance sharing
+ * a key shares one clock by construction rather than by operational discipline.
+ *
+ * This is why `enforce` no longer sends a timestamp: there is no longer anywhere
+ * honest to put one. A caller-supplied instant would have to be either ignored
+ * or trusted, and both were tried — trusting it is the defect above.
+ */
+export const SLIDING_WINDOW_LUA = `
 local key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local limit = tonumber(ARGV[3])
-local member = ARGV[4]
+local window = tonumber(ARGV[1])
+local limit = tonumber(ARGV[2])
+local member = ARGV[3]
+-- REDIS IS THE CLOCK. One key, one clock, read inside the same atomic script
+-- that acts on it. See the header above for what a caller-supplied clock did.
+local t = redis.call('TIME')
+local now = (tonumber(t[1]) * 1000) + math.floor(tonumber(t[2]) / 1000)
 redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
 local count = redis.call('ZCARD', key)
 if count < limit then
@@ -121,6 +156,14 @@ export class RedisSlidingWindowRateLimiter implements RateLimiter {
     this.redis = redis;
   }
 
+  /**
+   * `now` IS DELIBERATELY IGNORED FOR THE WINDOW, and kept only to satisfy the
+   * shared `RateLimiter` interface that the in-process limiter genuinely needs
+   * it for. The window's clock is Redis's — see `SLIDING_WINDOW_LUA`. It is
+   * still used for the MEMBER, where it is a uniqueness salt rather than a
+   * decision input: a member is opaque to the script, and a wrong clock in one
+   * can only make it more unique, never less.
+   */
   async enforce(check: RateLimitCheck, now: Date = new Date()): Promise<RateLimitDecision> {
     const nowMs = now.getTime();
     // Member uniqueness within the same millisecond, ACROSS processes.
@@ -139,7 +182,6 @@ export class RedisSlidingWindowRateLimiter implements RateLimiter {
         SLIDING_WINDOW_LUA,
         1,
         storageKey(check.policyName, check.subjectKey),
-        nowMs,
         check.windowMs,
         check.limit,
         member,

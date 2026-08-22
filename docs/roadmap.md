@@ -55,6 +55,7 @@ All must hold before launch:
 
 | Gate | |
 |---|---|
+| **Edge or pre-authentication rate limit, against a stated proxy-trust boundary** | Before any environment serves the financial surface. The per-principal limiter runs AFTER identity and capability resolution — about 22 database queries, one of them a session-row `UPDATE` — so it bounds abuse by an authenticated caller and nothing before that (KAR-RSK-046). A limiter placed earlier would have to key on attacker-controlled input, which is why this is an edge control and not an application change |
 | Separate staging environment | Provisioned and exercised |
 | Separately deployed control plane | Independent credentials |
 | **Sealed vault extracted** to its own security boundary | Before any production `SEALED` data |

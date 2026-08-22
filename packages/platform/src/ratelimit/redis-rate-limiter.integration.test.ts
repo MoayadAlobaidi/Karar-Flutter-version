@@ -18,6 +18,7 @@ import { Redis } from 'ioredis';
 import { RateLimitRedisConnection } from './redis-connection.js';
 import {
   RATE_LIMIT_COMMAND_TIMEOUT_MS,
+  SLIDING_WINDOW_LUA,
   createRateLimitRedisClient,
   RateLimitStoreError,
   RedisSlidingWindowRateLimiter,
@@ -84,21 +85,65 @@ describe.skipIf(unreachable !== null)('RedisSlidingWindowRateLimiter (live Redis
   });
 
   it('admits to the limit, refuses with retryAfter, and slides the window', async () => {
+    // A SHORT REAL WINDOW AND A REAL WAIT, because the clock is Redis's now.
+    //
+    // This test used to drive the window by handing the limiter synthetic
+    // instants — 0s, 1s, 2s, then 60.001s — which is precisely the capability
+    // that had to be removed: a caller that can name the time can prune a
+    // shared window by its own reckoning, and one that had drifted did
+    // (KAR-RSK-047). With Redis as the clock there is nowhere honest to inject
+    // an instant, so the window is small enough to wait out.
     const subjectKey = uniqueSubject('basic');
-    const check = { policyName: 'itest', limit: 3, windowMs: 60_000, subjectKey };
+    const check = { policyName: 'itest', limit: 3, windowMs: 400, subjectKey };
     for (let i = 0; i < 3; i += 1) {
-      const decision = await limiter.enforce(check, at(i * 1000));
-      expect(decision.allowed).toBe(true);
+      expect((await limiter.enforce(check)).allowed).toBe(true);
     }
-    const refused = await limiter.enforce(check, at(3_000));
+    const refused = await limiter.enforce(check);
     expect(refused.allowed).toBe(false);
     if (refused.allowed) throw new Error('unreachable');
-    expect(refused.retryAfterMs).toBe(57_000);
-    // Refused attempts are not recorded: once the oldest admit leaves the
-    // window, capacity returns.
-    const afterSlide = await limiter.enforce(check, at(60_001));
-    expect(afterSlide.allowed).toBe(true);
+    // Bounded by the window and positive: the exact value depends on how long
+    // the three admits took, which is a real property of a real clock.
+    expect(refused.retryAfterMs).toBeGreaterThan(0);
+    expect(refused.retryAfterMs).toBeLessThanOrEqual(400);
+
+    // Refused attempts are not recorded, so once the oldest admit leaves the
+    // window capacity returns — waited out rather than asserted.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect((await limiter.enforce(check)).allowed).toBe(true);
+  }, 30_000);
+
+  it('one clock governs one window, whatever the CALLERS believe the time is', () => {
+    // THE DEFECT, AS A PROPERTY OF THE SCRIPT ITSELF.
+    //
+    // Reproduced against live Redis before the fix: five entries aged 45s in a
+    // 60s window with a limit of 5, an instance 20 seconds ahead ADMITTED and
+    // took the sorted set from 5 entries to 1 — destroying the history every
+    // correctly-clocked instance was counting, so the next correct-clock
+    // request admitted too. At a drift of one window the ceiling collapses.
+    //
+    // The script can no longer be told the time, and that is checked here
+    // rather than argued: a timestamp cannot be passed because the script does
+    // not read one, and it obtains its own from Redis inside the same atomic
+    // evaluation that prunes and admits.
+    expect(SLIDING_WINDOW_LUA).toContain("redis.call('TIME')");
+    expect(SLIDING_WINDOW_LUA).not.toMatch(/local now = tonumber\(ARGV/);
+    // ARGV carries the window, the limit and the member — and no instant.
+    expect(SLIDING_WINDOW_LUA).toContain('local window = tonumber(ARGV[1])');
+    expect(SLIDING_WINDOW_LUA).toContain('local limit = tonumber(ARGV[2])');
+    expect(SLIDING_WINDOW_LUA).toContain('local member = ARGV[3]');
   });
+
+  it('two callers with wildly different clocks still share one window', async () => {
+    // The behavioural half. Both calls pass an instant; the limiter ignores
+    // them for the window, so the second is refused by the FIRST one's entry
+    // rather than admitted by its own reckoning of the time.
+    const subjectKey = uniqueSubject('skew');
+    const check = { policyName: 'skew', limit: 1, windowMs: 60_000, subjectKey };
+    expect((await limiter.enforce(check, new Date('2020-01-01T00:00:00Z'))).allowed).toBe(true);
+    expect((await limiter.enforce(check, new Date('2030-01-01T00:00:00Z'))).allowed).toBe(false);
+    // …and the far-future caller destroyed nothing: the entry is still there.
+    expect((await limiter.enforce(check, new Date())).allowed).toBe(false);
+  }, 30_000);
 
   it('isolates windows per (policy, subject) key', async () => {
     const a = uniqueSubject('iso-a');

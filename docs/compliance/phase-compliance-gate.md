@@ -514,6 +514,23 @@ Every row re-read (register v0.7). **Nine added: KAR-RSK-042–050.** **No row c
 
 **KAR-RSK-011 is OVERDUE and is not re-dated.** See §10.
 
+### 3b. KAR-RSK-046 — the pre-limiter work cost, decided rather than carried
+
+**Decision: (B) EXPLICITLY ACCEPTED as an undeployed / deployment-edge residual.** Not fixed at Phase 5, and the reasoning is recorded here rather than left to a risk row, because the prompt for this closeout asked for a decision and a decision is what a gate is for.
+
+**The finding.** Principal enrichment and capability resolution together issue **22 database queries** before the financial rate limiter is consulted — one of them an `UPDATE` of the caller's own session row. An admitted read costs 26, so exceeding a budget saves about 15% of the database cost rather than all of it. A principal whose capability is UNAVAILABLE is refused at 403 **without reaching the limiter at all**, paying the full twelve-query resolution at unbounded frequency. There is no IP-keyed or pre-authentication limit anywhere on the surface.
+
+**Why (A) was considered and rejected for this phase.** The obvious fix — move a limiter in front of identity — is worse than the problem. A limiter placed before principal enrichment has no trustworthy subject to key on: the only inputs available are attacker-controlled. Keying on a forwarding header before a proxy-trust boundary is defined lets an attacker choose their own bucket, and lets them exhaust someone else's. **This repository has no deployment, so it has no proxy-trust configuration, and inventing one to satisfy a closeout would be the fake IP limiter the instruction for this work explicitly warns against.** The other half — caching capability resolution — needs an invalidation design that can never serve a stale availability answer, and availability is the control that stands between a person and a capability no jurisdiction has approved. Neither is a change to make in a closeout.
+
+**The conditions (B) requires, each satisfied or scheduled:**
+
+- **Nothing is deployed.** No environment exists; the surface refuses to compose outside `KARAR_ENV=local`.
+- **The documents no longer imply the per-principal limiter protects all pre-handler work.** The guard's own header said "a refused request does no work" and now says what it costs, in the file a reader checks. `docs/phases/phase-05.md` carries the same correction.
+- **Deployment entry criteria now require the control.** Recorded below and in the roadmap: **no environment may serve this surface without an edge or pre-authentication limit, or an equivalent protection, defined against a stated proxy-trust boundary.** That is a gate on deployment, not on a phase.
+- **Owner and closure trigger are concrete.** Engineering Owner; closed by an edge control existing in a deployment profile, with the proxy-trust boundary written down, before the first non-local environment serves a request.
+
+**Residual accepted meanwhile, stated plainly:** an unauthenticated or unavailable-capability caller can drive roughly 12–22 database queries per request at whatever rate the network allows, and one `UPDATE` per authenticated one. In an undeployed system that is a cost nobody pays. In a deployed one without the edge control it is a denial-of-service surface, which is why the deployment criterion above is not advisory.
+
 ### 4. Exceptions
 
 **All three OPEN. No exit trigger fired. None opened, closed, approved or re-approved** (register v0.6). **EXC-001 is load-bearing in a second place**: Phase 5 was again authored, reviewed and verified under one human owner, with the review passes performed by independent agent contexts rather than by a second person. That is the compensating discipline the exception already describes and it is not the separation the exception is about.
