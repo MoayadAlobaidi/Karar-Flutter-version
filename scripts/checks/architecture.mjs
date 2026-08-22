@@ -1912,10 +1912,18 @@ export function checkPurePackages(ctx) {
     ...PURITY_CONSTRAINED_PACKAGES.map((p) => ({ ...p, scanSource: true })),
   ];
 
+  // COUNTED, NOT ASSUMED. `scanned` used to be `tiers.length` — the literal
+  // 6 — whether the packages held ten thousand files or none, so the zero-scan
+  // rule could never fire on this check and an empty `packages/` tree passed.
+  // A fifth reviewer named it as the worst of the three padders, because 6
+  // corresponds to nothing on disk. It is now the manifests read plus the
+  // source files walked.
+  let examined = 0;
   for (const { name, allowed, scanSource } of tiers) {
     const pkgDir = path.join(root, 'packages', name);
     const pkgJsonPath = path.join(pkgDir, 'package.json');
     const relPath = rel(root, pkgJsonPath);
+    if (fs.existsSync(pkgJsonPath)) examined += 1;
     if (!fs.existsSync(pkgJsonPath)) {
       violations.push({ file: relPath, detail: 'package.json missing' });
       continue;
@@ -1943,6 +1951,7 @@ export function checkPurePackages(ctx) {
     // test 1's subject, which enforces the same shape one layer deeper.
     if (!scanSource) continue;
     for (const file of codeFiles([path.join(pkgDir, 'src')])) {
+      examined += 1;
       const src = loadStripped(file);
       for (const { specifier, line } of extractImports(src)) {
         if (specifier.startsWith('.') || allowed.includes(specifier)) continue;
@@ -1956,7 +1965,7 @@ export function checkPurePackages(ctx) {
   }
   return violationsResult(
     violations,
-    tiers.length,
+    examined,
     `pure: ${PURE_PACKAGES.join(', ')}; purity-constrained (manifest + source): ${PURITY_CONSTRAINED_PACKAGES.map((p) => p.name).join(', ')}`,
   );
 }

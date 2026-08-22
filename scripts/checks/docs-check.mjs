@@ -990,6 +990,40 @@ function readRegisterRows(root, file, idPattern, statuses) {
   return rows;
 }
 
+/**
+ * The exceptions register, which keeps its ids in HEADINGS and its statuses in
+ * a vertical key/value table — `### EXC-001 — …` then `| Status | OPEN |`.
+ *
+ * The fifth register, and the fourth-register fix did not reach it because
+ * `readRegisterRows` was shaped for the three instances in front of it: an id
+ * in the first cell of a horizontal row. A fifth reviewer counted 116 EXC
+ * citations across nineteen documents, including all four policies and the
+ * gate record, with zero coverage. No live fork exists today — all three
+ * entries are OPEN everywhere — so this is the gap BEFORE it becomes the
+ * finding, which is the only useful moment to close one.
+ */
+function readExceptionRows(root) {
+  const full = path.join(root, 'docs', 'compliance', 'exceptions-register.md');
+  if (!fs.existsSync(full)) return null;
+  const rows = new Map();
+  let current = null;
+  for (const line of fs.readFileSync(full, 'utf8').split('\n')) {
+    const heading = /^#{2,4}\s*(EXC-\d+)\b/.exec(line);
+    if (heading !== null) {
+      current = heading[1];
+      if (!rows.has(current)) rows.set(current, null);
+      continue;
+    }
+    if (current === null) continue;
+    const status = /^\|\s*Status\s*\|\s*\**`?(OPEN|CLOSED)\b/i.exec(line.trim());
+    if (status !== null && rows.get(current) === null) {
+      rows.set(current, status[1].toUpperCase());
+      current = null;
+    }
+  }
+  return rows;
+}
+
 function checkRegisterTraceability(root = REPO_ROOT) {
   const problems = [];
   const registers = [
@@ -1028,6 +1062,13 @@ function checkRegisterTraceability(root = REPO_ROOT) {
       ]),
       file: 'docs/compliance/risk-register.md',
       statuses: ['OPEN', 'CLOSED', 'ACCEPTED'],
+    },
+    {
+      id: 'EXC',
+      pattern: 'EXC-\\d+',
+      rows: readExceptionRows(root),
+      file: 'docs/compliance/exceptions-register.md',
+      statuses: ['OPEN', 'CLOSED'],
     },
     // THE FOURTH REGISTER, and the reason it is here.
     //
@@ -2668,6 +2709,22 @@ function buildTraceabilityFixture(options = {}) {
     'docs/compliance/iso27001/continual-improvement.md',
     ['# Improvement', '', '| CI-001 | an entry | OPEN |', ''].join('\n'),
   );
+  // The FIFTH register keeps its id in a HEADING and its status in a vertical
+  // key/value table, which is exactly why the fourth-register parser could not
+  // read it.
+  write(
+    'docs/compliance/exceptions-register.md',
+    [
+      '# Exceptions',
+      '',
+      '### EXC-001 — an exception',
+      '',
+      '| | |',
+      '|---|---|',
+      '| Status | OPEN |',
+      '',
+    ].join('\n'),
+  );
   write(
     'docs/citing.md',
     [
@@ -2678,6 +2735,8 @@ function buildTraceabilityFixture(options = {}) {
       '',
       // The fourth register, cited the way the corpus cites it.
       `CI-001 is \`${options.quotedCiStatus ?? 'OPEN'}\`.`,
+      '',
+      `EXC-001 is \`${options.quotedExcStatus ?? 'OPEN'}\`.`,
       '',
       `EV-001 ${options.verb ?? 'is'} \`${options.quotedEvStatus ?? evStatus}\`.`,
       '',
@@ -2791,6 +2850,15 @@ const TRACEABILITY_CASES = [
     expect: [],
     forbid: /./,
     why: 'every id resolves, the path exists, the quoted status matches, and the dated block is history',
+  },
+  {
+    name: 'the FIFTH register — an exception whose id lives in a heading',
+    options: { quotedExcStatus: 'CLOSED' },
+    expect: [/says EXC-001 is CLOSED, but .*exceptions-register\.md records OPEN/],
+    why:
+      'the exceptions register keeps ids in headings and statuses in a vertical table, so the ' +
+      'fourth-register parser could not read it — 116 citations across nineteen documents with ' +
+      'no coverage, closed here BEFORE it became the finding',
   },
   {
     // SEEDED FROM THE PRE-FIX BYTES, not from the sentence the fix wrote.
