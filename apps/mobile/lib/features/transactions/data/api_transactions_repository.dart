@@ -40,31 +40,32 @@ final class ApiTransactionsRepository implements TransactionsRepository {
     TransactionFilter filter = const TransactionFilter(),
     int? limit,
     String? cursor,
-  }) =>
-      guarded<Page<Transaction>>('financial.transactions', () async {
-        final response = await _client.listOwnTransactions(
-          limit: limit,
-          cursor: cursor,
-          accountId: filter.accountId,
-          currency: filter.currencyCode,
-          direction: filter.direction == null
-              ? null
-              : moneyDirectionToDto(filter.direction!),
-          status:
-              filter.status == null ? null : transactionStatusToDto(filter.status!),
-          sourceKind:
-              filter.sourceKind == null ? null : sourceKindToDto(filter.sourceKind!),
-          // Days go out as days. A `DateTime` here would attach a time and an
-          // offset to something that has neither.
-          bookedFrom: filter.bookedFrom?.iso8601,
-          bookedTo: filter.bookedTo?.iso8601,
-        );
-        return pageFrom<Transaction, TransactionViewDto>(
-          response.items,
-          response.page,
-          transactionFromDto,
-        );
-      });
+  }) => guarded<Page<Transaction>>('financial.transactions', () async {
+    final response = await _client.listOwnTransactions(
+      limit: limit,
+      cursor: cursor,
+      accountId: filter.accountId,
+      currency: filter.currencyCode,
+      direction: filter.direction == null
+          ? null
+          : moneyDirectionToDto(filter.direction!),
+      status: filter.status == null
+          ? null
+          : transactionStatusToDto(filter.status!),
+      sourceKind: filter.sourceKind == null
+          ? null
+          : sourceKindToDto(filter.sourceKind!),
+      // Days go out as days. A `DateTime` here would attach a time and an
+      // offset to something that has neither.
+      bookedFrom: filter.bookedFrom?.iso8601,
+      bookedTo: filter.bookedTo?.iso8601,
+    );
+    return pageFrom<Transaction, TransactionViewDto>(
+      response.items,
+      response.page,
+      transactionFromDto,
+    );
+  });
 
   @override
   Future<Result<TransactionDetail>> read(String transactionId) =>
@@ -88,45 +89,46 @@ final class ApiTransactionsRepository implements TransactionsRepository {
   Future<Result<Transaction>> correct(
     String transactionId,
     TransactionCorrection correction,
-  ) =>
-      guarded<Transaction>(
-        'financial.transactions.correct',
-        () async => transactionFromDto(
-          await _client.correctOwnTransaction(
-            transactionId: transactionId,
-            body: correctionBodyFor(correction),
-          ),
-        ),
-      );
+  ) => guarded<Transaction>(
+    'financial.transactions.correct',
+    () async => transactionFromDto(
+      await _client.correctOwnTransaction(
+        transactionId: transactionId,
+        body: correctionBodyFor(correction),
+      ),
+    ),
+  );
 
   @override
   Future<Result<CategoryAssignment>> assignCategory(
     String transactionId,
     String categoryCode,
-  ) =>
-      guarded<CategoryAssignment>(
-        'financial.transactions.category',
-        () async => categoryAssignmentFromDto(
-          await _client.assignOwnTransactionCategory(
-            transactionId: transactionId,
-            body: AssignOwnTransactionCategoryRequestDto(categoryCode: categoryCode),
-          ),
+  ) => guarded<CategoryAssignment>(
+    'financial.transactions.category',
+    () async => categoryAssignmentFromDto(
+      await _client.assignOwnTransactionCategory(
+        transactionId: transactionId,
+        body: AssignOwnTransactionCategoryRequestDto(
+          categoryCode: categoryCode,
         ),
-      );
+      ),
+    ),
+  );
 
   @override
-  Future<Result<List<TransactionProvenance>>> listProvenance(String transactionId) =>
-      guarded<List<TransactionProvenance>>(
-        'financial.transactions.provenance',
-        () async {
-          final response = await _client.listOwnTransactionProvenance(
-            transactionId: transactionId,
-          );
-          return List<TransactionProvenance>.unmodifiable(<TransactionProvenance>[
-            for (final row in response.items) provenanceFromDto(row),
-          ]);
-        },
+  Future<Result<List<TransactionProvenance>>> listProvenance(
+    String transactionId,
+  ) => guarded<List<TransactionProvenance>>(
+    'financial.transactions.provenance',
+    () async {
+      final response = await _client.listOwnTransactionProvenance(
+        transactionId: transactionId,
       );
+      return List<TransactionProvenance>.unmodifiable(<TransactionProvenance>[
+        for (final row in response.items) provenanceFromDto(row),
+      ]);
+    },
+  );
 
   @override
   Future<Result<TransactionDeletionOutcome>> delete(String transactionId) =>
@@ -147,7 +149,9 @@ final class ApiTransactionsRepository implements TransactionsRepository {
 /// `magnitude` and `direction` travel together and the magnitude is
 /// non-negative by construction: [MoneyEntry] cannot be built from a signed
 /// value, so there is no path here that could send one.
-CreateOwnManualTransactionRequestDto createBodyFor(ManualTransactionDraft draft) {
+CreateOwnManualTransactionRequestDto createBodyFor(
+  ManualTransactionDraft draft,
+) {
   final merchant = _presentOrNull(draft.merchant);
   final note = _presentOrNull(draft.note);
   return CreateOwnManualTransactionRequestDto(
@@ -165,6 +169,11 @@ CreateOwnManualTransactionRequestDto createBodyFor(ManualTransactionDraft draft)
     note: note == null
         ? const Omittable<String>.omitted()
         : Omittable<String>.sent(note),
+    // OMITTED on a first attempt, which is what makes the platform's duplicate
+    // guard work: an unqualified write is a claim that this movement is new,
+    // and the server refuses it if an identical one exists. Present only when
+    // a person has said that a refused duplicate was a second real purchase.
+    occurrenceOrdinal: draft.occurrenceOrdinal,
   );
 }
 
@@ -172,44 +181,45 @@ CreateOwnManualTransactionRequestDto createBodyFor(ManualTransactionDraft draft)
 ///
 /// A field ABSENT is left alone; a field present as `null` is CLEARED. The
 /// `clear*` flags are the only way a null reaches the wire.
-CorrectOwnTransactionRequestDto correctionBodyFor(TransactionCorrection correction) =>
-    CorrectOwnTransactionRequestDto(
-      expectedVersion: correction.expectedVersion,
-      // Both halves or neither: sending one without the other is a request the
-      // platform refuses, and rightly.
-      magnitude: correction.entry == null
-          ? null
-          : amountToDto(correction.entry!.magnitude),
-      direction: correction.entry == null
-          ? null
-          : moneyDirectionToDto(correction.entry!.direction),
-      bookingDate: correction.bookingDate?.iso8601,
-      valueDate: correction.clearValueDate
-          ? const Omittable<String>.sent(null)
-          : (correction.valueDate == null
-              ? const Omittable<String>.omitted()
-              : Omittable<String>.sent(correction.valueDate!.iso8601)),
-      merchant: correction.clearMerchant
-          ? const Omittable<String>.sent(null)
-          : _omittableText(correction.merchant),
-      description: _presentOrNull(correction.description),
-      note: correction.clearNote
-          ? const Omittable<String>.sent(null)
-          : _omittableText(correction.note),
-      status: correction.status == null
-          ? null
-          : transactionStatusToDto(correction.status!),
-    );
+CorrectOwnTransactionRequestDto correctionBodyFor(
+  TransactionCorrection correction,
+) => CorrectOwnTransactionRequestDto(
+  expectedVersion: correction.expectedVersion,
+  // Both halves or neither: sending one without the other is a request the
+  // platform refuses, and rightly.
+  magnitude: correction.entry == null
+      ? null
+      : amountToDto(correction.entry!.magnitude),
+  direction: correction.entry == null
+      ? null
+      : moneyDirectionToDto(correction.entry!.direction),
+  bookingDate: correction.bookingDate?.iso8601,
+  valueDate: correction.clearValueDate
+      ? const Omittable<String>.sent(null)
+      : (correction.valueDate == null
+            ? const Omittable<String>.omitted()
+            : Omittable<String>.sent(correction.valueDate!.iso8601)),
+  merchant: correction.clearMerchant
+      ? const Omittable<String>.sent(null)
+      : _omittableText(correction.merchant),
+  description: _presentOrNull(correction.description),
+  note: correction.clearNote
+      ? const Omittable<String>.sent(null)
+      : _omittableText(correction.note),
+  status: correction.status == null
+      ? null
+      : transactionStatusToDto(correction.status!),
+);
 
 /// The `MinorUnitAmount` a figure travels as.
 ///
 /// `minorUnits` stays the exact characters the domain holds. Nothing here
 /// parses it to a number, so nothing can round it.
 MinorUnitAmountDto amountToDto(Money money) => MinorUnitAmountDto(
-      minorUnits: money.minorUnits,
-      currency: money.currency,
-      exponent: money.exponent,
-    );
+  minorUnits: money.minorUnits,
+  currency: money.currency,
+  exponent: money.exponent,
+);
 
 String? _presentOrNull(String? value) {
   final trimmed = value?.trim();
@@ -239,39 +249,47 @@ MoneyDirectionDto moneyDirectionToDto(MoneyDirection direction) =>
     switch (direction) {
       MoneyDirection.moneyOut => MoneyDirectionDto.moneyOut,
       MoneyDirection.moneyIn => MoneyDirectionDto.moneyIn,
-      MoneyDirection.unrecognised => throw unwritableVocabularyMember('direction'),
+      MoneyDirection.unrecognised => throw unwritableVocabularyMember(
+        'direction',
+      ),
     };
 
 MoneyDirection moneyDirectionFromDto(MoneyDirectionDto dto) => switch (dto) {
-      MoneyDirectionDto.moneyOut => MoneyDirection.moneyOut,
-      MoneyDirectionDto.moneyIn => MoneyDirection.moneyIn,
-      MoneyDirectionDto.unknown => MoneyDirection.unrecognised,
-    };
+  MoneyDirectionDto.moneyOut => MoneyDirection.moneyOut,
+  MoneyDirectionDto.moneyIn => MoneyDirection.moneyIn,
+  MoneyDirectionDto.unknown => MoneyDirection.unrecognised,
+};
 
 TransactionStatusDto transactionStatusToDto(TransactionStatus status) =>
     switch (status) {
       TransactionStatus.posted => TransactionStatusDto.posted,
       TransactionStatus.voided => TransactionStatusDto.voided,
-      TransactionStatus.unrecognised => throw unwritableVocabularyMember('status'),
+      TransactionStatus.unrecognised => throw unwritableVocabularyMember(
+        'status',
+      ),
     };
 
-TransactionStatus transactionStatusFromDto(TransactionStatusDto dto) => switch (dto) {
+TransactionStatus transactionStatusFromDto(TransactionStatusDto dto) =>
+    switch (dto) {
       TransactionStatusDto.posted => TransactionStatus.posted,
       TransactionStatusDto.voided => TransactionStatus.voided,
       TransactionStatusDto.unknown => TransactionStatus.unrecognised,
     };
 
 SourceDirection sourceDirectionFromDto(SourceDirectionDto dto) => switch (dto) {
-      SourceDirectionDto.debit => SourceDirection.debit,
-      SourceDirectionDto.credit => SourceDirection.credit,
-      SourceDirectionDto.notStated => SourceDirection.notStated,
-      SourceDirectionDto.unknown => SourceDirection.unrecognised,
-    };
+  SourceDirectionDto.debit => SourceDirection.debit,
+  SourceDirectionDto.credit => SourceDirection.credit,
+  SourceDirectionDto.notStated => SourceDirection.notStated,
+  SourceDirectionDto.unknown => SourceDirection.unrecognised,
+};
 
-DirectionMapping directionMappingFromDto(DirectionMappingDto dto) => switch (dto) {
+DirectionMapping directionMappingFromDto(DirectionMappingDto dto) =>
+    switch (dto) {
       DirectionMappingDto.manualEntry => DirectionMapping.manualEntry,
-      DirectionMappingDto.sourceDirectionWord => DirectionMapping.sourceDirectionWord,
-      DirectionMappingDto.sourceSignedAmount => DirectionMapping.sourceSignedAmount,
+      DirectionMappingDto.sourceDirectionWord =>
+        DirectionMapping.sourceDirectionWord,
+      DirectionMappingDto.sourceSignedAmount =>
+        DirectionMapping.sourceSignedAmount,
       DirectionMappingDto.sourceSignedAmountInverted =>
         DirectionMapping.sourceSignedAmountInverted,
       DirectionMappingDto.unknown => DirectionMapping.unrecognised,
@@ -286,23 +304,25 @@ RevisionAttribution revisionAttributionFromDto(RevisionAttributionDto dto) =>
     };
 
 RevisableField revisableFieldFromDto(RevisableFieldDto dto) => switch (dto) {
-      RevisableFieldDto.amount => RevisableField.amount,
-      RevisableFieldDto.bookingdate => RevisableField.bookingDate,
-      RevisableFieldDto.valuedate => RevisableField.valueDate,
-      RevisableFieldDto.merchant => RevisableField.merchant,
-      RevisableFieldDto.description => RevisableField.description,
-      RevisableFieldDto.note => RevisableField.note,
-      RevisableFieldDto.status => RevisableField.status,
-      RevisableFieldDto.unknown => RevisableField.unrecognised,
-    };
+  RevisableFieldDto.amount => RevisableField.amount,
+  RevisableFieldDto.bookingdate => RevisableField.bookingDate,
+  RevisableFieldDto.valuedate => RevisableField.valueDate,
+  RevisableFieldDto.merchant => RevisableField.merchant,
+  RevisableFieldDto.description => RevisableField.description,
+  RevisableFieldDto.note => RevisableField.note,
+  RevisableFieldDto.status => RevisableField.status,
+  RevisableFieldDto.unknown => RevisableField.unrecognised,
+};
 
-AssignmentSource assignmentSourceFromDto(AssignmentSourceDto dto) => switch (dto) {
+AssignmentSource assignmentSourceFromDto(AssignmentSourceDto dto) =>
+    switch (dto) {
       AssignmentSourceDto.user => AssignmentSource.user,
       AssignmentSourceDto.rule => AssignmentSource.rule,
       AssignmentSourceDto.unknown => AssignmentSource.unrecognised,
     };
 
-AssignmentStatus assignmentStatusFromDto(AssignmentStatusDto dto) => switch (dto) {
+AssignmentStatus assignmentStatusFromDto(AssignmentStatusDto dto) =>
+    switch (dto) {
       AssignmentStatusDto.active => AssignmentStatus.active,
       AssignmentStatusDto.superseded => AssignmentStatus.superseded,
       AssignmentStatusDto.unknown => AssignmentStatus.unrecognised,
@@ -310,14 +330,16 @@ AssignmentStatus assignmentStatusFromDto(AssignmentStatusDto dto) => switch (dto
 
 CategoryAssignmentOrigin categoryAssignmentOriginFromDto(
   ProvenanceViewCategoryAssignmentSourceDto dto,
-) =>
-    switch (dto) {
-      ProvenanceViewCategoryAssignmentSourceDto.none => CategoryAssignmentOrigin.none,
-      ProvenanceViewCategoryAssignmentSourceDto.user => CategoryAssignmentOrigin.user,
-      ProvenanceViewCategoryAssignmentSourceDto.rule => CategoryAssignmentOrigin.rule,
-      ProvenanceViewCategoryAssignmentSourceDto.unknown =>
-        CategoryAssignmentOrigin.unrecognised,
-    };
+) => switch (dto) {
+  ProvenanceViewCategoryAssignmentSourceDto.none =>
+    CategoryAssignmentOrigin.none,
+  ProvenanceViewCategoryAssignmentSourceDto.user =>
+    CategoryAssignmentOrigin.user,
+  ProvenanceViewCategoryAssignmentSourceDto.rule =>
+    CategoryAssignmentOrigin.rule,
+  ProvenanceViewCategoryAssignmentSourceDto.unknown =>
+    CategoryAssignmentOrigin.unrecognised,
+};
 
 // ---------------------------------------------------------------------------
 // Decoders
@@ -325,26 +347,27 @@ CategoryAssignmentOrigin categoryAssignmentOriginFromDto(
 
 /// One transaction.
 Transaction transactionFromDto(TransactionViewDto dto) => Transaction(
-      transactionId: dto.transactionId,
-      accountId: dto.accountId,
-      amount: moneyFrom(dto.amount, 'TransactionView.amount'),
-      direction: moneyDirectionFromDto(dto.direction),
-      bookingDate: calendarDayFrom(dto.bookingDate, 'TransactionView.bookingDate'),
-      valueDate:
-          calendarDayFromOrNull(dto.valueDate, 'TransactionView.valueDate'),
-      eventOccurredAt: dto.eventOccurredAt,
-      sourceTimezone: dto.sourceTimezone,
-      merchant: dto.merchant,
-      description: dto.description,
-      note: dto.note,
-      originalAmount:
-          moneyFromOrNull(dto.originalAmount, 'TransactionView.originalAmount'),
-      sourceKind: sourceKindFromDto(dto.sourceKind),
-      availability: railAvailabilityFromDto(dto.availability),
-      status: transactionStatusFromDto(dto.status),
-      createdAt: dto.createdAt,
-      version: dto.version,
-    );
+  transactionId: dto.transactionId,
+  accountId: dto.accountId,
+  amount: moneyFrom(dto.amount, 'TransactionView.amount'),
+  direction: moneyDirectionFromDto(dto.direction),
+  bookingDate: calendarDayFrom(dto.bookingDate, 'TransactionView.bookingDate'),
+  valueDate: calendarDayFromOrNull(dto.valueDate, 'TransactionView.valueDate'),
+  eventOccurredAt: dto.eventOccurredAt,
+  sourceTimezone: dto.sourceTimezone,
+  merchant: dto.merchant,
+  description: dto.description,
+  note: dto.note,
+  originalAmount: moneyFromOrNull(
+    dto.originalAmount,
+    'TransactionView.originalAmount',
+  ),
+  sourceKind: sourceKindFromDto(dto.sourceKind),
+  availability: railAvailabilityFromDto(dto.availability),
+  status: transactionStatusFromDto(dto.status),
+  createdAt: dto.createdAt,
+  version: dto.version,
+);
 
 /// The transaction with its history, its active category and the divergence
 /// the platform stated.
@@ -373,13 +396,18 @@ TransactionRevision revisionFromDto(TransactionRevisionViewDto dto) =>
     );
 
 /// The values one revision recorded.
-RevisionValues revisionValuesFromDto(RevisionValuesViewDto dto) => RevisionValues(
+RevisionValues revisionValuesFromDto(RevisionValuesViewDto dto) =>
+    RevisionValues(
       amount: moneyFrom(dto.amount, 'RevisionValuesView.amount'),
       direction: moneyDirectionFromDto(dto.direction),
-      bookingDate:
-          calendarDayFrom(dto.bookingDate, 'RevisionValuesView.bookingDate'),
-      valueDate:
-          calendarDayFromOrNull(dto.valueDate, 'RevisionValuesView.valueDate'),
+      bookingDate: calendarDayFrom(
+        dto.bookingDate,
+        'RevisionValuesView.bookingDate',
+      ),
+      valueDate: calendarDayFromOrNull(
+        dto.valueDate,
+        'RevisionValuesView.valueDate',
+      ),
       eventOccurredAt: dto.eventOccurredAt,
       sourceTimezone: dto.sourceTimezone,
       merchant: dto.merchant,
@@ -417,8 +445,9 @@ TransactionProvenance provenanceFromDto(ProvenanceViewDto dto) =>
       ),
       sourceDirection: sourceDirectionFromDto(dto.sourceDirection),
       directionMapping: directionMappingFromDto(dto.directionMapping),
-      categoryAssignmentSource:
-          categoryAssignmentOriginFromDto(dto.categoryAssignmentSource),
+      categoryAssignmentSource: categoryAssignmentOriginFromDto(
+        dto.categoryAssignmentSource,
+      ),
       createdAt: dto.createdAt,
     );
 
@@ -430,17 +459,16 @@ TransactionProvenance provenanceFromDto(ProvenanceViewDto dto) =>
 /// finish is the one answer this mapper must never give.
 TransactionDeletionOutcome deletionOutcomeFromDto(
   TransactionDeletionOutcomeViewDto dto,
-) =>
-    TransactionDeletionOutcome(
-      transactionId: dto.transactionId,
-      applied: switch (dto.outcome) {
-        TransactionDeletionOutcomeViewOutcomeDto.deleted => true,
-        TransactionDeletionOutcomeViewOutcomeDto.partiallyApplied => false,
-        TransactionDeletionOutcomeViewOutcomeDto.unknown => false,
-      },
-      transferMatchesDeleted: dto.transferMatchesDeleted,
-      // The refusal code as the contract spells it. `toWire` answers null for
-      // a token this build has never seen, which is the honest rendering: the
-      // client holds no name for it and must not invent one.
-      code: dto.code?.toWire(),
-    );
+) => TransactionDeletionOutcome(
+  transactionId: dto.transactionId,
+  applied: switch (dto.outcome) {
+    TransactionDeletionOutcomeViewOutcomeDto.deleted => true,
+    TransactionDeletionOutcomeViewOutcomeDto.partiallyApplied => false,
+    TransactionDeletionOutcomeViewOutcomeDto.unknown => false,
+  },
+  transferMatchesDeleted: dto.transferMatchesDeleted,
+  // The refusal code as the contract spells it. `toWire` answers null for
+  // a token this build has never seen, which is the honest rendering: the
+  // client holds no name for it and must not invent one.
+  code: dto.code?.toWire(),
+);

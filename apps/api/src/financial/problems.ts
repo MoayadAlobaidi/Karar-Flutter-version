@@ -28,6 +28,21 @@ export interface ProblemBody {
   readonly retryable?: boolean;
   readonly requestId?: string;
   readonly limitBytes?: number;
+  /**
+   * The occurrence ordinal that WOULD be accepted, on `OCCURRENCE_ORDINAL_NOT_NEXT`.
+   *
+   * Structured rather than left in the prose. The detail already said "the next
+   * unused occurrence for this movement is N", and a client that had to parse
+   * an integer out of an English sentence would break the first time the
+   * sentence was translated — so the one fact a caller must act on was
+   * unreachable to it, and a person who genuinely bought the same thing twice
+   * could not record the second one.
+   *
+   * Safe to disclose: it is a small counter over a movement the caller has just
+   * described in full. It reveals how many identical movements the caller
+   * already has, which the caller is the subject of.
+   */
+  readonly nextOrdinal?: number;
 }
 
 export interface ProblemResponse {
@@ -132,6 +147,10 @@ export function codedProblem(
   title: string,
   code: string,
   detail?: string,
+  extra: Omit<ProblemBody, 'type' | 'title' | 'status' | 'code' | 'detail'> = {},
 ): ProblemResponse {
-  return problem(status, title, code, detail === undefined ? {} : { detail });
+  return problem(status, title, code, {
+    ...(detail === undefined ? {} : { detail }),
+    ...extra,
+  });
 }

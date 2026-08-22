@@ -34,14 +34,14 @@ import 'financial_fixtures.dart';
 
 /// A page with no successor.
 Page<T> onePage<T>(List<T> items) => Page<T>(
-      items: items,
-      cursor: PageCursor(
-        limit: 50,
-        returned: items.length,
-        hasMore: false,
-        nextCursor: null,
-      ),
-    );
+  items: items,
+  cursor: PageCursor(
+    limit: 50,
+    returned: items.length,
+    hasMore: false,
+    nextCursor: null,
+  ),
+);
 
 /// Accounts, balances, source links and issuers, all scripted.
 final class ScriptedAccountsRepository
@@ -72,7 +72,10 @@ final class ScriptedAccountsRepository
   final List<String> reads = <String>[];
 
   @override
-  Future<Result<Page<FinancialAccount>>> listOwnAccounts({int? limit, String? cursor}) async {
+  Future<Result<Page<FinancialAccount>>> listOwnAccounts({
+    int? limit,
+    String? cursor,
+  }) async {
     reads.add('listOwnAccounts');
     final failure = listFailure;
     if (failure != null) {
@@ -93,9 +96,12 @@ final class ScriptedAccountsRepository
   }
 
   @override
-  Future<Result<FinancialAccount>> createManualAccount(ManualAccountDraft draft) async {
+  Future<Result<FinancialAccount>> createManualAccount(
+    ManualAccountDraft draft,
+  ) async {
     created.add(draft);
-    return createResult ?? Success<FinancialAccount>(account(accountId: 'account-new'));
+    return createResult ??
+        Success<FinancialAccount>(account(accountId: 'account-new'));
   }
 
   @override
@@ -104,7 +110,8 @@ final class ScriptedAccountsRepository
     AccountEdit edit,
   ) async {
     updated.add(edit);
-    return updateResult ?? Success<FinancialAccount>(account(accountId: accountId));
+    return updateResult ??
+        Success<FinancialAccount>(account(accountId: accountId));
   }
 
   @override
@@ -115,7 +122,9 @@ final class ScriptedAccountsRepository
   }) async {
     reads.add('listBalances');
     return Success<Page<BalanceSnapshot>>(
-      onePage<BalanceSnapshot>(balances[accountId] ?? const <BalanceSnapshot>[]),
+      onePage<BalanceSnapshot>(
+        balances[accountId] ?? const <BalanceSnapshot>[],
+      ),
     );
   }
 
@@ -127,20 +136,28 @@ final class ScriptedAccountsRepository
   }) async {
     reads.add('listSourceLinks');
     return Success<Page<AccountSourceLink>>(
-      onePage<AccountSourceLink>(sourceLinks[accountId] ?? const <AccountSourceLink>[]),
+      onePage<AccountSourceLink>(
+        sourceLinks[accountId] ?? const <AccountSourceLink>[],
+      ),
     );
   }
 
   @override
-  Future<Result<Page<Issuer>>> listSelectableIssuers({int? limit, String? cursor}) async {
+  Future<Result<Page<Issuer>>> listSelectableIssuers({
+    int? limit,
+    String? cursor,
+  }) async {
     reads.add('listSelectableIssuers');
     return Success<Page<Issuer>>(onePage<Issuer>(issuers));
   }
 }
 
 /// Instruments, scripted per account.
-final class ScriptedInstrumentsRepository implements PaymentInstrumentsRepository {
-  ScriptedInstrumentsRepository([this.byAccount = const <String, List<PaymentInstrument>>{}]);
+final class ScriptedInstrumentsRepository
+    implements PaymentInstrumentsRepository {
+  ScriptedInstrumentsRepository([
+    this.byAccount = const <String, List<PaymentInstrument>>{},
+  ]);
 
   Map<String, List<PaymentInstrument>> byAccount;
   final List<String> reads = <String>[];
@@ -153,7 +170,9 @@ final class ScriptedInstrumentsRepository implements PaymentInstrumentsRepositor
   }) async {
     reads.add(accountId);
     return Success<Page<PaymentInstrument>>(
-      onePage<PaymentInstrument>(byAccount[accountId] ?? const <PaymentInstrument>[]),
+      onePage<PaymentInstrument>(
+        byAccount[accountId] ?? const <PaymentInstrument>[],
+      ),
     );
   }
 }
@@ -177,6 +196,10 @@ final class ScriptedTransactionsRepository implements TransactionsRepository {
   List<TransactionProvenance> provenanceRows;
   Failure? listFailure;
   Result<Transaction>? createResult;
+
+  /// Answers consumed in order, one per `createManual` call. Falls back to
+  /// [createResult] when exhausted.
+  List<Result<Transaction>>? createResults;
   Result<Transaction>? correctResult;
   Result<CategoryAssignment>? assignResult;
   Result<TransactionDeletionOutcome>? deleteResult;
@@ -223,6 +246,14 @@ final class ScriptedTransactionsRepository implements TransactionsRepository {
   @override
   Future<Result<Transaction>> createManual(ManualTransactionDraft draft) async {
     created.add(draft);
+    // A SCRIPT OF ANSWERS, so a test can drive the duplicate conversation: the
+    // platform refuses an unqualified repeat, the person confirms, and the
+    // second call must be able to answer differently from the first. A single
+    // `createResult` could only ever tell a one-message story.
+    final scripted = createResults;
+    if (scripted != null && scripted.isNotEmpty) {
+      return scripted.removeAt(0);
+    }
     return createResult ?? Success<Transaction>(transaction());
   }
 
@@ -253,7 +284,9 @@ final class ScriptedTransactionsRepository implements TransactionsRepository {
   }
 
   @override
-  Future<Result<TransactionDeletionOutcome>> delete(String transactionId) async {
+  Future<Result<TransactionDeletionOutcome>> delete(
+    String transactionId,
+  ) async {
     deleted.add(transactionId);
     return deleteResult ??
         Success<TransactionDeletionOutcome>(
@@ -268,7 +301,8 @@ final class ScriptedTransactionsRepository implements TransactionsRepository {
 }
 
 /// The reviewed category catalogue, scripted.
-final class ScriptedCategoriesRepository implements TransactionCategoriesRepository {
+final class ScriptedCategoriesRepository
+    implements TransactionCategoriesRepository {
   ScriptedCategoriesRepository([this.entries = const <TransactionCategory>[]]);
 
   List<TransactionCategory> entries;
@@ -284,7 +318,9 @@ final class ScriptedCategoriesRepository implements TransactionCategoriesReposit
     if (held != null) {
       return Failed<Page<TransactionCategory>>(held);
     }
-    return Success<Page<TransactionCategory>>(onePage<TransactionCategory>(entries));
+    return Success<Page<TransactionCategory>>(
+      onePage<TransactionCategory>(entries),
+    );
   }
 }
 
@@ -298,17 +334,18 @@ List<Override> financialOverrides({
   ScriptedTransactionsRepository? transactions,
   ScriptedCategoriesRepository? categories,
   BootstrapSnapshot? bootstrap,
-}) =>
-    <Override>[
-      financialBootstrapProvider.overrideWithValue(bootstrap ?? syntheticBootstrap()),
-      if (accounts != null) ...<Override>[
-        financialAccountsRepositoryProvider.overrideWithValue(accounts),
-        issuerCatalogueRepositoryProvider.overrideWithValue(accounts),
-      ],
-      if (instruments != null)
-        paymentInstrumentsRepositoryProvider.overrideWithValue(instruments),
-      if (transactions != null)
-        transactionsRepositoryProvider.overrideWithValue(transactions),
-      if (categories != null)
-        transactionCategoriesRepositoryProvider.overrideWithValue(categories),
-    ];
+}) => <Override>[
+  financialBootstrapProvider.overrideWithValue(
+    bootstrap ?? syntheticBootstrap(),
+  ),
+  if (accounts != null) ...<Override>[
+    financialAccountsRepositoryProvider.overrideWithValue(accounts),
+    issuerCatalogueRepositoryProvider.overrideWithValue(accounts),
+  ],
+  if (instruments != null)
+    paymentInstrumentsRepositoryProvider.overrideWithValue(instruments),
+  if (transactions != null)
+    transactionsRepositoryProvider.overrideWithValue(transactions),
+  if (categories != null)
+    transactionCategoriesRepositoryProvider.overrideWithValue(categories),
+];

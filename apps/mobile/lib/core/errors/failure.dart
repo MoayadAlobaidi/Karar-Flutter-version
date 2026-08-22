@@ -31,7 +31,8 @@ sealed class Failure {
   String get diagnosticLabel;
 
   @override
-  String toString() => '$runtimeType(code: $code, correlationId: $correlationId)';
+  String toString() =>
+      '$runtimeType(code: $code, correlationId: $correlationId)';
 }
 
 /// No valid session. The caller must authenticate before retrying.
@@ -44,7 +45,11 @@ final class AuthenticationRequiredFailure extends Failure {
 
 /// The session is authenticated but the principal lacks the permission.
 final class NotAuthorizedFailure extends Failure {
-  const NotAuthorizedFailure({super.code, super.correlationId, this.requirement});
+  const NotAuthorizedFailure({
+    super.code,
+    super.correlationId,
+    this.requirement,
+  });
 
   /// The named requirement the server reported (permission or membership).
   /// Non-sensitive.
@@ -57,7 +62,11 @@ final class NotAuthorizedFailure extends Failure {
 /// Policy or capability state forbids the operation even though the principal
 /// is authenticated and otherwise permitted.
 final class OperationRestrictedFailure extends Failure {
-  const OperationRestrictedFailure({super.code, super.correlationId, this.restriction});
+  const OperationRestrictedFailure({
+    super.code,
+    super.correlationId,
+    this.restriction,
+  });
 
   /// The restriction identifier reported by the server. Non-sensitive.
   final String? restriction;
@@ -68,7 +77,11 @@ final class OperationRestrictedFailure extends Failure {
 
 /// Processing requires a consent grant that does not exist or was withdrawn.
 final class ConsentRequiredFailure extends Failure {
-  const ConsentRequiredFailure({super.code, super.correlationId, this.purposeRef});
+  const ConsentRequiredFailure({
+    super.code,
+    super.correlationId,
+    this.purposeRef,
+  });
 
   final String? purposeRef;
 
@@ -79,7 +92,11 @@ final class ConsentRequiredFailure extends Failure {
 /// A materially changed document version is in force; the existing grant no
 /// longer permits processing until it is re-accepted.
 final class ReConsentRequiredFailure extends Failure {
-  const ReConsentRequiredFailure({super.code, super.correlationId, this.purposeRef});
+  const ReConsentRequiredFailure({
+    super.code,
+    super.correlationId,
+    this.purposeRef,
+  });
 
   final String? purposeRef;
 
@@ -104,7 +121,11 @@ final class TenantSelectionRequiredFailure extends Failure {
 /// `RESOLVED` state, which reaches READY with an empty capability list; only
 /// this failure blocks startup.
 final class BootstrapUnavailableFailure extends Failure {
-  const BootstrapUnavailableFailure({super.code, super.correlationId, this.retryable});
+  const BootstrapUnavailableFailure({
+    super.code,
+    super.correlationId,
+    this.retryable,
+  });
 
   /// Whether the server said a retry could change the answer. Null when it
   /// did not say — absent rather than guessed, so the client offers a retry
@@ -118,7 +139,10 @@ final class BootstrapUnavailableFailure extends Failure {
 /// Capability resolution did not complete. Capability-gated surfaces fail
 /// closed rather than assuming a capability is available.
 final class CapabilityResolutionUnavailableFailure extends Failure {
-  const CapabilityResolutionUnavailableFailure({super.code, super.correlationId});
+  const CapabilityResolutionUnavailableFailure({
+    super.code,
+    super.correlationId,
+  });
 
   @override
   String get diagnosticLabel => 'capability_resolution_unavailable';
@@ -127,7 +151,11 @@ final class CapabilityResolutionUnavailableFailure extends Failure {
 /// The session was valid and is no longer: expired, revoked, or terminated by
 /// refresh-token reuse detection. Local credentials have been cleared.
 final class SessionExpiredFailure extends Failure {
-  const SessionExpiredFailure({super.code, super.correlationId, this.reason = SessionEndReason.expired});
+  const SessionExpiredFailure({
+    super.code,
+    super.correlationId,
+    this.reason = SessionEndReason.expired,
+  });
 
   final SessionEndReason reason;
 
@@ -168,7 +196,11 @@ final class RateLimitedFailure extends Failure {
 /// A dependency the server needs is unavailable, so the request was refused
 /// rather than processed on partial state. Fails closed.
 final class DependencyUnavailableFailure extends Failure {
-  const DependencyUnavailableFailure({super.code, super.correlationId, this.retryable});
+  const DependencyUnavailableFailure({
+    super.code,
+    super.correlationId,
+    this.retryable,
+  });
 
   /// See [BootstrapUnavailableFailure.retryable].
   final bool? retryable;
@@ -180,7 +212,11 @@ final class DependencyUnavailableFailure extends Failure {
 /// The request was rejected as malformed or outside policy. Carries field
 /// identifiers only, never the submitted values.
 final class InvalidRequestFailure extends Failure {
-  const InvalidRequestFailure({super.code, super.correlationId, this.fields = const <String>[]});
+  const InvalidRequestFailure({
+    super.code,
+    super.correlationId,
+    this.fields = const <String>[],
+  });
 
   final List<String> fields;
 
@@ -200,9 +236,23 @@ final class NotFoundFailure extends Failure {
 /// The resource changed under the caller, or the requested transition is not
 /// legal from the current state.
 final class ConflictFailure extends Failure {
-  const ConflictFailure({super.code, super.correlationId, this.reason});
+  const ConflictFailure({
+    super.code,
+    super.correlationId,
+    this.reason,
+    this.nextOrdinal,
+  });
 
   final String? reason;
+
+  /// On `OCCURRENCE_ORDINAL_NOT_NEXT`, the ordinal the server WOULD accept.
+  ///
+  /// Carried through the failure because it is the one piece of a 409 a caller
+  /// can ACT on: without it the client can only tell a person that recording
+  /// their second identical purchase failed, and the platform supports
+  /// recording it. Read from the structured field, never from translated
+  /// prose.
+  final int? nextOrdinal;
 
   @override
   String get diagnosticLabel => 'conflict';
@@ -276,7 +326,11 @@ final class UnsafeRequestNotReplayedFailure extends Failure {
 /// Platform secure storage could not be read or written. Treated as a closed
 /// door: the application behaves as if no credential exists.
 final class SecureStorageUnavailableFailure extends Failure {
-  const SecureStorageUnavailableFailure({super.code, super.correlationId, required this.operation});
+  const SecureStorageUnavailableFailure({
+    super.code,
+    super.correlationId,
+    required this.operation,
+  });
 
   final SecureStorageOperation operation;
 
@@ -295,7 +349,11 @@ enum SecureStorageOperation { read, write, delete }
 /// only decisions ABOUT credentials, such as the persisted-session
 /// invalidation marker, whose whole value depends on the write having landed.
 final class LocalStorageUnavailableFailure extends Failure {
-  const LocalStorageUnavailableFailure({super.code, super.correlationId, required this.operation});
+  const LocalStorageUnavailableFailure({
+    super.code,
+    super.correlationId,
+    required this.operation,
+  });
 
   final LocalStorageOperation operation;
 
@@ -328,7 +386,8 @@ final class LocalSecurityStateUnavailableFailure extends Failure {
   final LocalSecurityStateOperation operation;
 
   @override
-  String get diagnosticLabel => 'local_security_state_unavailable_${operation.name}';
+  String get diagnosticLabel =>
+      'local_security_state_unavailable_${operation.name}';
 }
 
 /// Which security-state operation could not be performed. `open` means the
@@ -351,7 +410,11 @@ final class LocalSecurityStateCorruptFailure extends Failure {
 /// Required build configuration is absent or invalid. A production build in
 /// this state must not start.
 final class ConfigurationInvalidFailure extends Failure {
-  const ConfigurationInvalidFailure({super.code, super.correlationId, required this.violations});
+  const ConfigurationInvalidFailure({
+    super.code,
+    super.correlationId,
+    required this.violations,
+  });
 
   /// Machine-readable violation identifiers. Never contains a configured
   /// value, only the name of what was wrong.
@@ -364,7 +427,11 @@ final class ConfigurationInvalidFailure extends Failure {
 /// The response did not match the contract: an absent required field, a value
 /// of the wrong shape, or a body that is not the declared media type.
 final class ContractViolationFailure extends Failure {
-  const ContractViolationFailure({super.code, super.correlationId, this.location});
+  const ContractViolationFailure({
+    super.code,
+    super.correlationId,
+    this.location,
+  });
 
   /// Where the violation was detected, as a path expression. Field names
   /// only, never values.

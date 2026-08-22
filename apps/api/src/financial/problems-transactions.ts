@@ -128,6 +128,12 @@ export function problemForTransactionsError(error: TransactionsSurfaceError): Pr
         'Occurrence ordinal not next',
         'OCCURRENCE_ORDINAL_NOT_NEXT',
         `the next unused occurrence for this movement is ${String(error.nextOrdinal)}`,
+        // STRUCTURED, not only in the prose. A client that had to read the
+        // integer out of an English sentence would break on the first
+        // translation, which is how the one fact a caller must act on became
+        // unreachable to the client — and a person who genuinely bought the
+        // same thing twice could not record the second one.
+        { nextOrdinal: error.nextOrdinal },
       );
     case 'VERSION_CONFLICT':
       return codedProblem(

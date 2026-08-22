@@ -65,8 +65,7 @@ import 'app_localizations_en.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -74,8 +73,7 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -96,10 +94,7 @@ abstract class AppLocalizations {
       ];
 
   /// A list of this localizations delegate's supported locales.
-  static const List<Locale> supportedLocales = <Locale>[
-    Locale('ar'),
-    Locale('en'),
-  ];
+  static const List<Locale> supportedLocales = <Locale>[Locale('ar'), Locale('en')];
 
   /// Product name shown in the task switcher and the about screen.
   ///
@@ -4031,6 +4026,24 @@ abstract class AppLocalizations {
   /// **'Karar could not save this transaction.'**
   String get transactionRejected;
 
+  /// Title of the notice shown when the platform refuses an identical transaction as a possible duplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'You may already have recorded this'**
+  String get transactionDuplicateTitle;
+
+  /// Explains why a transaction was refused as a duplicate and what the person can do about it.
+  ///
+  /// In en, this message translates to:
+  /// **'An identical transaction is already recorded for this account on this date. If you really did buy this twice, record it as a separate purchase.'**
+  String get transactionDuplicateMessage;
+
+  /// Action that records a refused duplicate as a second genuine occurrence of the same movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Record as a separate purchase'**
+  String get transactionDuplicateConfirmAction;
+
   /// Action that deletes one transaction.
   ///
   /// In en, this message translates to:
@@ -6330,8 +6343,7 @@ abstract class AppLocalizations {
   String get sourceAuthorityFieldLabel;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -6340,8 +6352,7 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['ar', 'en'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['ar', 'en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;

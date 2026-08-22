@@ -29,7 +29,8 @@ final class CategoryPickerScreen extends ConsumerStatefulWidget {
   final String transactionId;
 
   @override
-  ConsumerState<CategoryPickerScreen> createState() => _CategoryPickerScreenState();
+  ConsumerState<CategoryPickerScreen> createState() =>
+      _CategoryPickerScreenState();
 }
 
 class _CategoryPickerScreenState extends ConsumerState<CategoryPickerScreen> {
@@ -63,13 +64,13 @@ class _CategoryPickerScreenState extends ConsumerState<CategoryPickerScreen> {
           data: (CategoryCatalogueView view) => switch (view) {
             CategoryCatalogueUnavailable() => _Unavailable(l10n: l10n),
             CategoryCatalogueLoaded(:final catalogue) => _Catalogue(
-                catalogue: catalogue,
-                query: query,
-                search: _search,
-                write: write,
-                l10n: l10n,
-                transactionId: widget.transactionId,
-              ),
+              catalogue: catalogue,
+              query: query,
+              search: _search,
+              write: write,
+              l10n: l10n,
+              transactionId: widget.transactionId,
+            ),
           },
         ),
       ),
@@ -84,18 +85,17 @@ final class _Unavailable extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
-          child: KararStateView.error(
-            title: l10n.categoriesUnavailableTitle,
-            message: l10n.categoriesUnavailableDescription,
-            actionLabel: l10n.actionRetry,
-            onAction: () => unawaited(
-              ref.read(categoryCatalogueProvider.notifier).refresh(),
-            ),
-          ),
-        ),
-      );
+    child: SingleChildScrollView(
+      padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
+      child: KararStateView.error(
+        title: l10n.categoriesUnavailableTitle,
+        message: l10n.categoriesUnavailableDescription,
+        actionLabel: l10n.actionRetry,
+        onAction: () =>
+            unawaited(ref.read(categoryCatalogueProvider.notifier).refresh()),
+      ),
+    ),
+  );
 }
 
 final class _Catalogue extends ConsumerWidget {
@@ -189,10 +189,17 @@ final class _Outcome extends StatelessWidget {
       TransactionWriteIdle() ||
       TransactionWriteSubmitting() ||
       TransactionWriteSaved() ||
-      TransactionDeleteSettled() =>
-        null,
-      TransactionCategorySaved() =>
-        KararBanner(message: l10n.categoryAssigned, tone: KararStatusTone.success),
+      TransactionDeleteSettled() => null,
+      // Unreachable here: this screen never creates a manual transaction, and
+      // the duplicate question only arises from that one write. Matched
+      // explicitly rather than with a wildcard so that a screen which LATER
+      // gains a create path is made to answer the question rather than
+      // silently swallowing it.
+      TransactionDuplicateRefused() => null,
+      TransactionCategorySaved() => KararBanner(
+        message: l10n.categoryAssigned,
+        tone: KararStatusTone.success,
+      ),
       TransactionWriteRejected(
         :final isUserAssignmentWins,
         :final isCategoryUnknown,
@@ -201,9 +208,11 @@ final class _Outcome extends StatelessWidget {
           message: isUserAssignmentWins
               ? l10n.categoryAssignmentWins
               : isCategoryUnknown
-                  ? l10n.categoryUnknown
-                  : l10n.transactionRejected,
-          tone: isUserAssignmentWins ? KararStatusTone.info : KararStatusTone.danger,
+              ? l10n.categoryUnknown
+              : l10n.transactionRejected,
+          tone: isUserAssignmentWins
+              ? KararStatusTone.info
+              : KararStatusTone.danger,
         ),
     };
     if (banner == null) {

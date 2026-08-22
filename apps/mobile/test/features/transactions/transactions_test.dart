@@ -33,26 +33,26 @@ const Size wideSurface = Size(1400, 24000);
 const String subjectTransactionId = 'transaction-0001';
 
 List<Transaction> someTransactions() => <Transaction>[
-      transaction(
-        transactionId: 'transaction-0001',
-        description: 'A movement out',
-        merchant: 'Synthetic Merchant',
-      ),
-      transaction(
-        transactionId: 'transaction-0002',
-        description: 'A movement in',
-        amount: money('9900'),
-        direction: MoneyDirection.moneyIn,
-        bookingDate: const CalendarDay(year: 2026, month: 3, day: 2),
-      ),
-      transaction(
-        transactionId: 'transaction-0003',
-        description: 'An imported movement',
-        amount: money('-1500', currency: 'USD'),
-        sourceKind: SourceKind.csv,
-        accountId: 'account-0003',
-      ),
-    ];
+  transaction(
+    transactionId: 'transaction-0001',
+    description: 'A movement out',
+    merchant: 'Synthetic Merchant',
+  ),
+  transaction(
+    transactionId: 'transaction-0002',
+    description: 'A movement in',
+    amount: money('9900'),
+    direction: MoneyDirection.moneyIn,
+    bookingDate: const CalendarDay(year: 2026, month: 3, day: 2),
+  ),
+  transaction(
+    transactionId: 'transaction-0003',
+    description: 'An imported movement',
+    amount: money('-1500', currency: 'USD'),
+    sourceKind: SourceKind.csv,
+    accountId: 'account-0003',
+  ),
+];
 
 AppLocalizations l10nOf(WidgetTester tester, Type screen) =>
     AppLocalizations.of(tester.element(find.byType(screen)));
@@ -84,11 +84,57 @@ void main() {
         expect(find.text(l10n.directionMoneyOut), findsWidgets);
 
         // The day is rendered from its own integers, in the locale's numerals.
-        final formatter =
-            KararFormatter.of(tester.element(find.byType(TransactionsScreen)));
+        final formatter = KararFormatter.of(
+          tester.element(find.byType(TransactionsScreen)),
+        );
         expect(find.text(formatter.applyNumerals('2026-03-01')), findsWidgets);
       },
       textScales: featureTextScales,
+    );
+
+    testWidgets(
+      'two legitimate occurrences of one movement are both listed, not collapsed',
+      (WidgetTester tester) async {
+        // The other end of the duplicate conversation. Once a person has said
+        // the repeat is real, the listing must show it: a client that folded
+        // identical rows together would quietly undo the answer they gave, and
+        // the second coffee would stop existing anywhere they can see.
+        await pumpFeatureScreen(
+          tester,
+          const TransactionsScreen(),
+          surfaceSize: wideSurface,
+          overrides: financialOverrides(
+            accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
+            transactions: ScriptedTransactionsRepository(
+              transactions: <Transaction>[
+                transaction(
+                  transactionId: 'occurrence-1',
+                  description: 'Coffee',
+                ),
+                // Identical in every field a person can see. Only the identity
+                // differs, which is exactly the case a naive dedup would eat.
+                transaction(
+                  transactionId: 'occurrence-2',
+                  description: 'Coffee',
+                ),
+              ],
+            ),
+          ),
+        );
+
+        expect(find.byType(TransactionRow), findsNWidgets(2));
+        expect(find.text('Coffee'), findsNWidgets(2));
+        // Phase 5 totals nothing on this screen by design, so "included in
+        // spending" is exactly this: both occurrences are present as separate
+        // movements for anything downstream to add up.
+        expect(
+          tester
+              .widgetList<TransactionRow>(find.byType(TransactionRow))
+              .map((TransactionRow r) => r.transaction.transactionId)
+              .toList(),
+          <String>['occurrence-1', 'occurrence-2'],
+        );
+      },
     );
 
     testInBothDirections(
@@ -112,7 +158,8 @@ void main() {
           for (final widget in tester.allWidgets)
             if (widget is Text &&
                 widget.data != null &&
-                (widget.data!.contains('QAR') || widget.data!.contains('USD')) &&
+                (widget.data!.contains('QAR') ||
+                    widget.data!.contains('USD')) &&
                 RegExp('[0-9٠-٩۰-۹]').hasMatch(widget.data!))
               widget.data!,
         ];
@@ -125,29 +172,33 @@ void main() {
       textScales: featureTextScales,
     );
 
-    testWidgets('a filter narrows the listing through the platform, not locally',
-        (WidgetTester tester) async {
-      final repository =
-          ScriptedTransactionsRepository(transactions: someTransactions());
-      await pumpFeatureScreen(
-        tester,
-        const TransactionsScreen(),
-        surfaceSize: wideSurface,
-        overrides: financialOverrides(
-          accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
-          transactions: repository,
-        ),
-      );
-      final l10n = l10nOf(tester, TransactionsScreen);
+    testWidgets(
+      'a filter narrows the listing through the platform, not locally',
+      (WidgetTester tester) async {
+        final repository = ScriptedTransactionsRepository(
+          transactions: someTransactions(),
+        );
+        await pumpFeatureScreen(
+          tester,
+          const TransactionsScreen(),
+          surfaceSize: wideSurface,
+          overrides: financialOverrides(
+            accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
+            transactions: repository,
+          ),
+        );
+        final l10n = l10nOf(tester, TransactionsScreen);
 
-      await tester.tap(find.text(l10n.directionMoneyIn).first);
-      await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.directionMoneyIn).first);
+        await tester.pumpAndSettle();
 
-      expect(repository.filters.last.direction, MoneyDirection.moneyIn);
-    });
+        expect(repository.filters.last.direction, MoneyDirection.moneyIn);
+      },
+    );
 
-    testWidgets('only the two runnable rails are offered as a source filter',
-        (WidgetTester tester) async {
+    testWidgets('only the two runnable rails are offered as a source filter', (
+      WidgetTester tester,
+    ) async {
       await pumpFeatureScreen(
         tester,
         const TransactionsScreen(),
@@ -166,8 +217,9 @@ void main() {
       expect(find.text(l10n.dataOriginFileImportOnly), findsNothing);
     });
 
-    testWidgets('the platform decides whether there is another page',
-        (WidgetTester tester) async {
+    testWidgets('the platform decides whether there is another page', (
+      WidgetTester tester,
+    ) async {
       final repository = ScriptedTransactionsRepository(
         transactions: someTransactions(),
         hasMore: true,
@@ -186,7 +238,10 @@ void main() {
       expect(find.text(l10n.transactionsLoadMoreAction), findsOneWidget);
       await tester.tap(find.text(l10n.transactionsLoadMoreAction));
       await tester.pumpAndSettle();
-      expect(repository.reads.where((String read) => read == 'listOwn').length, 2);
+      expect(
+        repository.reads.where((String read) => read == 'listOwn').length,
+        2,
+      );
     });
 
     testInBothDirections(
@@ -213,28 +268,28 @@ void main() {
       textScales: featureTextScales,
     );
 
-    testInBothDirections(
-      'a failed read is an error state with a retry',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const TransactionsScreen(),
-          locale: locale,
-          textScale: scale,
-          surfaceSize: wideSurface,
-          overrides: financialOverrides(
-            accounts: ScriptedAccountsRepository(),
-            transactions: ScriptedTransactionsRepository(
-              listFailure: const DependencyUnavailableFailure(),
-            ),
+    testInBothDirections('a failed read is an error state with a retry', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const TransactionsScreen(),
+        locale: locale,
+        textScale: scale,
+        surfaceSize: wideSurface,
+        overrides: financialOverrides(
+          accounts: ScriptedAccountsRepository(),
+          transactions: ScriptedTransactionsRepository(
+            listFailure: const DependencyUnavailableFailure(),
           ),
-        );
-        final l10n = l10nOf(tester, TransactionsScreen);
-        expect(find.text(l10n.transactionsUnavailableTitle), findsOneWidget);
-        expect(find.text(l10n.actionRetry), findsOneWidget);
-      },
-      textScales: featureTextScales,
-    );
+        ),
+      );
+      final l10n = l10nOf(tester, TransactionsScreen);
+      expect(find.text(l10n.transactionsUnavailableTitle), findsOneWidget);
+      expect(find.text(l10n.actionRetry), findsOneWidget);
+    }, textScales: featureTextScales);
   });
 
   group('the detail screen', () {
@@ -245,36 +300,37 @@ void main() {
       Locale locale = const Locale('en'),
       double textScale = 1.0,
       ScriptedTransactionsRepository? repository,
-    }) =>
-        pumpFeatureScreen(
-          tester,
-          const TransactionDetailScreen(transactionId: subjectTransactionId),
-          locale: locale,
-          textScale: textScale,
-          surfaceSize: wideSurface,
-          overrides: financialOverrides(
-            accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
-            transactions: repository ??
-                ScriptedTransactionsRepository(
-                  detail: detail ?? transactionDetail(),
-                  provenanceRows: provenanceRows ?? <TransactionProvenance>[provenance()],
-                ),
-          ),
-        );
-
-    testInBothDirections(
-      'renders the amount, the days and the source',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpDetail(tester, locale: locale, textScale: scale);
-        final l10n = l10nOf(tester, TransactionDetailScreen);
-
-        expect(find.text(l10n.transactionAmountLabel), findsWidgets);
-        expect(find.text(l10n.transactionBookedOnLabel), findsWidgets);
-        expect(find.text(l10n.directionMoneyOut), findsOneWidget);
-        expect(find.text(l10n.transactionStatusPosted), findsOneWidget);
-      },
-      textScales: featureTextScales,
+    }) => pumpFeatureScreen(
+      tester,
+      const TransactionDetailScreen(transactionId: subjectTransactionId),
+      locale: locale,
+      textScale: textScale,
+      surfaceSize: wideSurface,
+      overrides: financialOverrides(
+        accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
+        transactions:
+            repository ??
+            ScriptedTransactionsRepository(
+              detail: detail ?? transactionDetail(),
+              provenanceRows:
+                  provenanceRows ?? <TransactionProvenance>[provenance()],
+            ),
+      ),
     );
+
+    testInBothDirections('renders the amount, the days and the source', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpDetail(tester, locale: locale, textScale: scale);
+      final l10n = l10nOf(tester, TransactionDetailScreen);
+
+      expect(find.text(l10n.transactionAmountLabel), findsWidgets);
+      expect(find.text(l10n.transactionBookedOnLabel), findsWidgets);
+      expect(find.text(l10n.directionMoneyOut), findsOneWidget);
+      expect(find.text(l10n.transactionStatusPosted), findsOneWidget);
+    }, textScales: featureTextScales);
 
     testInBothDirections(
       'a second currency is shown beside the booked amount and never converted',
@@ -295,7 +351,8 @@ void main() {
           for (final widget in tester.allWidgets)
             if (widget is Text &&
                 widget.data != null &&
-                (widget.data!.contains('QAR') || widget.data!.contains('USD')) &&
+                (widget.data!.contains('QAR') ||
+                    widget.data!.contains('USD')) &&
                 RegExp('[0-9٠-٩۰-۹]').hasMatch(widget.data!))
               widget.data!,
         ];
@@ -323,7 +380,9 @@ void main() {
               TransactionRevision(
                 revisionNumber: 2,
                 attribution: RevisionAttribution.userInput,
-                changedFields: const <RevisableField>[RevisableField.description],
+                changedFields: const <RevisableField>[
+                  RevisableField.description,
+                ],
                 values: transactionDetail().revisions.single.values,
                 recordedAt: DateTime.utc(2026, 3, 4),
               ),
@@ -333,8 +392,9 @@ void main() {
           textScale: scale,
         );
         final l10n = l10nOf(tester, TransactionDetailScreen);
-        final formatter =
-            KararFormatter.of(tester.element(find.byType(TransactionDetailScreen)));
+        final formatter = KararFormatter.of(
+          tester.element(find.byType(TransactionDetailScreen)),
+        );
 
         expect(
           find.text(formatter.applyNumerals(l10n.transactionRevisionNumber(1))),
@@ -342,7 +402,10 @@ void main() {
         );
         expect(find.text(l10n.transactionRevisionSourceImport), findsOneWidget);
         expect(find.text(l10n.transactionRevisionUserInput), findsOneWidget);
-        expect(find.text(l10n.transactionRevisionNoChangedFields), findsOneWidget);
+        expect(
+          find.text(l10n.transactionRevisionNoChangedFields),
+          findsOneWidget,
+        );
         // Divergence is the platform's statement, rendered as such.
         expect(find.text(l10n.transactionDivergesFromSource), findsOneWidget);
       },
@@ -357,15 +420,22 @@ void main() {
 
         expect(find.text(l10n.provenanceImportedFromStatement), findsOneWidget);
         expect(find.text(l10n.sourceDirectionDebit), findsOneWidget);
-        expect(find.text(l10n.directionMappingSourceDirectionWord), findsOneWidget);
-        expect(find.text(l10n.provenanceFingerprintVersionLabel), findsOneWidget);
+        expect(
+          find.text(l10n.directionMappingSourceDirectionWord),
+          findsOneWidget,
+        );
+        expect(
+          find.text(l10n.provenanceFingerprintVersionLabel),
+          findsOneWidget,
+        );
         expect(find.text('fingerprint-algorithm-1'), findsOneWidget);
       },
       textScales: featureTextScales,
     );
 
-    testWidgets('the active category and who decided it are shown',
-        (WidgetTester tester) async {
+    testWidgets('the active category and who decided it are shown', (
+      WidgetTester tester,
+    ) async {
       await pumpDetail(
         tester,
         detail: transactionDetail(activeCategory: categoryAssignment()),
@@ -377,26 +447,33 @@ void main() {
       expect(find.text(l10n.transactionCategoryByUser), findsNWidgets(2));
     });
 
-    testWidgets('no category reads as no category, never as an empty one',
-        (WidgetTester tester) async {
+    testWidgets('no category reads as no category, never as an empty one', (
+      WidgetTester tester,
+    ) async {
       await pumpDetail(tester);
       expect(
-        find.text(l10nOf(tester, TransactionDetailScreen).transactionCategoryNone),
+        find.text(
+          l10nOf(tester, TransactionDetailScreen).transactionCategoryNone,
+        ),
         findsOneWidget,
       );
     });
 
-    testWidgets('a delete is offered because the platform exposes one',
-        (WidgetTester tester) async {
+    testWidgets('a delete is offered because the platform exposes one', (
+      WidgetTester tester,
+    ) async {
       await pumpDetail(tester);
       expect(
-        find.text(l10nOf(tester, TransactionDetailScreen).transactionDeleteAction),
+        find.text(
+          l10nOf(tester, TransactionDetailScreen).transactionDeleteAction,
+        ),
         findsOneWidget,
       );
     });
 
-    testWidgets('a partial delete is reported as partial, never as done',
-        (WidgetTester tester) async {
+    testWidgets('a partial delete is reported as partial, never as done', (
+      WidgetTester tester,
+    ) async {
       final repository = ScriptedTransactionsRepository(
         detail: transactionDetail(),
         deleteResult: const Success<TransactionDeletionOutcome>(
@@ -437,7 +514,10 @@ void main() {
         overrides: financialOverrides(
           accounts: ScriptedAccountsRepository(
             accounts: <FinancialAccount>[
-              account(accountId: 'account-0001', displayName: 'Everyday account'),
+              account(
+                accountId: 'account-0001',
+                displayName: 'Everyday account',
+              ),
             ],
           ),
           transactions: repository,
@@ -449,7 +529,11 @@ void main() {
     testInBothDirections(
       'the amount is a magnitude and the direction is chosen separately',
       (WidgetTester tester, Locale locale, double scale) async {
-        final repository = await pumpEntry(tester, locale: locale, textScale: scale);
+        final repository = await pumpEntry(
+          tester,
+          locale: locale,
+          textScale: scale,
+        );
         final l10n = l10nOf(tester, ManualTransactionScreen);
 
         await tester.tap(find.text('Everyday account'));
@@ -472,8 +556,183 @@ void main() {
       textScales: featureTextScales,
     );
 
-    testWidgets('a signed amount is refused rather than silently corrected',
-        (WidgetTester tester) async {
+    /// Fills the form with one movement. Used by every duplicate case below so
+    /// the second attempt is byte-identical to the first, which is what makes
+    /// the platform refuse it.
+    Future<void> enterOneCoffee(
+      WidgetTester tester,
+      AppLocalizations l10n,
+    ) async {
+      await tester.tap(find.text('Everyday account'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), '4.50');
+      await tester.tap(find.text(l10n.directionMoneyOut));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(1), '2026-03-01');
+      await tester.enterText(find.byType(TextField).at(3), 'Coffee');
+      await tester.tap(find.text(l10n.actionSave));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a FIRST purchase records with no occurrence claimed', (
+      WidgetTester tester,
+    ) async {
+      // The ordinary case, and the control for everything below: an
+      // unqualified write is a claim that this movement is NEW, and the
+      // platform's duplicate guard depends on it staying unqualified.
+      final repository = await pumpEntry(tester);
+      await enterOneCoffee(tester, l10nOf(tester, ManualTransactionScreen));
+      expect(repository.created.single.occurrenceOrdinal, isNull);
+    });
+
+    testWidgets(
+      'an ACCIDENTAL duplicate is still refused, and nothing is written twice',
+      (WidgetTester tester) async {
+        // The protection this whole flow must not weaken. A second identical
+        // write is refused, the person is asked, and until they answer nothing
+        // further reaches the platform.
+        final repository = await pumpEntry(tester);
+        repository.createResults = <Result<Transaction>>[
+          const Failed<Transaction>(
+            ConflictFailure(code: transactionDuplicateCode),
+          ),
+        ];
+        final l10n = l10nOf(tester, ManualTransactionScreen);
+        await enterOneCoffee(tester, l10n);
+
+        expect(repository.created, hasLength(1));
+        expect(find.text(l10n.transactionDuplicateTitle), findsOneWidget);
+        // Asked, not told: the offer exists and has not been taken.
+        expect(
+          find.text(l10n.transactionDuplicateConfirmAction),
+          findsOneWidget,
+        );
+        expect(find.text(l10n.transactionFormSaved), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'a SECOND REAL purchase records separately after the person says so',
+      (WidgetTester tester) async {
+        final repository = await pumpEntry(tester);
+        repository.createResults = <Result<Transaction>>[
+          const Failed<Transaction>(
+            ConflictFailure(code: transactionDuplicateCode),
+          ),
+          Success<Transaction>(transaction(transactionId: 'txn-second')),
+        ];
+        final l10n = l10nOf(tester, ManualTransactionScreen);
+        await enterOneCoffee(tester, l10n);
+
+        await tester.tap(find.text(l10n.transactionDuplicateConfirmAction));
+        await tester.pumpAndSettle();
+
+        expect(repository.created, hasLength(2));
+        // The first claimed nothing; the second claims occurrence 2. Both carry
+        // the same movement, which is the point — a repeat is the same purchase
+        // happening again, not a different one.
+        expect(repository.created[0].occurrenceOrdinal, isNull);
+        expect(repository.created[1].occurrenceOrdinal, 2);
+        expect(
+          repository.created[1].description,
+          repository.created[0].description,
+        );
+        expect(
+          repository.created[1].entry.magnitude.minorUnits,
+          repository.created[0].entry.magnitude.minorUnits,
+        );
+        expect(find.text(l10n.transactionFormSaved), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a STALE ordinal is actionable: the server names the free one and it is used',
+      (WidgetTester tester) async {
+        // THE RACE. Between the refusal and the confirmation another device
+        // recorded the same movement, so occurrence 2 is taken. The server says
+        // which one is free and the client uses THAT — it never adds one to a
+        // previous value, because the previous value is exactly what went stale.
+        final repository = await pumpEntry(tester);
+        repository.createResults = <Result<Transaction>>[
+          const Failed<Transaction>(
+            ConflictFailure(code: transactionDuplicateCode),
+          ),
+          const Failed<Transaction>(
+            ConflictFailure(
+              code: transactionOccurrenceNotNextCode,
+              nextOrdinal: 5,
+            ),
+          ),
+          Success<Transaction>(transaction(transactionId: 'txn-fifth')),
+        ];
+        final l10n = l10nOf(tester, ManualTransactionScreen);
+        await enterOneCoffee(tester, l10n);
+
+        await tester.tap(find.text(l10n.transactionDuplicateConfirmAction));
+        await tester.pumpAndSettle();
+        // Still actionable rather than a dead end, and now carrying the server's
+        // answer.
+        expect(
+          find.text(l10n.transactionDuplicateConfirmAction),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text(l10n.transactionDuplicateConfirmAction));
+        await tester.pumpAndSettle();
+
+        expect(repository.created, hasLength(3));
+        expect(repository.created[1].occurrenceOrdinal, 2);
+        expect(repository.created[2].occurrenceOrdinal, 5);
+        expect(find.text(l10n.transactionFormSaved), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a repeated confirmation while one is in flight does not double-write',
+      (WidgetTester tester) async {
+        // Two taps on the confirm control must produce one write, not two: the
+        // second is a person being impatient, not a person asserting a third
+        // occurrence.
+        final repository = await pumpEntry(tester);
+        repository.createResults = <Result<Transaction>>[
+          const Failed<Transaction>(
+            ConflictFailure(code: transactionDuplicateCode),
+          ),
+          Success<Transaction>(transaction(transactionId: 'txn-second')),
+        ];
+        final l10n = l10nOf(tester, ManualTransactionScreen);
+        await enterOneCoffee(tester, l10n);
+
+        final confirm = find.text(l10n.transactionDuplicateConfirmAction);
+        await tester.tap(confirm);
+        await tester.tap(confirm, warnIfMissed: false);
+        await tester.pumpAndSettle();
+
+        expect(repository.created, hasLength(2));
+      },
+    );
+
+    testWidgets('a refusal that is NOT a duplicate stays a plain rejection', (
+      WidgetTester tester,
+    ) async {
+      // The narrowness that keeps the offer honest: an action is offered only
+      // where the platform offered one.
+      final repository = await pumpEntry(tester);
+      repository.createResults = <Result<Transaction>>[
+        const Failed<Transaction>(
+          ConflictFailure(code: 'ACCOUNT_NOT_WRITABLE'),
+        ),
+      ];
+      final l10n = l10nOf(tester, ManualTransactionScreen);
+      await enterOneCoffee(tester, l10n);
+
+      expect(find.text(l10n.transactionDuplicateConfirmAction), findsNothing);
+      expect(find.textContaining(l10n.transactionRejected), findsOneWidget);
+    });
+
+    testWidgets('a signed amount is refused rather than silently corrected', (
+      WidgetTester tester,
+    ) async {
       final repository = await pumpEntry(tester);
       final l10n = l10nOf(tester, ManualTransactionScreen);
 
@@ -486,13 +745,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.created, isEmpty);
-      expect(find.textContaining(l10n.transactionFormErrorMagnitude), findsOneWidget);
+      expect(
+        find.textContaining(l10n.transactionFormErrorMagnitude),
+        findsOneWidget,
+      );
     });
 
     testInBothDirections(
       'a malformed day is refused with a validation summary',
       (WidgetTester tester, Locale locale, double scale) async {
-        final repository = await pumpEntry(tester, locale: locale, textScale: scale);
+        final repository = await pumpEntry(
+          tester,
+          locale: locale,
+          textScale: scale,
+        );
         final l10n = l10nOf(tester, ManualTransactionScreen);
 
         await tester.tap(find.text('Everyday account'));
@@ -512,8 +778,9 @@ void main() {
       textScales: featureTextScales,
     );
 
-    testWidgets('a day typed in Arabic numerals is understood',
-        (WidgetTester tester) async {
+    testWidgets('a day typed in Arabic numerals is understood', (
+      WidgetTester tester,
+    ) async {
       final repository = await pumpEntry(tester, locale: const Locale('ar'));
       final l10n = l10nOf(tester, ManualTransactionScreen);
 
@@ -530,8 +797,9 @@ void main() {
       expect(draft.bookingDate.iso8601, '2026-03-01');
     });
 
-    testWidgets('with no accounts the form says to add one first',
-        (WidgetTester tester) async {
+    testWidgets('with no accounts the form says to add one first', (
+      WidgetTester tester,
+    ) async {
       await pumpFeatureScreen(
         tester,
         const ManualTransactionScreen(),
@@ -542,7 +810,9 @@ void main() {
         ),
       );
       expect(
-        find.text(l10nOf(tester, ManualTransactionScreen).transactionFormNoAccounts),
+        find.text(
+          l10nOf(tester, ManualTransactionScreen).transactionFormNoAccounts,
+        ),
         findsOneWidget,
       );
     });
@@ -578,19 +848,28 @@ void main() {
       (WidgetTester tester, Locale locale, double scale) async {
         await pumpCorrection(tester, locale: locale, textScale: scale);
         expect(
-          find.text(l10nOf(tester, TransactionCorrectionScreen).transactionCorrectNotice),
+          find.text(
+            l10nOf(
+              tester,
+              TransactionCorrectionScreen,
+            ).transactionCorrectNotice,
+          ),
           findsOneWidget,
         );
       },
       textScales: featureTextScales,
     );
 
-    testWidgets('sends the expected version and only what changed',
-        (WidgetTester tester) async {
+    testWidgets('sends the expected version and only what changed', (
+      WidgetTester tester,
+    ) async {
       final repository = await pumpCorrection(tester);
       final l10n = l10nOf(tester, TransactionCorrectionScreen);
 
-      await tester.enterText(find.byType(TextField).at(2), 'A corrected description');
+      await tester.enterText(
+        find.byType(TextField).at(2),
+        'A corrected description',
+      );
       await tester.tap(find.text(l10n.actionSave));
       await tester.pumpAndSettle();
 
@@ -602,8 +881,9 @@ void main() {
       expect(correction.bookingDate, isNull);
     });
 
-    testWidgets('the magnitude and the direction travel together',
-        (WidgetTester tester) async {
+    testWidgets('the magnitude and the direction travel together', (
+      WidgetTester tester,
+    ) async {
       final repository = await pumpCorrection(tester);
       final l10n = l10nOf(tester, TransactionCorrectionScreen);
 
@@ -618,37 +898,39 @@ void main() {
       expect(correction.entry!.magnitude.minorUnits, '4500');
     });
 
-    testInBothDirections(
-      'a version conflict is explained',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpCorrection(
-          tester,
-          correctResult: const Failed<Transaction>(
-            ConflictFailure(code: 'TRANSACTION_VERSION_CONFLICT'),
-          ),
-          locale: locale,
-          textScale: scale,
-        );
-        final l10n = l10nOf(tester, TransactionCorrectionScreen);
-
-        await tester.enterText(find.byType(TextField).at(2), 'Changed');
-        await tester.tap(find.text(l10n.actionSave));
-        await tester.pumpAndSettle();
-
-        expect(find.text(l10n.transactionVersionConflict), findsOneWidget);
-      },
-      textScales: featureTextScales,
-    );
-
-    testWidgets('there is no control for the account, currency or source instant',
-        (WidgetTester tester) async {
-      await pumpCorrection(tester);
+    testInBothDirections('a version conflict is explained', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpCorrection(
+        tester,
+        correctResult: const Failed<Transaction>(
+          ConflictFailure(code: 'TRANSACTION_VERSION_CONFLICT'),
+        ),
+        locale: locale,
+        textScale: scale,
+      );
       final l10n = l10nOf(tester, TransactionCorrectionScreen);
-      // The currency is shown as a read-only value and has no field.
-      expect(find.text('QAR'), findsOneWidget);
-      expect(find.text(l10n.transactionFormAccountLabel), findsNothing);
-      expect(find.text(l10n.transactionEventOccurredLabel), findsNothing);
-    });
+
+      await tester.enterText(find.byType(TextField).at(2), 'Changed');
+      await tester.tap(find.text(l10n.actionSave));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l10n.transactionVersionConflict), findsOneWidget);
+    }, textScales: featureTextScales);
+
+    testWidgets(
+      'there is no control for the account, currency or source instant',
+      (WidgetTester tester) async {
+        await pumpCorrection(tester);
+        final l10n = l10nOf(tester, TransactionCorrectionScreen);
+        // The currency is shown as a read-only value and has no field.
+        expect(find.text('QAR'), findsOneWidget);
+        expect(find.text(l10n.transactionFormAccountLabel), findsNothing);
+        expect(find.text(l10n.transactionEventOccurredLabel), findsNothing);
+      },
+    );
   });
 
   group('the correction use case', () {
@@ -662,26 +944,28 @@ void main() {
       expect(repository.corrections, isEmpty);
     });
 
-    test('a manual draft with a signed magnitude is refused before it is sent',
-        () async {
-      final repository = ScriptedTransactionsRepository();
-      final result = await RecordManualTransaction(repository)(
-        ManualTransactionDraft(
-          accountId: 'account-0001',
-          entry: MoneyEntry(
-            magnitude: money('-100'),
-            direction: MoneyDirection.moneyOut,
+    test(
+      'a manual draft with a signed magnitude is refused before it is sent',
+      () async {
+        final repository = ScriptedTransactionsRepository();
+        final result = await RecordManualTransaction(repository)(
+          ManualTransactionDraft(
+            accountId: 'account-0001',
+            entry: MoneyEntry(
+              magnitude: money('-100'),
+              direction: MoneyDirection.moneyOut,
+            ),
+            bookingDate: const CalendarDay(year: 2026, month: 3, day: 1),
+            description: 'A movement',
           ),
-          bookingDate: const CalendarDay(year: 2026, month: 3, day: 1),
-          description: 'A movement',
-        ),
-      );
-      expect(
-        (result.failureOrNull! as InvalidRequestFailure).fields,
-        contains(TransactionDraftViolation.magnitudeRequired.name),
-      );
-      expect(repository.created, isEmpty);
-    });
+        );
+        expect(
+          (result.failureOrNull! as InvalidRequestFailure).fields,
+          contains(TransactionDraftViolation.magnitudeRequired.name),
+        );
+        expect(repository.created, isEmpty);
+      },
+    );
   });
 
   group('accessibility', () {
@@ -690,7 +974,9 @@ void main() {
     // neither. A control a screen reader cannot name is unusable to somebody
     // who cannot see it, and a tap target below the platform minimum is
     // unusable to somebody whose hands shake.
-    testWidgets('every interactive control is named and big enough', (WidgetTester tester) async {
+    testWidgets('every interactive control is named and big enough', (
+      WidgetTester tester,
+    ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
 
       await pumpFeatureScreen(
@@ -699,7 +985,9 @@ void main() {
         surfaceSize: wideSurface,
         overrides: financialOverrides(
           accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
-          transactions: ScriptedTransactionsRepository(transactions: someTransactions()),
+          transactions: ScriptedTransactionsRepository(
+            transactions: someTransactions(),
+          ),
         ),
       );
 
@@ -712,5 +1000,4 @@ void main() {
       handle.dispose();
     });
   });
-
 }

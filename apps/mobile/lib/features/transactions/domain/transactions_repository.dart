@@ -55,14 +55,14 @@ final class TransactionFilter {
       bookedTo == null;
 
   int get activeCount => <Object?>[
-        accountId,
-        currencyCode,
-        direction,
-        status,
-        sourceKind,
-        bookedFrom,
-        bookedTo,
-      ].where((Object? value) => value != null).length;
+    accountId,
+    currencyCode,
+    direction,
+    status,
+    sourceKind,
+    bookedFrom,
+    bookedTo,
+  ].where((Object? value) => value != null).length;
 
   TransactionFilter copyWith({
     String? accountId,
@@ -79,16 +79,17 @@ final class TransactionFilter {
     bool clearSourceKind = false,
     bool clearBookedFrom = false,
     bool clearBookedTo = false,
-  }) =>
-      TransactionFilter(
-        accountId: clearAccountId ? null : (accountId ?? this.accountId),
-        currencyCode: clearCurrencyCode ? null : (currencyCode ?? this.currencyCode),
-        direction: clearDirection ? null : (direction ?? this.direction),
-        status: clearStatus ? null : (status ?? this.status),
-        sourceKind: clearSourceKind ? null : (sourceKind ?? this.sourceKind),
-        bookedFrom: clearBookedFrom ? null : (bookedFrom ?? this.bookedFrom),
-        bookedTo: clearBookedTo ? null : (bookedTo ?? this.bookedTo),
-      );
+  }) => TransactionFilter(
+    accountId: clearAccountId ? null : (accountId ?? this.accountId),
+    currencyCode: clearCurrencyCode
+        ? null
+        : (currencyCode ?? this.currencyCode),
+    direction: clearDirection ? null : (direction ?? this.direction),
+    status: clearStatus ? null : (status ?? this.status),
+    sourceKind: clearSourceKind ? null : (sourceKind ?? this.sourceKind),
+    bookedFrom: clearBookedFrom ? null : (bookedFrom ?? this.bookedFrom),
+    bookedTo: clearBookedTo ? null : (bookedTo ?? this.bookedTo),
+  );
 
   @override
   String toString() => 'TransactionFilter($activeCount)';
@@ -108,6 +109,7 @@ final class ManualTransactionDraft {
     this.valueDate,
     this.merchant,
     this.note,
+    this.occurrenceOrdinal,
   });
 
   final String accountId;
@@ -118,14 +120,46 @@ final class ManualTransactionDraft {
   final String? merchant;
   final String? note;
 
+  /// WHICH OCCURRENCE of an otherwise identical movement this is.
+  ///
+  /// Null on a first attempt, which is the ordinary case and the one a person
+  /// never thinks about. The platform refuses a second identical movement with
+  /// `DUPLICATE_TRANSACTION` — deliberately, because an accidental double-tap
+  /// and a second real purchase look exactly alike from the outside — and only
+  /// a person can say which it was. Setting this is that answer.
+  ///
+  /// It exists because the field was in the contract and in the generated
+  /// client from the beginning and reached neither this type nor the wire, so
+  /// a person who genuinely bought the same coffee twice could record one of
+  /// them and their ledger silently understated their spending
+  /// (`KAR-RSK-049`).
+  final int? occurrenceOrdinal;
+
+  /// The same draft, re-stated as a specific occurrence.
+  ///
+  /// The ordinal comes from the server's refusal, never from the client adding
+  /// one to a previous value: the server names the next unused ordinal, and
+  /// between the refusal and the retry another write may have taken it.
+  ManualTransactionDraft asOccurrence(int ordinal) => ManualTransactionDraft(
+    accountId: accountId,
+    entry: entry,
+    bookingDate: bookingDate,
+    description: description,
+    valueDate: valueDate,
+    merchant: merchant,
+    note: note,
+    occurrenceOrdinal: ordinal,
+  );
+
   List<TransactionDraftViolation> get violations => <TransactionDraftViolation>[
-        if (accountId.trim().isEmpty) TransactionDraftViolation.accountRequired,
-        if (description.trim().isEmpty) TransactionDraftViolation.descriptionRequired,
-        if (entry.direction == MoneyDirection.unrecognised)
-          TransactionDraftViolation.directionRequired,
-        if (!_isNonNegativeMagnitude(entry.magnitude.minorUnits))
-          TransactionDraftViolation.magnitudeRequired,
-      ];
+    if (accountId.trim().isEmpty) TransactionDraftViolation.accountRequired,
+    if (description.trim().isEmpty)
+      TransactionDraftViolation.descriptionRequired,
+    if (entry.direction == MoneyDirection.unrecognised)
+      TransactionDraftViolation.directionRequired,
+    if (!_isNonNegativeMagnitude(entry.magnitude.minorUnits))
+      TransactionDraftViolation.magnitudeRequired,
+  ];
 
   @override
   String toString() => 'ManualTransactionDraft()';
@@ -212,7 +246,9 @@ abstract interface class TransactionsRepository {
     String categoryCode,
   );
 
-  Future<Result<List<TransactionProvenance>>> listProvenance(String transactionId);
+  Future<Result<List<TransactionProvenance>>> listProvenance(
+    String transactionId,
+  );
 
   /// Deletes the transaction and the transfer matches naming it. The outcome
   /// says how far it got.
@@ -229,8 +265,7 @@ final class LoadTransactionPage {
   Future<Result<Page<Transaction>>> call({
     TransactionFilter filter = const TransactionFilter(),
     String? cursor,
-  }) =>
-      _repository.listOwn(filter: filter, limit: pageLimit, cursor: cursor);
+  }) => _repository.listOwn(filter: filter, limit: pageLimit, cursor: cursor);
 }
 
 /// Reads one transaction with its history.
@@ -266,7 +301,9 @@ final class RecordManualTransaction {
         Failed<Transaction>(
           InvalidRequestFailure(
             code: invalidRequestCode,
-            fields: <String>[for (final violation in violations) violation.name],
+            fields: <String>[
+              for (final violation in violations) violation.name,
+            ],
           ),
         ),
       );
@@ -287,7 +324,9 @@ final class CorrectTransaction {
   ) {
     if (correction.isEmpty) {
       return Future<Result<Transaction>>.value(
-        const Failed<Transaction>(InvalidRequestFailure(code: transactionNoChangeCode)),
+        const Failed<Transaction>(
+          InvalidRequestFailure(code: transactionNoChangeCode),
+        ),
       );
     }
     return _repository.correct(transactionId, correction);
@@ -300,8 +339,10 @@ final class AssignTransactionCategory {
 
   final TransactionsRepository _repository;
 
-  Future<Result<CategoryAssignment>> call(String transactionId, String categoryCode) =>
-      _repository.assignCategory(transactionId, categoryCode);
+  Future<Result<CategoryAssignment>> call(
+    String transactionId,
+    String categoryCode,
+  ) => _repository.assignCategory(transactionId, categoryCode);
 }
 
 /// Deletes one transaction, reporting how far the delete got.
@@ -332,3 +373,13 @@ const String invalidRequestCode = 'INVALID_REQUEST';
 
 /// The platform's own code for a correction that changes nothing.
 const String transactionNoChangeCode = 'NO_CHANGE';
+
+/// The platform's refusal of an otherwise identical movement.
+///
+/// Not an error to render: it is a question only the person can answer, and
+/// `TransactionDuplicateRefused` is where the client asks it.
+const String transactionDuplicateCode = 'DUPLICATE_TRANSACTION';
+
+/// The ordinal a repeat claimed is not the next unused one — another write took
+/// it in between. The problem body carries the ordinal that IS free.
+const String transactionOccurrenceNotNextCode = 'OCCURRENCE_ORDINAL_NOT_NEXT';

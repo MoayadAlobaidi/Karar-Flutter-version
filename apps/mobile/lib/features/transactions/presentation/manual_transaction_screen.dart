@@ -40,7 +40,8 @@ final class ManualTransactionScreen extends ConsumerStatefulWidget {
       _ManualTransactionScreenState();
 }
 
-class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScreen> {
+class _ManualTransactionScreenState
+    extends ConsumerState<ManualTransactionScreen> {
   final TextEditingController _amount = TextEditingController();
   final TextEditingController _bookingDate = TextEditingController();
   final TextEditingController _valueDate = TextEditingController();
@@ -68,8 +69,9 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
     final l10n = context.l10n;
     final write = ref.watch(transactionWriteControllerProvider);
     final accountsView = ref.watch(ownAccountsProvider).value;
-    final accounts =
-        accountsView is AccountsLoaded ? accountsView.accounts : const <FinancialAccount>[];
+    final accounts = accountsView is AccountsLoaded
+        ? accountsView.accounts
+        : const <FinancialAccount>[];
 
     return Scaffold(
       appBar: KararAppBar(
@@ -128,7 +130,8 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
                           FinancialChoice(
                             label: moneyDirectionLabel(direction, l10n),
                             isSelected: _direction == direction,
-                            onPressed: () => setState(() => _direction = direction),
+                            onPressed: () =>
+                                setState(() => _direction = direction),
                           ),
                       ],
                     ),
@@ -174,6 +177,24 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
                       isLoading: write is TransactionWriteSubmitting,
                       onPressed: () => _submit(accounts),
                     ),
+                    // THE ANSWER TO THE DUPLICATE QUESTION, offered only when
+                    // the platform has actually asked it. A second, separate
+                    // control rather than a change to Save: re-pressing Save
+                    // would be the same unqualified claim and would be refused
+                    // identically forever, and a person pressing it twice must
+                    // not silently become a person asserting a repeat.
+                    if (write is TransactionDuplicateRefused) ...<Widget>[
+                      SizedBox(height: context.spacing.md),
+                      KararButton(
+                        label: l10n.transactionDuplicateConfirmAction,
+                        isFullWidth: true,
+                        onPressed: () => unawaited(
+                          ref
+                              .read(transactionWriteControllerProvider.notifier)
+                              .confirmAnotherOccurrence(write),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -189,7 +210,9 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
     final accountId = _accountId;
     final account = accountId == null
         ? null
-        : accounts.where((FinancialAccount a) => a.accountId == accountId).firstOrNull;
+        : accounts
+              .where((FinancialAccount a) => a.accountId == accountId)
+              .firstOrNull;
     if (account == null) {
       errors.add(TransactionDraftViolation.accountRequired.name);
     }
@@ -204,7 +227,9 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
       errors.add(_bookingDateError);
     }
     final valueDateText = _valueDate.text.trim();
-    final valueDate = valueDateText.isEmpty ? null : CalendarDay.tryParse(valueDateText);
+    final valueDate = valueDateText.isEmpty
+        ? null
+        : CalendarDay.tryParse(valueDateText);
     if (valueDateText.isNotEmpty && valueDate == null) {
       errors.add(_valueDateError);
     }
@@ -213,12 +238,17 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
     }
 
     setState(() => _localErrors = errors);
-    if (errors.isNotEmpty || account == null || minorUnits == null || bookingDate == null) {
+    if (errors.isNotEmpty ||
+        account == null ||
+        minorUnits == null ||
+        bookingDate == null) {
       return;
     }
 
     unawaited(
-      ref.read(transactionWriteControllerProvider.notifier).create(
+      ref
+          .read(transactionWriteControllerProvider.notifier)
+          .create(
             ManualTransactionDraft(
               accountId: account.accountId,
               entry: MoneyEntry(
@@ -232,7 +262,9 @@ class _ManualTransactionScreenState extends ConsumerState<ManualTransactionScree
               bookingDate: bookingDate,
               description: _description.text.trim(),
               valueDate: valueDate,
-              merchant: _merchant.text.trim().isEmpty ? null : _merchant.text.trim(),
+              merchant: _merchant.text.trim().isEmpty
+                  ? null
+                  : _merchant.text.trim(),
               note: _note.text.trim().isEmpty ? null : _note.text.trim(),
             ),
           ),
@@ -306,20 +338,30 @@ final class _Outcome extends StatelessWidget {
       TransactionWriteIdle() ||
       TransactionWriteSubmitting() ||
       TransactionCategorySaved() ||
-      TransactionDeleteSettled() =>
-        null,
-      TransactionWriteSaved() =>
-        KararBanner(message: l10n.transactionFormSaved, tone: KararStatusTone.success),
+      TransactionDeleteSettled() => null,
+      TransactionWriteSaved() => KararBanner(
+        message: l10n.transactionFormSaved,
+        tone: KararStatusTone.success,
+      ),
       TransactionWriteRejected(:final violatedFields) => KararBanner(
-          title: l10n.transactionFormValidationSummaryTitle,
-          message: violatedFields.isEmpty
-              ? l10n.transactionRejected
-              : <String>[
-                  for (final field in violatedFields)
-                    transactionDraftErrorLabel(field, l10n),
-                ].join('\n'),
-          tone: KararStatusTone.danger,
-        ),
+        title: l10n.transactionFormValidationSummaryTitle,
+        message: violatedFields.isEmpty
+            ? l10n.transactionRejected
+            : <String>[
+                for (final field in violatedFields)
+                  transactionDraftErrorLabel(field, l10n),
+              ].join('\n'),
+        tone: KararStatusTone.danger,
+      ),
+      // A QUESTION, NOT AN ERROR, and the tone says so. The platform cannot
+      // tell an accidental double-tap from a second real purchase and neither
+      // can this screen; the person can. `warning` rather than `danger`
+      // because nothing has gone wrong — a guard did its job and is asking.
+      TransactionDuplicateRefused() => KararBanner(
+        title: l10n.transactionDuplicateTitle,
+        message: l10n.transactionDuplicateMessage,
+        tone: KararStatusTone.warning,
+      ),
     };
     if (banner == null) {
       return const SizedBox.shrink();

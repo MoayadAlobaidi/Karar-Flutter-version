@@ -90,6 +90,15 @@ components:
         type: boolean
         description: Present only where retrying could change the answer.
       requestId: { type: string }
+      nextOrdinal:
+        type: integer
+        minimum: 1
+        description: >-
+          On `OCCURRENCE_ORDINAL_NOT_NEXT`, the occurrence ordinal that WOULD be
+          accepted for this movement. Structured because the human-readable
+          `detail` is translated, and a client that had to parse an integer out
+          of a sentence would break the first time it was — leaving a person who
+          genuinely bought the same thing twice unable to record the second one.
   RateLimited:
     description: >-
       RFC 7807 with `code: RATE_LIMITED`. `details.retryAfterSeconds` is the

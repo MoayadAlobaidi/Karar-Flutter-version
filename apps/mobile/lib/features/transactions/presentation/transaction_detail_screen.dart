@@ -129,7 +129,8 @@ final class _Body extends ConsumerWidget {
                       tone: switch (transaction.status) {
                         TransactionStatus.posted => KararStatusTone.success,
                         TransactionStatus.voided => KararStatusTone.danger,
-                        TransactionStatus.unrecognised => KararStatusTone.neutral,
+                        TransactionStatus.unrecognised =>
+                          KararStatusTone.neutral,
                       },
                     ),
                   ],
@@ -144,8 +145,9 @@ final class _Body extends ConsumerWidget {
                   Text(
                     l10n.transactionOriginalAmountNotice,
                     textAlign: TextAlign.start,
-                    style: context.typography.bodySmall
-                        .copyWith(color: context.colors.contentTertiary),
+                    style: context.typography.bodySmall.copyWith(
+                      color: context.colors.contentTertiary,
+                    ),
                   ),
                 ],
                 SizedBox(height: context.spacing.sm),
@@ -247,10 +249,9 @@ final class _Body extends ConsumerWidget {
     if (confirmed != true) {
       return;
     }
-    await ref.read(transactionWriteControllerProvider.notifier).delete(
-          transaction.transactionId,
-          accountId: transaction.accountId,
-        );
+    await ref
+        .read(transactionWriteControllerProvider.notifier)
+        .delete(transaction.transactionId, accountId: transaction.accountId);
   }
 }
 
@@ -331,15 +332,17 @@ final class _Revisions extends StatelessWidget {
                         l10n.transactionRevisionNumber(revision.revisionNumber),
                       ),
                       textAlign: TextAlign.start,
-                      style: context.typography.labelLarge
-                          .copyWith(color: context.colors.contentPrimary),
+                      style: context.typography.labelLarge.copyWith(
+                        color: context.colors.contentPrimary,
+                      ),
                     ),
                     SizedBox(height: context.spacing.xxs),
                     Text(
                       revisionAttributionLabel(revision.attribution, l10n),
                       textAlign: TextAlign.start,
-                      style: context.typography.bodySmall
-                          .copyWith(color: context.colors.contentSecondary),
+                      style: context.typography.bodySmall.copyWith(
+                        color: context.colors.contentSecondary,
+                      ),
                     ),
                     SizedBox(height: context.spacing.xxs),
                     Text(
@@ -352,8 +355,9 @@ final class _Revisions extends StatelessWidget {
                               ].join(', '),
                             ),
                       textAlign: TextAlign.start,
-                      style: context.typography.bodySmall
-                          .copyWith(color: context.colors.contentSecondary),
+                      style: context.typography.bodySmall.copyWith(
+                        color: context.colors.contentSecondary,
+                      ),
                     ),
                     SizedBox(height: context.spacing.xs),
                     LabelledValue(
@@ -363,7 +367,10 @@ final class _Revisions extends StatelessWidget {
                     SizedBox(height: context.spacing.xs),
                     LabelledValue(
                       label: l10n.transactionBookedOnLabel,
-                      value: formatCalendarDay(context, revision.values.bookingDate),
+                      value: formatCalendarDay(
+                        context,
+                        revision.values.bookingDate,
+                      ),
                     ),
                     SizedBox(height: context.spacing.xs),
                     LabelledValue(
@@ -398,15 +405,18 @@ final class _Provenance extends ConsumerWidget {
           error: (Object error, StackTrace _) => Text(
             l10n.transactionProvenanceUnavailable,
             textAlign: TextAlign.start,
-            style: context.typography.bodyMedium
-                .copyWith(color: context.colors.contentSecondary),
+            style: context.typography.bodyMedium.copyWith(
+              color: context.colors.contentSecondary,
+            ),
           ),
           data: (List<TransactionProvenance> rows) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               for (final row in rows)
                 Padding(
-                  padding: EdgeInsetsDirectional.only(bottom: context.spacing.md),
+                  padding: EdgeInsetsDirectional.only(
+                    bottom: context.spacing.md,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -415,13 +425,18 @@ final class _Provenance extends ConsumerWidget {
                           l10n.transactionRevisionNumber(row.revisionNumber),
                         ),
                         textAlign: TextAlign.start,
-                        style: context.typography.labelLarge
-                            .copyWith(color: context.colors.contentPrimary),
+                        style: context.typography.labelLarge.copyWith(
+                          color: context.colors.contentPrimary,
+                        ),
                       ),
                       SizedBox(height: context.spacing.xs),
                       LabelledValue(
                         label: l10n.accountSourceFieldLabel,
-                        value: sourceKindLabel(row.sourceKind, row.availability, l10n),
+                        value: sourceKindLabel(
+                          row.sourceKind,
+                          row.availability,
+                          l10n,
+                        ),
                       ),
                       SizedBox(height: context.spacing.xs),
                       LabelledValue(
@@ -438,7 +453,10 @@ final class _Provenance extends ConsumerWidget {
                       SizedBox(height: context.spacing.xs),
                       LabelledValue(
                         label: l10n.provenanceDirectionMappingLabel,
-                        value: directionMappingLabel(row.directionMapping, l10n),
+                        value: directionMappingLabel(
+                          row.directionMapping,
+                          l10n,
+                        ),
                       ),
                       SizedBox(height: context.spacing.xs),
                       LabelledValue(
@@ -452,8 +470,9 @@ final class _Provenance extends ConsumerWidget {
                       Text(
                         l10n.provenanceVersionsLabel,
                         textAlign: TextAlign.start,
-                        style: context.typography.labelMedium
-                            .copyWith(color: context.colors.contentSecondary),
+                        style: context.typography.labelMedium.copyWith(
+                          color: context.colors.contentSecondary,
+                        ),
                       ),
                       LabelledValue(
                         label: l10n.provenanceParserVersionLabel,
@@ -496,27 +515,37 @@ final class _WriteOutcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget? banner = switch (state) {
       TransactionWriteIdle() || TransactionWriteSubmitting() => null,
+      // Unreachable here: this screen never creates a manual transaction, and
+      // the duplicate question only arises from that one write. Matched
+      // explicitly rather than with a wildcard so that a screen which LATER
+      // gains a create path is made to answer the question rather than
+      // silently swallowing it.
+      TransactionDuplicateRefused() => null,
       TransactionWriteSaved() => KararBanner(
-          message: l10n.transactionCorrectionSaved,
-          tone: KararStatusTone.success,
-        ),
+        message: l10n.transactionCorrectionSaved,
+        tone: KararStatusTone.success,
+      ),
       TransactionCategorySaved() => KararBanner(
-          message: l10n.categoryAssigned,
-          tone: KararStatusTone.success,
-        ),
-      TransactionDeleteSettled(:final outcome) => outcome.applied
-          ? KararBanner(message: l10n.transactionDeleted, tone: KararStatusTone.success)
-          : KararBanner(
-              message: l10n.transactionDeletePartial,
-              tone: KararStatusTone.warning,
-            ),
+        message: l10n.categoryAssigned,
+        tone: KararStatusTone.success,
+      ),
+      TransactionDeleteSettled(:final outcome) =>
+        outcome.applied
+            ? KararBanner(
+                message: l10n.transactionDeleted,
+                tone: KararStatusTone.success,
+              )
+            : KararBanner(
+                message: l10n.transactionDeletePartial,
+                tone: KararStatusTone.warning,
+              ),
       TransactionWriteRejected(:final isVersionConflict, :final isNoChange) =>
         KararBanner(
           message: isVersionConflict
               ? l10n.transactionVersionConflict
               : isNoChange
-                  ? l10n.transactionNoChange
-                  : l10n.transactionRejected,
+              ? l10n.transactionNoChange
+              : l10n.transactionRejected,
           tone: KararStatusTone.danger,
         ),
     };

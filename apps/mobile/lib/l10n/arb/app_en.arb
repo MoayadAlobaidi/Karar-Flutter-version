@@ -2853,6 +2853,18 @@
   "@transactionRejected": {
     "description": "Generic failure message when a transaction could not be stored."
   },
+  "transactionDuplicateTitle": "You may already have recorded this",
+  "@transactionDuplicateTitle": {
+    "description": "Title of the notice shown when the platform refuses an identical transaction as a possible duplicate."
+  },
+  "transactionDuplicateMessage": "An identical transaction is already recorded for this account on this date. If you really did buy this twice, record it as a separate purchase.",
+  "@transactionDuplicateMessage": {
+    "description": "Explains why a transaction was refused as a duplicate and what the person can do about it."
+  },
+  "transactionDuplicateConfirmAction": "Record as a separate purchase",
+  "@transactionDuplicateConfirmAction": {
+    "description": "Action that records a refused duplicate as a second genuine occurrence of the same movement."
+  },
   "transactionDeleteAction": "Delete transaction",
   "@transactionDeleteAction": {
     "description": "Action that deletes one transaction."

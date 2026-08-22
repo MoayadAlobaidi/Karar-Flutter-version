@@ -496,19 +496,19 @@ The matrix tally is re-derived by counting its own rows and is **17 DESIGNED / 8
 
 ### 3. Risk register review and deltas
 
-Every row re-read (register v0.7). **Nine added: KAR-RSK-042–050.** **No row closed.**
+Every row re-read. **Nine added: KAR-RSK-042–050. Three closed: KAR-RSK-047, KAR-RSK-048 and KAR-RSK-049. One accepted with a recorded residual: KAR-RSK-046.**
 
-*(This §3 said four and listed 042–045, which was the set at the moment the record was frozen — before the independent reviews ran. The reviews added four more, and a gate record that claims to incorporate its reviews' findings has to carry them. The register and this section now agree on the same eight.)*
+*(This §3 said four and listed 042–045, which was the set at the moment the record was frozen — before the independent reviews ran. The reviews added four more, the first CI run the phase ever had added a ninth, and a gate record that claims to incorporate its reviews' findings has to carry them. It then said "no row closed", which was true when written and stopped being true when the remediation ran. The register and this section now agree on the same nine rows AND the same nine statuses.)*
 
 - **042** — the client, executed on a runtime for the first time, does not reach a screen. 16 High.
 - **043** — the statement-import picker is unreachable end to end by anyone today, because the surface is gated on a capability nothing deploys. 15 High.
 - **044** — a verification control can pass without having verified anything; two did. 12 Moderate.
 - **045** — a CI lane can stay broken for an arbitrary number of commits when no pull request is open to run it. 12 Moderate.
 - **046** — a refused request performs 22 database round trips, including a row `UPDATE`, before the limiter is consulted. 12 Moderate.
-- **047** — the rate-limit window is pruned with the application's clock, so one skewed instance destructively shortens it fleet-wide. 8 Moderate.
-- **048** — the encrypted source store's AAD binds the subject and nothing else, and no adapter can bind the import, because the port never hands it one. 8 Moderate.
-- **049** — the client cannot record a second legitimately identical purchase, so a ledger silently understates spending. 12 Moderate.
-- **050** — a security-relevant screen assertion was wrong and platform-divergent, and had never run on CI because the phase had no pull request. Found by the first CI run the phase ever had. 8 Moderate, **fixed**.
+- **047** — the rate-limit window was pruned with the application's clock, so one skewed instance destructively shortened it fleet-wide. 8 Moderate. **CLOSED** — reproduced against live Redis first (a caller 20 seconds ahead took the sorted set from five entries to one), then fixed by reading `TIME` inside the Lua script so Redis is the clock and the caller cannot send one.
+- **048** — the encrypted source store's AAD bound the subject and nothing else, and no adapter could bind the import, because the port never handed it one. 8 Moderate. **CLOSED** — `verify`, `open` and `erase` now take the caller-owned binding context, the comparison is constant-time and length-prefixed, and migration 0102 makes `object_ref` unique.
+- **049** — the client could not record a second legitimately identical purchase, so a ledger silently understated spending. 12 Moderate. **CLOSED** — the occurrence concept is plumbed end to end, and the ordinal a repeat claims is the server's own `nextOrdinal`, never `previous + 1`.
+- **050** — a security-relevant screen assertion was wrong and platform-divergent, and had never run on CI because the phase had no pull request. Found by the first CI run the phase ever had. 8 Moderate, **fixed**; the row stays OPEN for its process half, which is KAR-RSK-045's.
 
 **031, 032 and 033 — the device gap — were re-examined and HELD, and Phase 5 sharpened them.** The phase produced a native picker on both platforms whose implementations have still never run against a real document provider, and this verification added a demonstrated startup failure on the one runtime tried. A gap that was an absence of proof now has a consequence attached to it.
 

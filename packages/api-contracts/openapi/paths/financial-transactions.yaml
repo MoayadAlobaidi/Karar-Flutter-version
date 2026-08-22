@@ -231,8 +231,14 @@
         description: >-
           The write cannot be accepted as stated (codes ACCOUNT_NOT_WRITABLE,
           ACCOUNT_CURRENCY_MISMATCH, DUPLICATE_TRANSACTION,
-          OCCURRENCE_ORDINAL_NOT_NEXT). A duplicate names the fingerprint
-          VERSION, never the fingerprint.
+          OCCURRENCE_ORDINAL_NOT_NEXT). A duplicate names NEITHER the
+          fingerprint nor its algorithm version: the fingerprint is a
+          per-subject keyed MAC, and echoing anything derived from it would
+          make a 409 an oracle for whether a given movement is already
+          recorded. On OCCURRENCE_ORDINAL_NOT_NEXT the body carries
+          `nextOrdinal`, the ordinal that would be accepted, as a structured
+          integer — a client must not have to parse it out of the
+          human-readable detail, which is translated.
         content:
           application/problem+json:
             schema:

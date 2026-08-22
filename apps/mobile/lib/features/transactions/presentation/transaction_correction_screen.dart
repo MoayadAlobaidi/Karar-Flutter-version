@@ -81,7 +81,8 @@ class _TransactionCorrectionScreenState
       body: SafeArea(
         top: false,
         child: detail.when(
-          loading: () => KararLoadingView(subject: l10n.transactionCorrectTitle),
+          loading: () =>
+              KararLoadingView(subject: l10n.transactionCorrectTitle),
           error: (Object error, StackTrace _) => Center(
             child: SingleChildScrollView(
               padding: EdgeInsetsDirectional.all(context.spacing.screenInset),
@@ -238,8 +239,10 @@ class _TransactionCorrectionScreenState
 
   void _submit(Transaction transaction) {
     final errors = <String>[];
-    final minorUnits =
-        minorUnitsFromTypedAmount(_amount.text, transaction.amount.exponent);
+    final minorUnits = minorUnitsFromTypedAmount(
+      _amount.text,
+      transaction.amount.exponent,
+    );
     if (minorUnits == null) {
       errors.add(TransactionDraftViolation.magnitudeRequired.name);
     }
@@ -262,7 +265,9 @@ class _TransactionCorrectionScreenState
         minorUnits != storedMagnitude || _direction != transaction.direction;
 
     unawaited(
-      ref.read(transactionWriteControllerProvider.notifier).correct(
+      ref
+          .read(transactionWriteControllerProvider.notifier)
+          .correct(
             transaction.transactionId,
             TransactionCorrection(
               expectedVersion: transaction.version,
@@ -276,14 +281,17 @@ class _TransactionCorrectionScreenState
                       direction: _direction ?? transaction.direction,
                     )
                   : null,
-              bookingDate:
-                  bookingDate == transaction.bookingDate ? null : bookingDate,
+              bookingDate: bookingDate == transaction.bookingDate
+                  ? null
+                  : bookingDate,
               description: _description.text.trim() == transaction.description
                   ? null
                   : _description.text.trim(),
               merchant: _merchant.text.trim() == (transaction.merchant ?? '')
                   ? null
-                  : (_merchant.text.trim().isEmpty ? null : _merchant.text.trim()),
+                  : (_merchant.text.trim().isEmpty
+                        ? null
+                        : _merchant.text.trim()),
               clearMerchant:
                   transaction.merchant != null && _merchant.text.trim().isEmpty,
               note: _note.text.trim() == (transaction.note ?? '')
@@ -333,19 +341,24 @@ final class _CorrectionOutcome extends StatelessWidget {
       TransactionWriteIdle() ||
       TransactionWriteSubmitting() ||
       TransactionCategorySaved() ||
-      TransactionDeleteSettled() =>
-        null,
+      TransactionDeleteSettled() => null,
+      // Unreachable here: this screen never creates a manual transaction, and
+      // the duplicate question only arises from that one write. Matched
+      // explicitly rather than with a wildcard so that a screen which LATER
+      // gains a create path is made to answer the question rather than
+      // silently swallowing it.
+      TransactionDuplicateRefused() => null,
       TransactionWriteSaved() => KararBanner(
-          message: l10n.transactionCorrectionSaved,
-          tone: KararStatusTone.success,
-        ),
+        message: l10n.transactionCorrectionSaved,
+        tone: KararStatusTone.success,
+      ),
       TransactionWriteRejected(:final isVersionConflict, :final isNoChange) =>
         KararBanner(
           message: isVersionConflict
               ? l10n.transactionVersionConflict
               : isNoChange
-                  ? l10n.transactionNoChange
-                  : l10n.transactionRejected,
+              ? l10n.transactionNoChange
+              : l10n.transactionRejected,
           tone: KararStatusTone.danger,
         ),
     };

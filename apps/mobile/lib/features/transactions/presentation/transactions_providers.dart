@@ -24,43 +24,49 @@ import '../domain/transactions_repository.dart';
 
 final Provider<TransactionsRepository> transactionsRepositoryProvider =
     Provider<TransactionsRepository>(
-  (Ref ref) => ApiTransactionsRepository(ref.watch(apiClientProvider)),
-);
+      (Ref ref) => ApiTransactionsRepository(ref.watch(apiClientProvider)),
+    );
 
 final Provider<LoadTransactionPage> loadTransactionPageProvider =
     Provider<LoadTransactionPage>(
-  (Ref ref) => LoadTransactionPage(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) =>
+          LoadTransactionPage(ref.watch(transactionsRepositoryProvider)),
+    );
 
 final Provider<LoadTransactionDetail> loadTransactionDetailProvider =
     Provider<LoadTransactionDetail>(
-  (Ref ref) => LoadTransactionDetail(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) =>
+          LoadTransactionDetail(ref.watch(transactionsRepositoryProvider)),
+    );
 
 final Provider<LoadTransactionProvenance> loadTransactionProvenanceProvider =
     Provider<LoadTransactionProvenance>(
-  (Ref ref) => LoadTransactionProvenance(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) =>
+          LoadTransactionProvenance(ref.watch(transactionsRepositoryProvider)),
+    );
 
 final Provider<RecordManualTransaction> recordManualTransactionProvider =
     Provider<RecordManualTransaction>(
-  (Ref ref) => RecordManualTransaction(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) =>
+          RecordManualTransaction(ref.watch(transactionsRepositoryProvider)),
+    );
 
 final Provider<CorrectTransaction> correctTransactionProvider =
     Provider<CorrectTransaction>(
-  (Ref ref) => CorrectTransaction(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) =>
+          CorrectTransaction(ref.watch(transactionsRepositoryProvider)),
+    );
 
 final Provider<AssignTransactionCategory> assignTransactionCategoryProvider =
     Provider<AssignTransactionCategory>(
-  (Ref ref) => AssignTransactionCategory(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) =>
+          AssignTransactionCategory(ref.watch(transactionsRepositoryProvider)),
+    );
 
 final Provider<DeleteTransaction> deleteTransactionProvider =
     Provider<DeleteTransaction>(
-  (Ref ref) => DeleteTransaction(ref.watch(transactionsRepositoryProvider)),
-);
+      (Ref ref) => DeleteTransaction(ref.watch(transactionsRepositoryProvider)),
+    );
 
 /// The filter the listing is currently narrowed by.
 final class TransactionFilterController extends Notifier<TransactionFilter> {
@@ -73,10 +79,10 @@ final class TransactionFilterController extends Notifier<TransactionFilter> {
 }
 
 final NotifierProvider<TransactionFilterController, TransactionFilter>
-    transactionFilterProvider =
+transactionFilterProvider =
     NotifierProvider<TransactionFilterController, TransactionFilter>(
-  TransactionFilterController.new,
-);
+      TransactionFilterController.new,
+    );
 
 /// What the listing screen renders.
 sealed class TransactionListing {
@@ -128,12 +134,14 @@ final class TransactionListingController
     _nextCursor = null;
     final result = await ref.watch(loadTransactionPageProvider)(filter: filter);
     return switch (result) {
-      Failed<Page<Transaction>>(:final failure) => TransactionsUnavailable(failure),
+      Failed<Page<Transaction>>(:final failure) => TransactionsUnavailable(
+        failure,
+      ),
       Success<Page<Transaction>>(:final value) => _accumulate(
-          <Transaction>[],
-          value,
-          filter: filter,
-        ),
+        <Transaction>[],
+        value,
+        filter: filter,
+      ),
     };
   }
 
@@ -141,7 +149,9 @@ final class TransactionListingController
   /// next page.
   Future<void> loadMore() async {
     final current = state.value;
-    if (current is! TransactionsLoaded || !current.hasMore || current.isLoadingMore) {
+    if (current is! TransactionsLoaded ||
+        !current.hasMore ||
+        current.isLoadingMore) {
       return;
     }
     final cursor = _nextCursor;
@@ -158,21 +168,26 @@ final class TransactionListingController
       ),
     );
     final filter = ref.read(transactionFilterProvider);
-    final result =
-        await ref.read(loadTransactionPageProvider)(filter: filter, cursor: cursor);
+    final result = await ref.read(loadTransactionPageProvider)(
+      filter: filter,
+      cursor: cursor,
+    );
     if (issued.hasEnded) {
       // The page was asked for under an organisation the session has left. It
       // would be APPENDED to whatever the new organisation has loaded, which is
       // one listing holding two organisations' transactions.
       return;
     }
-    state = AsyncData<TransactionListing>(
-      switch (result) {
-        Failed<Page<Transaction>>(:final failure) => TransactionsUnavailable(failure),
-        Success<Page<Transaction>>(:final value) =>
-          _accumulate(current.transactions, value, filter: filter),
-      },
-    );
+    state = AsyncData<TransactionListing>(switch (result) {
+      Failed<Page<Transaction>>(:final failure) => TransactionsUnavailable(
+        failure,
+      ),
+      Success<Page<Transaction>>(:final value) => _accumulate(
+        current.transactions,
+        value,
+        filter: filter,
+      ),
+    });
   }
 
   Future<void> refresh() async {
@@ -209,10 +224,10 @@ final class TransactionListingController
 }
 
 final AsyncNotifierProvider<TransactionListingController, TransactionListing>
-    transactionListingProvider =
+transactionListingProvider =
     AsyncNotifierProvider<TransactionListingController, TransactionListing>(
-  TransactionListingController.new,
-);
+      TransactionListingController.new,
+    );
 
 /// The most recent transactions on one account, for the account detail screen.
 final class AccountRecentTransactionsController
@@ -236,12 +251,17 @@ final class AccountRecentTransactionsController
   }
 }
 
-final AsyncNotifierProviderFamily<AccountRecentTransactionsController,
-        List<Transaction>, String> accountRecentTransactionsProvider =
-    AsyncNotifierProvider.family<AccountRecentTransactionsController,
-        List<Transaction>, String>(
-  AccountRecentTransactionsController.new,
-);
+final AsyncNotifierProviderFamily<
+  AccountRecentTransactionsController,
+  List<Transaction>,
+  String
+>
+accountRecentTransactionsProvider =
+    AsyncNotifierProvider.family<
+      AccountRecentTransactionsController,
+      List<Transaction>,
+      String
+    >(AccountRecentTransactionsController.new);
 
 /// One transaction with its history, its active category and the divergence
 /// the platform stated.
@@ -260,20 +280,29 @@ final class TransactionDetailController
 
   @override
   Future<TransactionDetail?> load() async {
-    final result = await ref.watch(loadTransactionDetailProvider)(transactionId);
+    final result = await ref.watch(loadTransactionDetailProvider)(
+      transactionId,
+    );
     return switch (result) {
       Success<TransactionDetail>(:final value) => value,
-      Failed<TransactionDetail>(:final failure) => throw TransactionReadFailure(failure),
+      Failed<TransactionDetail>(:final failure) => throw TransactionReadFailure(
+        failure,
+      ),
     };
   }
 }
 
-final AsyncNotifierProviderFamily<TransactionDetailController, TransactionDetail?,
-        String> transactionDetailProvider =
-    AsyncNotifierProvider.family<TransactionDetailController, TransactionDetail?,
-        String>(
-  TransactionDetailController.new,
-);
+final AsyncNotifierProviderFamily<
+  TransactionDetailController,
+  TransactionDetail?,
+  String
+>
+transactionDetailProvider =
+    AsyncNotifierProvider.family<
+      TransactionDetailController,
+      TransactionDetail?,
+      String
+    >(TransactionDetailController.new);
 
 /// The safe provenance of one transaction.
 final class TransactionProvenanceController
@@ -287,7 +316,9 @@ final class TransactionProvenanceController
 
   @override
   Future<List<TransactionProvenance>> load() async {
-    final result = await ref.watch(loadTransactionProvenanceProvider)(transactionId);
+    final result = await ref.watch(loadTransactionProvenanceProvider)(
+      transactionId,
+    );
     return switch (result) {
       Success<List<TransactionProvenance>>(:final value) => value,
       Failed<List<TransactionProvenance>>(:final failure) =>
@@ -296,12 +327,17 @@ final class TransactionProvenanceController
   }
 }
 
-final AsyncNotifierProviderFamily<TransactionProvenanceController,
-        List<TransactionProvenance>, String> transactionProvenanceProvider =
-    AsyncNotifierProvider.family<TransactionProvenanceController,
-        List<TransactionProvenance>, String>(
-  TransactionProvenanceController.new,
-);
+final AsyncNotifierProviderFamily<
+  TransactionProvenanceController,
+  List<TransactionProvenance>,
+  String
+>
+transactionProvenanceProvider =
+    AsyncNotifierProvider.family<
+      TransactionProvenanceController,
+      List<TransactionProvenance>,
+      String
+    >(TransactionProvenanceController.new);
 
 /// Carries a typed failure through `AsyncValue.error`.
 final class TransactionReadFailure implements Exception {
@@ -346,6 +382,40 @@ final class TransactionDeleteSettled extends TransactionWriteState {
   const TransactionDeleteSettled(this.outcome);
 
   final TransactionDeletionOutcome outcome;
+}
+
+/// The platform refused this write as a DUPLICATE, and only a person can say
+/// whether it was one.
+///
+/// An accidental double-tap and a second real purchase are indistinguishable
+/// from outside: same account, same day, same amount, same merchant. The
+/// platform refuses the second write for exactly that reason and offers the
+/// person the answer it cannot supply — record it as another occurrence, or
+/// leave it alone because the first one is already there.
+///
+/// This state exists because the refusal used to arrive as a generic conflict.
+/// The contract, the generated client and the platform all supported recording
+/// a genuine repeat; the client had nowhere to put the answer, so a person who
+/// bought the same coffee twice recorded one of them and their spending was
+/// understated with no indication anything was missing (`KAR-RSK-049`).
+final class TransactionDuplicateRefused extends TransactionWriteState {
+  const TransactionDuplicateRefused({
+    required this.draft,
+    required this.nextOrdinal,
+  });
+
+  /// The draft as the person entered it, ready to be re-stated as an occurrence.
+  final ManualTransactionDraft draft;
+
+  /// The ordinal the SERVER says is next, when it said so.
+  ///
+  /// Null on the first refusal, which carries `DUPLICATE_TRANSACTION` and no
+  /// ordinal — the confirming write then attempts occurrence 2 and, if another
+  /// write took it in between, the server answers `OCCURRENCE_ORDINAL_NOT_NEXT`
+  /// with the ordinal that is actually free. The client never computes one by
+  /// adding to a previous value: between a refusal and a retry, another device
+  /// may have recorded the same movement.
+  final int? nextOrdinal;
 }
 
 final class TransactionWriteRejected extends TransactionWriteState {
@@ -395,11 +465,77 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
     }
     switch (result) {
       case Failed<Transaction>(:final failure):
-        state = TransactionWriteRejected(failure);
+        state = _rejectionFor(draft, failure);
       case Success<Transaction>(:final value):
         state = TransactionWriteSaved(value);
         await _refreshListings(value.accountId);
     }
+  }
+
+  /// Re-states a refused draft as a specific occurrence and writes it again.
+  ///
+  /// THE PERSON'S ANSWER, not a retry. `create` is not reused for this because
+  /// a retry of an unqualified draft would be refused identically forever —
+  /// what changes is that the write now CLAIMS to be a repeat, which is a
+  /// different assertion and one only a person can make.
+  ///
+  /// Concurrency-safe by deferring to the server: the ordinal comes from the
+  /// server's own refusal when it supplied one, and otherwise starts at 2. If
+  /// another write took that ordinal in between, the server answers
+  /// `OCCURRENCE_ORDINAL_NOT_NEXT` with the one that is free and this returns
+  /// to [TransactionDuplicateRefused] carrying it — so a second confirmation
+  /// lands on a real ordinal rather than looping or overwriting.
+  ///
+  /// AN ANSWER IS CONSUMED ONCE. The guard is not `is TransactionWriteSubmitting`
+  /// but the identity of the refusal being answered, because the dangerous
+  /// replay is not the one that arrives while the write is in flight — it is
+  /// the one that arrives just AFTER the write succeeded, from a control that
+  /// has not rebuilt yet. That tap carries a question the platform has already
+  /// stopped asking, and acting on it would record the same purchase a third
+  /// time on a person's single say-so.
+  Future<void> confirmAnotherOccurrence(
+    TransactionDuplicateRefused refusal,
+  ) async {
+    if (!identical(state, refusal)) {
+      return;
+    }
+    final TenantDataGeneration issued = binding;
+    state = const TransactionWriteSubmitting();
+    final draft = refusal.draft.asOccurrence(refusal.nextOrdinal ?? 2);
+    final result = await ref.read(recordManualTransactionProvider)(draft);
+    if (issued.hasEnded) {
+      return;
+    }
+    switch (result) {
+      case Failed<Transaction>(:final failure):
+        state = _rejectionFor(refusal.draft, failure);
+      case Success<Transaction>(:final value):
+        state = TransactionWriteSaved(value);
+        await _refreshListings(value.accountId);
+    }
+  }
+
+  /// A refusal a person can act on, where the platform offers one.
+  ///
+  /// Only the two duplicate/occurrence codes become an actionable state. Every
+  /// other failure stays a plain rejection, because inventing an action for a
+  /// refusal the platform did not offer one for is how a client starts
+  /// guessing.
+  static TransactionWriteState _rejectionFor(
+    ManualTransactionDraft draft,
+    Failure failure,
+  ) {
+    if (failure.code == transactionDuplicateCode) {
+      return TransactionDuplicateRefused(draft: draft, nextOrdinal: null);
+    }
+    if (failure.code == transactionOccurrenceNotNextCode) {
+      final held = failure;
+      return TransactionDuplicateRefused(
+        draft: draft,
+        nextOrdinal: held is ConflictFailure ? held.nextOrdinal : null,
+      );
+    }
+    return TransactionWriteRejected(failure);
   }
 
   Future<void> correct(
@@ -411,7 +547,10 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
     }
     final TenantDataGeneration issued = binding;
     state = const TransactionWriteSubmitting();
-    final result = await ref.read(correctTransactionProvider)(transactionId, correction);
+    final result = await ref.read(correctTransactionProvider)(
+      transactionId,
+      correction,
+    );
     if (issued.hasEnded) {
       return;
     }
@@ -432,8 +571,10 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
     }
     final TenantDataGeneration issued = binding;
     state = const TransactionWriteSubmitting();
-    final result =
-        await ref.read(assignTransactionCategoryProvider)(transactionId, categoryCode);
+    final result = await ref.read(assignTransactionCategoryProvider)(
+      transactionId,
+      categoryCode,
+    );
     if (issued.hasEnded) {
       return;
     }
@@ -474,7 +615,7 @@ final class TransactionWriteController extends Notifier<TransactionWriteState> {
 }
 
 final NotifierProvider<TransactionWriteController, TransactionWriteState>
-    transactionWriteControllerProvider =
+transactionWriteControllerProvider =
     NotifierProvider<TransactionWriteController, TransactionWriteState>(
-  TransactionWriteController.new,
-);
+      TransactionWriteController.new,
+    );
