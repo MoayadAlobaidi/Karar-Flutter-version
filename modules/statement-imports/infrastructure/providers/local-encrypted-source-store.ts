@@ -94,6 +94,16 @@ export class LocalSourceStoreEnvironmentError extends Error {
  * that held, and the subject half did not.
  *
  * Comparing this prefix restores the subject half without changing the port.
+ *
+ * THE IMPORT HALF IS STILL NOT BOUND, AND NO ADAPTER CAN BIND IT. The port
+ * hands `open`, `verify` and `erase` a descriptor with neither the import id
+ * nor the media type, so an object replayed under a DIFFERENT import of the
+ * SAME subject decrypts — verified. Cross-user and cross-tenant are refused.
+ * The header's claim that "an object moved between subjects or replayed under
+ * another import fails authentication" is therefore half true, and the half
+ * that fails is structural rather than local to this adapter: an S3-plus-KMS
+ * implementation would be no better, because the port never hands it the
+ * import. Recorded as KAR-RSK-048 with a treatment that widens the port.
  */
 function subjectAssociatedDataPrefix(principal: ImportsPrincipal): Buffer {
   return Buffer.from(`${ASSOCIATED_DATA_LABEL}|${principal.tenantId}|${principal.userId}|`, 'utf8');

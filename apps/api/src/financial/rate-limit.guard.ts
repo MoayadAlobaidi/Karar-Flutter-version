@@ -14,18 +14,32 @@
  * Two properties follow from that position, and both are asserted at the HTTP
  * boundary rather than argued here:
  *
- *   1. A refused request does no work. It never queries account existence,
- *      never creates an import draft, never writes a source byte, never parses
- *      a CSV, never opens a commit transaction and never mutates transfer
- *      state — because the handler body is where all of that lives and the
- *      handler body does not run.
+ *   1. A refused request does no USE-CASE work. It never queries account
+ *      existence, never creates an import draft, never writes a source byte,
+ *      never parses a CSV, never opens a commit transaction and never mutates
+ *      transfer state — because the handler body is where all of that lives
+ *      and the handler body does not run.
+ *
+ *      **It is not free, and this used to say it was.** Everything IN FRONT of
+ *      the limiter has already run: principal enrichment and capability
+ *      resolution together issue 22 database queries before the budget is
+ *      consulted, one of them an `UPDATE` of the caller's own session row. An
+ *      admitted read costs 26, so exceeding a budget saves about 15% of the
+ *      database cost rather than all of it, and a principal whose capability is
+ *      UNAVAILABLE is refused at 403 without reaching this guard at all — the
+ *      full resolution, at unbounded frequency. That is KAR-RSK-046, with a
+ *      treatment; the sentence is corrected here because a comment overstating
+ *      a control is worse than no comment.
  *   2. A 429 is not an oracle. The capability gate refuses FIRST, so an
  *      unavailable capability answers 403 whatever the budget says; and two
  *      requests that differ only in whether the named resource exists produce
  *      byte-identical 429s, because nothing has looked yet.
  *
  * WHAT IT READS. The session-resolved principal, and the handler being
- * dispatched. Never a body, a query or a header — a caller cannot name the
+ * dispatched. Never a body, a query or a header — though note that on the ten
+ * JSON write routes Fastify has already read and parsed up to its 1 MiB body
+ * limit by the time this runs, so "before anything reads the request" is true
+ * of this guard and not of the request lifecycle — a caller cannot name the
  * budget it is charged to, cannot name a tenant, and cannot name a subject.
  *
  * AN UNMAPPED OPERATION IS REFUSED, NOT ADMITTED. A mounted route with no

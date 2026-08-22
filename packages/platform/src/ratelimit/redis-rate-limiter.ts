@@ -5,7 +5,15 @@
  * The window lives server-side in a ZSET and the whole
  * prune-count-admit-record step runs as one Lua script, so N application
  * instances share one window with no admit race (two concurrent requests at
- * limit-1 cannot both pass). Refused attempts are not recorded — symmetric
+ * limit-1 cannot both pass).
+ *
+ * THAT IS TRUE OF CONCURRENCY AND NOT OF TIME. The prune uses the timestamp the
+ * CALLING PROCESS supplies (`Date.now()`), never Redis's own `TIME`, so an
+ * instance whose clock has drifted prunes the shared window by its own reckoning
+ * — destructively, since the pruned entries are gone for every instance. At a
+ * drift of one window the ceiling collapses. Recorded as KAR-RSK-047 with its
+ * treatment; not changed here because it alters the script every limiter on the
+ * surface shares. Refused attempts are not recorded — symmetric
  * with the in-process limiter.
  *
  * Store failures are surfaced as `RateLimitStoreError` and DECIDED ABOUT in
@@ -66,6 +74,31 @@ export interface RedisEvalClient {
  * with no offline queue it would be rejected and the fail-closed policies
  * would refuse a request over a store that is up.
  */
+/**
+ * How long one rate-limit command may take before it is an error.
+ *
+ * A REFUSED CONNECTION WAS THE ONLY FAILURE THIS CLIENT COULD SEE. With no
+ * command timeout — and ioredis has no default — a Redis that ACCEPTS the
+ * connection and then stops answering parks the guard forever. Reproduced
+ * with a proxy that forwards normally until it sees an `EVAL` and then
+ * silences upstream: `connect()` returned true, the client reported `ready`,
+ * and both a fail-closed and a fail-open policy were still pending after 15
+ * seconds. The Fastify server is deliberately booted with no request,
+ * connection or handler timeout, so nothing above the guard would have ended
+ * it either — the request had already been authenticated and was holding a
+ * database lease.
+ *
+ * That is the difference between "Redis is down", which this client handled
+ * correctly in 0 ms, and "Redis is slow" — an AOF rewrite stalling on fsync,
+ * memory pressure, a silent partition — which it could not handle at all. A
+ * bounded command turns the second into the first, so the declared
+ * fail-closed and fail-open behaviours apply to both.
+ *
+ * One second is generous for a single `EVAL` against a local or same-network
+ * Redis and far below any human-visible latency budget.
+ */
+export const RATE_LIMIT_COMMAND_TIMEOUT_MS = 1_000;
+
 export function createRateLimitRedisClient(options: {
   readonly host: string;
   readonly port: number;
@@ -76,6 +109,7 @@ export function createRateLimitRedisClient(options: {
     enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
     lazyConnect: true,
+    commandTimeout: RATE_LIMIT_COMMAND_TIMEOUT_MS,
   });
 }
 

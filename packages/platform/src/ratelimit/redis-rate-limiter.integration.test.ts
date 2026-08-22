@@ -8,6 +8,7 @@
  * evidence (same stance as the database suites).
  */
 
+import net from 'node:net';
 import { RATE_LIMIT_POLICIES } from './policy.js';
 import { SecretValue } from '../config/secret-value.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -16,6 +17,7 @@ import { Redis } from 'ioredis';
 
 import { RateLimitRedisConnection } from './redis-connection.js';
 import {
+  RATE_LIMIT_COMMAND_TIMEOUT_MS,
   createRateLimitRedisClient,
   RateLimitStoreError,
   RedisSlidingWindowRateLimiter,
@@ -187,6 +189,53 @@ describe.skipIf(unreachable !== null)('RateLimitRedisConnection (live Redis)', (
       await connection.close();
     }
   });
+
+  it('bounds a command against a store that ACCEPTS and then stops answering', async () => {
+    // "REDIS IS DOWN" AND "REDIS IS SLOW" ARE DIFFERENT FAILURES, and this
+    // client could only see the first. The test above proves a refused
+    // connection is reported in milliseconds. This one proves the other case:
+    // a socket that connects, completes the handshake, and then never replies.
+    //
+    // Without a command timeout — and ioredis has no default — the guard
+    // parked forever. The Fastify server is deliberately booted with no
+    // request, connection or handler timeout, so nothing above the guard would
+    // have ended it either, and the request had already been authenticated and
+    // was holding a database lease. Every declared fail-closed and fail-open
+    // behaviour was unreachable for the entire class.
+    //
+    // The proxy below is the reproduction: it accepts, speaks the handshake by
+    // forwarding to the real Redis, and then goes silent on the first command
+    // after the connection reports ready.
+    const silent = net.createServer((socket) => {
+      const upstream = net.connect(redisPort, redisHost);
+      let commands = 0;
+      socket.on('data', (chunk: Buffer) => {
+        commands += 1;
+        // Let the handshake through; swallow the first real command.
+        if (commands > 2) return;
+        upstream.write(chunk);
+      });
+      upstream.on('data', (chunk: Buffer) => socket.write(chunk));
+      socket.on('error', () => upstream.destroy());
+      upstream.on('error', () => socket.destroy());
+      socket.on('close', () => upstream.destroy());
+    });
+    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', resolve));
+    const address = silent.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+
+    const client = createRateLimitRedisClient({ host: '127.0.0.1', port });
+    try {
+      await client.connect();
+      const started = Date.now();
+      await expect(client.eval('return 1', 0)).rejects.toThrow();
+      // Bounded, and bounded by OUR number rather than by a socket giving up.
+      expect(Date.now() - started).toBeLessThan(RATE_LIMIT_COMMAND_TIMEOUT_MS * 5);
+    } finally {
+      client.disconnect();
+      await new Promise<void>((resolve) => silent.close(() => resolve()));
+    }
+  }, 30_000);
 
   it('closes a connected client cleanly, leaving nothing to reconnect', async () => {
     const client = createRateLimitRedisClient({ host: redisHost, port: redisPort });

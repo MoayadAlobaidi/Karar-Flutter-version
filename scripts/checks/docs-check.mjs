@@ -754,6 +754,25 @@ function readControlMatrix(root) {
   if (!fs.existsSync(full)) return null;
   const text = fs.readFileSync(full, 'utf8');
   const ids = new Set([...text.matchAll(/^\|\s*(KAR-CTL-\d+)\s*\|/gm)].map((m) => m[1]));
+  // PER-STATUS counts, derived from the rows themselves. Checking only the sum
+  // let a tally be wrong by thirteen controls and still pass: moving
+  // `17 DESIGNED / 83 IMPLEMENTED` to `30 DESIGNED / 70 IMPLEMENTED` preserves
+  // the total and inverts what the matrix says about how much of the control
+  // set actually has a running mechanism — which is the number every framework
+  // view and every gate report quotes.
+  const byStatus = { DESIGNED: 0, IMPLEMENTED: 0, DEFERRED: 0, EXCEPTION: 0 };
+  const seen = new Set();
+  for (const m of text.matchAll(/^\|\s*(KAR-CTL-\d+)\s*\|(.*)$/gm)) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    for (const cell of m[2].split('|').map((c) => c.trim())) {
+      const status = /^(DESIGNED|IMPLEMENTED|DEFERRED|EXCEPTION)(\s*\[[^\]]*\])?$/.exec(cell);
+      if (status !== null) {
+        byStatus[status[1]] += 1;
+        break;
+      }
+    }
+  }
   // The newest declared tally, in the form the matrix writes it:
   // `17 DESIGNED / 83 IMPLEMENTED / 15 DEFERRED / 1 EXCEPTION = 116`.
   const tallies = [
@@ -768,7 +787,7 @@ function readControlMatrix(root) {
     total: m[5] === undefined ? null : Number(m[5]),
     index: m.index,
   }));
-  return { path: 'docs/compliance/control-matrix.md', ids, tallies, text };
+  return { path: 'docs/compliance/control-matrix.md', ids, byStatus, tallies, text };
 }
 
 /**
@@ -930,7 +949,12 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
         // without the sentences that said it being revisited.
         if (
           built.length > 0 &&
-          /\b(?:every|all(?: seven)?|each)\s+capabilit(?:y|ies)\s+(?:is|are|remains?|stays?)\s+(?:still\s+)?`?NOT_IMPLEMENTED`?/i.test(
+          // The NOUN is a list, because the claim is about the registry and a
+          // writer may reach for any word that names its contents. It matched
+          // only `capability`/`capabilities`, and a live document said "every
+          // registry ENTRY is NOT_IMPLEMENTED" — identical meaning, one word
+          // apart, and the rule was blind to it.
+          /\b(?:every|all(?: seven)?|each)\s+(?:capabilit(?:y|ies)|registry entr(?:y|ies)|entr(?:y|ies) in the registry)\s+(?:is|are|remains?|stays?)\s+(?:still\s+)?`?NOT_IMPLEMENTED`?/i.test(
             block.text,
           )
         ) {
@@ -991,6 +1015,21 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
             `${matrix.path}: the newest declared tally sums to ${summed} but the file holds ` +
               `${actual} KAR-CTL rows`,
           );
+        }
+        // Each status, not just the total. A tally that sums correctly out of
+        // the wrong parts is the shape that survived every previous check.
+        for (const [status, declaredCount] of [
+          ['DESIGNED', newest.designed],
+          ['IMPLEMENTED', newest.implemented],
+          ['DEFERRED', newest.deferred],
+          ['EXCEPTION', newest.exception],
+        ]) {
+          if (declaredCount !== matrix.byStatus[status]) {
+            problems.push(
+              `${matrix.path}: the newest declared tally says ${declaredCount} ${status} but the ` +
+                `rows hold ${matrix.byStatus[status]}`,
+            );
+          }
         }
         if (newest.total !== null && newest.total !== actual) {
           problems.push(
@@ -1791,6 +1830,9 @@ function buildComplianceFixture(options = {}) {
       '',
       'Every capability is NOT_IMPLEMENTED and deployed nowhere.',
       '',
+      // The same claim in the words a live document actually used.
+      'Every registry entry is NOT_IMPLEMENTED and deployed nowhere.',
+      '',
       'TRANSACTIONS is deployed to production and available to callers.',
       '',
       'No Phase 4 compliance GATE has been executed.',
@@ -1869,29 +1911,39 @@ function buildComplianceFixture(options = {}) {
   return root;
 }
 
+// The expectations name the FILE and the CLAIM, never the line. A line number
+// is not what any of these cases is about, and pinning one made an insertion
+// anywhere in the fixture shift every case below it — brittleness that costs
+// review attention without buying precision. `seed-section` is the exception
+// and keeps its line, because WHICH of its two dated sections a finding lands
+// in is exactly the property that case exists to hold.
 const COMPLIANCE_SELF_TEST_CASES = [
   {
-    expect: /seed-stale\.md:3 says TRANSACTIONS is NOT_IMPLEMENTED/,
+    expect: /seed-stale\.md:\d+ says TRANSACTIONS is NOT_IMPLEMENTED/,
     why: 'the exact stale sentence found in the Phase 5 report',
   },
   {
-    expect: /seed-stale\.md:5 says every capability is NOT_IMPLEMENTED/,
+    expect: /seed-stale\.md:\d+ says every capability is NOT_IMPLEMENTED/,
     why: 'the universal form, which the per-capability rule cannot see',
   },
   {
-    expect: /seed-stale\.md:7 says TRANSACTIONS is deployed or available/,
+    expect: /seed-stale\.md:\d+ says every capability is NOT_IMPLEMENTED/,
+    why: '"registry entry" is the same claim in a different noun, and the rule was blind to it',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says TRANSACTIONS is deployed or available/,
     why: 'IMPLEMENTED conflated with DEPLOYED — the misreading the registry exists to prevent',
   },
   {
-    expect: /seed-stale\.md:9 denies a Phase 4 gate/,
+    expect: /seed-stale\.md:\d+ denies a Phase 4 gate/,
     why: 'the exact stale sentence found in the compliance README',
   },
   {
-    expect: /seed-stale\.md:11 says Phase 5 is NOT STARTED/,
+    expect: /seed-stale\.md:\d+ says Phase 5 is NOT STARTED/,
     why: 'a phase status contradicting the README row',
   },
   {
-    expect: /seed-stale\.md:13 says BUDGETS is IMPLEMENTED/,
+    expect: /seed-stale\.md:\d+ says BUDGETS is IMPLEMENTED/,
     why: 'the OTHER direction: prose claiming more than the registry holds',
   },
   {
@@ -1903,7 +1955,7 @@ const COMPLIANCE_SELF_TEST_CASES = [
     why: 'a dated record for the CURRENT phase is current state, not history',
   },
   {
-    expect: /seed-stale\.md:15 carries the \[P4\] marker and says no pull request exists/,
+    expect: /seed-stale\.md:\d+ carries the \[P4\] marker and says no pull request exists/,
     why: 'the gate document names a Phase 4 pull request, so denying it is stale',
   },
 ];
@@ -1935,7 +1987,7 @@ const COMPLIANCE_MUTATION_CASES = [
   {
     name: 'registry flipped to NOT_IMPLEMENTED',
     options: { transactionsImplementation: 'NOT_IMPLEMENTED' },
-    forbid: /seed-stale\.md:3 says TRANSACTIONS is NOT_IMPLEMENTED/,
+    forbid: /seed-stale\.md:\d+ says TRANSACTIONS is NOT_IMPLEMENTED/,
     expect: /seed-clean\.md:\d+ says TRANSACTIONS is IMPLEMENTED/,
     why: 'with the registry unbuilt, the denial becomes true and the claim becomes false — both must move',
   },
