@@ -57,6 +57,7 @@
 //
 // Zero dependencies: node: builtins only.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -895,6 +896,52 @@ function currentStateFiles(root) {
  *      exempt by the same per-block rule everything else here uses — a dated
  *      record quoting the status it saw is history, not a fork.
  */
+
+/**
+ * Every path git tracks, once per process.
+ *
+ * `git ls-files` rather than `fs.existsSync`, so the answer is the same in a
+ * working tree with build output in it and in a fresh clone. Falls back to the
+ * filesystem only where git cannot answer at all — a tarball checkout, or a
+ * self-test fixture, neither of which is a repository.
+ */
+let TRACKED = null;
+function trackedPaths(root) {
+  if (TRACKED !== null && TRACKED.root === root) return TRACKED.set;
+  let set;
+  try {
+    const out = execFileSync('git', ['-C', root, 'ls-files'], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    // Files AND the directories that contain them. `git ls-files` lists only
+    // files, and an evidence row routinely cites a directory — "the migrations
+    // live in `packages/platform/db/migrations/`" — which is a true statement
+    // about the repository and must not read as a missing path.
+    set = new Set();
+    for (const file of out.split('\n').filter(Boolean)) {
+      set.add(file);
+      const parts = file.split('/');
+      for (let i = 1; i < parts.length; i += 1) {
+        const dir = parts.slice(0, i).join('/');
+        set.add(dir);
+        set.add(`${dir}/`);
+      }
+    }
+  } catch {
+    set = null;
+  }
+  if (set === null || set.size === 0) {
+    // No git here. Answer from disk, and say so by behaving as the old rule
+    // did rather than by reporting every path as missing.
+    set = {
+      has: (candidate) => fs.existsSync(path.join(root, candidate)),
+    };
+  }
+  TRACKED = { root, set };
+  return set;
+}
+
 function readRegisterRows(root, file, idPattern, statuses) {
   const full = path.join(root, 'docs', 'compliance', file);
   if (!fs.existsSync(full)) return null;
@@ -1018,6 +1065,14 @@ function checkRegisterTraceability(root = REPO_ROOT) {
       // spaces, and a leading segment that exists as a top-level entry. A row
       // routinely backticks a status word, a SQL fragment or a URL, and none
       // of those is a path claim.
+      //
+      // "IN THE REPOSITORY" MEANS TRACKED BY GIT, not present on this disk.
+      // The first version asked the filesystem and passed locally while
+      // failing on CI, because it was standing in a working tree where the
+      // checker's own gitignored report had just been written. A row citing a
+      // build output is citing something a fresh clone does not have — which
+      // is exactly the fork this rule is for — and a check that only fails on
+      // other people's machines is worse than one that does not fail at all.
       for (const p of m[2].matchAll(/`([^`\s]+\/[^`\s]*)`/g)) {
         // A `path:line` citation is a citation of the path. The line number
         // is not part of the name and is routinely how an evidence row points
@@ -1030,7 +1085,7 @@ function checkRegisterTraceability(root = REPO_ROOT) {
         const top = candidate.split('/')[0];
         if (!fs.existsSync(path.join(root, top))) continue;
         if (candidate.includes('*')) continue;
-        if (fs.existsSync(path.join(root, candidate))) continue;
+        if (trackedPaths(root).has(candidate)) continue;
         problems.push(
           `docs/compliance/evidence-register.md:${line} ${m[1]} cites \`${candidate}\`, which is not in the repository`,
         );
@@ -2324,6 +2379,11 @@ function buildTraceabilityFixture(options = {}) {
 
   write('README.md', ['# R', '', '| Current phase | **5 — IN PROGRESS** |', ''].join('\n'));
   write('src/real.ts', 'export const real = 1;\n');
+  // A file that EXISTS and that git does not track. The fixture root is not a
+  // git repository at all, so `trackedPaths` falls back to the filesystem —
+  // which is exactly the environment the old rule was always in, and is how
+  // this case reproduces the CI failure locally.
+  if (options.untracked === true) write('build/out.json', '{}\n');
   write(
     'docs/compliance/evidence-register.md',
     [
@@ -2362,6 +2422,26 @@ function buildTraceabilityFixture(options = {}) {
       '',
     ].join('\n'),
   );
+  // A REAL git repository, because the rule asks git. A fixture that was only
+  // a directory would fall back to the filesystem and could never reproduce
+  // the case that matters: a file that exists on disk and is not tracked,
+  // which is what a build product is and what passed locally while failing
+  // on CI.
+  const git = (...args) => {
+    try {
+      execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' });
+    } catch {
+      // No git on this machine. The fixture then exercises the documented
+      // filesystem fallback instead, and the untracked case is skipped by
+      // its own expectation being unreachable — which the runner reports.
+    }
+  };
+  git('init', '-q');
+  git('config', 'user.email', 'selftest@example.invalid');
+  git('config', 'user.name', 'self test');
+  git('add', 'README.md', 'src', 'docs');
+  git('commit', '-qm', 'fixture');
+
   return root;
 }
 
@@ -2389,6 +2469,25 @@ const TRACEABILITY_CASES = [
       /citing\.md:\d+ says EV-001 is COLLECTED, but .*evidence-register\.md records PENDING/,
     ],
     why: 'a corpus quoting a status its register does not hold is the fork this control exists for',
+  },
+  {
+    name: 'a build product cited as a location',
+    options: { evPath: 'build/out.json', untracked: true },
+    expect: [/EV-001 cites `build\/out\.json`, which is not in the repository/],
+    why:
+      'MUTATION of the question itself: the file EXISTS on disk and git does not track it. ' +
+      'The first version of this rule asked the filesystem, passed locally in a working tree ' +
+      "with the checker's own report freshly written into it, and failed on CI — a check that " +
+      "only fails on other people's machines is worse than one that does not fail at all",
+  },
+  {
+    name: 'a directory citation',
+    options: { evPath: 'src/' },
+    expect: [],
+    forbid: /cites `src\/`/,
+    why:
+      '`git ls-files` lists files, and an evidence row routinely cites a directory. Treating a ' +
+      'tracked directory as missing would report every such row',
   },
   {
     name: 'the clean tree',
