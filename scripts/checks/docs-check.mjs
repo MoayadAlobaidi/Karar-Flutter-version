@@ -1133,6 +1133,92 @@ function checkComplianceCurrentState(root = REPO_ROOT) {
     }
   }
 
+  // --- Rule 5b: a phase whose gate record exists HAS evidence rows, and a
+  //     current-state document may not say otherwise.
+  //
+  // `docs/phases/phase-05.md` carried "None recorded yet … this foundation has
+  // not reached [a compliance gate]" under its Evidence produced heading, and
+  // kept carrying it after the gate executed and wrote ten evidence rows. The
+  // sentence was true when written and became false in a different file, which
+  // is the shape every stale claim in this corpus has had.
+  if (gatePhases !== null && declared !== null && gatePhases.gates.has(declared.phase)) {
+    const denials = [
+      /^\s*None recorded yet\b/im,
+      new RegExp(
+        `\\bhas not reached (?:one|a compliance gate)\\b|\\bno Phase ${declared.phase.replace('.', '\\.')} evidence (?:row|rows) (?:exist|has been)`,
+        'i',
+      ),
+    ];
+    for (const { rel, blocks } of blocksByFile) {
+      for (const block of blocks) {
+        for (const pattern of denials) {
+          if (pattern.test(block.text)) {
+            report(
+              rel,
+              block,
+              `denies that Phase ${declared.phase} evidence exists, but ` +
+                `docs/compliance/phase-compliance-gate.md carries a Phase ${declared.phase} gate ` +
+                'record and the evidence register carries its rows',
+            );
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 5c: the architecture self-test headline, derived from the runner.
+  //
+  // The phase report quoted the self-test as 70 cases in one paragraph and 86
+  // in another. The runner is the authority and it prints the number, so a
+  // prose figure that disagrees with the emitted report is checkable.
+  const archReportPath = path.join(root, 'scripts', 'checks', '.out', 'architecture-report.json');
+  const archReport = fs.existsSync(archReportPath) ? fs.readFileSync(archReportPath, 'utf8') : null;
+  if (archReport !== null) {
+    let cases;
+    try {
+      cases = JSON.parse(archReport)?.selfTest?.cases ?? null;
+    } catch {
+      cases = null;
+    }
+    if (typeof cases === 'number') {
+      // SCOPED TO THE SENTENCE, because there are two self-tests.
+      //
+      // The architecture runner and the documentation runner each print one and
+      // their counts differ. A rule that matched "self-test … N cases" anywhere
+      // reported the docs figure against the architecture number and called a
+      // correct sentence stale — the same over-broad matching this check exists
+      // to replace, committed by the check itself. The sentence has to say which
+      // runner it means, and one that does not is left alone.
+      const docsCases = selfTestCaseCount();
+      for (const { rel, blocks } of blocksByFile) {
+        for (const block of blocks) {
+          for (const sentence of block.text.split(/(?<=[.;])\s+/)) {
+            const isArchitecture = /arch:test|architecture (?:runner|suite|self-test)/i.test(
+              sentence,
+            );
+            const isDocs = /docs:check|documentation (?:runner|checks?|self-test)/i.test(sentence);
+            if (isArchitecture === isDocs) continue;
+            const expected = isArchitecture ? cases : docsCases;
+            const runner = isArchitecture
+              ? "the architecture runner's own report"
+              : "this runner's own case list";
+            for (const m of sentence.matchAll(/\bself-test\b[^.\n]{0,40}?\b(\d{2,4})\s*cases/gi)) {
+              if (Number(m[1]) !== expected) {
+                report(
+                  rel,
+                  block,
+                  `states a self-test of ${m[1]} cases; ${runner} records ${String(expected)}. ` +
+                    'Mark the figure HISTORICAL if it belongs to an earlier checkpoint',
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // --- Rule 5: the current phase's status, as the README declares it.
   if (declared !== null) {
     const p = declared.phase.replace('.', '\\.');
@@ -1783,6 +1869,13 @@ function buildComplianceFixture(options = {}) {
     ].join('\n'),
   );
 
+  // The architecture runner's emitted report, so the self-test-figure rule has
+  // an authority to compare prose against.
+  write(
+    'scripts/checks/.out/architecture-report.json',
+    JSON.stringify({ selfTest: { cases: 3, failures: [] } }),
+  );
+
   write(
     'docs/compliance/control-matrix.md',
     [
@@ -1841,6 +1934,12 @@ function buildComplianceFixture(options = {}) {
       '',
       'BUDGETS is IMPLEMENTED.',
       '',
+      // A gate record exists for this phase, so denying its evidence is stale.
+      'None recorded yet for this phase.',
+      '',
+      // A figure that names its runner and disagrees with it.
+      'pnpm arch:test self-test passes over 999 cases.',
+      '',
       // The PR fact, denied for the phase whose gate document names one. The
       // marker must OPEN the block, which is what keeps a contingency note
       // that merely MENTIONS other markers from being attributed to them.
@@ -1885,6 +1984,11 @@ function buildComplianceFixture(options = {}) {
       // from the gate record would reject the one sentence in the corpus that
       // is most carefully accurate.
       'The gate is written first: no Phase 5 pull request exists.',
+      '',
+      // Correct figures for both runners: neither may be reported.
+      'The architecture runner self-test passes over 3 cases.',
+      '',
+      'pnpm docs:check self-test ok over 4 cases.',
       '',
       'The baseline is ISO/IEC 27002:2022 with its 93 controls.',
       '',
@@ -1958,6 +2062,14 @@ const COMPLIANCE_SELF_TEST_CASES = [
     expect: /seed-stale\.md:\d+ carries the \[P4\] marker and says no pull request exists/,
     why: 'the gate document names a Phase 4 pull request, so denying it is stale',
   },
+  {
+    expect: /seed-stale\.md:\d+ denies that Phase 5 evidence exists/,
+    why: 'a phase whose gate record exists has evidence rows, and prose may not deny them',
+  },
+  {
+    expect: /seed-stale\.md:\d+ states a self-test of 999 cases/,
+    why: 'a figure that names the architecture runner must agree with what the runner reports',
+  },
 ];
 
 const COMPLIANCE_NEGATIVE_CASES = [
@@ -1978,6 +2090,10 @@ const COMPLIANCE_NEGATIVE_CASES = [
     forbid: /seed-clean\.md:1[0-9] denies a Phase 5 gate/,
     why: 'a Phase 5 gate record exists and a Phase 5 pull request does not — the two facts are derived separately, and the sentence is true',
   },
+  {
+    forbid: /seed-clean\.md:\d+ states a self-test of/,
+    why: 'both figures name their own runner and both are correct; a rule that could not tell the two runners apart reported one against the other',
+  },
 ];
 
 // Mutation cases: the derived fact is changed and the SAME prose must flip
@@ -1992,6 +2108,23 @@ const COMPLIANCE_MUTATION_CASES = [
     why: 'with the registry unbuilt, the denial becomes true and the claim becomes false — both must move',
   },
 ];
+
+/**
+ * How many cases this runner's own self-test holds.
+ *
+ * Derived from the case arrays rather than read from the emitted report,
+ * because the report is written AFTER the checks run — reading it would compare
+ * today's prose against yesterday's number.
+ */
+function selfTestCaseCount() {
+  return (
+    SELF_TEST_CASES.length +
+    NEGATIVE_SELF_TEST_CASES.length +
+    COMPLIANCE_SELF_TEST_CASES.length +
+    COMPLIANCE_NEGATIVE_CASES.length +
+    COMPLIANCE_MUTATION_CASES.length
+  );
+}
 
 function runSelfTest() {
   const fixtureRoot = buildSelfTestFixture();
