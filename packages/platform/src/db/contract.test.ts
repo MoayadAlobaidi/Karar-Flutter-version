@@ -22,6 +22,8 @@ import {
   verifyMigrations,
 } from './migrations.js';
 import { SecretValue } from '../config/secret-value.js';
+import { dropScratchDatabase } from './scratch-database.js';
+import { skipUnlessDatabaseRequired } from './connection-budget.js';
 
 // Contract tests against a real PostgreSQL (docs/architecture/
 // database-portability.md section 7). All database tests live in this one
@@ -69,6 +71,7 @@ const realFilenames = realMigrations.map((file) => file.filename);
 const realVersions = realMigrations.map((file) => file.version);
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('platform contract suite', unreachable);
 if (unreachable !== null) {
   const target = `${superuserMaintenanceProfile.host}:${superuserMaintenanceProfile.port}`;
 
@@ -149,7 +152,7 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
       for (const database of createdDatabases) {
-        await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+        await dropScratchDatabase(maintenance, database);
       }
     } finally {
       await maintenance.end();
@@ -166,6 +169,14 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
   let probeDir: string; // real migrations + 0003_migration_probe
   let driftDir: string; // real migrations, mutated for drift scenarios
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('brings a fresh database from zero to latest and verifies clean', async () => {
     dbA = scratchDbName('a');
     createdDatabases.push(dbA);
@@ -186,8 +197,16 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
       expect(report.pending).toEqual([]);
       expect(report.applied.map((row) => row.status)).toEqual(realFilenames.map(() => 'ok'));
     });
-  });
+  }, 30_000);
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('creates a second fresh database identically, from zero', async () => {
     dbB = await createScratchDatabase('b');
     await withAdapter('migrator', dbB, async (adapter) => {
@@ -202,7 +221,7 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
         r.applied.map(({ version, name, checksum }) => ({ version, name, checksum }));
       expect(shape(report)).toEqual(shape(first));
     });
-  });
+  }, 30_000);
 
   it('is idempotent: repeated migrate and verify are no-ops with stable reports', async () => {
     await withAdapter('migrator', dbA, async (adapter) => {
@@ -261,6 +280,14 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
     });
   });
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('denies DDL to karar_app and allows exactly the granted DML', async () => {
     probeDir = await createScratchMigrationsDir();
     await writeFile(join(probeDir, '9998_migration_probe.sql'), PROBE_MIGRATION);
@@ -308,7 +335,7 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
       );
       expect(rows.rows[0]?.count).toBe('1');
     });
-  });
+  }, 30_000);
 
   it('adapter contract: session timeouts, transactions, error mapping, shutdown', async () => {
     const adapter = new PostgresPersistenceAdapter(
@@ -432,6 +459,14 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
     });
   });
 
+  // PROVISIONS A DATABASE, so the 5-second default is the wrong bound. Measured
+  // alone this test takes ~0.4s; under the full suite the file it lives in
+  // takes ~20s, because every integration suite here is contending for one
+  // PostgreSQL. It timed out once in ten consecutive canonical runs.
+  //
+  // This is a TIMEOUT ADJUSTMENT, not a fix: nothing about the test got
+  // faster. 30s is two orders of magnitude above the unloaded cost and still
+  // well inside "something is genuinely hung", which is what a timeout is for.
   it('reset-local is double-guarded and rebuilds the database from zero', async () => {
     const guardEnv = { ...process.env };
     delete guardEnv.KARAR_ENV;
@@ -470,7 +505,7 @@ describe.skipIf(unreachable !== null)('database contract (live PostgreSQL)', () 
       );
       expect(probe.rows[0]?.exists).toBeNull();
     });
-  });
+  }, 30_000);
 });
 
 describe('migration file validation (no database required)', () => {

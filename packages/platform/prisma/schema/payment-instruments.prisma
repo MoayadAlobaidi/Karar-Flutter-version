@@ -1,0 +1,89 @@
+// payment-instruments module mapping (migration 0098_payment_instruments.sql).
+// Prisma maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma); `make prisma-drift` is what keeps this file honest.
+//
+// THE MOST IMPORTANT PROPERTY OF THIS MODEL IS A FIELD THAT IS NOT HERE.
+//
+// There is NO balance, NO amount, NO limit, NO available figure and NO
+// currency — because there is no such column, because a card is not a balance
+// (ADR-0028). Two virtual cards on one wallet are two rows against ONE
+// account, and a schema that permitted a second balance would eventually hold
+// one. The only Int on this model is `version`, the optimistic-concurrency
+// token: it counts writes, not money. There is deliberately no Decimal, no
+// Float and no BigInt anywhere near this model, and the module's
+// no-instrument-balance-columns suite asserts the live table's column set
+// EXHAUSTIVELY so that adding one fails a test rather than shipping.
+//
+// The mask and the subject's label are Bytes: ciphertext, nonce and auth tag
+// per field, with the algorithm and key version per row. No plaintext field
+// exists for either, because no plaintext column exists for either — both are
+// HIGHLY_SENSITIVE_FINANCIAL and are treated exactly as the
+// financial-accounts, transactions and financial-connections narrative
+// columns are. The mask ciphertext is bounded at EIGHT bytes in the
+// migration, which under a length-preserving cipher is eight characters: no
+// PAN, IBAN or MSISDN fits, and the domain refuses PAN-shaped input before a
+// key is ever used.
+//
+// ALSO NOT EXPRESSIBLE HERE, and worth naming: there is NO @@unique over
+// (account, instrument type) or (account, mask), and there cannot be a useful
+// one over the mask at all — a fresh nonce per encryption makes the
+// ciphertext non-deterministic. Many instruments per account is the ORDINARY
+// case (ADR-0028), so the primary key is the only unique index on the table.
+//
+// Deliberately NOT expressed here, enforced by the migration and its tests
+// instead: every CHECK constraint — the instrument-type and status
+// vocabularies, the eight-byte mask bound, the nonce and tag lengths — plus
+// the identity trigger that freezes WHICH ACCOUNT an instrument spends from
+// (SQLSTATE KAR30) and the version discipline (KAR31), RLS enable/force with
+// the tenant+user principal policy, and the grants.
+//
+// tenant_id, user_id and account_id are plain scalars by design
+// (data-model.md §2): no relation crosses a module boundary, and
+// accountReferenceType declares what that uuid points at without importing
+// another module's types.
+
+model PaymentInstrument {
+  id                     String   @id @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  userId                 String   @map("user_id") @db.Uuid
+
+  // The ONE balance-bearing account this instrument spends from. Singular by
+  // schema, frozen by trigger after insert.
+  accountId              String   @map("account_id") @db.Uuid
+  accountReferenceType   String   @map("account_reference_type")
+
+  // PHYSICAL_CARD | VIRTUAL_CARD | PREPAID_CARD | TOKENIZED_CARD |
+  // QR_PAYMENT_IDENTITY | OTHER. TOKENIZED_CARD names the fact that a token
+  // exists in the world; no column here could hold one.
+  instrumentType         String   @map("instrument_type")
+  // ACTIVE | SUSPENDED | EXPIRED | CANCELLED. No value means connected,
+  // provisioned, synced or authorized, and none may be added.
+  status                 String
+
+  hsfAlgorithm           String   @map("hsf_algorithm")
+  hsfKeyVersion          String   @map("hsf_key_version")
+
+  // The mask, ciphertext only, bounded at eight bytes by the migration.
+  instrumentMaskCiphertext Bytes  @map("instrument_mask_ciphertext")
+  instrumentMaskNonce      Bytes  @map("instrument_mask_nonce")
+  instrumentMaskAuthTag    Bytes  @map("instrument_mask_auth_tag")
+
+  // The name the SUBJECT gave it. Required: two virtual cards on one wallet
+  // are indistinguishable without one, and every way of deriving a label is
+  // worse than asking.
+  displayLabelCiphertext Bytes    @map("display_label_ciphertext")
+  displayLabelNonce      Bytes    @map("display_label_nonce")
+  displayLabelAuthTag    Bytes    @map("display_label_auth_tag")
+
+  // The only Int on this model. It counts writes, not money.
+  version                Int      @default(1)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @map("updated_at") @db.Timestamptz(6)
+
+  // Two non-unique indexes, and no unique one beyond the primary key. "What
+  // spends from this account?" and "what do I hold?" are the two questions;
+  // neither may be answered by a constraint that forbids a second card.
+  @@index([tenantId, userId, accountId, createdAt], map: "payment_instruments_account_idx")
+  @@index([tenantId, userId, createdAt], map: "payment_instruments_owner_idx")
+  @@map("payment_instruments")
+}

@@ -96,6 +96,7 @@ import {
   type ClientContextSource,
 } from './bootstrap-adapters.js';
 import { toBootstrapCapability } from './capability-view-adapter.js';
+import type { FinancialCapabilityResolution } from './financial-capability-gate.js';
 import { governingJurisdictionFor } from './effective-jurisdiction.js';
 import { JurisdictionCeilingSource } from './jurisdiction-ceiling-source.js';
 
@@ -121,7 +122,17 @@ export interface Phase35CompositionInput {
   readonly edgeContext: ClientContextSource;
 }
 
-export function composePhase35Modules(input: Phase35CompositionInput): DynamicModule[] {
+export interface Phase35Composition {
+  readonly modules: DynamicModule[];
+  /**
+   * The capability resolver the bootstrap document is projected from, handed
+   * onward so the Phase 5 financial gate refuses from the SAME facts rather
+   * than from a second lookup of its own.
+   */
+  readonly capabilityResolution: FinancialCapabilityResolution;
+}
+
+export function composePhase35Modules(input: Phase35CompositionInput): Phase35Composition {
   const { prisma, recordAudit, clock, environment, logger } = input;
 
   // Jurisdiction — reads, plus the ONE subject-facing write: a caller
@@ -188,21 +199,25 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
   );
 
   // Capability — its ceiling comes from the jurisdiction resolution above.
+  //
+  // The resolver is named rather than inlined because it is SHARED: the
+  // bootstrap document's client view is projected from it, and the Phase 5
+  // financial gate refuses execution from it (composition/financial-capability-gate.ts).
+  // One instance, one set of facts — so "the client was told the capability is
+  // not navigable" and "the route refuses" cannot drift apart.
   const registry = productionRegistryView();
-  const clientCapabilityView = new ResolveClientCapabilityView(
+  const capabilityResolution = new ResolveCapabilityAvailability(
     registry,
-    new ResolveCapabilityAvailability(
-      registry,
-      environment,
-      new JurisdictionCeilingSource({ assignments: userAssignments, activePackVersion, clock }),
-      new PrismaCapabilityAvailabilityRepository(prisma),
-      new PrismaTenantCapabilityEntitlementRepository(prisma),
-      new ConsentGateAdapter(input.consentStatus),
-      new LicenceDirectoryAdapter(input.resolveEntity, input.entities, input.licences),
-      new NoProvidersConfiguredSource(),
-      new CapabilityAuditTrail(recordAudit, environment),
-    ),
+    environment,
+    new JurisdictionCeilingSource({ assignments: userAssignments, activePackVersion, clock }),
+    new PrismaCapabilityAvailabilityRepository(prisma),
+    new PrismaTenantCapabilityEntitlementRepository(prisma),
+    new ConsentGateAdapter(input.consentStatus),
+    new LicenceDirectoryAdapter(input.resolveEntity, input.entities, input.licences),
+    new NoProvidersConfiguredSource(),
+    new CapabilityAuditTrail(recordAudit, environment),
   );
+  const clientCapabilityView = new ResolveClientCapabilityView(registry, capabilityResolution);
 
   // Operating entity — the CLIENT-SAFE projection only. The reader SELECTs
   // the reviewed columns; the id it reads is never caller-supplied, it comes
@@ -342,7 +357,7 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
     },
   };
 
-  return [
+  const modules: DynamicModule[] = [
     BootstrapApiModule.register({
       useCases: {
         getBootstrap: new GetBootstrap(bootstrapDeps),
@@ -394,4 +409,6 @@ export function composePhase35Modules(input: Phase35CompositionInput): DynamicMo
       clock,
     }),
   ];
+
+  return { modules, capabilityResolution };
 }

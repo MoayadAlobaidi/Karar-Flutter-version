@@ -36,6 +36,30 @@ export class RateLimitKeyHasher {
     return this.digest(`id:${id}`);
   }
 
+  /**
+   * The subject a FINANCIAL budget is charged to: one principal in one tenant.
+   *
+   * Deliberately not `idKey(userId)`. A person bound to two tenants would
+   * otherwise share one budget across organisations, so one tenant's activity
+   * could refuse the other's — and the refusal would be a signal about the
+   * other tenant. The `subject:` domain tag keeps the namespace disjoint from
+   * `email:`, `ip:` and `id:`.
+   *
+   * Both inputs are SERVER-derived, from the session's principal binding.
+   * Neither is ever taken from a request body, query or header.
+   */
+  subjectKey(tenantId: string, userId: string): RateLimitSubjectKey {
+    // LENGTH-PREFIXED, not separator-joined. The keyed fingerprint provider
+    // in modules/statement-imports states the rule this follows: "a `|`
+    // separator alone is a canonicalisation bug waiting for an identifier that
+    // contains one". Both inputs are UUIDs today and no collision is
+    // reachable; the point is that it stays unreachable when an identifier
+    // type changes.
+    return this.digest(
+      `subject:${String(tenantId.length)}:${tenantId}:${String(userId.length)}:${userId}`,
+    );
+  }
+
   private digest(material: string): string {
     return createHmac('sha256', this.pepper.unwrap()).update(material).digest('hex').slice(0, 32);
   }

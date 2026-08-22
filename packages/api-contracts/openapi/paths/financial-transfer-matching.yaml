@@ -1,0 +1,283 @@
+# transfer-matching surface — path-item fragments (ADR-0009: authored by
+# hand, never generated from code). The phase lead merges these into
+# openapi.yaml via $ref per path, e.g.:
+#   /financial/transfer-matches:
+#     $ref: './paths/financial-transfer-matching.yaml#/~1financial~1transfer-matches'
+#
+# WHAT A TRANSFER MATCH IS: a relationship between TWO of one subject's own
+# transactions that were one movement of their own money — the outflow from
+# one account and the inflow into another. It is a RELATIONSHIP, not a
+# transaction, and it is deliberately not a third record of the amount.
+#
+# Contract rules made visible here:
+#   * THE MATCH CARRIES NO AMOUNT, NO TOTAL AND NO NET. The figures live on
+#     the two transactions it names; a copy on the relationship would be a
+#     third number free to disagree with both. `version` is the only number in
+#     the response, and there is no count of matched money anywhere.
+#   * A SUGGESTION CHANGES NOTHING. Only the person's confirmation makes a
+#     match authoritative, and `authoritative` is emitted on the wire so a
+#     client renders that distinction rather than inferring it from a status
+#     it half-recognises.
+#   * REJECTION IS NOT DELETION. A rejected match keeps its row, so the same
+#     pair is not suggested again as though nobody had ever looked. It is also
+#     how a person WITHDRAWS a confirmation: CONFIRMED -> REJECTED is a legal
+#     transition, and there is no un-confirm verb pretending otherwise.
+#   * There is no SUGGEST operation on this surface. Suggestion is produced by
+#     the platform from the subject's own transactions; a client-driven
+#     "match these two" route would let a person assert a relationship the
+#     equal-and-opposite rule refuses, and its contract has not been chosen.
+#   * EVERY operation acts for the AUTHENTICATED principal. No `userId`, no
+#     `tenantId`, anywhere.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`,
+#     served under the media type the single writer in
+#     apps/api/src/errors/problem-response.ts emits.
+
+/financial/transfer-matches:
+  get:
+    operationId: listOwnTransferMatches
+    summary: List the transfer matches suggested for the caller's own transactions
+    description: >-
+      Every match the AUTHENTICATED principal owns, newest suggestion first,
+      or one state of them. A client that wants only the decisions still
+      pending asks for `state=SUGGESTED`; a client that wants what the person
+      has actually agreed asks for `state=CONFIRMED`.
+    tags: [transfer-matching]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
+      - name: state
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/MatchState'
+    responses:
+      '200':
+        description: The caller's own transfer matches, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/TransferMatchView'
+                page:
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/transfer-matches/{matchId}/confirmation:
+  post:
+    operationId: confirmOwnTransferMatch
+    summary: Confirm that two of the caller's transactions were one movement of their money
+    description: >-
+      The subject's own decision, and the only thing that makes a match
+      authoritative. The moment of the decision is taken from the server's
+      clock and is never accepted from the caller — a client-supplied decision
+      time is a client-supplied fact about a person's intent.
+
+      Idempotent: confirming an already-confirmed match answers 200 with the
+      current row and does not bump its version.
+    tags: [transfer-matching]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/MatchIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion: { type: integer, minimum: 1 }
+    responses:
+      '200':
+        description: The confirmed match.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/TransferMatchView'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: No such match for this principal (code TRANSFER_MATCH_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: >-
+          The match changed under the caller, or the transition is not
+          available from its current state (codes
+          TRANSFER_MATCH_VERSION_CONFLICT, TRANSFER_MATCH_RULE_VIOLATED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/transfer-matches/{matchId}/rejection:
+  post:
+    operationId: rejectOwnTransferMatch
+    summary: Reject a suggested match, or withdraw a confirmation
+    description: >-
+      Legal from SUGGESTED and from CONFIRMED. From CONFIRMED it is how a
+      person withdraws a decision they made — the row is kept, so the platform
+      remembers that this pair was looked at and does not suggest it again as
+      though it never had been.
+
+      A rejected match is terminal: it cannot be confirmed afterwards.
+    tags: [transfer-matching]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: '#/components/MatchIdParameter'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [expectedVersion]
+            properties:
+              expectedVersion: { type: integer, minimum: 1 }
+    responses:
+      '200':
+        description: The rejected match.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/TransferMatchView'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '404':
+        description: No such match for this principal (code TRANSFER_MATCH_NOT_FOUND).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '409':
+        description: >-
+          The match changed under the caller, or the transition is not
+          available from its current state (codes
+          TRANSFER_MATCH_VERSION_CONFLICT, TRANSFER_MATCH_RULE_VIOLATED).
+        content:
+          application/problem+json:
+            schema:
+              $ref: './paths/financial-shared.yaml#/components/Problem'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  MatchIdParameter:
+    name: matchId
+    in: path
+    required: true
+    description: One of the CALLER'S OWN matches. Any other id answers 404.
+    schema: { type: string, format: uuid }
+  MatchState:
+    type: string
+    enum: [SUGGESTED, CONFIRMED, REJECTED]
+  SuggestionBasis:
+    type: string
+    description: >-
+      Why the platform suggested this pair. One value today, and it is a
+      RULE, not a guess: two amounts equal and opposite, in the same currency,
+      within a stated window.
+    enum: [EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW]
+  MatchSideView:
+    type: object
+    additionalProperties: false
+    required: [transactionId, accountId, currency]
+    description: >-
+      One side of the relationship. It carries no amount and no date: those
+      belong to the transaction it names, which the caller can read on the
+      transactions surface. A copy here would be free to disagree with it.
+    properties:
+      transactionId: { type: string, format: uuid }
+      accountId: { type: string, format: uuid }
+      currency: { type: string, pattern: '^[A-Z]{3}$' }
+  TransferMatchView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        matchId,
+        outflow,
+        inflow,
+        state,
+        authoritative,
+        suggestionBasis,
+        suggestionWindow,
+        subjectDecidedAt,
+        firstSuggestedAt,
+        createdAt,
+        updatedAt,
+        version,
+      ]
+    description: >-
+      Deliberately absent, and to stay absent: any amount, total, net or
+      converted figure; any exchange rate (cross-currency movements are not
+      matchable, so there is nothing to convert); any confidence or score; any
+      category; and the row's `tenantId` and `userId`.
+    properties:
+      matchId: { type: string, format: uuid }
+      outflow:
+        $ref: '#/components/MatchSideView'
+      inflow:
+        $ref: '#/components/MatchSideView'
+      state:
+        $ref: '#/components/MatchState'
+      authoritative:
+        type: boolean
+        description: >-
+          True only for CONFIRMED. Stated on the wire so nothing downstream
+          has to decide for itself whether a suggestion counts.
+      suggestionBasis:
+        $ref: '#/components/SuggestionBasis'
+      suggestionWindow:
+        type: string
+        description: >-
+          The VERSION LABEL of the rule that produced the suggestion, e.g.
+          `equal-and-opposite/same-currency/P3D/v1`. A person can tell later
+          which rule looked at their data.
+      subjectDecidedAt:
+        type: [string, 'null']
+        format: date-time
+        description: When the person decided. Null while they have not.
+      firstSuggestedAt: { type: string, format: date-time }
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }

@@ -21,6 +21,12 @@ String identityFailureMessage(AppLocalizations l10n, Failure failure) =>
     switch (failure) {
       AuthenticationRequiredFailure() => l10n.failureSessionEnded,
       SessionExpiredFailure() => l10n.failureSessionEnded,
+      // An answer that arrived after the person switched organisation or
+      // signed out. From where they are standing the session they asked
+      // under has ended, which is exactly what this notice says — so it is
+      // reused rather than adding a message that says the same thing in
+      // different words.
+      SessionChangedFailure() => l10n.failureSessionEnded,
       NotAuthorizedFailure() || OperationRestrictedFailure() => l10n.failureNotPermitted,
       ConsentRequiredFailure() || ReConsentRequiredFailure() => l10n.failureConsentRequired,
       TenantSelectionRequiredFailure() => l10n.failureTenantSelection,

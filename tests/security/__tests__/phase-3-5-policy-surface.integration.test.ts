@@ -166,12 +166,14 @@ describe.skipIf(unreachable !== null)('Phase 3.5 policy surface (live PostgreSQL
       rows: [],
     });
 
-    // …and the descriptor the gate does read says the capability is unbuilt.
+    // …and the descriptor the gate does read says the capability is built and
+    // deployed nowhere. The deployed-nowhere half is what this file is about:
+    // no database row can express it, so no row can grant it either.
     const descriptor = CAPABILITY_REGISTRY[TARGET_CAPABILITY];
     expect({
       implementation: descriptor.implementation,
       deployedEnvironments: Object.keys(descriptor.deployment),
-    }).toEqual({ implementation: 'NOT_IMPLEMENTED', deployedEnvironments: [] });
+    }).toEqual({ implementation: 'IMPLEMENTED', deployedEnvironments: [] });
   });
 
   it('the closed capability vocabulary refuses a capability id that is not in the registry', async () => {

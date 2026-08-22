@@ -11,12 +11,14 @@ import {
 } from './connection-profile.js';
 import { PostgresPersistenceAdapter } from './adapter.js';
 import { createPrismaClient, type PrismaHandle } from './prisma.js';
+import { dropScratchDatabase } from './scratch-database.js';
 import {
   DEFAULT_REQUIRED_CONTEXT,
   PrincipalContextError,
   withPrincipalContext,
   withTenant,
 } from './principal-context.js';
+import { skipUnlessDatabaseRequired } from './connection-budget.js';
 
 // Principal context against a real PostgreSQL: the GUC binding that RLS
 // policies read. Same live-database pattern and skip discipline as
@@ -49,6 +51,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('platform principal context suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -196,7 +199,7 @@ describe.skipIf(unreachable !== null)('principal context on a live PostgreSQL', 
   afterAll(async () => {
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }

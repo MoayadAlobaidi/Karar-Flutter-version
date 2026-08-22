@@ -17,10 +17,10 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 
 | | |
 |---|---|
-| Current phase | **4 — COMPLETE** — merged to `main` ([phase report](docs/phases/phase-04.md), [PR #7](https://github.com/MoayadAlobaidi/Karar-Flutter-version/pull/7), merge commit [`457bd4e`](https://github.com/MoayadAlobaidi/Karar-Flutter-version/commit/457bd4e71b9920d348289204cf6e3b34146d2abd)); Phase 5 **NOT STARTED**. COMPLETE and merged mean the implementation, its internal gates and its merge are done — **not** deployed, signed, certified, app-store ready, production ready, or reviewed by counsel or a regulator |
-| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — its PR is open and unmerged |
-| Branch model | `main` + phase branches (current: `claude/karar-v2-phase-4-flutter-foundation`) |
-| Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, and a Flutter client covering account, identity and platform state — **no consumer product capability is implemented or reachable** |
+| Current phase | **5 — IN PROGRESS** — the financial data platform, on `claude/karar-v2-phase-5-financial-foundation` ([report](docs/phases/phase-05.md)). The marker moved to 5 with the **first real mounted ingestion path** — CSV statement upload and parse — because architecture test 24 (resource limits) activates at phase 5 and a limits test with no path to scan proves nothing. **Not complete, not deployed**: no build has run on a device, there is no provider connector, and no capability is available |
+| Last completed phase | 4 (Flutter and mobile security foundation, [report](docs/phases/phase-04.md)) — merged 18 August 2026 |
+| Branch model | `main` + phase branches (current: `claude/karar-v2-phase-5-financial-foundation`) |
+| Application implementation | Platform foundation, identity/tenancy/access control, the jurisdiction and capability foundation, a Flutter client covering account, identity and platform state, and the Phase 5 financial data platform: six financial modules plus `provider-capabilities`, behind **27 HTTP operations over 21 `/financial/*` paths** with CSV statement ingestion mounted. **Nothing is deployed and no capability is available anywhere** — the registry entry for `TRANSACTIONS` is `IMPLEMENTED` and deployed nowhere, no PolicyPack clears it, and no client renders it |
 | Mobile | Builds and tests for Android and iOS, with per-environment application identifiers verified out of real packaged artifacts. **No signed build, no signing material, no store submission, no deployed endpoint** — a build for any environment other than `LOCAL` is refused because no endpoint exists, and the biometric prompt has never been exercised on a device |
 | Cloud | None provisioned; local development is cloud-free |
 | Compliance | Readiness framework in place; **no certification is claimed** |
@@ -32,7 +32,7 @@ The full list with rationale is in [`docs/architecture/overview.md` §2](docs/ar
 | If you want to… | Read |
 |---|---|
 | Understand the system | [`docs/architecture/overview.md`](docs/architecture/overview.md) |
-| Know why something is the way it is | [`docs/adr/`](docs/adr/README.md) — 26 decision records |
+| Know why something is the way it is | [`docs/adr/`](docs/adr/README.md) — 29 decision records |
 | Onboard as an engineer | [`docs/onboarding/developer.md`](docs/onboarding/developer.md) |
 | Work on the Flutter client | [`docs/onboarding/flutter.md`](docs/onboarding/flutter.md) |
 | Run it locally | [Developer quick start](#developer-quick-start) below |
@@ -87,12 +87,12 @@ graph TB
 
 | Container | What it is |
 |---|---|
-| `apps/mobile` | Flutter client (consumer; white-label flavors are Phase 11). Renders values; computes nothing authoritative. Ten feature folders, all of them account, identity or platform state; a generated Dart API client with contract drift detection; Android and iOS build guards that refuse a deployed-environment package with no usable endpoint — see [`flutter.md`](docs/architecture/flutter.md) |
+| `apps/mobile` | Flutter client (consumer; white-label flavors are Phase 11). Renders values; computes nothing authoritative. Seventeen feature folders — ten of account, identity and platform state, seven financial (accounts and wallets, transactions, categories, payment instruments, statement imports, transfer matching, connections and sources), every financial route gated on the platform's own capability answer and re-evaluated on every build; a generated Dart API client with contract drift detection; Android and iOS build guards that refuse a deployed-environment package with no usable endpoint — see [`flutter.md`](docs/architecture/flutter.md) |
 | `apps/api` | NestJS modular monolith — the only public API surface |
 | `apps/worker` | Second entrypoint over the same modules: outbox relay, projections, scheduled jobs |
 | `apps/admin` | Super Admin SPA; talks to the control plane only, carries no database driver |
-| `packages/` | Seven shared packages; five are framework-free pure. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation (including the Prisma runtime and the RLS principal context), errors, observability, events/outbox/jobs |
-| `modules/` | 24 module directories, each behind a `public-api.ts`; 12 have code, the rest are skeletons awaiting their phase |
+| `packages/` | Ten workspace packages; five are framework-free pure (`shared-kernel`, `financial-engine`, `jurisdiction-policy`, `state-machine` and `content-trust` — the `PURE_PACKAGES` tier the architecture checker enforces), one more is the manifest-and-source-constrained `capability-registry`, and two are local test fixtures that exist so synthetic values cannot reach a production install. `platform` is the backend platform library shared by api and worker — typed config, the PostgreSQL foundation (including the Prisma runtime and the RLS principal context), errors, observability, events/outbox/jobs |
+| `modules/` | 29 module directories; the 19 that have code each publish a `public-api.ts`, and the rest are skeletons awaiting their phase |
 | PostgreSQL | The one authoritative store — RLS-enforced tenant isolation |
 | Local infra | Docker Compose ([`docker-compose.yml`](docker-compose.yml)): `postgres`, `redis`, `minio`, `otel-collector` — zero cloud dependency |
 | Provider adapters | Every external dependency (AI, storage, keys, messaging, identity, billing) behind a port in `infrastructure/` |
@@ -129,14 +129,15 @@ domain/          entities, rules, no I/O          → may use shared-kernel only
 infrastructure/  adapters, persistence, providers → implements application/ ports
 ```
 
-Cross-module imports resolve to the target module's `public-api.ts` and nothing else. Five packages (`shared-kernel`, `financial-engine`, `jurisdiction-policy`, `capability-registry`, `state-machine`) are pure — no framework, no I/O. Forbidden imports fail the architecture tests in CI, not a code review's memory. See [`clean-architecture.md`](docs/architecture/clean-architecture.md) and [`architecture-tests.md`](docs/testing/architecture-tests.md).
+Cross-module imports resolve to the target module's `public-api.ts` and nothing else. Five packages (`shared-kernel`, `financial-engine`, `jurisdiction-policy`, `state-machine`, `content-trust`) are pure — the `PURE_PACKAGES` tier the checker enforces; `capability-registry` is separately manifest-and-source-constrained — no framework, no I/O. Forbidden imports fail the architecture tests in CI, not a code review's memory. See [`clean-architecture.md`](docs/architecture/clean-architecture.md) and [`architecture-tests.md`](docs/testing/architecture-tests.md).
 
 ## Repository structure
 
 ```
 apps/        mobile · api · worker · admin — entrypoints, no business logic
 packages/    shared-kernel · financial-engine · jurisdiction-policy · capability-registry · state-machine · api-contracts · platform
-modules/     24 module directories, each with public-api.ts and MODULE.md; 12 have code
+             plus two local-only fixture packages: consent-local-fixtures · financial-retention-local-fixtures
+modules/     29 module directories, each with MODULE.md; the 19 with code publish public-api.ts
 infra/       Terraform — contracts · providers · per-deployment compositions
 docs/        architecture · adr · security · compliance · phases · legacy · onboarding
 scripts/     verification, checks, helpers
@@ -151,8 +152,13 @@ Full detail, including availability, gates, and external providers: [`capability
 
 | Capability / context | In one phrase |
 |---|---|
-| `financial-accounts` | Institutions, connectors, account records |
-| `transactions` | Ingestion, normalization, dedup, categorization |
+| `financial-accounts` | Issuer catalogue and per-country markets, accounts and wallets, source-reported balance snapshots |
+| `financial-connections` | How data arrives, and which source feeds which account — rails, connections, account source links |
+| `payment-instruments` | What spends from an account — cards and payment identities, never a balance |
+| `transactions` | Ingestion, normalization, dedup, provenance, categorization |
+| `transfer-matching` | Two transactions that were one movement of a person's own money |
+| `statement-imports` | A CSV statement staged behind review — draft, upload, parse, preview, commit or erase |
+| `provider-capabilities` | What a provider *could* do, described in types and owning no table — it executes nothing |
 | `budgets` | Budget definition and tracking |
 | `goals` | Savings plans and goals |
 | `insights` | Derived financial insight from engine facts |
@@ -189,6 +195,46 @@ Seven separated dimensions, deliberately never conflated:
 - **Brand** — presentation identity (tokens, name, app identity); configuration on top of a tenant.
 
 See [`jurisdiction-policy.md`](docs/architecture/jurisdiction-policy.md) and [`operating-entity.md`](docs/architecture/operating-entity.md).
+
+## Financial data model
+
+Seven concepts kept apart, because collapsing any pair asserts something untrue about a real person's finances ([ADR-0028](docs/adr/0028-multi-rail-financial-sources.md)). A person here typically holds several banks, more than one account of the same type at one of them, a mobile-money wallet or two, a payroll wallet, cards spending from a wallet, and cash.
+
+```mermaid
+graph TD
+  U[User] --> C[FinancialConnection<br/>how data arrives]
+  I[Institution / issuer] --> M[InstitutionMarket<br/>one row per country]
+  I -.names.-> C
+  C --> L[AccountSourceLink<br/>many-to-many]
+  L --> A[FinancialAccount / Wallet<br/>where a balance sits]
+  A --> S[BalanceSnapshot<br/>source-reported, per kind]
+  A --> PI[PaymentInstrument<br/>card, no balance column]
+  A --> T[Transaction]
+  T --> P[TransactionProvenance]
+  T --> TM[TransferMatch<br/>own-account movement, no amount]
+  ING[Manual entry · CSV import<br/>BUILT AND MOUNTED] --writes--> T
+  HTTP[HTTP surface<br/>27 operations, 21 paths] --reads--> A
+  FLU[Flutter screens<br/>BUILT, CAPABILITY-GATED] -.reads.-> HTTP
+  EXT[External provider rails<br/>NOT BUILT, refused by CHECK] -.feeds.-> C
+
+  style FLU stroke-dasharray: 5 5
+  style EXT stroke-dasharray: 5 5
+```
+
+**Dashed elements are not built, and the convention has moved twice because the tree has.** Payment instruments and transfer matching were the dashed pair while they were modelled in the ADR with no migration and no code; ingestion and the HTTP surface replaced them once those tables landed. Both of those are now solid too: manual transaction entry and CSV statement import write real rows, and 27 operations over 21 `/financial/*` paths read them back. What remains dashed is what a bank actually is: **every acquisition rail beyond `MANUAL` and `USER_FILE_UPLOAD` is refused by a database CHECK.** The screens are no longer dashed — seven financial feature folders read those 27 operations through the generated client — but nothing is deployed and no capability is AVAILABLE, so a mounted, gated route in a local build is not a capability anyone has been granted. Every solid box is schema that exists, code tested against live PostgreSQL, and a route the runtime-conformance suite drives for real — and **none of it is deployed anywhere.**
+
+Why each separation earns its cost:
+
+- **An issuer is not a market presence.** One issuer operating in four countries is one issuer with four market rows. Issuer codes carry no country prefix, because a code beginning `QA_` reads as a fact about where the issuer belongs and invites a duplicate row the moment a second market appears. **Country is not Jurisdiction** — the market table keys on country and has no jurisdiction column.
+- **A connection is not an account.** One connection may feed many accounts; one person may hold several connections to one institution.
+- **An account's origin is not its current source.** `origin_kind` is immutable and says only how the account first came to exist. An account may be typed in, then fed by CSV, then linked to an API, and stay one account — which is what account-source links exist for. No column asserts a single permanent data source.
+- **A wallet is an account; a card is not.** `CHECK ((wallet_kind IS NOT NULL) = (account_type = 'WALLET'))` — a biconditional, so neither half can be satisfied by accident. Two virtual cards on one wallet must not read as two more balances, and `payment_instruments` carries **no balance column at all**: the row describing a card has nowhere to put a figure, so no reader, export or projection can total one by accident.
+- **A transfer match is a relationship, not a movement.** `transfer_matches` names two of a person's transactions and says they were one movement of their own money. It carries **no amount** — the amounts live on the transactions it names, and a copy on the relationship would be a third figure that could disagree with both.
+- **An account has a nature, and nothing here adds it up.** `account_nature` is `ASSET`, `LIABILITY` or `UNKNOWN`, so a credit-card liability is not read as cash. `UNKNOWN` is the honest default rather than a placeholder, and no code in these modules sums, nets or totals balances.
+- **The account is identified by its id alone.** There is deliberately no uniqueness over institution + user, institution + type, institution + currency, or issuer + wallet kind. Two current accounts at one bank in one currency is ordinary.
+- **A balance kind is never inferred from another.** `balance_kind` is `NOT NULL` with no default, so a caller asking what can be spent cannot silently receive a settled figure.
+
+**Thirteen acquisition rails are named; only `MANUAL` and `USER_FILE_UPLOAD` may exist.** Every other rail is refused by a database CHECK, not merely by application code, so an unimplemented rail cannot be written even by direct SQL. **No credential of any kind is stored** — no username, password, mPIN, OTP, token, cookie or session state — there is no scraping or app automation, and nothing may display "Connected" for data that arrived by hand or by file.
 
 ## Infrastructure and database portability
 
@@ -257,10 +303,10 @@ No cloud account, API key, or shared database is required for any of it — that
 - **Property tests** — since Phase 3.5, the capability resolver's restrict-only invariant is proven rather than asserted: the ceiling core is exercised exhaustively over generated configurations, then swept with randomized grant-like inputs, asserting that no entitlement, consent, licence, or provider status can widen what code and policy have not permitted ([`capability-registry.md` §4](docs/architecture/capability-registry.md)).
 - **Leak-regression tests** — since Phase 3.5, suites that drive fakes trying to leak through every port and assert the serialized output carries exactly the declared fields: the bootstrap surface's closed field set, and the subject-policy audit trail's reference-only metadata.
 - **Contract tests** per repository port against the PostgreSQL contract, per [`database-portability.md` §7](docs/architecture/database-portability.md) — platform DB/outbox/jobs contracts run locally and in CI today, module repository ports since Phase 3; cloud provider legs are future.
-- **Architecture tests** — 26 CI-blocking structural tests plus a canary-purity check, kept in a registry with per-test activation phases; a test activates when the structure it guards exists, and the registry fails the run if an activation phase arrives without an implementation.
+- **Architecture tests** — 26 CI-blocking structural tests plus a canary-purity check, kept in a registry with per-test activation phases; a test activates when the structure it guards exists, and the registry fails the run if an activation phase arrives without an implementation. **24 of the 27 registry entries are ACTIVE and pass, 0 fail, 3 are deferred** — 13, 14 and canary-purity await the sealed-vault phase, and nothing else is asleep. Test 24 (resource limits declared) activated with the first mounted ingestion path, in the same commit that moved `currentPhase` to 5. **Three supplementary checks pass alongside them and a fourth reports `N/A`** — `phase5-ingestion-not-mounted-early` guards the window before phase 5, has no window left, and now says so: it returns `NOT_APPLICABLE` with a reason, is printed `N/A`, and is **excluded from the pass count** rather than counted among it. It used to print `PASS (files scanned: 0)` and be added to the total, which is a pass that proves nothing; test 24 is the control that took over its duty, and the runner's own self-test fails if the retired guard is ever counted as a pass again. A self-test runs on the same invocation, seeding a violation per checker to prove the passes are not vacuous. Its case count grows with the checkers and is therefore not pinned here — the runner prints it.
 - **Client tests** — since Phase 4, the Flutter suite runs on every PR: unit, widget and source-scanning tests, every component and screen exercised in **both locales** with direction derived from the locale rather than passed in, tap targets and overflow checked at 1.0x and 2.0x text scale, and WCAG contrast computed over both palettes. Golden baselines exist but are **deliberately excluded from CI** ([`flutter.md` §5](docs/architecture/flutter.md)).
 - **Artifact tests** — since Phase 4, assertions that read a real build rather than its source: the merged Android manifest's permission set compared exactly, the built APK's network policy and absence of credential material, the assertion that the Android release is unsigned rather than debug-signed, and the packaged iOS bundle's transport posture and **effective bundle identifier across all four environments**. They run on the lanes that produce an artifact, and a missing artifact fails them rather than skipping them — the correction for a period when they lived on a lane that built nothing and passed by skipping.
-- **Runtime contract conformance** — since Phase 4, real serialized responses from the composed application validated against the OpenAPI document that describes them, across 82 of the 128 declared operation/status pairs, with two ledgers asserted empty: no response carries an RFC 7807 body under the wrong media type, and no operation describes its body in prose without a schema. The contract drift check binds contract to client; this binds server to contract ([`flutter.md` §8](docs/architecture/flutter.md)).
+- **Runtime contract conformance** — since Phase 4, real serialized responses from the composed application validated against the OpenAPI document that describes them, with ledgers asserted empty: no response carries an RFC 7807 body under the wrong media type, and no operation describes its body in prose without a schema. The merged contract declares **327 operation/status pairs across 55 paths**; two suites cover **227** of them — 82 of the 128 non-financial pairs, and 145 of the 199 the Phase 5 financial surface declares, the financial ones in their own file so that one failure does not hide the rest. The contract drift check binds contract to client; this binds server to contract ([`flutter.md` §8](docs/architecture/flutter.md)).
 - **Security scans and SBOM** — dependency and secret scanning, software bill of materials, supply-chain checks.
 
 Required PR checks must pass before merge — CI blocks the merge, not merely the workflow run. The workflows are [`ci.yml`](.github/workflows/ci.yml) (lint, type-check, build, tests, architecture tests, the mobile lanes) and [`security.yml`](.github/workflows/security.yml) (scans, SBOM). Not every job is a required check; the current list is in [`repository-security-settings.md`](docs/operations/repository-security-settings.md). See [`architecture-tests.md`](docs/testing/architecture-tests.md).
@@ -269,7 +315,11 @@ Security concerns are reported privately per [`SECURITY.md`](SECURITY.md), never
 
 ## Roadmap and phase discipline
 
-Completed: 0, 0.5, 1, 2, 3, 3.5. Phase 4 is IN PROGRESS. Phase 3 delivered identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests; Phase 3.5 added Country and Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface; Phase 4, still in progress, adds the Flutter client — the startup state machine, a generated Dart API client with contract drift detection, authentication and session flows, secure token storage with single-flight refresh, application lock, tenant selection, jurisdiction self-declaration, capability-aware navigation, the consent surface, a design system with Arabic and RTL first-class, and Android and iOS build guards that refuse a deployed-environment package without a usable endpoint — and hardens the contracts it consumes, so that a bootstrap resolution failure and a legitimately empty capability set are now different answers, every problem document leaves through one writer, and real server responses are held against the OpenAPI document rather than only the generated client. What it does **not** deliver is stated as plainly in its [report](docs/phases/phase-04.md): no signed build, no deployed endpoint, and a biometric prompt that has never been exercised on a device. Next: 5 (financial data platform — institutions, connectors, accounts, transactions, normalization, provenance, categorization), **not started**.
+Completed: 0, 0.5, 1, 2, 3, 3.5, 4. **Phase 5 is IN PROGRESS; Phase 6 has NOT STARTED.** Phase 3 delivered identity, users, tenancy, operating entities, RBAC, consent with re-consent evaluation, sessions, kill switches, PostgreSQL RLS, and adversarial cross-tenant tests; Phase 3.5 added Country and Jurisdiction, typed versioned PolicyPacks with the `qa/v1` draft, resolution strategies and `EffectivePolicy`, `SubjectPolicySelection`, the compile-time capability registry with deny-by-default availability and tenant entitlements, session tenant binding, and the authenticated client bootstrap surface; Phase 4 added the Flutter client — the startup state machine, a generated Dart API client with contract drift detection, authentication and session flows, secure token storage with single-flight refresh, application lock, tenant selection, jurisdiction self-declaration, capability-aware navigation, the consent surface, a design system with Arabic and RTL first-class, and Android and iOS build guards that refuse a deployed-environment package without a usable endpoint — and hardened the contracts it consumes, so that a bootstrap resolution failure and a legitimately empty capability set are now different answers, every problem document leaves through one writer, and real server responses are held against the OpenAPI document rather than only the generated client. What it did **not** deliver is stated as plainly in its [report](docs/phases/phase-04.md): no signed build, no deployed endpoint, and a biometric prompt that has never been exercised on a device.
+
+Phase 5, in progress, has built the **financial data platform** across six modules — the issuer catalogue with per-country markets, accounts and wallets, source-reported balance snapshots, transactions with revisions and provenance, connections and account source links, payment instruments, transfer matching, and CSV statement imports — behind migrations 0087-0101, together with [ADR-0027](docs/adr/0027-calendar-day-and-instant.md) (calendar days are not instants) and [ADR-0028](docs/adr/0028-multi-rail-financial-sources.md) (seven separated concepts across thirteen named acquisition rails), both **ACCEPTED**. A seventh module, `provider-capabilities`, describes in types what a provider could do; it owns no table and executes nothing. The data is now reachable: **27 operations over 21 `/financial/*` paths** are mounted from the composition root, and CSV statement ingestion runs the full draft → upload → parse → preview → commit sequence with parsing writing no financial record and only a reviewed commit doing so. `currentPhase` moved to **5** and architecture test 24 became **ACTIVE** in that same commit, because a resource-limit test with no path to scan proves nothing.
+
+What Phase 5 has **not** done is equally load-bearing: **no build has run on a device**, there is **no provider connector** and no real provider capability VERIFIED, **nothing deployed** and no capability AVAILABLE, the retention decision is **unresolved** and fails closed outside LOCAL, and **account deletion is not exposed over HTTP** because its cross-module cascade is not atomic and the contract for reporting a partial outcome has not been chosen. Phase 5 is IN PROGRESS, not complete.
 
 Every phase ends with the same documented update set — README status block, roadmap, phase report, onboarding if commands changed, evidence register — specified in [`docs/phases/README.md`](docs/phases/README.md). Full phase table and gates: [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -278,7 +328,7 @@ Every phase ends with the same documented update set — README status block, ro
 | | |
 |---|---|
 | Architecture | [`docs/architecture/`](docs/architecture/overview.md) — start at the overview |
-| Decisions | [`docs/adr/`](docs/adr/README.md) — 26 records |
+| Decisions | [`docs/adr/`](docs/adr/README.md) — 29 records |
 | Security | [`docs/security/`](docs/README.md#security) |
 | Compliance | [`docs/compliance/`](docs/compliance/README.md) · policies in [`docs/policies/`](docs/policies/README.md) |
 | Onboarding | [`docs/onboarding/developer.md`](docs/onboarding/developer.md) · client: [`docs/onboarding/flutter.md`](docs/onboarding/flutter.md) |

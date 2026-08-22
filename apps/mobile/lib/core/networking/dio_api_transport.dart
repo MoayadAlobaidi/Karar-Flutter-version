@@ -175,7 +175,7 @@ final class DioApiTransport implements ApiTransport {
     try {
       response = await _dio.request<String>(
         request.path,
-        data: request.body,
+        data: request.rawBody?.bytes ?? request.body,
         queryParameters: <String, Object?>{
           for (final entry in request.query.entries)
             if (entry.value != null) entry.key: entry.value,
@@ -186,7 +186,10 @@ final class DioApiTransport implements ApiTransport {
           headers: headers,
           sendTimeout: request.timeouts.send,
           receiveTimeout: request.timeouts.receive,
-          contentType: request.body == null ? null : Headers.jsonContentType,
+          // A raw body states its own media type; a JSON body is always
+          // JSON; a request with no body declares no content type at all.
+          contentType: request.rawBody?.mediaType ??
+              (request.body == null ? null : Headers.jsonContentType),
         ),
       );
     } on DioException catch (error) {
@@ -199,6 +202,21 @@ final class DioApiTransport implements ApiTransport {
     }
 
     _networkStatus.recordReachable();
+
+    // THE SESSION THAT ASKED MUST STILL BE THE SESSION THAT IS SIGNED IN.
+    //
+    // The credential is captured before the request goes out; between then
+    // and now the person may have switched organisation or signed out, and
+    // this answer describes the organisation they LEFT. Returning it lets
+    // every caller write one organisation's figures into another's screen.
+    // Checked here rather than in each controller because a check that lives
+    // in many places is a check that is missing from one of them.
+    if (credential != null && _sessionChangedSince(credential)) {
+      final failure = SessionChangedFailure(correlationId: correlationId);
+      _logRequest(request, correlationId, status: null, startedAt: startedAt, failure: failure);
+      throw ApiException(failure);
+    }
+
     final status = response.statusCode ?? 0;
     final serverCorrelationId = _headerValue(response.headers, correlationIdHeader) ?? correlationId;
     _logRequest(request, serverCorrelationId, status: status, startedAt: startedAt, failure: null);
@@ -223,6 +241,21 @@ final class DioApiTransport implements ApiTransport {
       _failureFromResponse(response, status: status, correlationId: serverCorrelationId),
       statusCode: status,
     );
+  }
+
+  /// Whether the session has been replaced or ended since [issued] was read.
+  ///
+  /// Compares the session identifier, not the access token: a proactive or
+  /// reactive refresh rotates the token within the SAME session and must not
+  /// be mistaken for a switch. A transport with no session manager cannot
+  /// answer the question and does not pretend to.
+  bool _sessionChangedSince(SessionTokens issued) {
+    final manager = sessionManager;
+    if (manager == null) return false;
+    final current = manager.tokens;
+    // No session at all: signed out while the request was in flight.
+    if (current == null) return true;
+    return current.sessionId != issued.sessionId;
   }
 
   /// Resolves the credential to attach, refreshing proactively when the local

@@ -1,0 +1,382 @@
+# financial-connections surface — path-item fragments (ADR-0009: authored by
+# hand, never generated from code). The phase lead merges these into
+# openapi.yaml via $ref per path, e.g.:
+#   /financial/connections:
+#     $ref: './paths/financial-connections.yaml#/~1financial~1connections'
+#
+# WHAT THIS SURFACE IS, AND WHAT IT DELIBERATELY IS NOT.
+#
+# It reports HOW the caller's financial data arrives and WHICH source feeds
+# which account. It is READ-ONLY, and the safe projections are the whole of
+# it. There is no create, no update, no delete, and no link-confirmation
+# route, because every one of those is either a control-plane concern or a
+# path with an unresolved contract; a read-only surface cannot become a
+# writable one by accident.
+#
+# Contract rules made visible here:
+#   * NO STATUS ON THIS SURFACE MEANS "CONNECTED". `impliesLiveInstitutionLink`
+#     answers false for EVERY value the vocabulary permits, and it is emitted
+#     on the wire rather than left as documentation. Thirteen rails are named
+#     in the domain and exactly two may exist — MANUAL and USER_FILE_UPLOAD —
+#     with the database refusing any other even to direct SQL (ADR-0028).
+#     Every rail-bearing response therefore carries an `availability` that
+#     reads NOT_IMPLEMENTED for anything else, so a client cannot present an
+#     unimplemented rail as usable.
+#   * NO CREDENTIAL OF ANY KIND IS STORED ANYWHERE — no username, password,
+#     mPIN, OTP, token, cookie, certificate or synchronisation cursor — so
+#     there is nothing of that shape to expose and no field here through which
+#     one could appear.
+#   * THE SOURCE-LINK PROJECTION IS THE LEAK CONTROL. The stored entity
+#     carries the subject's external account reference and a per-subject keyed
+#     FINGERPRINT of it; neither is in the response, and the shape that omits
+#     them is the only shape a read path returns. Publishing the fingerprint
+#     would turn this route into an oracle that confirms whether a given
+#     external account belongs to a given person.
+#   * EVERY operation acts for the AUTHENTICATED principal. No `userId`, no
+#     `tenantId`, anywhere.
+#   * Errors are RFC 7807 problem documents with a machine-readable `code`,
+#     served under the media type the single writer in
+#     apps/api/src/errors/problem-response.ts emits.
+
+/financial/connections:
+  get:
+    operationId: listOwnFinancialConnections
+    summary: List the caller's own data connections, as safe summaries
+    description: >-
+      The connections the AUTHENTICATED principal owns, oldest first. Each row
+      says which rail it is, whether that rail can actually run, and — in the
+      same object — that it implies no live institution link. A client has
+      everything it needs to render an honest state and nothing it could
+      render as a connection to a bank.
+    tags: [financial-connections]
+    security:
+      - sessionAuth: []
+    parameters:
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
+      - name: rail
+        in: query
+        required: false
+        description: Restrict to one rail.
+        schema:
+          $ref: '#/components/ConnectionRail'
+      - name: status
+        in: query
+        required: false
+        description: >-
+          The connection's lifecycle state. ACTIVE means the connection
+          ACCEPTS data the subject supplies — it does not mean anything is
+          connected.
+        schema:
+          $ref: '#/components/ConnectionStatus'
+      - name: institutionId
+        in: query
+        required: false
+        schema: { type: string, format: uuid }
+    responses:
+      '200':
+        description: The caller's own connections, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/ConnectionSummaryView'
+                page:
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+/financial/accounts/{accountId}/source-links:
+  get:
+    operationId: listOwnAccountSourceLinks
+    summary: List which sources feed one of the caller's accounts, and how fresh they are
+    description: >-
+      The safe source and freshness summaries for ONE of the caller's own
+      accounts: which connection feeds it, on which rail, how authoritative
+      that source claims to be, when it was last observed, when it last
+      produced a successful import, what history it covers, and what it was
+      OBSERVED to be capable of.
+
+      Freshness is reported as observation, never as health. `lastObservedAt`
+      is the last time this platform saw the source at all;
+      `lastSuccessfulImportAt` is the last time data actually landed, and it
+      is null rather than approximated when none has. Capabilities are
+      OBSERVED / NOT_OBSERVED / NOT_PROVIDED — a capability nobody looked for
+      is not the same answer as one that was looked for and absent.
+
+      There is no confidence figure. A link is matched on an EXACT external
+      reference or it is PROBABLE and waits for the person to say; a
+      percentage would be a number nobody computed.
+
+      Deliberately absent from every row, and to stay absent: the external
+      account reference itself, its keyed fingerprint and the fingerprint
+      version, the reference scheme, and the row's tenant and user.
+    tags: [financial-connections]
+    security:
+      - sessionAuth: []
+    parameters:
+      - name: accountId
+        in: path
+        required: true
+        description: One of the CALLER'S OWN accounts. Any other id answers an empty page.
+        schema: { type: string, format: uuid }
+      - $ref: './paths/financial-shared.yaml#/components/LimitParameter'
+      - $ref: './paths/financial-shared.yaml#/components/CursorParameter'
+      - name: rail
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/ConnectionRail'
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/SourceLinkStatus'
+    responses:
+      '200':
+        description: The safe source-link summaries, strongest priority first, paginated.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items, page]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/AccountSourceLinkView'
+                page:
+                  $ref: './paths/financial-shared.yaml#/components/PageInfo'
+      '400':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '401':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '403':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+      '429':
+        $ref: './paths/financial-shared.yaml#/components/RateLimited'
+      '503':
+        $ref: './paths/financial-shared.yaml#/components/ProblemResponse'
+
+# Local component shapes for this fragment; the lead may lift them into the
+# root document's components section when merging.
+components:
+  ConnectionRail:
+    type: string
+    description: >-
+      How data arrives. Thirteen rails are NAMED because the vocabulary has to
+      describe the world; exactly two may be WRITTEN. Naming a rail is not a
+      claim that it works, which is why `availability` travels beside it
+      everywhere.
+    enum:
+      [
+        MANUAL,
+        USER_FILE_UPLOAD,
+        OPEN_FINANCE_API,
+        DIRECT_BANK_OR_WALLET_API,
+        LICENSED_AGGREGATOR_API,
+        HOST_TO_HOST_SFTP,
+        ISO_20022_FILE,
+        SWIFT_MT_FILE,
+        OFX_QFX_FILE,
+        QIF_FILE,
+        PDF_STATEMENT,
+        SECURE_EMAIL_STATEMENT,
+        DEVICE_SIGNAL,
+      ]
+  RailAvailability:
+    type: string
+    description: >-
+      Whether this platform can actually run the rail today. EXECUTABLE for
+      MANUAL and USER_FILE_UPLOAD, NOT_IMPLEMENTED for every other rail — and
+      the database enforces the same split, so an unimplemented rail cannot be
+      written even by direct SQL.
+    enum: [EXECUTABLE, NOT_IMPLEMENTED]
+  ConnectionStatus:
+    type: string
+    description: >-
+      The connection's own lifecycle. NOT ONE OF THESE MEANS CONNECTED:
+      ACTIVE means the connection accepts data the subject supplies.
+    enum: [ACTIVE, NOT_CONFIGURED, UNAVAILABLE, RETIRED, NOT_IMPLEMENTED]
+  SourceAuthority:
+    type: string
+    description: How much weight this source's version of a fact carries.
+    enum: [AUTHORITATIVE, SUPPLEMENTAL, UNVERIFIED]
+  MatchBasis:
+    type: string
+    description: >-
+      Why this source was linked to this account. EXACT_EXTERNAL_REFERENCE or
+      PROBABLE, and nothing in between — there is no confidence score in this
+      platform and none may be invented for display.
+    enum: [EXACT_EXTERNAL_REFERENCE, PROBABLE]
+  SourceLinkStatus:
+    type: string
+    enum: [PENDING_CONFIRMATION, LINKED, DECLINED, DORMANT]
+  SourceCapabilityObservation:
+    type: string
+    description: >-
+      What was OBSERVED, not what is supported. NOT_PROVIDED means the source
+      never offered it; NOT_OBSERVED means this platform has not seen it. The
+      two are different answers and are kept apart.
+    enum: [OBSERVED, NOT_OBSERVED, NOT_PROVIDED]
+  InstitutionLinkClaim:
+    type: object
+    additionalProperties: false
+    required: [impliesLiveInstitutionLink, providerAccessStatus]
+    description: >-
+      Emitted on the wire so the claim is checkable rather than merely stated
+      in prose. `impliesLiveInstitutionLink` is false for every value of every
+      status vocabulary on this surface, and no issuer exposes an interface to
+      this platform.
+    properties:
+      impliesLiveInstitutionLink:
+        type: boolean
+        enum: [false]
+      providerAccessStatus:
+        type: string
+        enum: [NOT_IMPLEMENTED]
+  ConnectionSummaryView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        connectionId,
+        rail,
+        availability,
+        status,
+        displayLabel,
+        institutionId,
+        link,
+        createdAt,
+        updatedAt,
+        version,
+      ]
+    description: >-
+      A safe summary. Deliberately absent, and to stay absent: `tenantId` and
+      `userId`; any credential of any kind (none is stored); any ciphertext,
+      nonce, auth tag, algorithm or key version; and any synchronisation
+      cursor or last-sync token, which would imply a sync that does not exist.
+    properties:
+      connectionId: { type: string, format: uuid }
+      rail:
+        $ref: '#/components/ConnectionRail'
+      availability:
+        $ref: '#/components/RailAvailability'
+      status:
+        $ref: '#/components/ConnectionStatus'
+      displayLabel:
+        type: string
+        description: The subject's own name for this connection, decrypted for its owner.
+      institutionId: { type: [string, 'null'], format: uuid }
+      link:
+        $ref: '#/components/InstitutionLinkClaim'
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }
+  AccountSourceLinkView:
+    type: object
+    additionalProperties: false
+    required:
+      [
+        sourceLinkId,
+        accountId,
+        connectionId,
+        rail,
+        availability,
+        sourceAuthority,
+        matchBasis,
+        status,
+        link,
+        subjectConfirmedAt,
+        sourcePriority,
+        observation,
+        historyCoverage,
+        capabilities,
+        createdAt,
+        updatedAt,
+        version,
+      ]
+    description: >-
+      The safe source-and-freshness summary. This is the ONLY shape a read
+      path returns for a source link; the stored entity carries the external
+      account reference and its keyed fingerprint, and neither has a field
+      here.
+    properties:
+      sourceLinkId: { type: string, format: uuid }
+      accountId: { type: string, format: uuid }
+      connectionId: { type: string, format: uuid }
+      rail:
+        $ref: '#/components/ConnectionRail'
+      availability:
+        $ref: '#/components/RailAvailability'
+      sourceAuthority:
+        $ref: '#/components/SourceAuthority'
+      matchBasis:
+        $ref: '#/components/MatchBasis'
+      status:
+        $ref: '#/components/SourceLinkStatus'
+      link:
+        $ref: '#/components/InstitutionLinkClaim'
+      subjectConfirmedAt:
+        type: [string, 'null']
+        format: date-time
+        description: When the person confirmed this link, or null while they have not.
+      sourcePriority: { type: integer, minimum: 1 }
+      observation:
+        $ref: '#/components/SourceObservationView'
+      historyCoverage:
+        description: >-
+          The calendar range this source has supplied, as DAYS (ADR-0027).
+          Null when nothing has been supplied.
+        oneOf:
+          - type: 'null'
+          - $ref: '#/components/HistoryCoverageView'
+      capabilities:
+        $ref: '#/components/SourceCapabilitiesView'
+      createdAt: { type: string, format: date-time }
+      updatedAt: { type: string, format: date-time }
+      version: { type: integer, minimum: 1 }
+  SourceObservationView:
+    type: object
+    additionalProperties: false
+    required: [firstObservedAt, lastObservedAt, lastSuccessfulImportAt]
+    description: >-
+      Freshness as OBSERVATION, not as health. These are instants, not days.
+    properties:
+      firstObservedAt: { type: string, format: date-time }
+      lastObservedAt: { type: string, format: date-time }
+      lastSuccessfulImportAt:
+        type: [string, 'null']
+        format: date-time
+        description: Null when no import has yet succeeded. Never approximated.
+  HistoryCoverageView:
+    type: object
+    additionalProperties: false
+    required: [start, end]
+    properties:
+      start: { type: string, format: date }
+      end: { type: string, format: date }
+  SourceCapabilitiesView:
+    type: object
+    additionalProperties: false
+    required: [balance, pendingTransactions]
+    properties:
+      balance:
+        $ref: '#/components/SourceCapabilityObservation'
+      pendingTransactions:
+        $ref: '#/components/SourceCapabilityObservation'

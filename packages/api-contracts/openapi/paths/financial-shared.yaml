@@ -1,0 +1,157 @@
+# Components shared by more than one financial fragment.
+#
+# Each of these was declared identically in up to six fragments. The client
+# generator refuses a component name defined twice, and it is right to: two
+# declarations of one type are one type that can silently diverge, and a
+# pagination envelope or a problem shape that differs by endpoint is a
+# contract a client cannot rely on.
+components:
+  CursorParameter:
+    name: cursor
+    in: query
+    required: false
+    description: >-
+      The `page.nextCursor` of the previous response. Opaque: it encodes a
+      position in the caller's OWN result set and carries no identity — a
+      cursor from another session names nothing here.
+    schema: { type: string, minLength: 1 }
+  LimitParameter:
+    name: limit
+    in: query
+    required: false
+    description: >-
+      Page size. Bounded by the central ingestion limit policy
+      (packages/platform/src/ingestion/limits.ts); a larger request is clamped
+      to the declared maximum rather than refused, and the page reports the
+      size it actually used.
+    schema: { type: integer, minimum: 1, maximum: 200 }
+  MinorUnitAmount:
+    type: object
+    additionalProperties: false
+    required: [minorUnits, currency, exponent]
+    description: >-
+      An exact amount. `minorUnits` is the signed integer the ledger holds,
+      serialized as CHARACTERS — never a JSON number, because a number is a
+      float and a float is not a ledger value (ADR-0006). `exponent` is the
+      currency's ISO 4217 minor-unit exponent, supplied so a client can render
+      without a currency table of its own; it is not a licence to divide.
+    properties:
+      minorUnits:
+        type: string
+        pattern: '^-?[0-9]{1,30}$'
+      currency:
+        type: string
+        pattern: '^[A-Z]{3}$'
+      exponent:
+        type: integer
+        minimum: 0
+  PageInfo:
+    type: object
+    additionalProperties: false
+    required: [limit, returned, hasMore, nextCursor]
+    description: >-
+      What this page IS, stated rather than inferred. `hasMore` is explicit so
+      an empty page is a stated end rather than something a client guesses at,
+      and `nextCursor` is null exactly when there is no next page.
+    properties:
+      limit: { type: integer, minimum: 1 }
+      returned: { type: integer, minimum: 0 }
+      hasMore: { type: boolean }
+      nextCursor: { type: [string, 'null'] }
+  Problem:
+    type: object
+    required: [type, title, status, code]
+    description: >-
+      RFC 7807. `code` is the machine-readable reason; a client renders an
+      honest state from it rather than from prose. Store, provider and driver
+      text never crosses this boundary, and neither does a stack or a cause.
+    properties:
+      type: { type: string }
+      title: { type: string }
+      status: { type: integer }
+      # 403 arrives two ways, and the caller cannot tell the reasons apart
+      # within either: CAPABILITY_UNAVAILABLE when the TRANSACTIONS
+      # capability is not available to this principal — a decided denial, a
+      # rail not implemented, nothing deployed, a jurisdiction that clears
+      # nothing, a pending legal review and a store failure are ONE answer,
+      # because distinguishing them would leak the policy state that
+      # produced it — and TENANT_BINDING_REQUIRED when the session carries
+      # no tenant binding, which is a different remedy.
+      code:
+        type: string
+        description: >-
+          e.g. AUTHENTICATION_REQUIRED, TENANT_BINDING_REQUIRED,
+          INVALID_REQUEST, ACCOUNT_NOT_FOUND, ACCOUNT_VERSION_CONFLICT,
+          INSTITUTION_NOT_SELECTABLE, ACCOUNT_RULE_VIOLATED,
+          RETENTION_UNRESOLVED, STORE_UNAVAILABLE.
+      detail: { type: string }
+      reason: { type: string }
+      retryable:
+        type: boolean
+        description: Present only where retrying could change the answer.
+      requestId: { type: string }
+      nextOrdinal:
+        type: integer
+        minimum: 1
+        description: >-
+          On `OCCURRENCE_ORDINAL_NOT_NEXT`, the occurrence ordinal that WOULD be
+          accepted for this movement. Structured because the human-readable
+          `detail` is translated, and a client that had to parse an integer out
+          of a sentence would break the first time it was — leaving a person who
+          genuinely bought the same thing twice unable to record the second one.
+  RateLimited:
+    description: >-
+      RFC 7807 with `code: RATE_LIMITED`. `details.retryAfterSeconds` is the
+      wait; `details.policy` names the budget that refused. The attempt was NOT
+      processed: no record was read, written, parsed or committed.
+
+
+      The budget is a SECURITY ceiling on request rate, not a product quota, a
+      subscription limit or a jurisdiction rule, and it is charged to the
+      authenticated principal the server resolved -- never to anything the
+      caller supplied.
+
+
+      The body is the PLATFORM problem shape, the same document identity's 429
+      already produces. Authoring a second 429 shape here would give one API two
+      error models, which is what the single problem writer exists to prevent.
+    content:
+      application/problem+json:
+        schema: { $ref: '#/components/Problem' }
+  ProblemResponse:
+    description: RFC 7807 problem document.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'
+  ProcessingVersionsView:
+    type: object
+    additionalProperties: false
+    required: [parserVersion, mappingVersion, normalizationVersion, fingerprintVersion]
+    description: >-
+      How this import was processed. `fingerprintVersion` is the ALGORITHM
+      version, never a fingerprint.
+    properties:
+      parserVersion: { type: string }
+      mappingVersion: { type: string }
+      normalizationVersion: { type: string }
+      fingerprintVersion: { type: string }
+  RetentionUnresolvedResponse:
+    description: >-
+      No approved retention decision governs this dataset, so nothing durable
+      may be written (code RETENTION_UNRESOLVED). This is a legal decision
+      nobody in this system may take on the subject's behalf: the platform
+      refuses the write rather than substituting a period. The document names
+      the dataset and nothing else — the pack version, the basis and the
+      approval reference are internal review artefacts and stay server-side.
+    content:
+      application/problem+json:
+        schema:
+          $ref: '#/components/Problem'
+  SourceKind:
+    type: string
+    description: >-
+      The rail a stored figure arrived on. EXTERNAL_PROVIDER is in the
+      vocabulary because the column can hold it; no path in this platform can
+      produce it, and `availability` on every rail-bearing response says so.
+    enum: [MANUAL, CSV, EXTERNAL_PROVIDER]

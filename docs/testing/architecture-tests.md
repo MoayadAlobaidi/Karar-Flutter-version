@@ -1,8 +1,30 @@
 # Architecture Tests
 
-**26 CI-blocking tests.** Plan v2 §13 specifies 21; the Phase 0.2 legacy audit added five (22–26).
+**26 CI-blocking tests**, plus a canary-purity check that is not numbered because it guards an artefact rather than a structure. Plan v2 §13 specifies 21; the Phase 0.2 legacy audit added five (22–26).
 
 **Gates block the merge, not merely the workflow run.** The legacy's gates *"block a workflow run, not a merge or a deploy; no enforcement path exists in the repository"* (INFRA-07).
+
+## Current status, and why three tests are asleep
+
+`pnpm arch:test`: of the **27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred by activation phase**; registry errors 0; the self-test passes over **86** cases; and of the four supplementary checks (`admin-no-db-driver`, `phase5-ingestion-not-mounted-early`, `module-permissions-in-catalogue`, `capability-registry-truth`) **three pass and one reports `N/A`**. `phase5-ingestion-not-mounted-early` guards the window before phase 5, has no window left, and now says so: it returns `NOT_APPLICABLE` with a reason and is **excluded from the pass count**. *(This paragraph previously recorded that it "scans zero files … and is counted as a pass, which is why the headline reads 27" — an accurate description of a defect, offered as a design. A control that cannot fail must not be able to inflate the number a reader uses to ask how many controls held; the runner's own self-test now fails if it is counted as a pass again.)* The registry's `currentPhase` is **5**.
+
+**The runner's own summary line prints `28 passed`, and it agrees with the rows above it.** It once printed `25` while the registry-derived figure was 24, because `phase5-ingestion-not-mounted-early` incremented the failure count on a violation and incremented nothing on a pass. All FOUR supplementary checks now count on both arms, so the asymmetry this paragraph used to record is gone — the paragraph is kept, corrected, because a reader who saw the old number should be able to find out what happened to it.
+
+Each test carries an **activation phase** in [`architecture-test-registry.json`](architecture-test-registry.json), and the runner enforces the gate in both directions: a test whose activation phase has been reached with no implementation is a **registry error**, not a silent skip.
+
+| Deferred | Activation | Waiting on |
+|---|---|---|
+| 13 Sealed containment | 13 | No code carries `SEALED`-marked content to scan (Documents + Sealed Vault phase) |
+| 14 Grant required | 13 | Vault transaction isolation becomes implementable and checkable with the same phase |
+| canary-purity | 13 | The sealed-integrity canary is designed and implemented (key-custody phase) |
+
+**Test 24 is the one worth explaining, because the lock it sits inside is the only one in this repository that runs in both directions.** Its activation phase is 5, and for most of Phase 5 the registry deliberately stayed at `currentPhase` 4: setting it to 5 while no ingestion path existed would have made the test scan nothing and pass, which is the failure mode this repository has already been bitten by three times. The other half of the lock, the supplementary `phase5-ingestion-not-mounted-early` check, refused a pre-phase-5 tree that mounted an ingestion path at all. **Neither the marker nor the path could move without the other** — and they moved together, in one commit that mounted the CSV upload and parse routes, implemented `checkResourceLimits`, flipped test 24 to `ACTIVE` with its `implementedIn`, advanced `currentPhase` 4 → 5, and updated the README status row.
+
+**What test 24 now enforces, and how its pass was shown to be non-vacuous.** It discovers real ingestion paths from the tree rather than from a maintained list — using the same definition the pre-activation guard used, so the two controls cannot disagree about what counts — and fails in both directions: a mounted path declaring no central policy, and a central policy naming a path that no longer exists. It also fails when the tree contains no real path at all. Two mutations of the live tree prove the pass is real rather than asserted: hardcoding a byte or row bound in a helper fails, naming `apps/api/src/financial/csv-body.ts`; removing the `INGESTION_LIMIT_POLICIES` reference from a mounted controller fails, naming `statement-import-source.controller.ts`. The first mutation is why the check scans the whole ingestion surface rather than only the files that mount a route: a controller can reference the central policy faithfully and then call a helper that hardcodes the number, and the helper is where the bound actually bites. That hole was found by mutating the real tree, not by the seeded self-tests — which is the argument for doing both.
+
+The supplementary `phase5-ingestion-not-mounted-early` check now scans zero files and passes trivially, because the marker has moved past it. It is kept rather than deleted: it is the guard that would fire again if the marker were ever rolled back with the routes left in place.
+
+The **self-test runs on every invocation**, not as a separate job: it seeds a violation per checker in a temporary tree and asserts each one fails and names the seeded file, then asserts that a set of legitimate shapes stays unflagged. A suite whose passes have not been shown to be non-vacuous on the same run is a suite that reports its own configuration.
 
 ---
 
@@ -18,15 +40,15 @@
 | 6 | No business logic in controllers | A controller exceeds declared complexity or calls more than one use case |
 | 10 | No direct provider access | A domain or application file names a vendor or **cloud SDK** — any GCP/AWS/Azure SDK import in `domain/` or `application/`; a provider-specific URI or resource name (`gs://`, `arn:`, project paths) in a domain entity; a database, storage, messaging, secrets, KMS, or AI provider client (Cloud SQL, RDS, GCS, S3, Pub/Sub, Secret Manager, Secrets Manager, Vertex, …) referenced outside its own adapter in `infrastructure/providers/` or `infrastructure/persistence/` |
 | 11 | Deterministic domain | `domain/` reads the system clock or a random source |
-| 17 | Pure packages | `jurisdiction-policy` or `state-machine` gains a framework dependency |
+| 17 | Pure packages | One of the five constrained packages gains a framework dependency: `shared-kernel`, `financial-engine`, `jurisdiction-policy` and `state-machine` are pure by manifest and source; `capability-registry` is purity-constrained by both |
 | 18 | Storage access | A domain touches `ObjectStorage` directly rather than via `documents` |
-| 20 | Kernel surface | `shared-kernel` exports anything beyond the nine universals |
+| 20 | Kernel surface | `shared-kernel` exports anything beyond the **ten** universals, or is missing one. The ten are `CalendarDay`, `Clock`, `Currency`, `DomainEvent`, `ExchangeRate`, `Money`, `Percentage`, `Result`, `TenantId`, `UserId`; [ADR-0027](../adr/0027-calendar-day-and-instant.md) raised the cap from nine to ten and authorises that one distinction and nothing more. The check runs in **both** directions — a fixture that omits a universal and one that adds a stranger — because a rename is absent under its old name and extra under its new one, which is also how an aliasing re-export that changes the public surface is caught |
 
 ## Correctness
 
 | # | Test | Fails when |
 |---|---|---|
-| 7 | Money discipline | A float, `number`, or `double` appears in a monetary position |
+| 7 | Money discipline | A monetary position is typed `number`, or a float operation appears, anywhere in the pure packages, any module layer, or the api/worker apps. Dart `double` is a SEPARATE control, in `apps/mobile/test`, not this one |
 | 12 | No jurisdiction branching | A conditional or pattern match on a country/jurisdiction identifier appears in `domain/`, `application/`, or `presentation/`. **Country codes in localization, reference data, formatting, fixtures, and seed data are permitted** |
 | 21 | Pinning | A table declared to carry legal consequence lacks `jurisdictionAtCreation`, `policyPackVersionAtCreation`, `operatingEntityAtCreation`, or `subjectPolicySelectionVersion` |
 

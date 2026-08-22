@@ -2512,6 +2512,3840 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The code was not accepted. It may have been used already, withdrawn, or issued for a different account.'**
   String get tenantInvitationFailedDescription;
+
+  /// Bottom navigation destination for the platform home surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get financialHomeTabHome;
+
+  /// Bottom navigation destination for the accounts and wallets surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts'**
+  String get financialHomeTabAccounts;
+
+  /// Title shown when the financial surface is not part of this account.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get financialUnavailableTitle;
+
+  /// Explains that the financial surface is not enabled, without naming what it would contain.
+  ///
+  /// In en, this message translates to:
+  /// **'This part of Karar is not available for your account.'**
+  String get financialUnavailableDescription;
+
+  /// Action that leaves the refusal screen and returns to the home surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Go back'**
+  String get financialUnavailableAction;
+
+  /// Title of the surface listing every account and wallet the person holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts & Wallets'**
+  String get accountsScreenTitle;
+
+  /// Empty state title when the person holds no accounts at all.
+  ///
+  /// In en, this message translates to:
+  /// **'No accounts yet'**
+  String get accountsEmptyTitle;
+
+  /// Empty state body when the person holds no accounts at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an account by hand to start keeping track of it.'**
+  String get accountsEmptyDescription;
+
+  /// Empty state title when filters removed every account.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches these filters'**
+  String get accountsFilteredEmptyTitle;
+
+  /// Empty state body when filters removed every account.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the filters to see everything you hold.'**
+  String get accountsFilteredEmptyDescription;
+
+  /// Error state title when the accounts listing failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts could not be loaded'**
+  String get accountsUnavailableTitle;
+
+  /// Error state body when the accounts listing failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read your accounts just now.'**
+  String get accountsUnavailableDescription;
+
+  /// Label for the control that chooses how accounts are grouped.
+  ///
+  /// In en, this message translates to:
+  /// **'Group by'**
+  String get accountsGroupByLabel;
+
+  /// Label for the group of controls that narrow the accounts listing.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get accountsFiltersLabel;
+
+  /// Action that removes every active filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get accountsFiltersClear;
+
+  /// Says how many filters are currently narrowing a listing.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No filters applied} =1{1 filter applied} other{{count} filters applied}}'**
+  String financialFiltersActiveCount(int count);
+
+  /// Action that opens the form for creating an account the person enters themselves.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an account by hand'**
+  String get accountsAddManualAction;
+
+  /// Title of the notice explaining that amounts in different currencies are kept apart.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown per currency'**
+  String get accountsPerCurrencyNoticeTitle;
+
+  /// Explains that no cross-currency total or conversion is performed anywhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar keeps each currency separate. It does not convert between currencies and does not add them together.'**
+  String get accountsPerCurrencyNoticeDescription;
+
+  /// Filter option that applies no narrowing on an axis.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get accountsFilterAllOption;
+
+  /// Grouping option: by the issuer of the account.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer'**
+  String get groupByIssuer;
+
+  /// Grouping option: by what kind of institution the issuer is.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer kind'**
+  String get groupByIssuerKind;
+
+  /// Grouping option: by the type of account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account type'**
+  String get groupByAccountType;
+
+  /// Grouping option: by the kind of wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet kind'**
+  String get groupByWalletKind;
+
+  /// Grouping option: by whether the balance is owed to or by the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Nature'**
+  String get groupByNature;
+
+  /// Grouping option: by currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get groupByCurrency;
+
+  /// Grouping option: by the account lifecycle status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get groupByLifecycle;
+
+  /// Grouping option: by how the account record came to exist.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get groupByOrigin;
+
+  /// Account type: a current account.
+  ///
+  /// In en, this message translates to:
+  /// **'Current account'**
+  String get accountTypeCurrent;
+
+  /// Account type: a savings account.
+  ///
+  /// In en, this message translates to:
+  /// **'Savings account'**
+  String get accountTypeSavings;
+
+  /// Account type: a credit card account.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit card account'**
+  String get accountTypeCreditCard;
+
+  /// Account type: cash the person holds themselves.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get accountTypeCash;
+
+  /// Account type: a wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get accountTypeWallet;
+
+  /// Account type: something the vocabulary does not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get accountTypeOther;
+
+  /// Account type this build of the app does not know; never softened into a known type.
+  ///
+  /// In en, this message translates to:
+  /// **'Type not recognised'**
+  String get accountTypeUnrecognised;
+
+  /// Wallet kind: mobile money.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile money'**
+  String get walletKindMobileMoney;
+
+  /// Wallet kind: electronic money.
+  ///
+  /// In en, this message translates to:
+  /// **'Electronic money'**
+  String get walletKindEMoney;
+
+  /// Wallet kind: prepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid'**
+  String get walletKindPrepaid;
+
+  /// Wallet kind: payroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get walletKindPayroll;
+
+  /// Wallet kind: a wallet inside a super app.
+  ///
+  /// In en, this message translates to:
+  /// **'Super app'**
+  String get walletKindSuperApp;
+
+  /// Wallet kind: something the vocabulary does not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Other wallet'**
+  String get walletKindOther;
+
+  /// Wallet kind this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet kind not recognised'**
+  String get walletKindUnrecognised;
+
+  /// Shown when an account carries no wallet kind because it is not a wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a wallet'**
+  String get walletKindNone;
+
+  /// Account nature: money owed to the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset'**
+  String get accountNatureAsset;
+
+  /// Account nature: money the person owes.
+  ///
+  /// In en, this message translates to:
+  /// **'Liability'**
+  String get accountNatureLiability;
+
+  /// Account nature the platform itself reported as unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not stated'**
+  String get accountNatureNotStated;
+
+  /// Account nature this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Nature not recognised'**
+  String get accountNatureUnrecognised;
+
+  /// Account status: in use.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get accountLifecycleActive;
+
+  /// Account status: archived by the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get accountLifecycleArchived;
+
+  /// Account status: closed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get accountLifecycleClosed;
+
+  /// Account status this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Status not recognised'**
+  String get accountLifecycleUnrecognised;
+
+  /// Issuer kind: a bank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get issuerKindBank;
+
+  /// Issuer kind: an electronic money issuer.
+  ///
+  /// In en, this message translates to:
+  /// **'Electronic money issuer'**
+  String get issuerKindEMoneyIssuer;
+
+  /// Issuer kind: a mobile money operator.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile money operator'**
+  String get issuerKindMobileMoneyOperator;
+
+  /// Issuer kind: financial services run by a telecom operator.
+  ///
+  /// In en, this message translates to:
+  /// **'Telecom financial services'**
+  String get issuerKindTelcoFinancialServices;
+
+  /// Issuer kind: a payment institution.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment institution'**
+  String get issuerKindPaymentInstitution;
+
+  /// Issuer kind: a fintech wallet provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Fintech wallet'**
+  String get issuerKindFintechWallet;
+
+  /// Issuer kind: a card issuer.
+  ///
+  /// In en, this message translates to:
+  /// **'Card issuer'**
+  String get issuerKindCardIssuer;
+
+  /// Issuer kind: an exchange house.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchange house'**
+  String get issuerKindExchangeHouse;
+
+  /// Issuer kind: something the vocabulary does not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Other institution'**
+  String get issuerKindOther;
+
+  /// Issuer kind this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer kind not recognised'**
+  String get issuerKindUnrecognised;
+
+  /// Shown when an account names no institution at all.
+  ///
+  /// In en, this message translates to:
+  /// **'No issuer named'**
+  String get issuerKindNone;
+
+  /// Issuer heading when the person named no institution for the account.
+  ///
+  /// In en, this message translates to:
+  /// **'No issuer named'**
+  String get issuerNotStated;
+
+  /// Marks an issuer the person typed themselves rather than choosing from the reviewed list.
+  ///
+  /// In en, this message translates to:
+  /// **'Named by you'**
+  String get issuerUnlistedHint;
+
+  /// Marks a reviewed issuer that can no longer be chosen for a new account.
+  ///
+  /// In en, this message translates to:
+  /// **'No longer offered'**
+  String get issuerRetiredHint;
+
+  /// Label for the short masked tail an account carries.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get accountMaskLabel;
+
+  /// Shown when no masked reference was reported for an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Not provided'**
+  String get accountMaskAbsent;
+
+  /// Shown when a reported reference was refused by the app because it could be a full number.
+  ///
+  /// In en, this message translates to:
+  /// **'Withheld'**
+  String get accountMaskWithheld;
+
+  /// States plainly that full identifiers are never displayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar never shows a full account, card or IBAN number.'**
+  String get accountMaskNeverFullNumber;
+
+  /// Section heading above the figures sources reported for an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Balances reported by sources'**
+  String get balancesSectionTitle;
+
+  /// Empty state when no source has reported a figure for this account.
+  ///
+  /// In en, this message translates to:
+  /// **'No balance reported'**
+  String get balancesEmptyTitle;
+
+  /// Empty state body when no balance figure exists.
+  ///
+  /// In en, this message translates to:
+  /// **'No source has reported a figure for this account yet.'**
+  String get balancesEmptyDescription;
+
+  /// States that balances are shown per kind and are never summed.
+  ///
+  /// In en, this message translates to:
+  /// **'Each figure is what one source reported, for the kind it reported. Karar does not add them together.'**
+  String get balancesNoTotalNotice;
+
+  /// Balance kind: the booked figure.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked'**
+  String get balanceKindBooked;
+
+  /// Balance kind: the available figure.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get balanceKindAvailable;
+
+  /// Balance kind: the current figure.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get balanceKindCurrent;
+
+  /// Balance kind: the outstanding figure.
+  ///
+  /// In en, this message translates to:
+  /// **'Outstanding'**
+  String get balanceKindOutstanding;
+
+  /// Balance kind: the credit limit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit limit'**
+  String get balanceKindCreditLimit;
+
+  /// Balance kind: a kind the source named that this vocabulary does not.
+  ///
+  /// In en, this message translates to:
+  /// **'Other kind reported'**
+  String get balanceKindOtherSourceReported;
+
+  /// Balance kind this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind not recognised'**
+  String get balanceKindUnrecognised;
+
+  /// Says the moment a reported figure was true, as the source stated it.
+  ///
+  /// In en, this message translates to:
+  /// **'True as of {when}'**
+  String balanceAsOfLabel(String when);
+
+  /// Says the moment this platform recorded a reported figure.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded by Karar on {when}'**
+  String balanceCapturedLabel(String when);
+
+  /// Heading for the older figures a source reported for the same balance kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier reports'**
+  String get balanceOlderReportsLabel;
+
+  /// Source label: a person typed this record in themselves.
+  ///
+  /// In en, this message translates to:
+  /// **'Manually added'**
+  String get dataOriginManuallyAdded;
+
+  /// Source label: this record came out of a statement file the person uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported from statement'**
+  String get dataOriginImportedFromStatement;
+
+  /// Source label: the only automatic route is a file the person uploads.
+  ///
+  /// In en, this message translates to:
+  /// **'File import only'**
+  String get dataOriginFileImportOnly;
+
+  /// Source label used when the platform did not say where data came from. Never softened into a connection.
+  ///
+  /// In en, this message translates to:
+  /// **'Source not stated'**
+  String get dataOriginNotStated;
+
+  /// Section heading for the source and freshness summary of an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Where this data comes from'**
+  String get sourceSectionTitle;
+
+  /// Label for the moment an import last finished successfully. It must not read as the platform having checked with an institution: this platform contacts none, and the moment is a record of what the person supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Data last arrived'**
+  String get sourceLastSynchronisedLabel;
+
+  /// Shown when a source is attached but has never delivered anything.
+  ///
+  /// In en, this message translates to:
+  /// **'No import has completed yet'**
+  String get sourceNeverImportedTitle;
+
+  /// Shown when nothing at all supplies data for an account.
+  ///
+  /// In en, this message translates to:
+  /// **'No source feeds this account'**
+  String get sourceNoneObservedTitle;
+
+  /// States plainly that no institution connection exists anywhere in the product.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar has no live link to any bank, wallet or card issuer. Data arrives only when you enter it or import a file.'**
+  String get sourceNoLiveLinkNotice;
+
+  /// Source link status: the person has not yet confirmed it.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting your confirmation'**
+  String get sourceStatusPendingConfirmation;
+
+  /// Source link status: the stored source is attached to this account inside Karar. Deliberately not phrased as a connection to an institution.
+  ///
+  /// In en, this message translates to:
+  /// **'Attached to this account'**
+  String get sourceStatusAttached;
+
+  /// Source link status: the person declined it.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined'**
+  String get sourceStatusDeclined;
+
+  /// Source link status: dormant.
+  ///
+  /// In en, this message translates to:
+  /// **'Dormant'**
+  String get sourceStatusDormant;
+
+  /// Source link status this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Status not recognised'**
+  String get sourceStatusUnrecognised;
+
+  /// How much weight this source carries: authoritative.
+  ///
+  /// In en, this message translates to:
+  /// **'Authoritative'**
+  String get sourceAuthorityAuthoritative;
+
+  /// How much weight this source carries: supplemental.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplemental'**
+  String get sourceAuthoritySupplemental;
+
+  /// How much weight this source carries: unverified.
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified'**
+  String get sourceAuthorityUnverified;
+
+  /// Source weight this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight not recognised'**
+  String get sourceAuthorityUnrecognised;
+
+  /// Label for the calendar range a source has supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Days covered'**
+  String get sourceCoverageLabel;
+
+  /// A closed range of calendar days, both rendered as days rather than moments. The placeholders are declared START FIRST because gen-l10n orders the generated positional parameters by this map, not by the order they appear in the message: declared end-first, every caller passing (start, end) silently rendered the range backwards.
+  ///
+  /// In en, this message translates to:
+  /// **'{start} to {end}'**
+  String sourceCoverageRange(String start, String end);
+
+  /// Shown when a source has supplied no days at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing supplied yet'**
+  String get sourceCoverageNone;
+
+  /// Label for whether balances have been observed from this source.
+  ///
+  /// In en, this message translates to:
+  /// **'Balances seen'**
+  String get sourceBalanceObservationLabel;
+
+  /// Label for whether pending transactions have been observed from this source.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending transactions seen'**
+  String get sourcePendingObservationLabel;
+
+  /// Observation: this platform has seen it.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen'**
+  String get sourceObservationObserved;
+
+  /// Observation: this platform has not seen it.
+  ///
+  /// In en, this message translates to:
+  /// **'Not seen'**
+  String get sourceObservationNotObserved;
+
+  /// Observation: the source never offered it.
+  ///
+  /// In en, this message translates to:
+  /// **'Never offered'**
+  String get sourceObservationNotProvided;
+
+  /// Observation this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Not recognised'**
+  String get sourceObservationUnrecognised;
+
+  /// Section heading for the cards and payment identities nested under an account.
+  ///
+  /// In en, this message translates to:
+  /// **'What spends from this account'**
+  String get instrumentsSectionTitle;
+
+  /// Empty state when an account has no payment instruments.
+  ///
+  /// In en, this message translates to:
+  /// **'No cards or payment identities'**
+  String get instrumentsEmptyTitle;
+
+  /// States that an instrument never carries a balance, however many instruments an account has.
+  ///
+  /// In en, this message translates to:
+  /// **'A card holds no balance of its own. The balance belongs to the account above.'**
+  String get instrumentsNoBalanceNotice;
+
+  /// Says how many payment instruments spend from one account.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No instruments} =1{1 instrument} other{{count} instruments}}'**
+  String instrumentsCountLabel(int count);
+
+  /// Instrument type: a physical card.
+  ///
+  /// In en, this message translates to:
+  /// **'Physical card'**
+  String get instrumentTypePhysicalCard;
+
+  /// Instrument type: a virtual card.
+  ///
+  /// In en, this message translates to:
+  /// **'Virtual card'**
+  String get instrumentTypeVirtualCard;
+
+  /// Instrument type: a prepaid card.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid card'**
+  String get instrumentTypePrepaidCard;
+
+  /// Instrument type: a tokenized card. A type, never a live provisioning state.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokenized card'**
+  String get instrumentTypeTokenizedCard;
+
+  /// Instrument type: a QR payment identity.
+  ///
+  /// In en, this message translates to:
+  /// **'QR payment identity'**
+  String get instrumentTypeQrPaymentIdentity;
+
+  /// Instrument type: something the vocabulary does not name.
+  ///
+  /// In en, this message translates to:
+  /// **'Other instrument'**
+  String get instrumentTypeOther;
+
+  /// Instrument type this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Type not recognised'**
+  String get instrumentTypeUnrecognised;
+
+  /// Instrument status: active.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get instrumentStatusActive;
+
+  /// Instrument status: suspended.
+  ///
+  /// In en, this message translates to:
+  /// **'Suspended'**
+  String get instrumentStatusSuspended;
+
+  /// Instrument status: expired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get instrumentStatusExpired;
+
+  /// Instrument status: cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get instrumentStatusCancelled;
+
+  /// Instrument status this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Status not recognised'**
+  String get instrumentStatusUnrecognised;
+
+  /// Says the platform reported this instrument as usable for spending.
+  ///
+  /// In en, this message translates to:
+  /// **'Can be used to spend'**
+  String get instrumentSpendable;
+
+  /// Says the platform reported this instrument as not usable for spending.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot be used to spend'**
+  String get instrumentNotSpendable;
+
+  /// Title of the screen showing one account or wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountDetailTitle;
+
+  /// Section heading for the identifying details of an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get accountDetailIdentitySection;
+
+  /// Action that opens the edit form for an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit account'**
+  String get accountDetailEditAction;
+
+  /// Section heading for the most recent transactions on an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transactions'**
+  String get accountDetailRecentTransactions;
+
+  /// Action that opens the full transaction list filtered to this account.
+  ///
+  /// In en, this message translates to:
+  /// **'See all transactions'**
+  String get accountDetailSeeAllTransactions;
+
+  /// Error state title when one account could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Account could not be loaded'**
+  String get accountDetailUnavailableTitle;
+
+  /// Error state body when one account could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read this account just now.'**
+  String get accountDetailUnavailableDescription;
+
+  /// Label for the currency an account is held in.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get accountCurrencyLabel;
+
+  /// Label for the type of an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get accountTypeFieldLabel;
+
+  /// Label for the kind of wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet kind'**
+  String get accountWalletKindFieldLabel;
+
+  /// Label for whether the balance is owed to or by the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Nature'**
+  String get accountNatureFieldLabel;
+
+  /// Label for the lifecycle status of an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get accountLifecycleFieldLabel;
+
+  /// Label for the institution an account is held at.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer'**
+  String get accountIssuerFieldLabel;
+
+  /// Label for how an account record came to exist.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get accountSourceFieldLabel;
+
+  /// Label for when an account record was created.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get accountCreatedLabel;
+
+  /// Label for when an account record last changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last changed'**
+  String get accountUpdatedLabel;
+
+  /// Title of the form that creates an account the person enters by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an account'**
+  String get accountFormCreateTitle;
+
+  /// Title of the form that edits an existing account.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit account'**
+  String get accountFormEditTitle;
+
+  /// Label for the name the person gives an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get accountFormDisplayNameLabel;
+
+  /// Helper text explaining that the account name is private to the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you see this name.'**
+  String get accountFormDisplayNameHelper;
+
+  /// Label for choosing the type of account.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get accountFormTypeLabel;
+
+  /// Label for choosing the kind of wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet kind'**
+  String get accountFormWalletKindLabel;
+
+  /// Helper text explaining when a wallet kind applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a wallet has a wallet kind.'**
+  String get accountFormWalletKindHelper;
+
+  /// Label for choosing whether the balance is owed to or by the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Nature'**
+  String get accountFormNatureLabel;
+
+  /// Label for the currency code of a new account.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get accountFormCurrencyLabel;
+
+  /// Helper text describing the shape of an ISO 4217 currency code.
+  ///
+  /// In en, this message translates to:
+  /// **'A three-letter code, such as QAR.'**
+  String get accountFormCurrencyHelper;
+
+  /// Label for the short masked tail of an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get accountFormMaskLabel;
+
+  /// Helper text that forbids entering a full identifier.
+  ///
+  /// In en, this message translates to:
+  /// **'A short masked tail only. Never a full account, card or IBAN number.'**
+  String get accountFormMaskHelper;
+
+  /// Label for choosing the institution an account is held at.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer'**
+  String get accountFormIssuerLabel;
+
+  /// Option that picks an institution from the reviewed catalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reviewed issuer'**
+  String get accountFormIssuerCatalogueOption;
+
+  /// Option that lets the person type an institution the catalogue does not hold.
+  ///
+  /// In en, this message translates to:
+  /// **'Name an issuer yourself'**
+  String get accountFormIssuerUnlistedOption;
+
+  /// Option that names no institution at all.
+  ///
+  /// In en, this message translates to:
+  /// **'No issuer'**
+  String get accountFormIssuerNoneOption;
+
+  /// Label for the institution name the person types themselves.
+  ///
+  /// In en, this message translates to:
+  /// **'Issuer name'**
+  String get accountFormIssuerUnlistedLabel;
+
+  /// Explains that the catalogue failed to load and offers the remaining path.
+  ///
+  /// In en, this message translates to:
+  /// **'The reviewed issuer list could not be loaded. You can still name an issuer yourself.'**
+  String get accountFormIssuersUnavailable;
+
+  /// Heading of the list summarising which fields must be corrected.
+  ///
+  /// In en, this message translates to:
+  /// **'Check these fields'**
+  String get accountFormValidationSummaryTitle;
+
+  /// Validation message: the account name is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for this account.'**
+  String get accountFormErrorDisplayName;
+
+  /// Validation message: the currency code is missing or malformed.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a three-letter currency code.'**
+  String get accountFormErrorCurrency;
+
+  /// Validation message: a wallet must state its kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a wallet kind.'**
+  String get accountFormErrorWalletKindRequired;
+
+  /// Validation message: a non-wallet cannot carry a wallet kind.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a wallet has a wallet kind.'**
+  String get accountFormErrorWalletKindNotAllowed;
+
+  /// Validation message: an issuer was named twice.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reviewed issuer or type one, not both.'**
+  String get accountFormErrorIssuerNamedTwice;
+
+  /// Confirmation shown after the platform stored an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get accountFormSaved;
+
+  /// Explains an optimistic-concurrency refusal on an account edit.
+  ///
+  /// In en, this message translates to:
+  /// **'This account changed while you were editing it. Reload it and try again.'**
+  String get accountFormVersionConflict;
+
+  /// Explains that a save was declined because the form matches what is stored.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed yet.'**
+  String get accountFormNoChange;
+
+  /// Generic failure message when an account could not be stored.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not save this account.'**
+  String get accountFormRejected;
+
+  /// Explains why the currency field is not editable on an existing account.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency cannot be changed once an account holds records.'**
+  String get accountFormCurrencyImmutable;
+
+  /// Title of the surface listing transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get transactionsScreenTitle;
+
+  /// Empty state title when no transactions exist at all.
+  ///
+  /// In en, this message translates to:
+  /// **'No transactions yet'**
+  String get transactionsEmptyTitle;
+
+  /// Empty state body when no transactions exist at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a transaction to start keeping track.'**
+  String get transactionsEmptyDescription;
+
+  /// Empty state title when filters removed every transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches these filters'**
+  String get transactionsFilteredEmptyTitle;
+
+  /// Empty state body when filters removed every transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the filters to see everything recorded.'**
+  String get transactionsFilteredEmptyDescription;
+
+  /// Error state title when the transaction listing failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions could not be loaded'**
+  String get transactionsUnavailableTitle;
+
+  /// Error state body when the transaction listing failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read your transactions just now.'**
+  String get transactionsUnavailableDescription;
+
+  /// Action that fetches the next page of transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get transactionsLoadMoreAction;
+
+  /// Action that opens the form for recording a transaction by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a transaction'**
+  String get transactionsAddManualAction;
+
+  /// Title of the screen showing one transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction'**
+  String get transactionDetailTitle;
+
+  /// Error state title when one transaction could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction could not be loaded'**
+  String get transactionDetailUnavailableTitle;
+
+  /// Error state body when one transaction could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read this transaction just now.'**
+  String get transactionDetailUnavailableDescription;
+
+  /// Label for the booked amount of a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get transactionAmountLabel;
+
+  /// Label for the amount in the currency the source used.
+  ///
+  /// In en, this message translates to:
+  /// **'As the source stated it'**
+  String get transactionOriginalAmountLabel;
+
+  /// Explains that a second currency is displayed without any conversion.
+  ///
+  /// In en, this message translates to:
+  /// **'The source used a different currency. Karar shows both and converts neither.'**
+  String get transactionOriginalAmountNotice;
+
+  /// Label for the calendar day an institution booked a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked on'**
+  String get transactionBookedOnLabel;
+
+  /// Label for the value date of a transaction, a calendar day.
+  ///
+  /// In en, this message translates to:
+  /// **'Value date'**
+  String get transactionValueDateLabel;
+
+  /// Label for the true instant a source stated, when it stated one.
+  ///
+  /// In en, this message translates to:
+  /// **'Source timestamp'**
+  String get transactionEventOccurredLabel;
+
+  /// Label for the time zone the source instant is meaningful in.
+  ///
+  /// In en, this message translates to:
+  /// **'Source time zone'**
+  String get transactionSourceTimezoneLabel;
+
+  /// Label for the description of a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get transactionDescriptionLabel;
+
+  /// Label for the merchant of a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant'**
+  String get transactionMerchantLabel;
+
+  /// Label for the note on a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get transactionNoteLabel;
+
+  /// Label for the account a transaction belongs to.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get transactionAccountLabel;
+
+  /// Transaction status: posted.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted'**
+  String get transactionStatusPosted;
+
+  /// Transaction status: voided.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided'**
+  String get transactionStatusVoided;
+
+  /// Transaction status this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Status not recognised'**
+  String get transactionStatusUnrecognised;
+
+  /// Direction: money arriving in the account.
+  ///
+  /// In en, this message translates to:
+  /// **'Money in'**
+  String get directionMoneyIn;
+
+  /// Direction: money leaving the account.
+  ///
+  /// In en, this message translates to:
+  /// **'Money out'**
+  String get directionMoneyOut;
+
+  /// Direction this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction not recognised'**
+  String get directionUnrecognised;
+
+  /// Label for the category on a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get transactionCategoryLabel;
+
+  /// Shown when no category has been assigned to a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'No category'**
+  String get transactionCategoryNone;
+
+  /// Action that opens the category catalogue for a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a category'**
+  String get transactionCategoryChangeAction;
+
+  /// Says a person chose this category themselves.
+  ///
+  /// In en, this message translates to:
+  /// **'Chosen by you'**
+  String get transactionCategoryByUser;
+
+  /// Says a deterministic rule set this category.
+  ///
+  /// In en, this message translates to:
+  /// **'Set by a rule'**
+  String get transactionCategoryByRule;
+
+  /// Category assignment source this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Source not recognised'**
+  String get transactionCategoryBySourceUnrecognised;
+
+  /// Label for the version of the rule that set a category.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule version'**
+  String get transactionCategoryRuleVersionLabel;
+
+  /// Section heading for the append-only revision history of a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get transactionRevisionsTitle;
+
+  /// Names one entry of the revision history by its number.
+  ///
+  /// In en, this message translates to:
+  /// **'Revision {number}'**
+  String transactionRevisionNumber(int number);
+
+  /// Revision attribution: the value came from a statement import.
+  ///
+  /// In en, this message translates to:
+  /// **'From an imported statement'**
+  String get transactionRevisionSourceImport;
+
+  /// Revision attribution: the value was entered by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Entered by hand'**
+  String get transactionRevisionManualEntry;
+
+  /// Revision attribution: the person corrected the value.
+  ///
+  /// In en, this message translates to:
+  /// **'Corrected by you'**
+  String get transactionRevisionUserInput;
+
+  /// Revision attribution this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Origin not recognised'**
+  String get transactionRevisionUnrecognised;
+
+  /// Lists which fields one revision changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed: {fields}'**
+  String transactionRevisionChangedFields(String fields);
+
+  /// Shown for the first revision, which changed nothing because it is the original.
+  ///
+  /// In en, this message translates to:
+  /// **'Originally recorded'**
+  String get transactionRevisionNoChangedFields;
+
+  /// States that current values differ from what the source supplied, as the platform reported.
+  ///
+  /// In en, this message translates to:
+  /// **'You have corrected a value the source supplied. The values from the source are kept in the history.'**
+  String get transactionDivergesFromSource;
+
+  /// Name of the amount field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'amount'**
+  String get revisableFieldAmount;
+
+  /// Name of the booking date field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'booking date'**
+  String get revisableFieldBookingDate;
+
+  /// Name of the value date field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'value date'**
+  String get revisableFieldValueDate;
+
+  /// Name of the merchant field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'merchant'**
+  String get revisableFieldMerchant;
+
+  /// Name of the description field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'description'**
+  String get revisableFieldDescription;
+
+  /// Name of the note field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'note'**
+  String get revisableFieldNote;
+
+  /// Name of the status field in a revision summary.
+  ///
+  /// In en, this message translates to:
+  /// **'status'**
+  String get revisableFieldStatus;
+
+  /// Name used for a revision field this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'a field not recognised'**
+  String get revisableFieldUnrecognised;
+
+  /// Section heading for where each revision of a transaction came from.
+  ///
+  /// In en, this message translates to:
+  /// **'Provenance'**
+  String get transactionProvenanceTitle;
+
+  /// Error state when the provenance listing failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Provenance could not be loaded'**
+  String get transactionProvenanceUnavailable;
+
+  /// Provenance: this revision originated in an uploaded statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Came from a statement file'**
+  String get provenanceImportedFromStatement;
+
+  /// Provenance: this revision did not originate in an uploaded statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Did not come from a statement file'**
+  String get provenanceNotImportedFromStatement;
+
+  /// Label for what the source itself said before any mapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction the source stated'**
+  String get provenanceSourceDirectionLabel;
+
+  /// Source direction: debit.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit'**
+  String get sourceDirectionDebit;
+
+  /// Source direction: credit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get sourceDirectionCredit;
+
+  /// Source direction: the source said nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Not stated'**
+  String get sourceDirectionNotStated;
+
+  /// Source direction this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Not recognised'**
+  String get sourceDirectionUnrecognised;
+
+  /// Label for how the source statement became the canonical sign.
+  ///
+  /// In en, this message translates to:
+  /// **'How the direction was decided'**
+  String get provenanceDirectionMappingLabel;
+
+  /// Direction mapping: a person entered it.
+  ///
+  /// In en, this message translates to:
+  /// **'Entered by hand'**
+  String get directionMappingManualEntry;
+
+  /// Direction mapping: taken from a debit or credit word in the source.
+  ///
+  /// In en, this message translates to:
+  /// **'From the wording used by the source'**
+  String get directionMappingSourceDirectionWord;
+
+  /// Direction mapping: taken from the sign of the source amount.
+  ///
+  /// In en, this message translates to:
+  /// **'From the sign used by the source'**
+  String get directionMappingSourceSignedAmount;
+
+  /// Direction mapping: taken from the source sign under the opposite convention.
+  ///
+  /// In en, this message translates to:
+  /// **'From the sign used by the source, inverted'**
+  String get directionMappingSourceSignedAmountInverted;
+
+  /// Direction mapping this build of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Not recognised'**
+  String get directionMappingUnrecognised;
+
+  /// Label for the four algorithm versions that processed a record.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing versions'**
+  String get provenanceVersionsLabel;
+
+  /// Label for the parser version.
+  ///
+  /// In en, this message translates to:
+  /// **'Parser'**
+  String get provenanceParserVersionLabel;
+
+  /// Label for the mapping version.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapping'**
+  String get provenanceMappingVersionLabel;
+
+  /// Label for the normalization version.
+  ///
+  /// In en, this message translates to:
+  /// **'Normalization'**
+  String get provenanceNormalizationVersionLabel;
+
+  /// Label for the version of the duplicate-detection algorithm. It is an algorithm version, never a fingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate check'**
+  String get provenanceFingerprintVersionLabel;
+
+  /// Action that opens the correction form.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct this transaction'**
+  String get transactionCorrectAction;
+
+  /// Title of the correction form.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct transaction'**
+  String get transactionCorrectTitle;
+
+  /// Explains that corrections append rather than overwrite.
+  ///
+  /// In en, this message translates to:
+  /// **'A correction is added to the history. Nothing is overwritten.'**
+  String get transactionCorrectNotice;
+
+  /// Confirmation shown after a correction was stored.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction recorded.'**
+  String get transactionCorrectionSaved;
+
+  /// Explains an optimistic-concurrency refusal on a correction.
+  ///
+  /// In en, this message translates to:
+  /// **'This transaction changed while you were editing it. Reload it and try again.'**
+  String get transactionVersionConflict;
+
+  /// Explains that a correction was declined because it changes nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed yet.'**
+  String get transactionNoChange;
+
+  /// Generic failure message when a transaction could not be stored.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not save this transaction.'**
+  String get transactionRejected;
+
+  /// Title of the notice shown when the platform refuses an identical transaction as a possible duplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'You may already have recorded this'**
+  String get transactionDuplicateTitle;
+
+  /// Explains why a transaction was refused as a duplicate and what the person can do about it.
+  ///
+  /// In en, this message translates to:
+  /// **'An identical transaction is already recorded for this account on this date. If you really did buy this twice, record it as a separate purchase.'**
+  String get transactionDuplicateMessage;
+
+  /// Action that records a refused duplicate as a second genuine occurrence of the same movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Record as a separate purchase'**
+  String get transactionDuplicateConfirmAction;
+
+  /// Action that deletes one transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete transaction'**
+  String get transactionDeleteAction;
+
+  /// Title of the confirmation dialog for deleting a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this transaction?'**
+  String get transactionDeleteConfirmTitle;
+
+  /// Body of the confirmation dialog for deleting a transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'The transaction and any transfer matches naming it will be removed.'**
+  String get transactionDeleteConfirmMessage;
+
+  /// Confirmation shown after a transaction was fully deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted.'**
+  String get transactionDeleted;
+
+  /// States that a delete was partially applied, rather than reporting success.
+  ///
+  /// In en, this message translates to:
+  /// **'Only part of this deletion completed. Some related records may remain.'**
+  String get transactionDeletePartial;
+
+  /// Title of the form that records a transaction by hand.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a transaction'**
+  String get transactionFormCreateTitle;
+
+  /// Label for choosing which account a manual transaction belongs to.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get transactionFormAccountLabel;
+
+  /// Label for the amount of a manual transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get transactionFormMagnitudeLabel;
+
+  /// Helper text explaining that the amount is a magnitude and the direction is chosen separately.
+  ///
+  /// In en, this message translates to:
+  /// **'A positive amount, in the currency of the account. Choose below whether it came in or went out.'**
+  String get transactionFormMagnitudeHelper;
+
+  /// Label for choosing whether money came in or went out.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get transactionFormDirectionLabel;
+
+  /// Label for the calendar day a manual transaction was booked.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked on'**
+  String get transactionFormBookingDateLabel;
+
+  /// Label for the optional value date of a manual transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Value date'**
+  String get transactionFormValueDateLabel;
+
+  /// Helper text describing the shape of a calendar day entry.
+  ///
+  /// In en, this message translates to:
+  /// **'A calendar day, as YYYY-MM-DD.'**
+  String get transactionFormDayHelper;
+
+  /// Label for the description of a manual transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get transactionFormDescriptionLabel;
+
+  /// Label for the optional merchant of a manual transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant'**
+  String get transactionFormMerchantLabel;
+
+  /// Label for the optional note on a manual transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get transactionFormNoteLabel;
+
+  /// Helper text marking a form field as optional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional.'**
+  String get transactionFormOptionalHelper;
+
+  /// Heading of the list summarising which transaction fields must be corrected.
+  ///
+  /// In en, this message translates to:
+  /// **'Check these fields'**
+  String get transactionFormValidationSummaryTitle;
+
+  /// Validation message: no account was chosen for a manual transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an account.'**
+  String get transactionFormErrorAccount;
+
+  /// Validation message: the description is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a description.'**
+  String get transactionFormErrorDescription;
+
+  /// Validation message: no direction was chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose whether money came in or went out.'**
+  String get transactionFormErrorDirection;
+
+  /// Validation message: the amount is missing, malformed or signed.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive amount.'**
+  String get transactionFormErrorMagnitude;
+
+  /// Validation message: the booking day is missing or malformed.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the day it was booked, as YYYY-MM-DD.'**
+  String get transactionFormErrorBookingDate;
+
+  /// Validation message: the value date is malformed.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the value date as YYYY-MM-DD, or leave it empty.'**
+  String get transactionFormErrorValueDate;
+
+  /// Confirmation shown after a manual transaction was stored.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded.'**
+  String get transactionFormSaved;
+
+  /// Explains that a transaction needs an account to belong to.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an account before recording a transaction.'**
+  String get transactionFormNoAccounts;
+
+  /// Heading of the controls that narrow the transaction listing.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get transactionFiltersTitle;
+
+  /// Filter label for money in or money out.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get transactionFilterDirectionLabel;
+
+  /// Filter label for transaction status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get transactionFilterStatusLabel;
+
+  /// Filter label for currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get transactionFilterCurrencyLabel;
+
+  /// Filter label for the rail a transaction arrived on.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get transactionFilterSourceLabel;
+
+  /// Filter label for the account a transaction belongs to.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get transactionFilterAccountLabel;
+
+  /// Title of the screen listing the reviewed category catalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a category'**
+  String get categoryPickerTitle;
+
+  /// Label for the field that filters the category catalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'Search categories'**
+  String get categorySearchLabel;
+
+  /// Empty state when the catalogue holds nothing selectable.
+  ///
+  /// In en, this message translates to:
+  /// **'No categories available'**
+  String get categoriesEmptyTitle;
+
+  /// Empty state body for the category catalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'The reviewed catalogue offers nothing to choose right now.'**
+  String get categoriesEmptyDescription;
+
+  /// Error state title when the category catalogue failed to load.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories could not be loaded'**
+  String get categoriesUnavailableTitle;
+
+  /// Error state body when the category catalogue failed to load.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read the category catalogue just now.'**
+  String get categoriesUnavailableDescription;
+
+  /// Marks a category that may no longer be chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'No longer offered'**
+  String get categoryRetiredHint;
+
+  /// Confirmation shown after a category was assigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Category saved.'**
+  String get categoryAssigned;
+
+  /// Explains that an existing choice by the person was not replaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own choice already stands.'**
+  String get categoryAssignmentWins;
+
+  /// Explains that a category code could not be assigned.
+  ///
+  /// In en, this message translates to:
+  /// **'That category is not available.'**
+  String get categoryUnknown;
+
+  /// Label for the version of the reviewed category catalogue.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalogue version'**
+  String get categoryCatalogueVersionLabel;
+
+  /// Screen reader label pairing a formatted amount with the direction it moved.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount}, {direction}'**
+  String a11yFinancialAmount(String amount, String direction);
+
+  /// Screen reader label for one account row in the portfolio. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {type}, {currency}'**
+  String a11yAccountSummary(String name, String type, String currency);
+
+  /// Screen reader label for one reported balance figure. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind}, {amount}, {asOf}'**
+  String a11yBalanceSummary(String kind, String amount, String asOf);
+
+  /// Screen reader label for one payment instrument nested under an account. The placeholders are declared in the order they appear in the message, because gen-l10n orders the generated positional parameters by this map rather than by the message: declared in any other order, every caller passing them in reading order silently produces a scrambled sentence.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, {type}, {status}'**
+  String a11yInstrumentSummary(String label, String type, String status);
+
+  /// Title of the statement-import surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a statement'**
+  String get statementImportTitle;
+
+  /// Title of the first step, where the person picks the target account and the CSV.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an account and a file'**
+  String get statementImportStartTitle;
+
+  /// Title of the step where the person says which column holds which field.
+  ///
+  /// In en, this message translates to:
+  /// **'Match the columns'**
+  String get statementImportMappingTitle;
+
+  /// Title of the step where the person sees what the parse found and decides.
+  ///
+  /// In en, this message translates to:
+  /// **'Review before importing'**
+  String get statementImportReviewTitle;
+
+  /// Says plainly that file upload is the only rail and that no banking credential is ever requested.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar imports statements you upload yourself. It does not connect to your bank, and it never asks for a banking password, PIN or one-time code.'**
+  String get statementImportRailExplanation;
+
+  /// Label for the account picker on the first step.
+  ///
+  /// In en, this message translates to:
+  /// **'Account to import into'**
+  String get statementImportAccountLabel;
+
+  /// Explains that the target account is chosen by the person and cannot be redirected by file content.
+  ///
+  /// In en, this message translates to:
+  /// **'You choose the account before the file is read. Nothing in the file can change where its rows land.'**
+  String get statementImportAccountHelper;
+
+  /// Shown when the person holds no account to import into.
+  ///
+  /// In en, this message translates to:
+  /// **'You need an account before you can import a statement.'**
+  String get statementImportNoAccounts;
+
+  /// Action that opens the device document picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a CSV file'**
+  String get statementImportChooseFile;
+
+  /// Screen-reader label for the control that opens the document picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a CSV statement file from your device'**
+  String get statementImportChooseFileSemantics;
+
+  /// States the accepted media type and the byte bound the platform enforces.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV only, up to {megabytes} MB.'**
+  String statementImportFileRules(int megabytes);
+
+  /// Confirms a file has been chosen, without naming it.
+  ///
+  /// In en, this message translates to:
+  /// **'File ready to upload'**
+  String get statementImportFileChosen;
+
+  /// Action that sends the chosen file to the platform.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload and continue'**
+  String get statementImportActionUpload;
+
+  /// Title shown when the build ships no document-picker adapter.
+  ///
+  /// In en, this message translates to:
+  /// **'No file picker is available here'**
+  String get statementImportPickerUnavailableTitle;
+
+  /// Shown where no document picker exists — a desktop host, or a device that presented no provider. Must not promise a future feature: Android and iOS already open the system picker.
+  ///
+  /// In en, this message translates to:
+  /// **'This device offered no document picker, so a statement cannot be chosen on it. Nothing else about the import has changed — where a picker is available, Karar asks for the one file you choose and never for access to your storage.'**
+  String get statementImportPickerUnavailableDetail;
+
+  /// Shown when the device could not read the chosen document. Names no path and no filename.
+  ///
+  /// In en, this message translates to:
+  /// **'That file could not be read from your device.'**
+  String get statementImportPickerUnreadable;
+
+  /// Shown when the chosen file has no bytes.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is empty.'**
+  String get statementImportSourceEmpty;
+
+  /// Shown when the chosen file is past the byte bound, before any upload is attempted.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is larger than the {megabytes} MB this import accepts.'**
+  String statementImportSourceTooLarge(int megabytes);
+
+  /// Shown when the chosen file cannot be decoded strictly as UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is not valid UTF-8 text. Karar refuses it rather than replacing the damaged characters, which would alter what your bank wrote.'**
+  String get statementImportSampleInvalidEncoding;
+
+  /// Shown when the local sample reader finds an unterminated quoted field.
+  ///
+  /// In en, this message translates to:
+  /// **'A quoted value in that file is never closed, so its columns cannot be counted reliably.'**
+  String get statementImportSampleMalformedQuoting;
+
+  /// Shown when a sampled line is wider than the platform column bound.
+  ///
+  /// In en, this message translates to:
+  /// **'A line in that file has more columns than this import accepts.'**
+  String get statementImportSampleTooManyColumns;
+
+  /// Introduces the mapping step and says why nothing is auto-detected.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell Karar what each column holds. Nothing is guessed, because a wrong guess moves money.'**
+  String get statementImportMappingIntro;
+
+  /// Toggle for whether the file starts with a header row.
+  ///
+  /// In en, this message translates to:
+  /// **'The first row is a heading row'**
+  String get statementImportHeaderRowLabel;
+
+  /// Explains why the header row is declared rather than sniffed.
+  ///
+  /// In en, this message translates to:
+  /// **'Stated, never detected. A heading row treated as data becomes a refused transaction.'**
+  String get statementImportHeaderRowHelper;
+
+  /// Names a CSV column by its 1-based position, for a file with no heading row.
+  ///
+  /// In en, this message translates to:
+  /// **'Column {number}'**
+  String statementImportColumnNumber(int number);
+
+  /// The choice meaning a field is left without a column.
+  ///
+  /// In en, this message translates to:
+  /// **'Not mapped'**
+  String get statementImportColumnNotMapped;
+
+  /// Caption above the local sample grid on the mapping step.
+  ///
+  /// In en, this message translates to:
+  /// **'The first rows of your file, shown as plain text.'**
+  String get statementImportPreviewCaption;
+
+  /// States the untrusted-content posture: file text is data, rendered inertly, never acted on.
+  ///
+  /// In en, this message translates to:
+  /// **'Values appear exactly as your file contains them. Karar never treats them as instructions.'**
+  String get statementImportPreviewInertNote;
+
+  /// The day the institution booked the movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking date'**
+  String get statementImportFieldBookingDate;
+
+  /// The day the movement takes value.
+  ///
+  /// In en, this message translates to:
+  /// **'Value date'**
+  String get statementImportFieldValueDate;
+
+  /// An instant the source genuinely supplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact time'**
+  String get statementImportFieldEventOccurredAt;
+
+  /// A time zone the source itself states.
+  ///
+  /// In en, this message translates to:
+  /// **'Time zone'**
+  String get statementImportFieldSourceTimezone;
+
+  /// The single signed amount column.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get statementImportFieldAmount;
+
+  /// The column carrying money out.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit'**
+  String get statementImportFieldDebitAmount;
+
+  /// The column carrying money in.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get statementImportFieldCreditAmount;
+
+  /// The per-row currency column.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get statementImportFieldCurrency;
+
+  /// The statement narrative.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get statementImportFieldDescription;
+
+  /// The merchant column, when the source separates one.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant'**
+  String get statementImportFieldMerchant;
+
+  /// A balance the source prints on each row.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get statementImportFieldSourceBalance;
+
+  /// The transaction reference the source prints.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get statementImportFieldSourceReference;
+
+  /// The masked tail digits the source prints.
+  ///
+  /// In en, this message translates to:
+  /// **'Card or account tail'**
+  String get statementImportFieldInstrumentMask;
+
+  /// The column used only to detect that a file covers more than one account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account identifier'**
+  String get statementImportFieldAccountIdentifier;
+
+  /// Names the whole line, used when it could not be split into fields at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole row'**
+  String get statementImportFieldRow;
+
+  /// Fallback for a safe-field name a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'A field this version does not recognise'**
+  String get statementImportFieldUnrecognised;
+
+  /// Explains that the account identifier column detects rather than selects.
+  ///
+  /// In en, this message translates to:
+  /// **'Used only to notice that a file covers more than one account, so the import can refuse instead of mixing them.'**
+  String get statementImportAccountIdentifierHelper;
+
+  /// Asks whether the file uses one signed column or a debit and credit pair.
+  ///
+  /// In en, this message translates to:
+  /// **'How is the amount written?'**
+  String get statementImportAmountShapeLabel;
+
+  /// The single signed amount column shape.
+  ///
+  /// In en, this message translates to:
+  /// **'One column, with a sign'**
+  String get statementImportAmountShapeSigned;
+
+  /// The two-column debit and credit shape.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate debit and credit columns'**
+  String get statementImportAmountShapeDebitCredit;
+
+  /// Asks which frame a signed amount column is written in.
+  ///
+  /// In en, this message translates to:
+  /// **'Whose point of view do the signs use?'**
+  String get statementImportSignFrameLabel;
+
+  /// The account-holder sign frame.
+  ///
+  /// In en, this message translates to:
+  /// **'Mine, so money I spend is negative'**
+  String get statementImportSignFrameAccountHolder;
+
+  /// The bank-ledger sign frame, in which the signs invert.
+  ///
+  /// In en, this message translates to:
+  /// **'The bank ledger, so a deposit is a credit'**
+  String get statementImportSignFrameBankLedger;
+
+  /// Explains why the sign frame must be stated rather than assumed.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no default. Reading the signs the wrong way turns every payment in the file into income.'**
+  String get statementImportSignFrameHelper;
+
+  /// Asks the date order to apply to dates that could be read two ways.
+  ///
+  /// In en, this message translates to:
+  /// **'How are ambiguous dates written?'**
+  String get statementImportDateOrderLabel;
+
+  /// The choice meaning no date order has been declared.
+  ///
+  /// In en, this message translates to:
+  /// **'Not stated'**
+  String get statementImportDateOrderNotStated;
+
+  /// The ISO date order.
+  ///
+  /// In en, this message translates to:
+  /// **'Year first, as in 2026-04-03'**
+  String get statementImportDateOrderIso;
+
+  /// The day-first date order, with a worked example.
+  ///
+  /// In en, this message translates to:
+  /// **'Day first, so 03/04 is 3 April'**
+  String get statementImportDateOrderDayFirst;
+
+  /// The month-first date order, with a worked example.
+  ///
+  /// In en, this message translates to:
+  /// **'Month first, so 03/04 is 4 March'**
+  String get statementImportDateOrderMonthFirst;
+
+  /// Explains that leaving the date order unstated produces typed refusals, not a silent default.
+  ///
+  /// In en, this message translates to:
+  /// **'If you do not state one, Karar refuses the rows it cannot read without guessing rather than picking a reading for you.'**
+  String get statementImportDateOrderHelper;
+
+  /// Asks whether the currency is a column or one code for the whole file.
+  ///
+  /// In en, this message translates to:
+  /// **'Where does the currency come from?'**
+  String get statementImportCurrencySourceLabel;
+
+  /// The choice meaning each row carries its own currency.
+  ///
+  /// In en, this message translates to:
+  /// **'A column in the file'**
+  String get statementImportCurrencyFromColumn;
+
+  /// The choice meaning one currency code covers the file.
+  ///
+  /// In en, this message translates to:
+  /// **'The whole file is in one currency'**
+  String get statementImportCurrencyStatedForFile;
+
+  /// Field for the single currency code covering the whole file.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency of the file'**
+  String get statementImportStatedCurrencyLabel;
+
+  /// Explains why exactly one currency source is accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'One or the other, never both. Two sources for one currency can disagree, and resolving that would mean choosing on your behalf.'**
+  String get statementImportCurrencyHelper;
+
+  /// Asks which kind of balance a mapped balance column carries.
+  ///
+  /// In en, this message translates to:
+  /// **'What does the balance column hold?'**
+  String get statementImportBalanceKindLabel;
+
+  /// The balance after each movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Running balance'**
+  String get statementImportBalanceKindRunning;
+
+  /// The booked balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Ledger balance'**
+  String get statementImportBalanceKindLedger;
+
+  /// The balance available to spend.
+  ///
+  /// In en, this message translates to:
+  /// **'Available balance'**
+  String get statementImportBalanceKindAvailable;
+
+  /// The balance at the end of the statement period.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing balance'**
+  String get statementImportBalanceKindClosing;
+
+  /// Optional field for the balance the statement claims, used for reconciliation.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance the statement states'**
+  String get statementImportStatedBalanceLabel;
+
+  /// Explains that the stated balance is for reconciliation only and is never stored as an account balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional. Used only to check that the rows add up. It is never saved as a balance of your account.'**
+  String get statementImportStatedBalanceHelper;
+
+  /// Asks which balance of the statement the stated figure is.
+  ///
+  /// In en, this message translates to:
+  /// **'Which balance is it?'**
+  String get statementImportStatedBalanceKindLabel;
+
+  /// The balance at the start of the statement period.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get statementImportStatedBalanceOpening;
+
+  /// The balance at the end of the statement period.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing'**
+  String get statementImportStatedBalanceClosing;
+
+  /// The booked balance of the statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Ledger'**
+  String get statementImportStatedBalanceLedger;
+
+  /// The available balance of the statement.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get statementImportStatedBalanceAvailable;
+
+  /// Validation message when the typed statement balance is not an exact amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the balance as digits, with at most the decimal places this currency uses.'**
+  String get statementImportStatedBalanceInvalid;
+
+  /// Mapping refused because a column index is negative or past the end of the rows.
+  ///
+  /// In en, this message translates to:
+  /// **'A chosen column is not in this file.'**
+  String get statementImportMappingColumnIndexInvalid;
+
+  /// Mapping refused because one column index is used for more than one field.
+  ///
+  /// In en, this message translates to:
+  /// **'One column is matched to two fields. A column cannot be two facts at once.'**
+  String get statementImportMappingColumnUsedTwice;
+
+  /// Mapping refused because the currency of the file is not determined.
+  ///
+  /// In en, this message translates to:
+  /// **'No currency column and no stated currency. The currency of your account is not an answer, because it would put a currency nobody chose on every row.'**
+  String get statementImportMappingCurrencyNotDetermined;
+
+  /// Mapping refused because two sources determine one currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Both a currency column and a stated currency. The two can disagree.'**
+  String get statementImportMappingCurrencyDoublyDetermined;
+
+  /// Mapping refused because a balance column was given without saying what kind of balance it holds.
+  ///
+  /// In en, this message translates to:
+  /// **'A balance column needs its kind stated. Running, ledger and available are three different numbers.'**
+  String get statementImportMappingBalanceKindNotStated;
+
+  /// Mapping refused because a time zone was mapped with no instant to apply it to.
+  ///
+  /// In en, this message translates to:
+  /// **'A time zone column needs an exact-time column to interpret.'**
+  String get statementImportMappingTimezoneWithoutInstant;
+
+  /// Action that parses the stored source under the stated mapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the file'**
+  String get statementImportActionParse;
+
+  /// Heading above the parse counts.
+  ///
+  /// In en, this message translates to:
+  /// **'What the file contained'**
+  String get statementImportCountsTitle;
+
+  /// Total data rows the parse read.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get statementImportCountRows;
+
+  /// Rows that parsed cleanly and would become transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to import'**
+  String get statementImportCountValid;
+
+  /// Rows the parse refused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get statementImportCountInvalid;
+
+  /// Rows identical to transactions this person already holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Already imported'**
+  String get statementImportCountExactDuplicates;
+
+  /// Rows that resemble existing transactions. Always zero; see the accompanying note.
+  ///
+  /// In en, this message translates to:
+  /// **'Possible duplicates'**
+  String get statementImportCountProbableDuplicates;
+
+  /// States that probable-duplicate detection is not implemented, so a zero reads as not looked for rather than none found.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not look for possible duplicates, so this is always zero.'**
+  String get statementImportProbableDuplicatesNote;
+
+  /// Heading above the reconciliation verdict.
+  ///
+  /// In en, this message translates to:
+  /// **'Does the statement add up?'**
+  String get statementImportReconciliationTitle;
+
+  /// Reconciliation verdict: the rows and the stated balance agree.
+  ///
+  /// In en, this message translates to:
+  /// **'The rows match the balance the statement states.'**
+  String get statementImportReconciliationMatched;
+
+  /// Reconciliation verdict: the rows and the stated balance disagree.
+  ///
+  /// In en, this message translates to:
+  /// **'The rows do not match the balance the statement states.'**
+  String get statementImportReconciliationMismatched;
+
+  /// Reconciliation verdict: nothing to compare. Deliberately not the same as matched.
+  ///
+  /// In en, this message translates to:
+  /// **'The statement stated no balance, so nothing was compared.'**
+  String get statementImportReconciliationNotAvailable;
+
+  /// Fallback for a reconciliation verdict a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not recognise the reconciliation result.'**
+  String get statementImportReconciliationUnrecognised;
+
+  /// Explains why a reconciliation mismatch prevents the commit.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing is blocked while they disagree. Importing a statement that does not add up would write records nobody can trust.'**
+  String get statementImportReconciliationBlocksCommit;
+
+  /// Heading above the list of refused rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused rows'**
+  String get statementImportRowIssuesTitle;
+
+  /// Shown when the parse refused nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No row was refused.'**
+  String get statementImportRowIssuesNone;
+
+  /// Names a refused row by its 1-based position among the data rows.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {number}'**
+  String statementImportRowNumber(int number);
+
+  /// Says that the refused-row report is truncated, so a partial list cannot read as a complete one.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total} refused rows.'**
+  String statementImportIssuesTruncated(int shown, int total);
+
+  /// Explains that the review surface deliberately carries no cell values.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not show values from your file here. Open your own file at these row numbers to see them.'**
+  String get statementImportNoValuesShown;
+
+  /// Remedy for a row refused because a convention was never stated.
+  ///
+  /// In en, this message translates to:
+  /// **'State the convention and read the file again.'**
+  String get statementImportRemedyStateAConvention;
+
+  /// Remedy for a row refused because the column matching is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct which column holds what.'**
+  String get statementImportRemedyCorrectTheMapping;
+
+  /// Remedy for a row refused because the file itself carries something unreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'Export the statement from your bank again.'**
+  String get statementImportRemedyCorrectTheFile;
+
+  /// Remedy for a row refused by a declared bound.
+  ///
+  /// In en, this message translates to:
+  /// **'This line is past a limit this import enforces.'**
+  String get statementImportRemedyRespectABound;
+
+  /// Fallback remedy for a reason code this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not know what to suggest here.'**
+  String get statementImportRemedyUnknown;
+
+  /// Row refusal: a required field was absent or blank.
+  ///
+  /// In en, this message translates to:
+  /// **'A required field was empty.'**
+  String get statementImportReasonRequiredFieldMissing;
+
+  /// Row refusal: the amount characters are not a number.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount is not a number Karar can read.'**
+  String get statementImportReasonUnreadableAmount;
+
+  /// Row refusal: both a dot and a comma reading are defensible and neither convention was stated.
+  ///
+  /// In en, this message translates to:
+  /// **'The decimal separator could be read two ways, and neither was stated.'**
+  String get statementImportReasonAmbiguousDecimalSeparator;
+
+  /// Row refusal: day-first and month-first both produce a real date and neither was stated.
+  ///
+  /// In en, this message translates to:
+  /// **'The date could be read two ways, and neither was stated.'**
+  String get statementImportReasonAmbiguousDateOrder;
+
+  /// Row refusal: the value is not a date in any accepted shape.
+  ///
+  /// In en, this message translates to:
+  /// **'The date is not in a shape Karar accepts.'**
+  String get statementImportReasonUnreadableDate;
+
+  /// Row refusal: a stated instant is not parseable.
+  ///
+  /// In en, this message translates to:
+  /// **'The exact time is not a time Karar can read.'**
+  String get statementImportReasonUnreadableInstant;
+
+  /// Row refusal: a stated zone is not an IANA zone the platform knows.
+  ///
+  /// In en, this message translates to:
+  /// **'The time zone is not one this platform knows.'**
+  String get statementImportReasonUnknownTimezone;
+
+  /// Row refusal: the currency code is not supported.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency is not one this platform supports.'**
+  String get statementImportReasonUnknownCurrency;
+
+  /// Row refusal: the row currency differs from the account currency and no conversion is performed.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency of this row is not the currency of the account, and nothing here converts between them.'**
+  String get statementImportReasonCurrencyMismatch;
+
+  /// Row refusal: a direction word that is neither debit nor credit in any recognised form.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not tell whether this row is money in or money out.'**
+  String get statementImportReasonAmbiguousDirection;
+
+  /// Row refusal: separate debit and credit columns both held a value on one line.
+  ///
+  /// In en, this message translates to:
+  /// **'The debit and credit columns both carried a value.'**
+  String get statementImportReasonDebitAndCreditBothPresent;
+
+  /// Row refusal: separate debit and credit columns were both empty on one line.
+  ///
+  /// In en, this message translates to:
+  /// **'The debit and credit columns were both empty.'**
+  String get statementImportReasonDebitAndCreditBothAbsent;
+
+  /// Row refusal: one field exceeded the per-field byte ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'A field is larger than this import accepts.'**
+  String get statementImportReasonFieldTooLarge;
+
+  /// Row refusal: the line had more columns than the declared ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'This row has more columns than this import accepts.'**
+  String get statementImportReasonTooManyColumns;
+
+  /// Row refusal: the line had a different number of columns than the header.
+  ///
+  /// In en, this message translates to:
+  /// **'This row has a different number of columns from the heading row.'**
+  String get statementImportReasonColumnCountMismatch;
+
+  /// Row refusal: the bytes are not valid UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'This row is not valid UTF-8 text.'**
+  String get statementImportReasonInvalidEncoding;
+
+  /// Row refusal: quoting that cannot be resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'A quoted value in this row is never closed.'**
+  String get statementImportReasonMalformedQuoting;
+
+  /// Row refusal: a number too large to be exact minor units.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount is too large to hold exactly.'**
+  String get statementImportReasonAmountExceedsRange;
+
+  /// Row refusal: more decimal places than the currency exponent allows.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount has more decimal places than its currency uses.'**
+  String get statementImportReasonDecimalPlacesExceedCurrency;
+
+  /// Fallback for a row reason code a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not recognise the reason this row was refused.'**
+  String get statementImportReasonUnrecognised;
+
+  /// Import refused: past the byte bound.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is larger than this import accepts.'**
+  String get statementImportRefusalSourceTooLarge;
+
+  /// Import refused: past the row bound.
+  ///
+  /// In en, this message translates to:
+  /// **'The file has more rows than this import accepts.'**
+  String get statementImportRefusalTooManyRows;
+
+  /// Import refused: past the column bound.
+  ///
+  /// In en, this message translates to:
+  /// **'The file has more columns than this import accepts.'**
+  String get statementImportRefusalTooManyColumns;
+
+  /// Import refused: one field exceeded the per-field byte ceiling.
+  ///
+  /// In en, this message translates to:
+  /// **'One field in the file is larger than this import accepts.'**
+  String get statementImportRefusalFieldTooLarge;
+
+  /// Import refused: the buffered-row bound was crossed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file needed more rows held at once than this import allows.'**
+  String get statementImportRefusalBufferedRowsExceeded;
+
+  /// Import refused: the buffered-byte bound was crossed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file needed more memory held at once than this import allows.'**
+  String get statementImportRefusalBufferedBytesExceeded;
+
+  /// Import refused: the wall-clock deadline was crossed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file took longer than this import allows.'**
+  String get statementImportRefusalDeadlineExceeded;
+
+  /// Import refused: the read was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file was cancelled.'**
+  String get statementImportRefusalCancelled;
+
+  /// Import refused: the error ceiling was reached.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many rows were refused for the file to be read any further.'**
+  String get statementImportRefusalTooManyErrors;
+
+  /// Import refused: the body was not the accepted media type.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was not sent as CSV.'**
+  String get statementImportRefusalUnsupportedMediaType;
+
+  /// Import refused: the bytes are not valid UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not valid UTF-8 text.'**
+  String get statementImportRefusalInvalidEncoding;
+
+  /// Import refused: the content is binary.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is not text.'**
+  String get statementImportRefusalBinaryContent;
+
+  /// Import refused: the content is a spreadsheet workbook rather than CSV.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is a spreadsheet. Export it as CSV and try again.'**
+  String get statementImportRefusalSpreadsheetContent;
+
+  /// Import refused: the content is a compressed archive.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is compressed. Extract it and upload the CSV inside.'**
+  String get statementImportRefusalCompressedContent;
+
+  /// Import refused: quoting that cannot be resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'A quoted value in the file is never closed.'**
+  String get statementImportRefusalMalformedQuoting;
+
+  /// Import refused: the source carried no content.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is empty.'**
+  String get statementImportRefusalEmptySource;
+
+  /// Import refused: a header row was declared but the file has none.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was read as having a heading row, and it has none.'**
+  String get statementImportRefusalNoHeaderRow;
+
+  /// Import refused: the mapping is too ambiguous to parse under.
+  ///
+  /// In en, this message translates to:
+  /// **'The columns as matched leave too much unstated to read the file.'**
+  String get statementImportRefusalMappingAmbiguous;
+
+  /// Import refused: the file describes more than one account.
+  ///
+  /// In en, this message translates to:
+  /// **'The file covers more than one account. Karar refuses it rather than mixing them into the account you chose.'**
+  String get statementImportRefusalMultipleAccountsInSource;
+
+  /// Import refused: the file currency differs from the account currency.
+  ///
+  /// In en, this message translates to:
+  /// **'The currency of the file is not the currency of the account, and nothing here converts between them.'**
+  String get statementImportRefusalCurrencyMismatch;
+
+  /// Import refused: reconciliation against the stated balance failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The rows do not add up to the balance the statement states.'**
+  String get statementImportRefusalReconciliationMismatch;
+
+  /// Import refused: this subject already committed the same file.
+  ///
+  /// In en, this message translates to:
+  /// **'You have already imported this exact file.'**
+  String get statementImportRefusalSourceAlreadyImported;
+
+  /// Import refused: the stored source failed its integrity check.
+  ///
+  /// In en, this message translates to:
+  /// **'The stored file no longer matches what was uploaded, so it was not read.'**
+  String get statementImportRefusalSourceIntegrityFailed;
+
+  /// Import refused: the stored source could not be read back.
+  ///
+  /// In en, this message translates to:
+  /// **'The stored file could not be read.'**
+  String get statementImportRefusalSourceUnreadable;
+
+  /// Fallback for an import refusal code a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not recognise the reason this import was refused.'**
+  String get statementImportRefusalUnrecognised;
+
+  /// Import state: draft.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get statementImportStateDraft;
+
+  /// Import state: the encrypted source is stored.
+  ///
+  /// In en, this message translates to:
+  /// **'File uploaded'**
+  String get statementImportStateSourceStored;
+
+  /// Import state: the parser is running.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file'**
+  String get statementImportStateParsing;
+
+  /// Import state: parsed and staged, awaiting the person.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your decision'**
+  String get statementImportStateReviewRequired;
+
+  /// Import state: the atomic write is in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing'**
+  String get statementImportStateCommitting;
+
+  /// Import state: the rows became transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get statementImportStateCommitted;
+
+  /// Import state: the person said no.
+  ///
+  /// In en, this message translates to:
+  /// **'Discarded'**
+  String get statementImportStateRejected;
+
+  /// Import state: something refused the import.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get statementImportStateFailed;
+
+  /// Import state: this exact file was already imported.
+  ///
+  /// In en, this message translates to:
+  /// **'Already imported'**
+  String get statementImportStateDuplicate;
+
+  /// Import state: the staged statement has been removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Erased'**
+  String get statementImportStateErased;
+
+  /// Fallback for an import state a newer platform sent that this build does not ship.
+  ///
+  /// In en, this message translates to:
+  /// **'A state this version does not recognise'**
+  String get statementImportStateUnrecognised;
+
+  /// Action that commits the reviewed import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import these transactions'**
+  String get statementImportActionCommit;
+
+  /// Action that erases the staged statement without importing it.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this import'**
+  String get statementImportActionDiscard;
+
+  /// Screen-reader and visible status while the file is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading your file'**
+  String get statementImportUploadingStatus;
+
+  /// Screen-reader and visible status while the platform parses the file.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading your file'**
+  String get statementImportParsingStatus;
+
+  /// Screen-reader and visible status while the commit is in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing your transactions'**
+  String get statementImportCommittingStatus;
+
+  /// Title shown after a successful commit.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement imported'**
+  String get statementImportCommittedTitle;
+
+  /// Label for how many transactions the commit wrote.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions added'**
+  String get statementImportCommittedCount;
+
+  /// Shown when a commit was an idempotent retry, so a person is told it succeeded rather than failed.
+  ///
+  /// In en, this message translates to:
+  /// **'This statement was already imported. Nothing was added a second time.'**
+  String get statementImportAlreadyCommitted;
+
+  /// Title shown after the staged statement is erased.
+  ///
+  /// In en, this message translates to:
+  /// **'Import discarded'**
+  String get statementImportDiscardedTitle;
+
+  /// Explains that erasing an import does not delete transactions it already produced.
+  ///
+  /// In en, this message translates to:
+  /// **'The file and the rows it staged are gone. Transactions already imported from it are not affected.'**
+  String get statementImportDiscardedDetail;
+
+  /// Title shown when the import surface could not be reached.
+  ///
+  /// In en, this message translates to:
+  /// **'This import cannot be shown'**
+  String get statementImportUnavailableTitle;
+
+  /// Body shown when a statement-import request failed, stating that nothing was written.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not reach the platform. Nothing was changed.'**
+  String get statementImportUnavailableDescription;
+
+  /// Title above a typed import refusal code.
+  ///
+  /// In en, this message translates to:
+  /// **'This file was refused'**
+  String get statementImportRefusedTitle;
+
+  /// Answer meaning the file starts with a header row.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, the first row is a heading'**
+  String get statementImportHeaderRowYes;
+
+  /// Answer meaning the first row of the file is data rather than a heading.
+  ///
+  /// In en, this message translates to:
+  /// **'No, the first row is a transaction'**
+  String get statementImportHeaderRowNo;
+
+  /// Title of the screen that lists proposed and decided transfer matches.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers between your own accounts'**
+  String get transferMatchesScreenTitle;
+
+  /// Explains what a transfer match is and that a proposal on its own changes nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Moving money between two accounts you own is one movement recorded twice — once leaving, once arriving. Karar proposes the pairs it found. Nothing changes until you answer.'**
+  String get transferMatchesIntro;
+
+  /// Label above the control that chooses which decisions the list shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get transferMatchesFilterLabel;
+
+  /// Filter that shows only the pairs the person has not answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for you'**
+  String get transferMatchesFilterAwaiting;
+
+  /// Filter that shows only the pairs the person confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirmed'**
+  String get transferMatchesFilterConfirmed;
+
+  /// Filter that shows only the pairs the person turned down or withdrew.
+  ///
+  /// In en, this message translates to:
+  /// **'You kept separate'**
+  String get transferMatchesFilterRejected;
+
+  /// Badge for a pair the platform proposed and nobody has answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed'**
+  String get transferMatchStateSuggested;
+
+  /// Badge for a pair the person confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed by you'**
+  String get transferMatchStateConfirmed;
+
+  /// Badge for a pair the person turned down, or a confirmation they withdrew.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept separate'**
+  String get transferMatchStateRejected;
+
+  /// Badge for a match state the shipped build does not recognise.
+  ///
+  /// In en, this message translates to:
+  /// **'A state this version does not know'**
+  String get transferMatchStateUnrecognised;
+
+  /// Stated on every proposed pair so a suggestion is never read as something already applied.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed. This is a question, not a decision.'**
+  String get transferMatchNothingChangedNote;
+
+  /// Stated on a confirmed pair, naming the person as the one who decided.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirmed this pair, so Karar counts the two entries as one movement.'**
+  String get transferMatchConfirmedNote;
+
+  /// Stated on a pair the person kept separate, including a withdrawn confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'The two entries keep counting separately, and this pair will not be proposed again.'**
+  String get transferMatchRejectedNote;
+
+  /// Stated on a pair whose state the shipped build does not recognise.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Karar cannot act on this pair. Update the app to answer it.'**
+  String get transferMatchUnrecognisedNote;
+
+  /// Heading above the rule the platform matched on.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this pair was proposed'**
+  String get transferMatchBasisHeading;
+
+  /// The one suggestion rule the platform declares, written out for a person.
+  ///
+  /// In en, this message translates to:
+  /// **'The two amounts are exactly equal and opposite, they are in the same currency, and they were booked within the window of the rule below.'**
+  String get transferMatchBasisEqualAndOpposite;
+
+  /// Shown when the suggestion basis is a value the shipped build does not recognise.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Karar does not know the rule that proposed this pair.'**
+  String get transferMatchBasisUnrecognised;
+
+  /// Label for the version label of the suggestion rule, shown verbatim.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule that proposed it'**
+  String get transferMatchRuleLabel;
+
+  /// States that no confidence figure exists, so nobody looks for one.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not score a pair. It either meets the rule or it is not proposed at all.'**
+  String get transferMatchNoScoreNote;
+
+  /// Heading for the outflow side of a proposed pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Money left this account'**
+  String get transferMatchOutflowHeading;
+
+  /// Heading for the inflow side of a proposed pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Money arrived in this account'**
+  String get transferMatchInflowHeading;
+
+  /// Label for the account one side of a pair sits on.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get transferMatchAccountLabel;
+
+  /// Label for the currency one side of a pair is held in.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get transferMatchCurrencyLabel;
+
+  /// Label for the amount of one side of a pair, as the platform reported it.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get transferMatchAmountLabel;
+
+  /// Label for the calendar day the institution booked one side of a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked'**
+  String get transferMatchBookedLabel;
+
+  /// Label for the description the source supplied for one side of a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get transferMatchDescriptionLabel;
+
+  /// Label for when the platform first proposed a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed on'**
+  String get transferMatchProposedAtLabel;
+
+  /// Label for when the person answered a pair.
+  ///
+  /// In en, this message translates to:
+  /// **'You answered on'**
+  String get transferMatchDecidedAtLabel;
+
+  /// Shown in place of an account name when the portfolio could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Account name unavailable'**
+  String get transferMatchAccountNotNamed;
+
+  /// Action that opens the two movements a pair relates.
+  ///
+  /// In en, this message translates to:
+  /// **'Show both movements'**
+  String get transferMatchActionOpenMovements;
+
+  /// Action that closes the two movements a pair relates.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide both movements'**
+  String get transferMatchActionHideMovements;
+
+  /// Action recording the person's confirmation that two entries are one movement.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, one movement'**
+  String get transferMatchActionConfirm;
+
+  /// Action recording that the person considers the two entries separate.
+  ///
+  /// In en, this message translates to:
+  /// **'No, two separate movements'**
+  String get transferMatchActionReject;
+
+  /// Action withdrawing a confirmation the person previously made.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw my confirmation'**
+  String get transferMatchActionWithdraw;
+
+  /// Screen-reader and visible status while a confirmation is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording your confirmation'**
+  String get transferMatchConfirmingStatus;
+
+  /// Screen-reader and visible status while a refusal or withdrawal is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording your answer'**
+  String get transferMatchRejectingStatus;
+
+  /// Tells the person that the answer controls appear once both movements are shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Open both movements to answer.'**
+  String get transferMatchOpenToAnswerNote;
+
+  /// Title of the dialog confirming that a pair is not a transfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep these two separate?'**
+  String get transferMatchRejectDialogTitle;
+
+  /// States the consequence of keeping a pair separate, including that it is remembered.
+  ///
+  /// In en, this message translates to:
+  /// **'Both entries stay exactly as they are and keep counting separately. Karar will not propose this pair again.'**
+  String get transferMatchRejectDialogMessage;
+
+  /// Title of the dialog confirming that a confirmation is being withdrawn.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw your confirmation?'**
+  String get transferMatchWithdrawDialogTitle;
+
+  /// States that withdrawing a confirmation is final: the pair cannot be confirmed again.
+  ///
+  /// In en, this message translates to:
+  /// **'The two entries go back to counting separately. Karar will not propose this pair again, and you cannot confirm it later.'**
+  String get transferMatchWithdrawDialogMessage;
+
+  /// Heading shown when the two sides of a pair name different currencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Two different currencies'**
+  String get transferMatchCrossCurrencyTitle;
+
+  /// Explains why a cross-currency pair is shown as two amounts and cannot be confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'These two movements are held in different currencies. Karar holds no exchange rate and never relates an amount in one currency to an amount in another, so this pair cannot be confirmed here.'**
+  String get transferMatchCrossCurrencyDetail;
+
+  /// Empty state when no pair is waiting to be answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing waiting for you'**
+  String get transferMatchesEmptyAwaitingTitle;
+
+  /// Body of the empty state when nothing is waiting to be answered.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar has not proposed any transfers between your own accounts.'**
+  String get transferMatchesEmptyAwaitingDescription;
+
+  /// Empty state when the person has confirmed nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not confirmed a pair yet'**
+  String get transferMatchesEmptyConfirmedTitle;
+
+  /// Body of the empty state for confirmed pairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairs you confirm are kept here.'**
+  String get transferMatchesEmptyConfirmedDescription;
+
+  /// Empty state when the person has turned nothing down.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not kept a pair separate yet'**
+  String get transferMatchesEmptyRejectedTitle;
+
+  /// Body of the empty state for pairs the person kept separate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairs you keep separate are remembered here, so Karar does not ask about them again.'**
+  String get transferMatchesEmptyRejectedDescription;
+
+  /// Title shown when the transfer-matching listing could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed transfers cannot be shown'**
+  String get transferMatchesUnavailableTitle;
+
+  /// Body shown when the listing failed, stating that nothing was written.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not reach the platform. Nothing was changed.'**
+  String get transferMatchesUnavailableDescription;
+
+  /// Refusal shown when the platform reported a version conflict on a decision.
+  ///
+  /// In en, this message translates to:
+  /// **'This pair changed while it was on your screen. Reload it and answer again.'**
+  String get transferMatchRefusalConflict;
+
+  /// Refusal shown when the platform no longer has the pair the person answered.
+  ///
+  /// In en, this message translates to:
+  /// **'This pair is no longer here. Nothing was changed.'**
+  String get transferMatchRefusalGone;
+
+  /// Refusal shown when the transition the person asked for is not legal from the pair's state.
+  ///
+  /// In en, this message translates to:
+  /// **'That answer is no longer available for this pair.'**
+  String get transferMatchRefusalNotAvailable;
+
+  /// Refusal shown when a confirmation was asked for across two currencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar cannot pair two movements in different currencies.'**
+  String get transferMatchRefusalCrossCurrency;
+
+  /// Refusal shown for any other reason a decision was not recorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer was not recorded. Nothing was changed.'**
+  String get transferMatchRefusalGeneric;
+
+  /// Shown in place of one side of a pair when the transaction behind it could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'This movement could not be loaded. Answer only when you can see both.'**
+  String get transferMatchMovementUnavailable;
+
+  /// Screen-reader and visible status while the two movements of a pair are read.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading both movements'**
+  String get transferMatchMovementsLoading;
+
+  /// Action that follows the platform's cursor to the next page of pairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more pairs'**
+  String get transferMatchesLoadMore;
+
+  /// Screen-reader and visible status while the next page of pairs is read.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more pairs'**
+  String get transferMatchesLoadingMore;
+
+  /// Title of the screen that lists the data sources a person holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Where your data comes from'**
+  String get dataSourcesScreenTitle;
+
+  /// Opening paragraph stating that data arrives only because the person supplied it.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in Karar is here because you put it here. Karar does not connect to any bank, wallet or card issuer, and it holds no credential for any of them.'**
+  String get dataSourcesIntro;
+
+  /// Title of the banner stating that no live institution link exists.
+  ///
+  /// In en, this message translates to:
+  /// **'No link to any institution'**
+  String get dataSourcesNoLiveLinkTitle;
+
+  /// States that no credential of any kind is requested or stored anywhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar never asks for a password, PIN, mPIN, one-time code, recovery code or card number, and stores none of them.'**
+  String get dataSourcesCredentialNote;
+
+  /// Heading above the list of data sources the person holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data sources'**
+  String get dataSourcesConnectionsHeading;
+
+  /// Label of the control that narrows the data-source list.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get dataSourcesFilterLabel;
+
+  /// Filter option showing every data source.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get dataSourcesFilterAll;
+
+  /// Filter option for sources that accept data the person supplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepting what you supply'**
+  String get dataSourcesFilterAccepting;
+
+  /// Filter option for sources with nothing set up on them yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set up'**
+  String get dataSourcesFilterNotConfigured;
+
+  /// Filter option for sources that are set up and not usable at the moment.
+  ///
+  /// In en, this message translates to:
+  /// **'Not usable now'**
+  String get dataSourcesFilterUnavailable;
+
+  /// Filter option for sources the person has retired.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished with'**
+  String get dataSourcesFilterRetired;
+
+  /// Filter option for sources whose way of receiving data was never built.
+  ///
+  /// In en, this message translates to:
+  /// **'Never built'**
+  String get dataSourcesFilterNotImplemented;
+
+  /// Empty-state title when the person holds no data sources at all.
+  ///
+  /// In en, this message translates to:
+  /// **'No data sources yet'**
+  String get dataSourcesEmptyTitle;
+
+  /// Empty-state description naming the two ways a source can come to exist.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been recorded about how your data arrives. Add an account by hand or import a statement file, and a source will appear here.'**
+  String get dataSourcesEmptyDescription;
+
+  /// Empty-state title when a filter hides every data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches this filter'**
+  String get dataSourcesFilteredEmptyTitle;
+
+  /// Empty-state description telling the person how to clear the filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose “All” to see every data source you hold.'**
+  String get dataSourcesFilteredEmptyDescription;
+
+  /// Error-state title when the data-source list could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data sources could not be read'**
+  String get dataSourcesUnavailableTitle;
+
+  /// Error-state description, ending with the statement that nothing changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read where your data comes from just now. Nothing about your data has changed.'**
+  String get dataSourcesUnavailableDescription;
+
+  /// Action that follows the platform cursor to the next page of data sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more data sources'**
+  String get dataSourcesLoadMore;
+
+  /// Screen-reader and visible status while the next page of data sources is read.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more data sources'**
+  String get dataSourcesLoadingMore;
+
+  /// Field label for the name the person gave one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name for this'**
+  String get connectionLabelFieldLabel;
+
+  /// Field label for the way data reaches the platform on one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'How data arrives'**
+  String get connectionRailFieldLabel;
+
+  /// Field label for the lifecycle state of one data-source record.
+  ///
+  /// In en, this message translates to:
+  /// **'State of this record'**
+  String get connectionStatusFieldLabel;
+
+  /// Field label for whether the platform can run the way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'Can Karar run this way of receiving data'**
+  String get connectionAvailabilityFieldLabel;
+
+  /// Field label for when a data-source record was created.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get connectionAddedAtLabel;
+
+  /// Field label for when the data-source record itself was last edited.
+  ///
+  /// In en, this message translates to:
+  /// **'This record last changed'**
+  String get connectionRecordChangedLabel;
+
+  /// Note preventing the record-changed date from being read as a freshness date.
+  ///
+  /// In en, this message translates to:
+  /// **'That is when the record itself changed. It is not when data arrived, and it is not a check with any institution.'**
+  String get connectionRecordChangedNote;
+
+  /// Action that opens the detail of one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Show details'**
+  String get connectionShowDetailAction;
+
+  /// Action that closes the detail of one data source.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide details'**
+  String get connectionHideDetailAction;
+
+  /// Name of the MANUAL way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'Typed in by you'**
+  String get connectionRailManual;
+
+  /// Name of the USER_FILE_UPLOAD way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'A file you upload'**
+  String get connectionRailUserFileUpload;
+
+  /// Name of the OPEN_FINANCE_API way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Open finance interface'**
+  String get connectionRailOpenFinanceApi;
+
+  /// Name of the DIRECT_BANK_OR_WALLET_API way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct bank or wallet interface'**
+  String get connectionRailDirectBankOrWalletApi;
+
+  /// Name of the LICENSED_AGGREGATOR_API way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Licensed aggregator interface'**
+  String get connectionRailLicensedAggregatorApi;
+
+  /// Name of the HOST_TO_HOST_SFTP way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Host-to-host file transfer'**
+  String get connectionRailHostToHostSftp;
+
+  /// Name of the ISO_20022_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'ISO 20022 file'**
+  String get connectionRailIso20022File;
+
+  /// Name of the SWIFT_MT_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'SWIFT MT file'**
+  String get connectionRailSwiftMtFile;
+
+  /// Name of the OFX_QFX_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'OFX or QFX file'**
+  String get connectionRailOfxQfxFile;
+
+  /// Name of the QIF_FILE way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'QIF file'**
+  String get connectionRailQifFile;
+
+  /// Name of the PDF_STATEMENT way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF statement'**
+  String get connectionRailPdfStatement;
+
+  /// Name of the SECURE_EMAIL_STATEMENT way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement by secure email'**
+  String get connectionRailSecureEmailStatement;
+
+  /// Name of the DEVICE_SIGNAL way of receiving data, which is not built.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal from this device'**
+  String get connectionRailDeviceSignal;
+
+  /// Name used when the platform sent a way of receiving data this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A way of receiving data this version does not know'**
+  String get connectionRailUnrecognised;
+
+  /// Short badge for a way of receiving data where the person types the data in.
+  ///
+  /// In en, this message translates to:
+  /// **'You enter it'**
+  String get railStandingBadgeYouEnterIt;
+
+  /// Short badge for a way of receiving data where the person uploads a file.
+  ///
+  /// In en, this message translates to:
+  /// **'You upload it'**
+  String get railStandingBadgeYouUploadIt;
+
+  /// Short badge for a way of receiving data that has no implementation at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Not built'**
+  String get railStandingBadgeNotBuilt;
+
+  /// Short badge for a way of receiving data this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown to this version'**
+  String get railStandingBadgeUnknown;
+
+  /// Sentence for the MANUAL way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'You type this in yourself. Karar records exactly what you enter and nothing else.'**
+  String get railStandingYouEnterIt;
+
+  /// Sentence for the USER_FILE_UPLOAD way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'You upload a file and Karar reads it. You choose the file, and Karar reads nothing you have not given it.'**
+  String get railStandingYouUploadIt;
+
+  /// Sentence for a way of receiving data that has no implementation. It must not read as a promise.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar has not built this. It is not switched off and it is not scheduled: there is no code for it, nothing to set up, and nothing to wait for.'**
+  String get railStandingNotBuilt;
+
+  /// Sentence for a way of receiving data this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Karar does not know this way of receiving data and will not describe it.'**
+  String get railStandingUnknown;
+
+  /// The platform answer that it can run this way of receiving data.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get railAvailabilityExecutable;
+
+  /// The platform answer that this way of receiving data was never implemented.
+  ///
+  /// In en, this message translates to:
+  /// **'No, Karar has never built it'**
+  String get railAvailabilityNotImplemented;
+
+  /// Shown when the platform answer about a way of receiving data is unknown to this build.
+  ///
+  /// In en, this message translates to:
+  /// **'An answer this version of Karar does not know'**
+  String get railAvailabilityUnrecognised;
+
+  /// ACTIVE lifecycle state. It means the record accepts data the person supplies, never that anything is connected.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepts what you supply'**
+  String get connectionStatusAcceptsWhatYouSupply;
+
+  /// NOT_CONFIGURED lifecycle state, kept distinct from unavailable and never built.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been set up on this yet'**
+  String get connectionStatusNotConfigured;
+
+  /// UNAVAILABLE lifecycle state, kept distinct from not set up and never built.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up, and not usable at the moment'**
+  String get connectionStatusUnavailable;
+
+  /// RETIRED lifecycle state.
+  ///
+  /// In en, this message translates to:
+  /// **'You are finished with this. What it already supplied stays readable.'**
+  String get connectionStatusRetired;
+
+  /// NOT_IMPLEMENTED lifecycle state, kept distinct from not set up and unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The way of receiving data this names was never built'**
+  String get connectionStatusNotImplemented;
+
+  /// Lifecycle state this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A state this version of Karar does not know'**
+  String get connectionStatusUnrecognised;
+
+  /// Heading above the two ways of receiving data that actually exist.
+  ///
+  /// In en, this message translates to:
+  /// **'The only two ways data reaches Karar'**
+  String get dataSourcesBuiltRailsHeading;
+
+  /// Heading above every way of receiving data that has no implementation.
+  ///
+  /// In en, this message translates to:
+  /// **'Ways of receiving data Karar has not built'**
+  String get dataSourcesRailsHeading;
+
+  /// Explains why unimplemented ways of receiving data are named at all, and states that naming is not a promise.
+  ///
+  /// In en, this message translates to:
+  /// **'These are named so Karar can describe the world accurately. None of them exists here: there is no code for any of them, nothing to set up, and nothing to wait for. Naming one is not a plan to build it.'**
+  String get dataSourcesRailsExplanation;
+
+  /// Heading above the list of accounts, each linking to the sources feeding it.
+  ///
+  /// In en, this message translates to:
+  /// **'Which sources feed each account'**
+  String get dataSourcesAccountsHeading;
+
+  /// Shown when the person holds no accounts, so no account can be listed.
+  ///
+  /// In en, this message translates to:
+  /// **'You hold no accounts yet, so nothing feeds anything.'**
+  String get dataSourcesAccountsEmpty;
+
+  /// Shown when the account list could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Your accounts could not be read just now, so they cannot be listed here.'**
+  String get dataSourcesAccountsUnavailable;
+
+  /// Action opening the sources feeding one account.
+  ///
+  /// In en, this message translates to:
+  /// **'Where its data comes from'**
+  String get dataSourcesOpenAccountSourcesAction;
+
+  /// Screen-reader label naming the account whose sources the action opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Where the data for {account} comes from'**
+  String dataSourcesOpenAccountSourcesA11y(String account);
+
+  /// Title of the screen listing the sources that feed one account.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources feeding this account'**
+  String get accountSourcesScreenTitle;
+
+  /// Opening paragraph of the per-account sources screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Every source below is something you supplied. Karar does not contact your bank, wallet or card issuer, so no date here is a check with anyone.'**
+  String get accountSourcesIntro;
+
+  /// Empty-state title when nothing feeds the account.
+  ///
+  /// In en, this message translates to:
+  /// **'No source feeds this account'**
+  String get accountSourcesEmptyTitle;
+
+  /// Empty-state description for an account with no sources.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been attached to this account yet. Enter figures by hand or import a statement file, and the source will appear here.'**
+  String get accountSourcesEmptyDescription;
+
+  /// Error-state title when the sources for one account could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources could not be read'**
+  String get accountSourcesUnavailableTitle;
+
+  /// Error-state description when the sources for one account could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not read the sources for this account just now.'**
+  String get accountSourcesUnavailableDescription;
+
+  /// Heading of one source card, numbered by its place in the stated order.
+  ///
+  /// In en, this message translates to:
+  /// **'Source {position}'**
+  String accountSourcesCardHeading(int position);
+
+  /// Field label for the priority the platform stated for one source.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority stated by Karar'**
+  String get accountSourcesPriorityLabel;
+
+  /// The stated priority of one source, as a rank.
+  ///
+  /// In en, this message translates to:
+  /// **'Rank {priority}'**
+  String accountSourcesPriorityValue(int priority);
+
+  /// Explains that the order on screen is the order the platform stated.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources are listed in the order Karar stated, strongest first. A smaller rank is a stronger source.'**
+  String get accountSourcesPriorityNote;
+
+  /// Shown when two sources share a priority, so no precedence is stated.
+  ///
+  /// In en, this message translates to:
+  /// **'Two of these sources claim the same rank, so which one takes precedence is not decided. Karar will not choose one for you.'**
+  String get accountSourcesPriorityAmbiguous;
+
+  /// States when data last arrived, naming the person as the origin so it cannot read as a check with an institution.
+  ///
+  /// In en, this message translates to:
+  /// **'You last supplied data through this source on {instant}.'**
+  String sourceArrivalYouSupplied(String instant);
+
+  /// Shown when no import has ever succeeded for one source.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has arrived through this source yet.'**
+  String get sourceArrivalNone;
+
+  /// Note preventing the arrival date from being read as a check with an institution.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar does not contact your bank, so this is a record of what you did, not a check with anyone.'**
+  String get accountSourcesArrivalNote;
+
+  /// Field label for when this source was first observed.
+  ///
+  /// In en, this message translates to:
+  /// **'First recorded'**
+  String get accountSourcesFirstRecordedLabel;
+
+  /// Field label for when this source was last observed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last recorded activity'**
+  String get accountSourcesLastRecordedLabel;
+
+  /// Note separating the last-observed date from the moment data actually arrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar last recorded something about this source then. Recording is not receiving: an upload that failed to read moves this date too.'**
+  String get accountSourcesLastRecordedNote;
+
+  /// Note preventing the coverage range from being read as a freshness guarantee.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the range of dates the supplied data itself covers. It is not a freshness date and says nothing about what happened after it.'**
+  String get accountSourcesCoverageNote;
+
+  /// Field label for when the person confirmed a source link.
+  ///
+  /// In en, this message translates to:
+  /// **'You confirmed this source'**
+  String get accountSourcesConfirmedLabel;
+
+  /// Shown when the person has not yet confirmed a source link.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for you to confirm'**
+  String get accountSourcesConfirmedPending;
+
+  /// Field label for the basis on which a source was attached to an account.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this source was attached'**
+  String get accountSourcesMatchLabel;
+
+  /// EXACT_EXTERNAL_REFERENCE basis for attaching a source to an account.
+  ///
+  /// In en, this message translates to:
+  /// **'The reference matched exactly'**
+  String get sourceMatchBasisExact;
+
+  /// PROBABLE basis for attaching a source to an account.
+  ///
+  /// In en, this message translates to:
+  /// **'A probable match, waiting for you to say'**
+  String get sourceMatchBasisProbable;
+
+  /// Basis for attaching a source that this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A reason this version of Karar does not know'**
+  String get sourceMatchBasisUnrecognised;
+
+  /// States that no confidence figure exists, so none is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar gives a source no confidence score. Either the reference matched exactly, or you are asked.'**
+  String get accountSourcesNoScoreNote;
+
+  /// Heading above what a source was observed to supply.
+  ///
+  /// In en, this message translates to:
+  /// **'What this source was seen to supply'**
+  String get accountSourcesCapabilitiesHeading;
+
+  /// Keeps NOT_OBSERVED and NOT_PROVIDED apart in words.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen, not supported. A thing nobody looked for is not the same answer as a thing looked for and absent.'**
+  String get accountSourcesCapabilitiesNote;
+
+  /// Refusal shown when what was asked for is gone.
+  ///
+  /// In en, this message translates to:
+  /// **'This is no longer there. Nothing about your data changed.'**
+  String get dataSourcesRefusalGone;
+
+  /// Refusal shown when the device has no usable connection or the request timed out.
+  ///
+  /// In en, this message translates to:
+  /// **'Karar could not reach the network. Nothing about your data changed.'**
+  String get dataSourcesRefusalOffline;
+
+  /// Refusal shown for any other reason a read did not complete.
+  ///
+  /// In en, this message translates to:
+  /// **'This could not be read just now. Nothing about your data changed.'**
+  String get dataSourcesRefusalGeneric;
+
+  /// Field label for how authoritative a source claims to be. It names the field; the value beside it is the weight itself.
+  ///
+  /// In en, this message translates to:
+  /// **'How much weight this source carries'**
+  String get sourceAuthorityFieldLabel;
 }
 
 class _AppLocalizationsDelegate

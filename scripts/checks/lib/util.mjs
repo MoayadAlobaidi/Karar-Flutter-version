@@ -14,7 +14,21 @@ export const EXCLUDED_DIRS = new Set([
   '.dart_tool',
   '.out',
   'Pods',
+  // Agent worktrees and scratch live here. They are nested checkouts of other
+  // commits, so descending into them makes every "scanned: N" figure depend on
+  // who happens to have an agent running, and lets a check that requires a file
+  // to be PRESENT be satisfied by a copy of another commit rather than by this
+  // tree. See the nested-checkout guard in walkFiles for the general case.
+  '.claude',
 ]);
+
+/**
+ * True when `dir` is the root of a checkout other than the walk's own root: a
+ * nested clone, a submodule, or a linked worktree (whose `.git` is a file).
+ */
+function isNestedCheckout(dir, root) {
+  return dir !== root && fs.existsSync(path.join(dir, '.git'));
+}
 
 /** File extensions treated as source code for import scans. */
 export const CODE_EXTS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.jsx']);
@@ -45,7 +59,7 @@ export function walkFiles(dir, { exts = null, includeTests = false } = {}) {
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (!EXCLUDED_DIRS.has(entry.name)) stack.push(full);
+        if (!EXCLUDED_DIRS.has(entry.name) && !isNestedCheckout(full, dir)) stack.push(full);
       } else if (entry.isFile()) {
         if (exts && !exts.has(path.extname(entry.name))) continue;
         if (!includeTests && exts === CODE_EXTS && isTestFile(full)) continue;

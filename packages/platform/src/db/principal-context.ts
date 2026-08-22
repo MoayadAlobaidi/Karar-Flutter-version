@@ -97,6 +97,29 @@ export class PrincipalContextError extends Error {
 export interface WithPrincipalContextOptions {
   /** Required keys for this call site; defaults to DEFAULT_REQUIRED_CONTEXT. */
   readonly require?: PrincipalContextRequirement;
+  /**
+   * How long the interactive transaction may run, in milliseconds.
+   *
+   * OMITTING IT IS A DECISION, AND IT USED TO BE AN UNINTENDED ONE. Prisma's
+   * default is 5,000 ms, and every caller of this function inherited it
+   * silently. That is the right order of magnitude for a single-row write and
+   * far too small for a bulk one: the CSV ingestion policy declares
+   * `maxRows: 50_000` and `deadlineMs: 30_000` — "the wall-clock ceiling for
+   * the whole operation" — and neither could be reached, because the parse
+   * stages rows one at a time inside this transaction and the commit writes
+   * four rows plus an update per record inside it. Measured against
+   * PostgreSQL 17, staging expired at roughly 3,000 rows and committing at
+   * roughly 700, and the caller was answered a RETRYABLE 503 for a condition
+   * no retry could resolve.
+   *
+   * A call site that writes in bulk passes the bound it is already declared
+   * to obey, so the number a reader finds in the limit policy is the number
+   * the database enforces. A call site that does not pass one keeps Prisma's
+   * default, which is correct for the single-row writes that are most of them.
+   */
+  readonly timeoutMs?: number;
+  /** How long to wait for a connection before the transaction starts. */
+  readonly maxWaitMs?: number;
 }
 
 /**
@@ -222,11 +245,17 @@ export async function withPrincipalContext<T>(
   }
 
   const run = fn as (tx: PrismaTransactionClient) => Promise<T>;
-  return target.client.$transaction(async (tx) => {
-    // Tagged template: values are bind parameters, never spliced into SQL.
-    await tx.$queryRaw`SELECT set_config('app.tenant_id', ${values.tenantId}, true), set_config('app.user_id', ${values.userId}, true), set_config('app.session_id', ${values.sessionId}, true), set_config('app.request_id', ${values.requestId}, true)`;
-    return run(tx as PrismaTransactionClient);
-  });
+  return target.client.$transaction(
+    async (tx) => {
+      // Tagged template: values are bind parameters, never spliced into SQL.
+      await tx.$queryRaw`SELECT set_config('app.tenant_id', ${values.tenantId}, true), set_config('app.user_id', ${values.userId}, true), set_config('app.session_id', ${values.sessionId}, true), set_config('app.request_id', ${values.requestId}, true)`;
+      return run(tx as PrismaTransactionClient);
+    },
+    {
+      ...(options.timeoutMs === undefined ? {} : { timeout: options.timeoutMs }),
+      ...(options.maxWaitMs === undefined ? {} : { maxWait: options.maxWaitMs }),
+    },
+  );
 }
 
 /**

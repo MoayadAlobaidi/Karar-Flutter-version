@@ -101,7 +101,9 @@ route lists or searches accounts (that is the users/control-plane surface, built
 |---|---|
 | `identity.session.revoke` | `PLATFORM_ADMIN` |
 | `identity.mfa.reset` | `PLATFORM_ADMIN` |
-| `identity.account.disable` / `identity.account.enable` | `PLATFORM_ADMIN` |
+| `identity.account.disable` / `identity.account.enable` | _none — declared, deliberately unseeded_ |
+
+Those two are **documented and deliberately not seeded**, and their absence is the control: deny-by-default means a right nobody holds denies. They arrive by forward migration together with the surface that invokes them, never before it. `PLATFORM_ADMIN` is where they would land, not where they are ([`../../docs/security/threat-model.md`](../../docs/security/threat-model.md)).
 
 The disable/enable use cases exist in this module as mechanisms; the RBAC module enforces which
 roles may invoke them (deny by default).

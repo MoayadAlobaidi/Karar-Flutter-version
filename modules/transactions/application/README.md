@@ -10,4 +10,18 @@ May import this module's `domain/`, its own ports, and `shared-kernel`. **Never 
 
 ---
 
-_Phase 0: this directory is a skeleton. No application code exists yet._
+_Phase 5: implemented. Six use cases (list, create, read, update, delete,
+assign category), none of whose inputs carry a `userId` or a `tenantId` — the
+principal arrives through `PrincipalContextPort`._
+
+_The ports here fall into three groups. **Bound elsewhere, refused through:**
+`TransactionRetentionDecisionPort` (no durable write without a decision) and
+`FinancialAccountAccessPort` (an account this principal actually owns, in the
+account's own currency) — both consulted before the fingerprint, before any
+encryption, and before the first write. **Bound by the statement-ingestion
+workstream:** `DedupFingerprintPort` (keyed per subject, versioned, over
+CONTENT only — occurrence is a separate column) and `HsfFieldEncryptionPort`.
+**Declared here and implemented here for another module:**
+`FinancialRecordPresencePort` and `FinancialRecordEraserPort`, which is how
+`modules/financial-accounts` reaches these records without importing this
+module._

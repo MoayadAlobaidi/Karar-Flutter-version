@@ -1,6 +1,7 @@
 import pg from 'pg';
 
 import type { ConnectionProfile } from './connection-profile.js';
+import { poolConfigFor } from './session-config.js';
 import { mapPgError, PgError } from './errors.js';
 
 /**
@@ -12,9 +13,11 @@ import { mapPgError, PgError } from './errors.js';
  * There is no ORM here and none planned at this layer; repositories built in
  * later phases sit on top of `query`/`withTransaction`.
  *
- * Session defaults: `statement_timeout` and `lock_timeout` from the profile
- * are sent by the driver as connection startup parameters, so every session in
- * the pool carries them without a per-checkout round trip.
+ * Session defaults: `statement_timeout`, `lock_timeout` and `TimeZone` are
+ * sent by the driver as connection startup parameters, so every session in the
+ * pool carries them without a per-checkout round trip and no newly opened
+ * connection can miss them. They come from `session-config.ts`, which is the
+ * one place both this adapter and the Prisma factory configure a session.
  */
 
 /** The query surface available inside `withTransaction`, bound to one session. */
@@ -32,22 +35,7 @@ export class PostgresPersistenceAdapter {
 
   constructor(profile: ConnectionProfile) {
     this.profile = profile;
-    this.pool = new pg.Pool({
-      host: profile.host,
-      port: profile.port,
-      database: profile.database,
-      user: profile.user,
-      // The only place the secret is revealed; the driver keeps it internal.
-      password: profile.password.unwrap(),
-      max: profile.poolMax,
-      application_name: `karar:${profile.name}`,
-      statement_timeout: profile.statementTimeoutMs,
-      lock_timeout: profile.lockTimeoutMs,
-      // Local profiles run without TLS; cloud profiles will map their
-      // SslConfig to driver TLS options when a cloud deployment phase adds
-      // them (database-portability.md, section 2).
-      ...(profile.ssl.mode === 'disable' ? {} : { ssl: true }),
-    });
+    this.pool = new pg.Pool(poolConfigFor(profile));
     // An idle client can be dropped by the server (restart, timeout). Without
     // a handler that is an uncaught 'error' event and a process crash; the
     // next checkout creates a fresh connection, so swallowing is correct.

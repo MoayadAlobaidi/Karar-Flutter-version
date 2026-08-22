@@ -57,12 +57,20 @@
 //
 // Zero dependencies: node: builtins only.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { childDirs, ensureOutDir, readJson, readText, walkFiles } from './lib/util.mjs';
+import {
+  childDirs,
+  ensureOutDir,
+  EXCLUDED_DIRS,
+  readJson,
+  readText,
+  walkFiles,
+} from './lib/util.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
@@ -301,6 +309,1398 @@ function checkLinks(files) {
 // then requires that no other tracked document contradicts it. It deliberately
 // checks only the CURRENT phase: earlier phases are settled history and later
 // ones are not claimed yet.
+/**
+ * Documents that contradict a fact the tree can be asked about.
+ *
+ * `docs:check` was green while `docs/phases/phase-05.md` said a statement could
+ * not be chosen on a device — twenty lines from its own deliverables table
+ * saying the picker was built — and while the architecture registry said
+ * modules held no code, beside 484 module source files. A green documentation
+ * gate that cannot see either of those is not a documentation gate.
+ *
+ * Only facts a machine can DERIVE are pinned here, and each rule names the
+ * artifact it derives from. This is deliberately not a prose parser: it asks a
+ * small number of yes/no questions of the source and refuses a document that
+ * answers them differently.
+ */
+function checkDerivedFacts() {
+  const problems = [];
+  const read = (rel) => {
+    const full = path.join(REPO_ROOT, rel);
+    return fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : null;
+  };
+  const countFiles = (dir, filter) => {
+    const root = path.join(REPO_ROOT, dir);
+    if (!fs.existsSync(root)) return 0;
+    let n = 0;
+    const walk = (d) => {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) {
+          if (EXCLUDED_DIRS.has(entry.name) || entry.name === '__tests__') continue;
+          walk(full);
+        } else if (filter(full)) n += 1;
+      }
+    };
+    walk(root);
+    return n;
+  };
+
+  // A. The pure-package list in the docs must match the executable checker.
+  const runner = read('scripts/checks/architecture.mjs');
+  if (runner === null) {
+    problems.push(
+      'scripts/checks/architecture.mjs missing — the pure-package fact cannot be derived',
+    );
+  } else {
+    const block = /const PURE_PACKAGES = \[([\s\S]*?)\];/.exec(runner);
+    if (block === null) {
+      problems.push('architecture.mjs has no parseable PURE_PACKAGES — this rule is now blind');
+    } else {
+      const actual = [...block[1].matchAll(/'([\w-]+)'/g)].map((m) => m[1]);
+      const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+      const expected = WORDS[actual.length] ?? String(actual.length);
+      for (const rel of [
+        'docs/testing/architecture-test-registry.json',
+        'docs/testing/architecture-tests.md',
+      ]) {
+        const text = read(rel);
+        if (text === null) continue;
+        for (const word of WORDS) {
+          if (word === expected) continue;
+          const stale = new RegExp(`the ${word} pure packages`, 'i');
+          if (stale.test(text)) {
+            problems.push(
+              `${rel} says "the ${word} pure packages"; the checker declares ${actual.length} (${actual.join(', ')})`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // B. The registry must not claim modules are empty while they hold code.
+  const moduleSources = countFiles('modules', (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+  const registryText = read('docs/testing/architecture-test-registry.json');
+  if (registryText !== null && moduleSources > 0) {
+    for (const claim of ['no module code', 'modules have no code', 'no TypeScript in modules']) {
+      if (registryText.toLowerCase().includes(claim)) {
+        problems.push(
+          `architecture-test-registry.json says "${claim}" while modules/ holds ${moduleSources} production files`,
+        );
+      }
+    }
+  }
+
+  // C. The phase report must not deny a picker that is registered.
+  const androidPicker = read(
+    'apps/mobile/android/app/src/main/kotlin/com/kararfinance/app/StatementDocumentPicker.kt',
+  );
+  const iosPicker = read('apps/mobile/ios/Runner/StatementDocumentPicker.swift');
+  // Every document a reader consults for current state, not just the phase
+  // report: the contradiction recurred across four of them last time.
+  const CURRENT_STATE_DOCS = [
+    'docs/phases/phase-05.md',
+    'README.md',
+    'apps/mobile/README.md',
+    'docs/roadmap.md',
+    'docs/onboarding/developer.md',
+    'docs/onboarding/flutter.md',
+    'docs/architecture/flutter.md',
+    'docs/architecture/backend.md',
+    'docs/architecture/overview.md',
+    'docs/phases/README.md',
+  ];
+  const phase = read('docs/phases/phase-05.md');
+  if (androidPicker !== null && iosPicker !== null) {
+    for (const rel of CURRENT_STATE_DOCS) {
+      const text = read(rel);
+      if (text === null) continue;
+      for (const claim of [
+        'no file picker adapter',
+        'cannot be chosen on a device',
+        'no picker adapter ships',
+        'picker port with no adapter',
+        // The deferred-work list said this and rules C/D did not know the
+        // words. Every phrase here was found in the tree, not imagined.
+        'picker port with no implementation',
+        'nobody can choose a file',
+      ]) {
+        if (text.toLowerCase().includes(claim)) {
+          problems.push(`${rel} says "${claim}" while both native picker implementations exist`);
+        }
+      }
+    }
+  }
+
+  // D. The phase report must not deny work whose invocation is in the source.
+  const manual =
+    read('modules/transactions/application/use-cases/create-manual-transaction.ts') ?? '';
+  const csv =
+    read('modules/statement-imports/application/use-cases/commit-statement-import.ts') ?? '';
+  if (phase !== null) {
+    if (manual.includes('merchantRules.evaluate') && csv.includes('this.categories.match')) {
+      for (const rel of CURRENT_STATE_DOCS) {
+        const text = read(rel);
+        if (text === null) continue;
+        for (const claim of [
+          'nothing applies merchant rules',
+          'categorization is assignment, not a pipeline',
+          'merchant rules are schema and domain; nothing applies them',
+        ]) {
+          if (text.toLowerCase().includes(claim)) {
+            problems.push(`${rel} says "${claim}" while both write paths invoke the evaluator`);
+          }
+        }
+      }
+    }
+    if (manual.includes('suggestTransfersFor') && csv.includes('suggestTransfersFor')) {
+      for (const claim of ['suggestion is not', 'nothing calls it']) {
+        if (phase.toLowerCase().includes(claim)) {
+          problems.push(
+            `docs/phases/phase-05.md says "${claim}" while both write paths trigger suggestion generation`,
+          );
+        }
+      }
+    }
+  }
+
+  // E. A module whose use cases the API app wires, and which holds production
+  // code, may not have documentation saying it has neither.
+  //
+  // This is the shape the staleness actually took: six MODULE.md files and
+  // three layer READMEs said "no transport layer exists yet" long after the
+  // routes were mounted and driven by the conformance suite. Rules C and D
+  // could not see it -- they match fixed phrases in a fixed file list, and
+  // these were different words in different files.
+  //
+  // Both halves are derived per MODULE, never globally: the skeleton modules
+  // say "no application code exists yet" and are telling the truth, so a rule
+  // keyed on whether the FINANCIAL app has controllers would flag all of them.
+  const composition = read('apps/api/src/composition/phase5-modules.ts') ?? '';
+  const wired = new Set(
+    [...composition.matchAll(/@karar\/([a-z-]+)/g)]
+      .map((m) => m[1])
+      .filter((name) => fs.existsSync(path.join(REPO_ROOT, 'modules', name))),
+  );
+  const TRANSPORT_DENIALS = [
+    'no transport layer exists yet',
+    'no transport layer and no',
+    'no http surface and no controller exist',
+    'no ingestion endpoint and no transport layer exist',
+    'no transport exists for this module yet',
+    'there is no http surface here',
+    'no transport, no ingestion',
+    'neither is a running path',
+  ];
+  const EMPTINESS_DENIALS = ['no application code exists yet', 'this directory is a skeleton'];
+  for (const rel of walkFiles(path.join(REPO_ROOT, 'modules'), { exts: MD_EXTS }).map((f) =>
+    path.relative(REPO_ROOT, f),
+  )) {
+    // modules/README.md sits directly under modules/ and names no module.
+    const moduleName = rel.split(path.sep)[1];
+    if (moduleName === undefined) continue;
+    if (!fs.existsSync(path.join(REPO_ROOT, 'modules', moduleName, 'MODULE.md'))) continue;
+    const text = read(rel);
+    if (text === null) continue;
+    const lower = text.toLowerCase();
+    if (wired.has(moduleName)) {
+      for (const denial of TRANSPORT_DENIALS) {
+        if (lower.includes(denial)) {
+          problems.push(
+            `${rel} says "${denial}" while apps/api/src/composition/phase5-modules.ts wires @karar/${moduleName} and mounts its routes`,
+          );
+        }
+      }
+    }
+    // An emptiness claim is judged against the directory the document sits in,
+    // not against its module: a layer README that says "this directory is a
+    // skeleton" is describing its own layer, and several modules have layers
+    // that are genuinely still empty next to layers that are not.
+    const ownDir = path.dirname(rel);
+    const ownSourceCount = countFiles(ownDir, (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+    if (ownSourceCount > 0) {
+      for (const denial of EMPTINESS_DENIALS) {
+        if (lower.includes(denial)) {
+          problems.push(
+            `${rel} says "${denial}" while ${ownDir} holds ${ownSourceCount} production files`,
+          );
+        }
+      }
+    }
+  }
+
+  // F. No current-state document may deny a Flutter financial surface that
+  // exists. Three of them did, including one that contradicted itself ten
+  // lines later.
+  const featuresDir = path.join(REPO_ROOT, 'apps', 'mobile', 'lib', 'features');
+  const financialFeatures = fs.existsSync(featuresDir)
+    ? fs
+        .readdirSync(featuresDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+        .filter((n) => /^(financial_|payment_|statement_|transaction|transfer_)/.test(n))
+    : [];
+  if (financialFeatures.length > 0) {
+    for (const rel of CURRENT_STATE_DOCS) {
+      const text = read(rel);
+      if (text === null) continue;
+      const lower = text.toLowerCase();
+      for (const claim of [
+        'any flutter financial surface',
+        'not built: any flutter surface',
+        'no flutter financial surface',
+      ]) {
+        const at = lower.indexOf(claim);
+        if (at < 0) continue;
+        // Only a DENIAL is a problem. The same words appear in sentences that
+        // describe what was built, so the preceding clause decides.
+        const before = lower.slice(Math.max(0, at - 60), at);
+        if (/not built|does not exist|no |never/.test(before)) {
+          problems.push(
+            `${rel} denies a Flutter financial surface while apps/mobile/lib/features holds ${financialFeatures.length} of them (${financialFeatures.join(', ')})`,
+          );
+        }
+      }
+    }
+  }
+
+  return problems;
+}
+
+// ---------------------------------------------------------------------------
+// Compliance current-state consistency
+// ---------------------------------------------------------------------------
+//
+// WHY A SEPARATE CHECK, AND WHY IT MAY NOT BE A PROSE UNDERSTANDER.
+//
+// `phase-status-consistency` carried one line — `if
+// (relative.startsWith('docs/compliance/')) continue;` — justified as "the
+// compliance corpus is a dated gate snapshot; it scopes its own claims". It
+// did not. With the whole directory exempt, the compliance README could say
+// "No Phase 4 or Phase 5 compliance GATE has been executed" while
+// `phase-compliance-gate.md` two files away carried a Phase 4 gate record AND
+// a post-merge record; the control matrix's `[P4]` note could say "no Phase 4
+// gate has executed, no pull request exists" after PR #7 merged; and the
+// documentation gate reported 14/14. A green docs check that cannot see the
+// canonical compliance documents is not evidence that they are current.
+//
+// The replacement is NOT general contradiction detection. Every rule below
+// derives ONE fact mechanically — from the capability registry, from the
+// control matrix's own rows, from the gate document's own headings, from the
+// README's phase row — and then refuses a small set of exact phrasings that
+// contradict it. A rule that cannot name the fact it derives does not belong
+// here.
+//
+// HISTORY IS NOT A CONTRADICTION, and the corpus is mostly history. A block
+// that says what was true at a stated moment is legitimate and must not be
+// rewritten into fiction, so `isHistoricalBlock` exempts one — but only when
+// the block SAYS SO in its own text. The marker has to be inside the block a
+// reader is looking at: a caveat four paragraphs up is not attached to the
+// sentence being read, which is how every stale claim below survived review.
+//
+// ONE COST, ACCEPTED DELIBERATELY. A correction note that QUOTES the sentence
+// it is correcting trips these rules, because a quotation and an assertion are
+// the same characters. The alternative — exempting quoted spans — is a hole
+// wide enough to drive the whole problem back through: any stale claim could
+// be dressed in quotation marks. Corrections in this corpus therefore describe
+// the old text rather than reproducing it, which costs an author one sentence
+// and keeps the rule something a reader can rely on.
+// ---------------------------------------------------------------------------
+
+/** Markers that scope a block to a moment rather than to now. */
+const HISTORICAL_MARKERS = [
+  /\[HISTORICAL\]/,
+  /\bHISTORICAL\b/,
+  /\bSUPERSEDED\b/,
+  /\bsuperseded (?:by|at|on)\b/i,
+  /retained as (?:the )?what was true/i,
+  /retained as what was true/i,
+  /State when this section was written/i,
+  /\bwas true when\b/i,
+  /\bas (?:it|they) stood at\b/i,
+];
+
+/** A version-history entry opens with its own version and date: `**v0.8 (2026-08-18…`. */
+const VERSION_HISTORY_OPENER = /^\*\*v\d+\.\d+\s*\(/;
+
+/**
+ * Splits markdown into blocks (blank-line separated), dropping fenced code.
+ *
+ * Blocks rather than lines because a marker applies to the paragraph it is in:
+ * line scope would force every sentence of a dated record to repeat the date,
+ * and document scope would let one `HISTORICAL` at the top launder the whole
+ * file — which is the failure mode the blanket directory exemption WAS.
+ */
+function markdownBlocks(text, currentPhase = null) {
+  const lines = text.split('\n');
+  const blocks = [];
+  let current = null;
+  let fenced = false;
+  // Heading level -> whether that heading scopes its section to a moment. A
+  // deeper heading INHERITS from its ancestors: `### Post-merge record` under
+  // `## Phase 4 gate record — executed 2026-08-18` is part of that record.
+  const headingStack = [];
+  const inHistoricalSection = () => headingStack.some((h) => h.historical);
+  lines.forEach((line, index) => {
+    if (/^\s*```/.test(line)) {
+      fenced = !fenced;
+      if (current) {
+        blocks.push(current);
+        current = null;
+      }
+      return;
+    }
+    if (fenced) return;
+    const heading = /^(#{1,6})\s/.exec(line);
+    if (heading !== null) {
+      if (current) {
+        blocks.push(current);
+        current = null;
+      }
+      const level = heading[1].length;
+      while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
+        headingStack.pop();
+      }
+      headingStack.push({ level, historical: isHistoricalHeading(line, currentPhase) });
+      return;
+    }
+    if (line.trim() === '') {
+      if (current) {
+        blocks.push(current);
+        current = null;
+      }
+      return;
+    }
+    if (current === null) {
+      current = { line: index + 1, text: line, historicalSection: inHistoricalSection() };
+    } else current.text += `\n${line}`;
+  });
+  if (current) blocks.push(current);
+  return blocks;
+}
+
+function isHistoricalBlock(block) {
+  if (block.historicalSection === true) return true;
+  if (VERSION_HISTORY_OPENER.test(block.text.trimStart())) return true;
+  return HISTORICAL_MARKERS.some((m) => m.test(block.text));
+}
+
+/**
+ * A heading that scopes its whole section to a moment.
+ *
+ * Gate records are section-shaped, not paragraph-shaped: `## Phase 3.5 gate
+ * record — executed 2026-08-16` is forty paragraphs of what was true on one
+ * day. Requiring each of them to repeat the date would make the documents
+ * worse to read and no more honest, so a heading may carry the scope for the
+ * section beneath it — but ONLY when the heading itself is explicitly marked
+ * or explicitly dated, which is the same standard a paragraph has to meet.
+ *
+ * A DATED PHASE RECORD IS HISTORICAL ONLY IF ITS PHASE HAS PASSED. This is the
+ * line that keeps the rule from laundering the thing it most needs to check: a
+ * record for the CURRENT phase is the newest current-state statement in the
+ * corpus, and it stays in scope no matter how it is dated. Phase 3.5's record
+ * is history at phase 5; Phase 5's record is not.
+ */
+function isHistoricalHeading(line, currentPhase) {
+  if (/\[HISTORICAL\]|\bHISTORICAL\b|\bSUPERSEDED\b/.test(line)) return true;
+  const phaseRecord = /^#{1,6}\s*Phase\s+([0-9.]+)\b[^\n]*\b(?:gate record|specifics)\b/i.exec(
+    line,
+  );
+  if (phaseRecord !== null && currentPhase !== null) {
+    return Number(phaseRecord[1]) < Number(currentPhase);
+  }
+  return false;
+}
+
+/** Capability descriptors, parsed from the registry source rather than imported. */
+function readCapabilityRegistry(root) {
+  const full = path.join(root, 'packages', 'capability-registry', 'src', 'index.ts');
+  if (!fs.existsSync(full)) return null;
+  const source = fs.readFileSync(full, 'utf8');
+  const body =
+    /export const CAPABILITY_REGISTRY[^=]*=\s*Object\.freeze\(\{([\s\S]*?)\n {2}\}\);/.exec(source);
+  if (body === null) return null;
+  const entries = new Map();
+  // Explicit descriptors: `ID: Object.freeze({ … })`.
+  for (const m of body[1].matchAll(/(\w+):\s*Object\.freeze\(\{([\s\S]*?)\n {4}\}\)/g)) {
+    const [, id, fields] = m;
+    entries.set(id, {
+      implementation: /implementation:\s*'(\w+)'/.exec(fields)?.[1] ?? null,
+      lifecycle: /lifecycle:\s*'(\w+)'/.exec(fields)?.[1] ?? null,
+      deployed: !/deployment:\s*Object\.freeze\(\{\}\)/.test(fields),
+      declaresJurisdiction: !/declaredJurisdictions:\s*Object\.freeze\(\[\]\)/.test(fields),
+    });
+  }
+  // `ID: descriptor('ID')` — the honest-unbuilt default, read from the factory.
+  const factory =
+    /function descriptor\(id: CapabilityId\): CapabilityDescriptor \{[\s\S]*?\n\}/.exec(source);
+  const defaults = {
+    implementation: factory ? (/implementation:\s*'(\w+)'/.exec(factory[0])?.[1] ?? null) : null,
+    lifecycle: factory ? (/lifecycle:\s*'(\w+)'/.exec(factory[0])?.[1] ?? null) : null,
+    deployed: factory ? !/deployment:\s*Object\.freeze\(\{\}\)/.test(factory[0]) : true,
+    declaresJurisdiction: factory
+      ? !/declaredJurisdictions:\s*Object\.freeze\(\[\]\)/.test(factory[0])
+      : true,
+  };
+  for (const m of body[1].matchAll(/(\w+):\s*descriptor\('(\w+)'\)/g)) {
+    entries.set(m[1], { ...defaults });
+  }
+  return entries;
+}
+
+/** Unique `KAR-CTL-NNN` row ids in the control matrix — the actual control set. */
+function readControlMatrix(root) {
+  const full = path.join(root, 'docs', 'compliance', 'control-matrix.md');
+  if (!fs.existsSync(full)) return null;
+  const text = fs.readFileSync(full, 'utf8');
+  const ids = new Set([...text.matchAll(/^\|\s*(KAR-CTL-\d+)\s*\|/gm)].map((m) => m[1]));
+  // PER-STATUS counts, derived from the rows themselves. Checking only the sum
+  // let a tally be wrong by thirteen controls and still pass: moving
+  // `17 DESIGNED / 83 IMPLEMENTED` to `30 DESIGNED / 70 IMPLEMENTED` preserves
+  // the total and inverts what the matrix says about how much of the control
+  // set actually has a running mechanism — which is the number every framework
+  // view and every gate report quotes.
+  const byStatus = { DESIGNED: 0, IMPLEMENTED: 0, DEFERRED: 0, EXCEPTION: 0 };
+  const seen = new Set();
+  for (const m of text.matchAll(/^\|\s*(KAR-CTL-\d+)\s*\|(.*)$/gm)) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    for (const cell of m[2].split('|').map((c) => c.trim())) {
+      const status = /^(DESIGNED|IMPLEMENTED|DEFERRED|EXCEPTION)(\s*\[[^\]]*\])?$/.exec(cell);
+      if (status !== null) {
+        byStatus[status[1]] += 1;
+        break;
+      }
+    }
+  }
+  // The newest declared tally, in the form the matrix writes it:
+  // `17 DESIGNED / 83 IMPLEMENTED / 15 DEFERRED / 1 EXCEPTION = 116`.
+  const tallies = [
+    ...text.matchAll(
+      /(\d+)\s+DESIGNED\s*\/\s*(\d+)\s+IMPLEMENTED\s*\/\s*(\d+)\s+DEFERRED\s*\/\s*(\d+)\s+EXCEPTION(?:\s*=\s*(\d+))?/g,
+    ),
+  ].map((m) => ({
+    designed: Number(m[1]),
+    implemented: Number(m[2]),
+    deferred: Number(m[3]),
+    exception: Number(m[4]),
+    total: m[5] === undefined ? null : Number(m[5]),
+    index: m.index,
+  }));
+  return { path: 'docs/compliance/control-matrix.md', ids, byStatus, tallies, text };
+}
+
+/**
+ * What the gate document records, per phase — and the two facts kept APART.
+ *
+ * A gate record existing and a pull request existing are different facts, and
+ * a rule that treats one as evidence of the other gets the Phase 5 case
+ * exactly backwards: its gate record is written and frozen BEFORE the pull
+ * request is opened, and the record says so in as many words. Deriving
+ * "therefore a PR exists" from "a gate record exists" would reject the one
+ * sentence in the corpus that is most carefully true.
+ *
+ * So: gate records come from headings, and pull requests come from a
+ * `pull/<n>` link appearing INSIDE that phase's section.
+ */
+function readGateRecordPhases(root) {
+  const full = path.join(root, 'docs', 'compliance', 'phase-compliance-gate.md');
+  if (!fs.existsSync(full)) return null;
+  const text = fs.readFileSync(full, 'utf8');
+  const gates = new Set();
+  const pullRequests = new Set();
+  // THE OUTCOME, per phase. Parsed because an independent review found the
+  // compliance corpus's own index reporting a PASS for a gate whose record
+  // says FAIL — in the favourable direction, in a paragraph boasting that this
+  // defect class had been fixed. Nothing could see it: this function derived
+  // which gates EXIST and never what any of them DECIDED, so the one number a
+  // reader takes away from a gate was the one number no rule compared.
+  const outcomes = new Map();
+  const fromOutcomeLine = new Set();
+  const lines = text.split('\n');
+  let section = null;
+  for (const line of lines) {
+    const heading = /^(#{2,4})\s*Phase\s+([0-9.]+)[^\n]*gate record/i.exec(line);
+    if (heading !== null) {
+      gates.add(heading[2]);
+      section = heading[2];
+      // PHASE 1 CARRIES ITS OUTCOME IN THE HEADING — `## Phase 1 gate record —
+      // PASSED, 2026-08-15` — and nowhere else, so the map had no entry for it
+      // and a fabricated Phase 1 outcome went unreported. A delta reviewer
+      // found the gap. An explicit `**Outcome:` line inside the section still
+      // wins, because that is the shape every later record uses.
+      const inHeading = /gate record\s*[—-]\s*([A-Z][A-Z_]{3,})/.exec(line);
+      if (inHeading !== null) outcomes.set(section, inHeading[1]);
+      continue;
+    }
+    if (section !== null && !fromOutcomeLine.has(section)) {
+      const outcome = /^\*\*Outcome:\s*`?([A-Z_]+)`?\.?\*\*/.exec(line.trim());
+      if (outcome !== null) {
+        // An explicit `**Outcome:` line WINS over one read from the heading:
+        // it is the shape every record after Phase 1 uses, and Phase 1's
+        // heading is the fallback rather than the rule.
+        outcomes.set(section, outcome[1]);
+        fromOutcomeLine.add(section);
+      }
+    }
+    // A later top-level heading that is not a phase gate record ends the
+    // section, so a pull request named under Phase 4 is not attributed to
+    // whatever section follows it.
+    if (/^##\s/.test(line) && heading === null) section = null;
+    if (section !== null && /\/pull\/\d+/.test(line)) pullRequests.add(section);
+  }
+  return { gates, pullRequests, outcomes };
+}
+
+/** The README's declared phase and status — the same row `readme-current-phase` validates. */
+function readDeclaredPhase(root) {
+  const full = path.join(root, 'README.md');
+  if (!fs.existsSync(full)) return null;
+  const m = /\|\s*Current phase\s*\|\s*\*\*([0-9.]+)\s*[—-]\s*([A-Z ]+?)\*\*/.exec(
+    fs.readFileSync(full, 'utf8'),
+  );
+  return m === null ? null : { phase: m[1], status: m[2].trim() };
+}
+
+/**
+ * A phase report for a phase that has already closed.
+ *
+ * `docs/phases/phase-03-5.md` describes Phase 3.5 as it was at Phase 3.5 —
+ * that is what a phase report IS, and the corpus already treats them this way
+ * in `phase-status-consistency`. The exemption is derived, never assumed: the
+ * phase number comes from the filename and is compared to the README's
+ * current phase, so the CURRENT phase's report is never exempt. That report is
+ * the single most-read current-state document in the repository.
+ */
+function isEarlierPhaseReport(root, file, currentPhase) {
+  if (currentPhase === null) return false;
+  const relative = path.relative(root, file);
+  const m = /^docs[\\/]phases[\\/]phase-(\d{2})(?:-(\d))?\.md$/.exec(relative);
+  if (m === null) return false;
+  const phase = Number(m[2] === undefined ? m[1] : `${Number(m[1])}.${m[2]}`);
+  return phase < Number(currentPhase);
+}
+
+/** Every markdown file a reader consults for CURRENT state. */
+function currentStateFiles(root) {
+  const out = [];
+  for (const dir of ['docs']) {
+    const full = path.join(root, dir);
+    if (fs.existsSync(full)) out.push(...walkFiles(full, { exts: MD_EXTS }));
+  }
+  const readme = path.join(root, 'README.md');
+  if (fs.existsSync(readme)) out.push(readme);
+  return out;
+}
+
+/**
+ * KAR-CTL-116, as a check rather than as a sweep somebody remembers to run.
+ *
+ * The control has read DESIGNED since Phase 3.5, where the sweep was run BY
+ * HAND and found nothing. Closing a nonconformity on a clean hand-run is
+ * closing it on the correction rather than on the corrective action, and
+ * CI-006 did exactly that; CI-011 then recorded the same mechanism missing at
+ * Phase 4, and again at Phase 5. This is the third target, and a third miss
+ * would have opened a nonconformity of its own — so it is built.
+ *
+ * THREE PROPERTIES, and each is a different way a register goes quiet:
+ *
+ *   1. EVERY CITED ID EXISTS. A document that cites `EV-511` when the register
+ *      stops at EV-510 reads as evidence to anyone who does not open the
+ *      register. This is the fork that a hand-run sweep is good at finding
+ *      once and useless at finding continuously.
+ *
+ *   2. EVERY PATH AN EVIDENCE ROW CITES EXISTS ON DISK. An evidence row whose
+ *      location cell names a file that was renamed points at nothing, and the
+ *      row still says COLLECTED.
+ *
+ *   3. EVERY QUOTED STATUS MATCHES ITS REGISTER. "EV-427 is `COLLECTED`" in a
+ *      gate record while the register says `PENDING` is the shape that let a
+ *      corpus disagree with itself for four phases. Historical blocks are
+ *      exempt by the same per-block rule everything else here uses — a dated
+ *      record quoting the status it saw is history, not a fork.
+ */
+
+/**
+ * Every path git tracks, once per process.
+ *
+ * `git ls-files` rather than `fs.existsSync`, so the answer is the same in a
+ * working tree with build output in it and in a fresh clone. Falls back to the
+ * filesystem only where git cannot answer at all — a tarball checkout, or a
+ * self-test fixture, neither of which is a repository.
+ */
+let TRACKED = null;
+function trackedPaths(root) {
+  if (TRACKED !== null && TRACKED.root === root) return TRACKED.set;
+  let set;
+  try {
+    const out = execFileSync('git', ['-C', root, 'ls-files'], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    // Files AND the directories that contain them. `git ls-files` lists only
+    // files, and an evidence row routinely cites a directory — "the migrations
+    // live in `packages/platform/db/migrations/`" — which is a true statement
+    // about the repository and must not read as a missing path.
+    set = new Set();
+    for (const file of out.split('\n').filter(Boolean)) {
+      set.add(file);
+      const parts = file.split('/');
+      for (let i = 1; i < parts.length; i += 1) {
+        const dir = parts.slice(0, i).join('/');
+        set.add(dir);
+        set.add(`${dir}/`);
+      }
+    }
+  } catch {
+    set = null;
+  }
+  if (set === null || set.size === 0) {
+    // No git here. Answer from disk, and say so by behaving as the old rule
+    // did rather than by reporting every path as missing.
+    set = {
+      has: (candidate) => fs.existsSync(path.join(root, candidate)),
+    };
+  }
+  TRACKED = { root, set };
+  return set;
+}
+
+function readRegisterRows(root, file, idPattern, statuses) {
+  const full = path.join(root, 'docs', 'compliance', file);
+  if (!fs.existsSync(full)) return null;
+  const text = fs.readFileSync(full, 'utf8');
+  const rows = new Map();
+  for (const m of text.matchAll(new RegExp(`^\\|\\s*(${idPattern})\\s*\\|(.*)$`, 'gm'))) {
+    if (rows.has(m[1])) continue;
+    // The status is the LAST cell that is one of the vocabulary's words, not
+    // the first: a row's narrative routinely names the status it used to have
+    // ("PENDING → COLLECTED"), and the authoritative one is the column at the
+    // end of the row.
+    const cells = m[2].split('|').map((c) => c.trim());
+    let status = null;
+    for (const cell of cells) {
+      const bare = cell.replace(/\*/g, '').trim();
+      const hit = statuses.find((s) => new RegExp(`^${s}\\b`).test(bare));
+      if (hit !== undefined) status = hit;
+    }
+    rows.set(m[1], status);
+  }
+  return rows;
+}
+
+function checkRegisterTraceability(root = REPO_ROOT) {
+  const problems = [];
+  const registers = [
+    {
+      id: 'EV',
+      pattern: 'EV-\\d+',
+      rows: readRegisterRows(root, 'evidence-register.md', 'EV-\\d+', [
+        'PENDING',
+        'COLLECTED',
+        'REVIEWED',
+      ]),
+      file: 'docs/compliance/evidence-register.md',
+      statuses: ['PENDING', 'COLLECTED', 'REVIEWED'],
+    },
+    {
+      id: 'KAR-CTL',
+      pattern: 'KAR-CTL-\\d+',
+      rows: readRegisterRows(root, 'control-matrix.md', 'KAR-CTL-\\d+', [
+        'DESIGNED',
+        'IMPLEMENTED',
+        'OPERATING',
+        'EVIDENCED',
+        'DEFERRED',
+        'EXCEPTION',
+      ]),
+      file: 'docs/compliance/control-matrix.md',
+      statuses: ['DESIGNED', 'IMPLEMENTED', 'OPERATING', 'EVIDENCED', 'DEFERRED', 'EXCEPTION'],
+    },
+    {
+      id: 'KAR-RSK',
+      pattern: 'KAR-RSK-\\d+',
+      rows: readRegisterRows(root, 'risk-register.md', 'KAR-RSK-\\d+', [
+        'OPEN',
+        'CLOSED',
+        'ACCEPTED',
+      ]),
+      file: 'docs/compliance/risk-register.md',
+      statuses: ['OPEN', 'CLOSED', 'ACCEPTED'],
+    },
+    // THE FOURTH REGISTER, and the reason it is here.
+    //
+    // This rule shipped covering three registers and stating the class. The
+    // continual-improvement log is the fourth — it has ids, a status column
+    // and the same authority — and it had no rule at all. The next cycle's
+    // BLOCKING finding landed in exactly that gap: CI-020 was re-opened in the
+    // log and left reading CLOSED in four other live documents, two of which
+    // discharge a Phase 6 entry criterion on it. Nothing could see it.
+    //
+    // Building a rule for the instance and describing the class is the defect
+    // this corpus has now reproduced in four consecutive review cycles. This
+    // entry is the class.
+    {
+      id: 'CI',
+      pattern: 'CI-\\d{3}',
+      // THE VOCABULARY COMES FROM THE SCHEMA, NOT FROM TODAY'S ROWS.
+      //
+      // This shipped as ['OPEN','CLOSED'] — the two values the table happened
+      // to hold — while the log's own schema defines four. A fifth reviewer
+      // showed the cost: a row whose status is IN_PROGRESS or ACCEPTED parses
+      // as null, and `actual === null` then exempts EVERY citation of that row
+      // silently, with the non-vacuity guard blind to it because the map is
+      // still full. That is this entry's own comment about building for the
+      // instance, committed in the entry that says it is the class.
+      rows: readRegisterRows(root, 'iso27001/continual-improvement.md', 'CI-\\d{3}', [
+        'OPEN',
+        'IN_PROGRESS',
+        'CLOSED',
+        'ACCEPTED',
+      ]),
+      file: 'docs/compliance/iso27001/continual-improvement.md',
+      statuses: ['OPEN', 'IN_PROGRESS', 'CLOSED', 'ACCEPTED'],
+    },
+  ];
+  for (const register of registers) {
+    if (register.rows === null || register.rows.size === 0) {
+      problems.push(
+        `${register.file} defines no ${register.id} rows — traceability is underivable`,
+      );
+    }
+  }
+  if (problems.length > 0) return problems;
+
+  const files = currentStateFiles(root);
+  const currentPhase = readDeclaredPhase(root)?.phase ?? null;
+
+  for (const file of files) {
+    const rel = path.relative(root, file);
+    const text = fs.readFileSync(file, 'utf8');
+
+    // --- 1. every cited id resolves.
+    for (const register of registers) {
+      const cited = new Map();
+      for (const m of text.matchAll(new RegExp(`\\b(${register.pattern})\\b`, 'g'))) {
+        if (register.rows.has(m[1]) || cited.has(m[1])) continue;
+        cited.set(m[1], text.slice(0, m.index).split('\n').length);
+      }
+      for (const [id, line] of cited) {
+        // A RANGE endpoint is a citation of the range, not of a row: "EV-501–EV-510"
+        // names ten rows and the register defines each of them. Only an id that
+        // resolves nowhere is a fork.
+        problems.push(`${rel}:${line} cites ${id}, which has no defining row in ${register.file}`);
+      }
+    }
+
+    // --- 3. every quoted status matches. Scoped per block, so a dated record
+    // quoting what it saw stays history rather than becoming a fork — and an
+    // EARLIER phase's report is a dated record in its entirety, on the same
+    // derived-from-the-registry rule `compliance-current-state` uses. Phase 2's
+    // report saying EV-216 was collected at Phase 2 is history, not a claim
+    // about now.
+    if (isEarlierPhaseReport(root, file, currentPhase)) continue;
+    for (const block of markdownBlocks(text, currentPhase).filter((b) => !isHistoricalBlock(b))) {
+      for (const register of registers) {
+        // THE VERB IS NOT ALWAYS "IS", AND WIDENING IT ALONE MAKES IT WORSE.
+        //
+        // This pattern was `\bis\s+<STATUS>`, and an independent review
+        // measured what that reaches: 16 of 42 status assertions in the
+        // corpus, 10 after the historical filter. The other 26 said "stays",
+        // "remains", "is still", or no verb at all — and four live documents
+        // went on calling KAR-CTL-116 DESIGNED after it moved, in a check
+        // whose control row claims it compares every quoted status.
+        //
+        // Widening the verb set alone reported nine problems of which SEVEN
+        // were false: the id and the status belonged to different clauses.
+        // "…landed at Phase 2 (KAR-CTL-056); this row stays DEFERRED" is about
+        // the row the cell belongs to; "response-timing equivalence is
+        // deferred" beside a citation of KAR-CTL-089 is about the timing work.
+        //
+        // So the verb is dropped and the SEPARATION is constrained instead:
+        //   * the status must be UPPERCASE — the corpus writes statuses that
+        //     way, and lowercase "deferred"/"open" are ordinary English;
+        //   * no `;` may intervene, because a semicolon is where the subject
+        //     changes;
+        //   * no OTHER register id may intervene, because the nearer id owns
+        //     the status;
+        //   * `|` and newline still stop it, so a row's own status COLUMN is
+        //     never read as prose about the row.
+        //
+        // Known limitation, stated rather than discovered later: the framework
+        // views' `(D)`/`(I)` shorthand is not a status word and is not matched.
+        // A PREDICATION, not mere adjacency. Dropping the verb entirely and
+        // keeping only the separation constraints went the other way — 20
+        // reports, most of them narrative that merely mentions a status near
+        // an id. The verb is what makes the sentence a claim ABOUT the id.
+        //
+        // `was` is deliberately absent: past tense is how this corpus writes
+        // history, and "KAR-CTL-113 was DESIGNED … it moved to IMPLEMENTED" is
+        // a correct sentence that a rule matching `was` would report.
+        // THE VERB IS SOMETIMES ABSENT, AND SOMETIMES PLURAL.
+        //
+        // A fifth reviewer recovered the exact bytes of cycle 4's blocker and
+        // ran this pattern against them: it matched 0 of 5. The blocker took
+        // two shapes — `KAR-RSK-042 and CI-020 are CLOSED` (plural copula) and
+        // `KAR-RSK-042 CLOSED, CI-020 CLOSED` (no verb at all) — and this rule
+        // fired only on the sentence the FIX rewrote them into. Three spots
+        // were corrected because a human could read them; the two nobody could
+        // read as prose survived another cycle, and the rule built to catch
+        // them was blind to both.
+        //
+        // `are` is in the set now, and a bare `id STATUS` adjacency counts when
+        // nothing but whitespace or punctuation separates them — which is the
+        // shape a table cell uses and the shape that survived.
+        // `are` is the addition; `was`/`were` are deliberately NOT. The
+        // blocker's plural form was present tense — "KAR-RSK-042 and CI-020
+        // are CLOSED" — and adding the past tense with it reported four
+        // sentences that correctly describe history, which is the same
+        // mistake in the other direction. Past tense is how this corpus
+        // writes what a thing USED to be.
+        const verbs = 'is|are|stays|remains|reads|records|holds at|is still';
+        // THE SENTENCE BOUNDARY WENT MISSING WHEN THE SEPARATION WAS WIDENED.
+        //
+        // The original pattern used `[^.|\n]`, which could not cross a full
+        // stop. Replacing it with a negative lookahead for `;`, `|`, newline
+        // and other ids dropped the `.` silently, and a delta reviewer found
+        // what that admits: "EV-506 records the CI run. Nothing is `REVIEWED`
+        // anywhere." reported as EV-506 being REVIEWED. That is a NEGATION,
+        // and it is this corpus's house sentence — it appears verbatim in the
+        // evidence register and in three gate records.
+        //
+        // The period is back. The known cost, stated rather than discovered
+        // later: a fork written across a semicolon — "EV-506 waits on the
+        // final head; it is COLLECTED" — is not matched, because the semicolon
+        // is also where the subject changes and excluding it is what stops
+        // "…(KAR-CTL-056); this row stays DEFERRED" from being read as a claim
+        // about 056. Precision was chosen over reach at that one shape.
+        // A NEGATION IS NOT AN ASSERTION. "…and no evidence row anywhere is
+        // REVIEWED" is a true sentence about the corpus, and the rule read it
+        // as EV-506 being REVIEWED. The sentence boundary does not help here —
+        // the negation is in the same clause — so the negators are excluded
+        // from the span between the id and the verb.
+        const negators = '\\bno\\b|\\bnothing\\b|\\bnone\\b|\\bnever\\b|\\bneither\\b';
+        const anyId = registers.map((r) => r.pattern).join('|');
+        const quoted = new RegExp(
+          `\\b(${register.pattern})\\b(?:(?!\\.|;|\\||\\n|${negators}|${anyId}).){0,90}?` +
+            `\\b(?:${verbs})\\s+\\**\`?(${register.statuses.join('|')})\\b`,
+          'g',
+        );
+        // The VERBLESS form — `CI-020 CLOSED` — and it is scoped to TABLE
+        // ROWS, which is where it survived two review cycles.
+        //
+        // Narrowing by punctuation was not enough. `as **KAR-CTL-113
+        // DESIGNED**, because the control's own statement…` is the same bytes
+        // in a sentence about the past, and a rule that cannot tell them apart
+        // either misses the defect or reports the narrative. What separates
+        // them is the container: a cell that lists an id beside a status IS a
+        // status claim, and a sentence that mentions one is not. So the
+        // verbless form applies only to lines beginning with `|`.
+        //
+        // The prose form above still applies everywhere, cell or not.
+        // A TRANSITION IS NOT A STATUS. `KAR-CTL-014 DESIGNED → IMPLEMENTED`
+        // inside a cell is a record of a move, and the status on the left of
+        // the arrow is the one it moved FROM. Excluded by lookahead rather
+        // than by narrowing the separator, because the separator is what makes
+        // this form findable at all.
+        const adjacent = new RegExp(
+          `\\b(${register.pattern}) \\**\`?(${register.statuses.join('|')})\\b(?!\\**\`?\\s*(?:→|->|to\\b))`,
+          'g',
+        );
+        // SHORT CELLS ONLY. A status column is a few words by nature — the
+        // cell that survived two cycles was `KAR-RSK-042 CLOSED, CI-020
+        // CLOSED`. A cell holding a paragraph is prose that happens to sit in
+        // a table, and this report is full of paragraphs ABOUT status forks,
+        // which contain the bytes of the thing they describe. Without this,
+        // the rule reports the sentence explaining the defect it just caught.
+        const cellText = block.text
+          .split('\n')
+          .filter((l) => l.trimStart().startsWith('|'))
+          .flatMap((l) => l.split('|'))
+          .map((cell) => cell.trim())
+          .filter((cell) => cell.length > 0 && cell.length <= 80)
+          .join('\n');
+        for (const m of [...block.text.matchAll(quoted), ...cellText.matchAll(adjacent)]) {
+          const actual = register.rows.get(m[1]);
+          // COMPARED CASE-INSENSITIVELY, because the verb set is matched that
+          // way and "EV-216 is collected" is agreement, not a fork. Widening
+          // the verbs without widening this reported nine problems of which
+          // two were the same status in a different case.
+          if (actual === undefined || actual === null) continue;
+          if (actual.toUpperCase() === m[2].toUpperCase()) continue;
+          problems.push(
+            `${rel}:${block.line} says ${m[1]} is ${m[2]}, but ${register.file} records ${actual}`,
+          );
+        }
+      }
+    }
+  }
+
+  // --- 2. every repository path an evidence row cites exists on disk.
+  const evidence = path.join(root, 'docs', 'compliance', 'evidence-register.md');
+  if (fs.existsSync(evidence)) {
+    const text = fs.readFileSync(evidence, 'utf8');
+    for (const m of text.matchAll(/^\|\s*(EV-\d+)\s*\|(.*)$/gm)) {
+      const line = text.slice(0, m.index).split('\n').length;
+      // Only backticked strings that LOOK like repository paths: a slash, no
+      // spaces, and a leading segment that exists as a top-level entry. A row
+      // routinely backticks a status word, a SQL fragment or a URL, and none
+      // of those is a path claim.
+      //
+      // "IN THE REPOSITORY" MEANS TRACKED BY GIT, not present on this disk.
+      // The first version asked the filesystem and passed locally while
+      // failing on CI, because it was standing in a working tree where the
+      // checker's own gitignored report had just been written. A row citing a
+      // build output is citing something a fresh clone does not have — which
+      // is exactly the fork this rule is for — and a check that only fails on
+      // other people's machines is worse than one that does not fail at all.
+      for (const p of m[2].matchAll(/`([^`\s]+\/[^`\s]*)`/g)) {
+        // A `path:line` citation is a citation of the path. The line number
+        // is not part of the name and is routinely how an evidence row points
+        // at the exact assertion it rests on.
+        const candidate = p[1]
+          .replace(/[.,;:]+$/, '')
+          .split('#')[0]
+          .replace(/:\d+(-\d+)?$/, '');
+        if (/^[a-z]+:\/\//i.test(candidate)) continue;
+        const top = candidate.split('/')[0];
+        if (!fs.existsSync(path.join(root, top))) continue;
+        if (candidate.includes('*')) continue;
+        if (trackedPaths(root).has(candidate)) continue;
+        problems.push(
+          `docs/compliance/evidence-register.md:${line} ${m[1]} cites \`${candidate}\`, which is not in the repository`,
+        );
+      }
+    }
+  }
+  // One fork reported once: the same path can be cited twice in a row's own
+  // narrative, and a reader does not need to be told twice.
+  return [...new Set(problems)];
+}
+
+function checkComplianceCurrentState(root = REPO_ROOT) {
+  const problems = [];
+  const capabilities = readCapabilityRegistry(root);
+  const matrix = readControlMatrix(root);
+  const gatePhases = readGateRecordPhases(root);
+  const declared = readDeclaredPhase(root);
+
+  // A blind rule is worse than no rule: it reports PASS forever. Each input
+  // that cannot be derived is a problem in its own right.
+  if (capabilities === null || capabilities.size === 0) {
+    problems.push(
+      'packages/capability-registry/src/index.ts: CAPABILITY_REGISTRY could not be parsed — ' +
+        'every capability-truth rule below is blind without it',
+    );
+  }
+  if (matrix === null) {
+    problems.push(
+      'docs/compliance/control-matrix.md is missing — the control tally is underivable',
+    );
+  }
+  if (gatePhases === null) {
+    problems.push(
+      'docs/compliance/phase-compliance-gate.md is missing — gate state is underivable',
+    );
+  }
+  if (declared === null) {
+    problems.push('README.md has no parseable "Current phase" row — phase state is underivable');
+  }
+
+  const currentPhase = declared === null ? null : declared.phase;
+  const files = currentStateFiles(root).filter(
+    (file) => !isEarlierPhaseReport(root, file, currentPhase),
+  );
+  const blocksByFile = files.map((file) => ({
+    rel: path.relative(root, file),
+    blocks: markdownBlocks(fs.readFileSync(file, 'utf8'), currentPhase).filter(
+      (b) => !isHistoricalBlock(b),
+    ),
+  }));
+  const report = (rel, block, detail) => problems.push(`${rel}:${block.line} ${detail}`);
+
+  // --- Rule 1: a capability's implementation state, as the registry holds it.
+  if (capabilities !== null) {
+    const built = [...capabilities.entries()].filter(([, d]) => d.implementation === 'IMPLEMENTED');
+    const unbuilt = [...capabilities.entries()].filter(
+      ([, d]) => d.implementation === 'NOT_IMPLEMENTED',
+    );
+    for (const { rel, blocks } of blocksByFile) {
+      for (const block of blocks) {
+        for (const [id] of built) {
+          const denies = new RegExp(
+            '`?' +
+              id +
+              '`?\\s+(?:is|was|remains|stays|still\\s+reads)\\s+(?:still\\s+)?`?NOT_IMPLEMENTED`?',
+          );
+          if (denies.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says ${id} is NOT_IMPLEMENTED; the capability registry declares it IMPLEMENTED. ` +
+                'Mark the block HISTORICAL if it describes an earlier moment, or correct it',
+            );
+          }
+        }
+        for (const [id] of unbuilt) {
+          const claims = new RegExp(
+            '`?' + id + '`?\\s+(?:is|was|becomes)\\s+(?:now\\s+)?`?IMPLEMENTED`?',
+          );
+          if (claims.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says ${id} is IMPLEMENTED; the capability registry declares it NOT_IMPLEMENTED`,
+            );
+          }
+        }
+        // The universal form, which no per-id rule catches: "every capability
+        // is NOT_IMPLEMENTED" was true for four phases and stopped being true
+        // without the sentences that said it being revisited.
+        if (
+          built.length > 0 &&
+          // The NOUN is a list, because the claim is about the registry and a
+          // writer may reach for any word that names its contents. It matched
+          // only `capability`/`capabilities`, and a live document said "every
+          // registry ENTRY is NOT_IMPLEMENTED" — identical meaning, one word
+          // apart, and the rule was blind to it.
+          /\b(?:every|all(?: seven)?|each)\s+(?:capabilit(?:y|ies)|registry entr(?:y|ies)|entr(?:y|ies) in the registry)\s+(?:is|are|remains?|stays?)\s+(?:still\s+)?`?NOT_IMPLEMENTED`?/i.test(
+            block.text,
+          )
+        ) {
+          report(
+            rel,
+            block,
+            `says every capability is NOT_IMPLEMENTED; the registry declares ` +
+              `${built.map(([id]) => id).join(', ')} IMPLEMENTED`,
+          );
+        }
+      }
+    }
+  }
+
+  // --- Rule 2: IMPLEMENTED is not DEPLOYED and is not AVAILABLE.
+  if (capabilities !== null) {
+    for (const [id, descriptor] of capabilities) {
+      if (descriptor.deployed) continue;
+      const conflates = new RegExp(
+        '`?' +
+          id +
+          '`?\\s+(?:is|was|has been)\\s+(?:now\\s+)?(?:DEPLOYED|deployed|AVAILABLE|available|live)\\b(?!\\s*(?:nowhere|in no\\b))',
+      );
+      for (const { rel, blocks } of blocksByFile) {
+        for (const block of blocks) {
+          if (conflates.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says ${id} is deployed or available; the registry's deployment map for it is ` +
+                'empty, and IMPLEMENTED means the code exists — never that anything runs',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 3: the control tally is derived from the matrix's own rows.
+  if (matrix !== null) {
+    const actual = matrix.ids.size;
+    if (actual === 0) {
+      problems.push(
+        `${matrix.path}: no KAR-CTL rows could be parsed — the control count rule is blind`,
+      );
+    } else {
+      // The matrix's newest declared tally must equal its own rows. A tally is
+      // the one number every framework view copies, so a wrong one propagates.
+      const newest = matrix.tallies.length > 0 ? matrix.tallies[0] : null;
+      if (newest === null) {
+        problems.push(
+          `${matrix.path}: no "N DESIGNED / N IMPLEMENTED / N DEFERRED / N EXCEPTION" tally found`,
+        );
+      } else {
+        const summed = newest.designed + newest.implemented + newest.deferred + newest.exception;
+        if (summed !== actual) {
+          problems.push(
+            `${matrix.path}: the newest declared tally sums to ${summed} but the file holds ` +
+              `${actual} KAR-CTL rows`,
+          );
+        }
+        // Each status, not just the total. A tally that sums correctly out of
+        // the wrong parts is the shape that survived every previous check.
+        for (const [status, declaredCount] of [
+          ['DESIGNED', newest.designed],
+          ['IMPLEMENTED', newest.implemented],
+          ['DEFERRED', newest.deferred],
+          ['EXCEPTION', newest.exception],
+        ]) {
+          if (declaredCount !== matrix.byStatus[status]) {
+            problems.push(
+              `${matrix.path}: the newest declared tally says ${declaredCount} ${status} but the ` +
+                `rows hold ${matrix.byStatus[status]}`,
+            );
+          }
+        }
+        if (newest.total !== null && newest.total !== actual) {
+          problems.push(
+            `${matrix.path}: the newest declared tally states a total of ${newest.total} but the ` +
+              `file holds ${actual} KAR-CTL rows`,
+          );
+        }
+      }
+      // Any other compliance document naming a control count must name THIS
+      // one. `Annex A` and `ISO` numbers are a different, external control set
+      // and are excluded by the line that carries them saying so.
+      for (const { rel, blocks } of blocksByFile) {
+        if (!rel.startsWith(path.join('docs', 'compliance'))) continue;
+        for (const block of blocks) {
+          for (const line of block.text.split('\n')) {
+            if (/Annex A|ISO\/IEC|ISO 27|Trust Services/i.test(line)) continue;
+            // Not preceded by a hyphen: `KAR-RSK-044 controls that pass
+            // without verifying` is a register id followed by an ordinary
+            // noun, not a count of anything.
+            for (const m of line.matchAll(/(?<![-\w])(\d{2,3})\s+controls\b/g)) {
+              if (Number(m[1]) !== actual) {
+                report(
+                  rel,
+                  block,
+                  `states "${m[1]} controls"; the control matrix holds ${actual} KAR-CTL rows. ` +
+                    'A count stated outside the matrix must be the matrix’s own',
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 4: a phase whose gate record exists did execute its gate, and a
+  //     phase whose pull request the gate document names does have one. TWO
+  //     facts, derived separately — see `readGateRecordPhases`.
+  if (gatePhases !== null && gatePhases.gates.size > 0) {
+    for (const phase of gatePhases.gates) {
+      const escaped = phase.replace('.', '\\.');
+      const executed = [
+        new RegExp(
+          `\\bno Phase ${escaped}\\b[^.\\n]{0,60}?\\bgate\\b[^.\\n]{0,40}?\\b(?:has|had)\\s+(?:been\\s+)?executed`,
+          'i',
+        ),
+        new RegExp(
+          `\\bNo Phase [0-9.]+ or Phase ${escaped}[^.\\n]{0,40}?GATE has been executed`,
+          'i',
+        ),
+        new RegExp(
+          `\\bNo Phase ${escaped}[^.\\n]{0,40}?(?:or Phase [0-9.]+ )?(?:compliance )?GATE has been executed`,
+          'i',
+        ),
+        new RegExp(`\\bPhase ${escaped} is NOT STARTED\\b`),
+        new RegExp(`\\bno Phase ${escaped} gate has executed`, 'i'),
+      ];
+      if (gatePhases.pullRequests.has(phase)) {
+        executed.push(new RegExp(`\\bno Phase ${escaped} pull request exists`, 'i'));
+      }
+      // --- the OUTCOME a block attributes to this phase's gate must be the
+      // outcome that gate recorded. Scoped per block like everything else, so
+      // a dated record quoting the outcome it saw stays history.
+      const recorded = gatePhases.outcomes.get(phase);
+      if (recorded !== undefined) {
+        // EVERY MENTION IN THE BLOCK, not the first one.
+        //
+        // `exec` on a non-global regex returns one match, and a delta reviewer
+        // showed what that costs: seed the false PASS into the SAME paragraph,
+        // after the corrected sentence, and it is invisible — which is the one
+        // paragraph in the corpus where this defect actually happened, because
+        // that paragraph now opens with the correction. A rule that stops at
+        // the first mention stops exactly where the fix put a right answer.
+        //
+        // The status token must be UPPERCASE, so the `i` flag is gone: under
+        // it, `[A-Z_]{4,}` matched ordinary words and "the outcome section is
+        // unchanged" was reported as an outcome of `section`.
+        const quoted = new RegExp(
+          `[Pp]hase ${escaped}\\s+gate\\b[^.\\n]{0,120}?\\boutcome\\s+\\**\`?([A-Z][A-Z_]{3,})\`?`,
+          'g',
+        );
+        for (const { rel, blocks } of blocksByFile) {
+          for (const block of blocks) {
+            for (const m of block.text.matchAll(quoted)) {
+              if (m === null || m[1] === recorded) continue;
+              report(
+                rel,
+                block,
+                `attributes outcome ${m[1]} to the Phase ${phase} gate, but its record in ` +
+                  `docs/compliance/phase-compliance-gate.md says ${recorded}`,
+              );
+            }
+          }
+        }
+      }
+      for (const { rel, blocks } of blocksByFile) {
+        for (const block of blocks) {
+          for (const pattern of executed) {
+            if (pattern.test(block.text)) {
+              report(
+                rel,
+                block,
+                `denies a Phase ${phase} gate, but ` +
+                  `docs/compliance/phase-compliance-gate.md carries a Phase ${phase} gate record. ` +
+                  'Mark the block HISTORICAL if it records an earlier moment, or correct it',
+              );
+              break;
+            }
+          }
+          // The `[P4]`-shaped denial: a block whose SUBJECT is the phase
+          // marker and which then says no pull request exists. Written as two
+          // conditions rather than one regex because the two facts sit in
+          // different sentences.
+          //
+          // The marker must OPEN the block. A contingency note routinely names
+          // its predecessors mid-sentence — "unlike [C1], [P2], [P3], and
+          // [P3.5]" — and matching those made one true finding arrive with
+          // three false ones attached to phases whose notes say nothing of the
+          // kind.
+          if (
+            gatePhases.pullRequests.has(phase) &&
+            new RegExp(`^\\*{0,2}\\[P${phase.replace('.', '\\.')}\\]`).test(
+              block.text.trimStart(),
+            ) &&
+            /\bno pull request exists\b/i.test(block.text)
+          ) {
+            report(
+              rel,
+              block,
+              `carries the [P${phase}] marker and says no pull request exists, but the gate ` +
+                `document records the Phase ${phase} pull request`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 5b: a phase whose gate record exists HAS evidence rows, and a
+  //     current-state document may not say otherwise.
+  //
+  // `docs/phases/phase-05.md` carried "None recorded yet … this foundation has
+  // not reached [a compliance gate]" under its Evidence produced heading, and
+  // kept carrying it after the gate executed and wrote ten evidence rows. The
+  // sentence was true when written and became false in a different file, which
+  // is the shape every stale claim in this corpus has had.
+  if (gatePhases !== null && declared !== null && gatePhases.gates.has(declared.phase)) {
+    const denials = [
+      /^\s*None recorded yet\b/im,
+      new RegExp(
+        `\\bhas not reached (?:one|a compliance gate)\\b|\\bno Phase ${declared.phase.replace('.', '\\.')} evidence (?:row|rows) (?:exist|has been)`,
+        'i',
+      ),
+    ];
+    for (const { rel, blocks } of blocksByFile) {
+      for (const block of blocks) {
+        for (const pattern of denials) {
+          if (pattern.test(block.text)) {
+            report(
+              rel,
+              block,
+              `denies that Phase ${declared.phase} evidence exists, but ` +
+                `docs/compliance/phase-compliance-gate.md carries a Phase ${declared.phase} gate ` +
+                'record and the evidence register carries its rows',
+            );
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 5c: the architecture self-test headline, derived from the runner.
+  //
+  // The phase report quoted the self-test as 70 cases in one paragraph and 86
+  // in another. The runner is the authority and it prints the number, so a
+  // prose figure that disagrees with the emitted report is checkable.
+  const archReportPath = path.join(root, 'scripts', 'checks', '.out', 'architecture-report.json');
+  const archReport = fs.existsSync(archReportPath) ? fs.readFileSync(archReportPath, 'utf8') : null;
+  if (archReport !== null) {
+    let cases;
+    try {
+      cases = JSON.parse(archReport)?.selfTest?.cases ?? null;
+    } catch {
+      cases = null;
+    }
+    if (typeof cases === 'number') {
+      // SCOPED TO THE SENTENCE, because there are two self-tests.
+      //
+      // The architecture runner and the documentation runner each print one and
+      // their counts differ. A rule that matched "self-test … N cases" anywhere
+      // reported the docs figure against the architecture number and called a
+      // correct sentence stale — the same over-broad matching this check exists
+      // to replace, committed by the check itself. The sentence has to say which
+      // runner it means, and one that does not is left alone.
+      const docsCases = selfTestCaseCount();
+      for (const { rel, blocks } of blocksByFile) {
+        for (const block of blocks) {
+          for (const sentence of block.text.split(/(?<=[.;])\s+/)) {
+            const isArchitecture = /arch:test|architecture (?:runner|suite|self-test)/i.test(
+              sentence,
+            );
+            const isDocs = /docs:check|documentation (?:runner|checks?|self-test)/i.test(sentence);
+            if (isArchitecture === isDocs) continue;
+            const expected = isArchitecture ? cases : docsCases;
+            const runner = isArchitecture
+              ? "the architecture runner's own report"
+              : "this runner's own case list";
+            for (const m of sentence.matchAll(/\bself-test\b[^.\n]{0,40}?\b(\d{2,4})\s*cases/gi)) {
+              if (Number(m[1]) !== expected) {
+                report(
+                  rel,
+                  block,
+                  `states a self-test of ${m[1]} cases; ${runner} records ${String(expected)}. ` +
+                    'Mark the figure HISTORICAL if it belongs to an earlier checkpoint',
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // --- Rule 5: the current phase's status, as the README declares it.
+  if (declared !== null) {
+    const p = declared.phase.replace('.', '\\.');
+    const wrong = [];
+    if (declared.status !== 'NOT STARTED') {
+      wrong.push({
+        pattern: new RegExp(`\\bPhase ${p}\\b[^.\\n]{0,40}?\\b(?:is|remains|stays)\\s+NOT STARTED`),
+        said: 'NOT STARTED',
+      });
+    }
+    if (declared.status !== 'COMPLETE') {
+      wrong.push({
+        pattern: new RegExp(`\\bPhase ${p}\\b[^.\\n]{0,40}?\\b(?:is|was)\\s+COMPLETE\\b`),
+        said: 'COMPLETE',
+      });
+    }
+    for (const { rel, blocks } of blocksByFile) {
+      for (const block of blocks) {
+        for (const { pattern, said } of wrong) {
+          if (pattern.test(block.text)) {
+            report(
+              rel,
+              block,
+              `says Phase ${declared.phase} is ${said}, but README declares it ` +
+                `${declared.status}. A status stated in more than one place has to agree in ` +
+                'all of them',
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return problems;
+}
+
 function checkPhaseStatusConsistency(files) {
   const problems = [];
   const readmePath = path.join(REPO_ROOT, 'README.md');
@@ -327,13 +1727,37 @@ function checkPhaseStatusConsistency(files) {
   for (const file of files) {
     const relative = path.relative(REPO_ROOT, file);
     // Phase reports for EARLIER phases are historical records and correctly
-    // describe their own phase as complete.
-    if (/docs\/phases\/phase-0(?!4)/.test(relative)) continue;
-    // The compliance corpus is a dated gate snapshot; it scopes its own claims.
-    if (relative.startsWith('docs/compliance/')) continue;
+    // describe their own phase as complete. The CURRENT phase's report is
+    // never exempt: it is the single most-read current-state document in the
+    // repository, and a claim that it has completed is exactly the claim this
+    // check exists to catch.
+    //
+    // THIS LINE READ `/docs\/phases\/phase-0(?!4)/` AND WAS A PHASE-4 CONSTANT.
+    // At phase 5 it skipped `phase-05.md` — the current report — and checked
+    // `phase-04.md`, whose phase had closed. So the one blanket exemption
+    // CI-018 did not remove covered the one file that matters most, while the
+    // register recorded the whole class as fixed. Derived from the registry
+    // now, like everything else here.
+    if (isEarlierPhaseReport(REPO_ROOT, file, phase)) continue;
 
     const text = fs.readFileSync(file, 'utf8');
+    // `docs/compliance/` was exempt WHOLESALE here, on the reasoning that the
+    // corpus is a dated gate snapshot that scopes its own claims. Some of it
+    // does and some of it did not, and the exemption could not tell them
+    // apart — so the canonical compliance documents were the one place a stale
+    // phase status could sit while this check reported PASS. The exemption is
+    // now per BLOCK and earned by the block's own text: a paragraph marked
+    // HISTORICAL or SUPERSEDED, or a dated version-history entry, is exempt
+    // wherever it appears; a paragraph that is not is checked wherever it
+    // appears.
+    const historicalLines = new Set();
+    for (const block of markdownBlocks(text, phase)) {
+      if (!isHistoricalBlock(block)) continue;
+      const span = block.text.split('\n').length;
+      for (let i = 0; i < span; i += 1) historicalLines.add(block.line + i);
+    }
     text.split('\n').forEach((line, index) => {
+      if (historicalLines.has(index + 1)) return;
       // A line that states what COMPLETE would mean, or denies completion, is
       // not a claim of it.
       if (/does not mean|will mean|not complete|NOT a closeout|is NOT complete/i.test(line)) return;
@@ -741,6 +2165,16 @@ function buildSelfTestFixture() {
   // STALE_FILE is deliberately never written, so the allowance that names it has
   // nothing to suppress and check 12 has something real to report.
 
+  // A nested checkout (a linked worktree's `.git` is a FILE, not a directory)
+  // and an agent scratch tree. Both carry a real violation, and neither may be
+  // scanned: otherwise every "scanned: N" figure this project publishes as
+  // evidence depends on who happens to have an agent running, and a check that
+  // requires a file to be PRESENT can be satisfied by a copy of some other
+  // commit rather than by this tree.
+  write('nested-checkout/.git', 'gitdir: /elsewhere/.git/worktrees/nested\n');
+  write('nested-checkout/docs/nested.md', '# Nested\n\nAs an AI, I cannot verify this.\n');
+  write('.claude/worktrees/agent-x/docs/agent.md', '# Agent\n\nAs an AI, I cannot verify this.\n');
+
   // Legitimate shapes, all in one file: none of them may raise a problem.
   write(
     'docs/clean.md',
@@ -815,6 +2249,9 @@ const NEGATIVE_SELF_TEST_CASES = [
   { check: 'no-ai-attribution', forbid: /clean\.md/ },
   { check: 'no-generated-by-line', forbid: /clean\.md/ },
   { check: 'no-assistant-boilerplate', forbid: /clean\.md/ },
+  // The walk stops at the edge of this checkout.
+  { check: 'no-assistant-boilerplate', forbid: /nested-checkout/ },
+  { check: 'no-assistant-boilerplate', forbid: /(^|[/\\])\.claude[/\\]/ },
   // The allowance does its job on the file it names…
   ...(ALLOWED_ENTRY
     ? [
@@ -827,6 +2264,592 @@ const NEGATIVE_SELF_TEST_CASES = [
       ]
     : []),
 ];
+
+// ---------------------------------------------------------------------------
+// Self-test fixture for compliance-current-state
+// ---------------------------------------------------------------------------
+//
+// A SECOND fixture, deliberately not the style one. These rules derive facts
+// from four specific files — the capability registry, the control matrix, the
+// gate document, the README phase row — and a fixture that carried those files
+// would change what every style case sees. Keeping them apart also keeps each
+// arm legible: everything written below is either a seeded contradiction that
+// MUST be reported, or a legitimate shape that must NOT be.
+// ---------------------------------------------------------------------------
+function buildComplianceFixture(options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'karar-compliance-selftest-'));
+  const write = (relPath, content) => {
+    const full = path.join(root, relPath);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
+  };
+  const implementation = options.transactionsImplementation ?? 'IMPLEMENTED';
+
+  write(
+    'packages/capability-registry/src/index.ts',
+    [
+      'export const CAPABILITY_REGISTRY: Readonly<Record<CapabilityId, CapabilityDescriptor>> =',
+      '  Object.freeze({',
+      '    TRANSACTIONS: Object.freeze({',
+      "      id: 'TRANSACTIONS',",
+      "      lifecycle: 'ALPHA',",
+      `      implementation: '${implementation}',`,
+      '      deployment: Object.freeze({}),',
+      '      declaredJurisdictions: Object.freeze([]),',
+      '    }),',
+      "    BUDGETS: descriptor('BUDGETS'),",
+      '  });',
+      '',
+      'function descriptor(id: CapabilityId): CapabilityDescriptor {',
+      '  return Object.freeze({',
+      '    id,',
+      "    lifecycle: 'PLANNED',",
+      "    implementation: 'NOT_IMPLEMENTED',",
+      '    deployment: Object.freeze({}),',
+      '    declaredJurisdictions: Object.freeze([]),',
+      '  });',
+      '}',
+      '',
+    ].join('\n'),
+  );
+
+  write(
+    'README.md',
+    [
+      '# Fixture',
+      '',
+      '| Field | Value |',
+      '|---|---|',
+      '| Current phase | **5 — IN PROGRESS** |',
+      '',
+    ].join('\n'),
+  );
+
+  // The architecture runner's emitted report, so the self-test-figure rule has
+  // an authority to compare prose against.
+  write(
+    'scripts/checks/.out/architecture-report.json',
+    JSON.stringify({ selfTest: { cases: 3, failures: [] } }),
+  );
+
+  write(
+    'docs/compliance/control-matrix.md',
+    [
+      '# Control Matrix',
+      '',
+      'Tally re-derived by counting rows: **1 DESIGNED / 1 IMPLEMENTED / 0 DEFERRED / 0 EXCEPTION = 2**.',
+      '',
+      '| id | statement | status |',
+      '|---|---|---|',
+      '| KAR-CTL-001 | first | DESIGNED |',
+      '| KAR-CTL-002 | second | IMPLEMENTED |',
+      '',
+    ].join('\n'),
+  );
+
+  write(
+    'docs/compliance/phase-compliance-gate.md',
+    [
+      '# Phase Compliance Gate',
+      '',
+      '## Phase 4 gate record — executed 2026-08-18',
+      '',
+      'The gate executed. [PR #7](https://github.com/o/r/pull/7) merged into main.',
+      '',
+      '### Post-merge record — executed 2026-08-18',
+      '',
+      'Phase 5 is NOT STARTED, and no Phase 4 gate has been executed at the time of writing.',
+      '',
+      // A gate record with NO pull-request link: the Phase 5 shape, where the
+      // record is frozen before the PR is opened and says so.
+      '## Phase 5 gate record — executed 2026-08-22',
+      '',
+      'Outcome recorded before the pull request exists.',
+      '',
+      // THE OUTCOME, in the two shapes the corpus actually uses. Without
+      // these the fixture's outcome map was EMPTY, so `recorded === undefined`
+      // short-circuited the whole gate-outcome rule and every self-test case
+      // passed with the rule deleted — on the rule that exists because a
+      // compliance index reported a PASS for a gate that FAILED. A delta
+      // reviewer deleted all thirty-two lines of it and the suite stayed
+      // green.
+      '**Outcome: FAIL_WITH_BLOCKING_FINDINGS.**',
+      '',
+      // Phase 1 carries its outcome in the HEADING and nowhere else.
+      '## Phase 1 gate record — PASSED, 2026-08-15',
+      '',
+      'The first gate.',
+      '',
+    ].join('\n'),
+  );
+
+  // Seeded contradictions — every one must be reported.
+  write(
+    'docs/seed-stale.md',
+    [
+      '# Stale',
+      '',
+      'TRANSACTIONS remains NOT_IMPLEMENTED in the capability registry.',
+      '',
+      'Every capability is NOT_IMPLEMENTED and deployed nowhere.',
+      '',
+      // The same claim in the words a live document actually used.
+      'Every registry entry is NOT_IMPLEMENTED and deployed nowhere.',
+      '',
+      'TRANSACTIONS is deployed to production and available to callers.',
+      '',
+      // The gate-outcome fork, in the shape it took in the live corpus.
+      'The Phase 5 gate closed with outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS.',
+      '',
+      // The SAME paragraph, correct sentence first: the rule stopped at the
+      // first match and this second mention was invisible.
+      'The Phase 5 gate outcome FAIL_WITH_BLOCKING_FINDINGS stands. ' +
+        'Restating: the Phase 5 gate recorded an outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS.',
+      '',
+      // Phase 1's outcome lives in its heading; a fork against it must report.
+      'The Phase 1 gate reported an outcome FAIL_WITH_BLOCKING_FINDINGS.',
+      '',
+      'No Phase 4 compliance GATE has been executed.',
+      '',
+      'Phase 5 is NOT STARTED.',
+      '',
+      'BUDGETS is IMPLEMENTED.',
+      '',
+      // A gate record exists for this phase, so denying its evidence is stale.
+      'None recorded yet for this phase.',
+      '',
+      // A figure that names its runner and disagrees with it.
+      'pnpm arch:test self-test passes over 999 cases.',
+      '',
+      // The PR fact, denied for the phase whose gate document names one. The
+      // marker must OPEN the block, which is what keeps a contingency note
+      // that merely MENTIONS other markers from being attributed to them.
+      '**[P4] contingency note:** this marker is unresolved — no pull request exists.',
+      '',
+      // The PLAIN-SENTENCE form of the same denial, which is how it actually
+      // appeared in the corpus: not behind a phase marker, just a reason cell
+      // in a deferred-items list that nobody re-read after the pull request
+      // was opened. The marker case above would not have caught it.
+      'Reason: no Phase 4 pull request exists when this record is frozen.',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'docs/compliance/seed-count.md',
+    [
+      '# Count',
+      '',
+      'The core control set holds 93 controls with honest statuses.',
+      '',
+      'KAR-RSK-044 controls that pass without verifying — a risk id, not a tally.',
+      '',
+    ].join('\n'),
+  );
+
+  // Legitimate shapes — none may be reported.
+  write(
+    'docs/seed-clean.md',
+    [
+      '# Clean',
+      '',
+      '[HISTORICAL] TRANSACTIONS remains NOT_IMPLEMENTED in the capability registry, as it stood at Phase 4.',
+      '',
+      'At the Phase 4 close this section was SUPERSEDED: every capability is NOT_IMPLEMENTED.',
+      '',
+      '**v0.6 (2026-08-16, Phase 3.5 close):** No Phase 4 compliance GATE has been executed.',
+      '',
+      'TRANSACTIONS is IMPLEMENTED, and is deployed nowhere.',
+      '',
+      'TRANSACTIONS is available nowhere: the deployment map is empty.',
+      '',
+      'BUDGETS is NOT_IMPLEMENTED.',
+      '',
+      'Phase 5 is IN PROGRESS.',
+      '',
+      // A gate record exists for Phase 5 and no pull request does. Denying the
+      // pull request is therefore TRUE, and must not be reported — deriving it
+      // from the gate record would reject the one sentence in the corpus that
+      // is most carefully accurate.
+      'The gate is written first: no Phase 5 pull request exists.',
+      '',
+      // Correct figures for both runners: neither may be reported.
+      'The architecture runner self-test passes over 3 cases.',
+      '',
+      'pnpm docs:check self-test ok over 4 cases.',
+      '',
+      'The baseline is ISO/IEC 27002:2022 with its 93 controls.',
+      '',
+    ].join('\n'),
+  );
+  // A section-scoped historical record: the heading carries the date and the
+  // phase has passed, so its paragraphs are history and must not be reported.
+  write(
+    'docs/compliance/seed-section.md',
+    [
+      '# Records',
+      '',
+      '## Phase 4 gate record — executed 2026-08-18',
+      '',
+      'Phase 5 is NOT STARTED and every capability is NOT_IMPLEMENTED.',
+      '',
+      '## Phase 5 gate record — executed 2026-08-22',
+      '',
+      'This section is the CURRENT phase and is therefore still checked: TRANSACTIONS remains NOT_IMPLEMENTED.',
+      '',
+    ].join('\n'),
+  );
+
+  return root;
+}
+
+// The expectations name the FILE and the CLAIM, never the line. A line number
+// is not what any of these cases is about, and pinning one made an insertion
+// anywhere in the fixture shift every case below it — brittleness that costs
+// review attention without buying precision. `seed-section` is the exception
+// and keeps its line, because WHICH of its two dated sections a finding lands
+// in is exactly the property that case exists to hold.
+const COMPLIANCE_SELF_TEST_CASES = [
+  {
+    expect:
+      /seed-stale\.md:\d+ attributes outcome PASS_WITH_DOCUMENTED_DEFERRED_ITEMS to the Phase 5 gate/,
+    why: 'a document attributing the wrong outcome to a gate is the shape of the corpus index that reported a PASS for a gate that FAILED',
+  },
+  {
+    expect: /seed-stale\.md:\d+ attributes outcome FAIL_WITH_BLOCKING_FINDINGS to the Phase 1 gate/,
+    why: 'Phase 1 carries its outcome in the heading and nowhere else, so the map had no entry for it and a fabricated Phase 1 outcome went unreported',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says TRANSACTIONS is NOT_IMPLEMENTED/,
+    why: 'the exact stale sentence found in the Phase 5 report',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says every capability is NOT_IMPLEMENTED/,
+    why: 'the universal form, which the per-capability rule cannot see',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says every capability is NOT_IMPLEMENTED/,
+    why: '"registry entry" is the same claim in a different noun, and the rule was blind to it',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says TRANSACTIONS is deployed or available/,
+    why: 'IMPLEMENTED conflated with DEPLOYED — the misreading the registry exists to prevent',
+  },
+  {
+    expect: /seed-stale\.md:\d+ denies a Phase 4 gate/,
+    why: 'the exact stale sentence found in the compliance README',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says Phase 5 is NOT STARTED/,
+    why: 'a phase status contradicting the README row',
+  },
+  {
+    expect: /seed-stale\.md:\d+ says BUDGETS is IMPLEMENTED/,
+    why: 'the OTHER direction: prose claiming more than the registry holds',
+  },
+  {
+    expect: /seed-count\.md:3 states "93 controls"/,
+    why: 'the exact stale count found in the compliance README',
+  },
+  {
+    expect: /seed-section\.md:9 says TRANSACTIONS is NOT_IMPLEMENTED/,
+    why: 'a dated record for the CURRENT phase is current state, not history',
+  },
+  {
+    expect: /seed-stale\.md:\d+ carries the \[P4\] marker and says no pull request exists/,
+    why: 'the gate document names a Phase 4 pull request, so denying it is stale',
+  },
+  {
+    expect: /seed-stale\.md:\d+ denies a Phase 4 gate/,
+    why:
+      'the plain-sentence denial — "no Phase 4 pull request exists" with no phase marker in ' +
+      'front of it — is the shape the real corpus carried, in a deferred-item reason cell ' +
+      'nobody revisited after the draft was opened. The marker-scoped case above does not ' +
+      'reach it',
+  },
+  {
+    expect: /seed-stale\.md:\d+ denies that Phase 5 evidence exists/,
+    why: 'a phase whose gate record exists has evidence rows, and prose may not deny them',
+  },
+  {
+    expect: /seed-stale\.md:\d+ states a self-test of 999 cases/,
+    why: 'a figure that names the architecture runner must agree with what the runner reports',
+  },
+];
+
+const COMPLIANCE_NEGATIVE_CASES = [
+  { forbid: /seed-clean\.md/, why: 'every shape in it is explicitly marked or actually true' },
+  {
+    forbid: /seed-section\.md:5/,
+    why: 'a dated gate-record heading for a PASSED phase scopes its section to that moment',
+  },
+  {
+    forbid: /control-matrix\.md/,
+    why: 'the fixture matrix tally matches its own rows, so the derived rule must stay silent',
+  },
+  {
+    forbid: /seed-count\.md:5/,
+    why: 'a register id followed by the word "controls" is an identifier and a noun, not a count',
+  },
+  {
+    forbid: /seed-clean\.md:1[0-9] denies a Phase 5 gate/,
+    why: 'a Phase 5 gate record exists and a Phase 5 pull request does not — the two facts are derived separately, and the sentence is true',
+  },
+  {
+    forbid: /seed-clean\.md:\d+ states a self-test of/,
+    why: 'both figures name their own runner and both are correct; a rule that could not tell the two runners apart reported one against the other',
+  },
+];
+
+// Mutation cases: the derived fact is changed and the SAME prose must flip
+// from reported to unreported, or the rule is reading something other than the
+// registry it claims to read.
+const COMPLIANCE_MUTATION_CASES = [
+  {
+    name: 'registry flipped to NOT_IMPLEMENTED',
+    options: { transactionsImplementation: 'NOT_IMPLEMENTED' },
+    forbid: /seed-stale\.md:\d+ says TRANSACTIONS is NOT_IMPLEMENTED/,
+    expect: /seed-clean\.md:\d+ says TRANSACTIONS is IMPLEMENTED/,
+    why: 'with the registry unbuilt, the denial becomes true and the claim becomes false — both must move',
+  },
+];
+
+/**
+ * How many cases this runner's own self-test holds.
+ *
+ * Derived from the case arrays rather than read from the emitted report,
+ * because the report is written AFTER the checks run — reading it would compare
+ * today's prose against yesterday's number.
+ */
+
+/**
+ * The fixture for KAR-CTL-116's check. Three tiny registers, one document that
+ * cites them, and one file on disk for a path citation to resolve against.
+ *
+ * `options` seeds each of the three properties independently, so a mutation
+ * can prove one rule is reading its register without disturbing the others.
+ */
+function buildTraceabilityFixture(options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'karar-traceability-selftest-'));
+  const write = (relPath, content) => {
+    const full = path.join(root, relPath);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
+  };
+  const evStatus = options.evStatus ?? 'PENDING';
+  const evPath = options.evPath ?? 'src/real.ts';
+
+  write('README.md', ['# R', '', '| Current phase | **5 — IN PROGRESS** |', ''].join('\n'));
+  write('src/real.ts', 'export const real = 1;\n');
+  // A file that EXISTS and that git does not track. The fixture root is not a
+  // git repository at all, so `trackedPaths` falls back to the filesystem —
+  // which is exactly the environment the old rule was always in, and is how
+  // this case reproduces the CI failure locally.
+  if (options.untracked === true) write('build/out.json', '{}\n');
+  write(
+    'docs/compliance/evidence-register.md',
+    [
+      '# Evidence',
+      '',
+      '| id | what | status |',
+      '| --- | --- | --- |',
+      `| EV-001 | a row that cites \`${evPath}\` | ${evStatus} |`,
+      '',
+    ].join('\n'),
+  );
+  write(
+    'docs/compliance/control-matrix.md',
+    ['# Controls', '', '| KAR-CTL-001 | a control | IMPLEMENTED |', ''].join('\n'),
+  );
+  write(
+    'docs/compliance/risk-register.md',
+    ['# Risks', '', '| KAR-RSK-001 | a risk | OPEN |', ''].join('\n'),
+  );
+  write(
+    'docs/compliance/iso27001/continual-improvement.md',
+    ['# Improvement', '', '| CI-001 | an entry | OPEN |', ''].join('\n'),
+  );
+  write(
+    'docs/citing.md',
+    [
+      '# Citing',
+      '',
+      // TRUE citations: every id resolves and the quoted status matches.
+      'KAR-CTL-001 is IMPLEMENTED and KAR-RSK-001 is OPEN.',
+      '',
+      // The fourth register, cited the way the corpus cites it.
+      `CI-001 is \`${options.quotedCiStatus ?? 'OPEN'}\`.`,
+      '',
+      `EV-001 ${options.verb ?? 'is'} \`${options.quotedEvStatus ?? evStatus}\`.`,
+      '',
+      ...(options.extraLine === undefined ? [] : [options.extraLine, '']),
+      ...(options.citeMissing === true
+        ? ['A fork: EV-404 and KAR-CTL-404 and KAR-RSK-404.', '']
+        : []),
+      // A dated block quoting what it saw: history, not a fork, and the
+      // per-block exemption everything else here uses must cover it too.
+      '**2026-01-01 (HISTORICAL):** EV-001 is `COLLECTED` at that checkpoint.',
+      '',
+    ].join('\n'),
+  );
+  // A REAL git repository, because the rule asks git. A fixture that was only
+  // a directory would fall back to the filesystem and could never reproduce
+  // the case that matters: a file that exists on disk and is not tracked,
+  // which is what a build product is and what passed locally while failing
+  // on CI.
+  const git = (...args) => {
+    try {
+      execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' });
+    } catch {
+      // No git on this machine. The fixture then exercises the documented
+      // filesystem fallback instead, and the untracked case is skipped by
+      // its own expectation being unreachable — which the runner reports.
+    }
+  };
+  git('init', '-q');
+  git('config', 'user.email', 'selftest@example.invalid');
+  git('config', 'user.name', 'self test');
+  git('add', 'README.md', 'src', 'docs');
+  git('commit', '-qm', 'fixture');
+
+  return root;
+}
+
+const TRACEABILITY_CASES = [
+  {
+    name: 'an id nothing defines',
+    options: { citeMissing: true },
+    expect: [
+      /citing\.md:\d+ cites EV-404, which has no defining row/,
+      /citing\.md:\d+ cites KAR-CTL-404, which has no defining row/,
+      /citing\.md:\d+ cites KAR-RSK-404, which has no defining row/,
+    ],
+    why: 'a document citing an id no register defines reads as evidence to anyone who does not open the register',
+  },
+  {
+    name: 'an evidence row citing a path that is not there',
+    options: { evPath: 'src/renamed.ts' },
+    expect: [/EV-001 cites `src\/renamed\.ts`, which is not in the repository/],
+    why: 'a row whose location cell was left behind by a rename still says COLLECTED',
+  },
+  {
+    name: 'a quoted status the register does not hold',
+    options: { evStatus: 'PENDING', quotedEvStatus: 'COLLECTED' },
+    expect: [
+      /citing\.md:\d+ says EV-001 is COLLECTED, but .*evidence-register\.md records PENDING/,
+    ],
+    why: 'a corpus quoting a status its register does not hold is the fork this control exists for',
+  },
+  {
+    name: 'a build product cited as a location',
+    options: { evPath: 'build/out.json', untracked: true },
+    expect: [/EV-001 cites `build\/out\.json`, which is not in the repository/],
+    why:
+      'MUTATION of the question itself: the file EXISTS on disk and git does not track it. ' +
+      'The first version of this rule asked the filesystem, passed locally in a working tree ' +
+      "with the checker's own report freshly written into it, and failed on CI — a check that " +
+      "only fails on other people's machines is worse than one that does not fail at all",
+  },
+  {
+    name: 'a directory citation',
+    options: { evPath: 'src/' },
+    expect: [],
+    forbid: /cites `src\/`/,
+    why:
+      '`git ls-files` lists files, and an evidence row routinely cites a directory. Treating a ' +
+      'tracked directory as missing would report every such row',
+  },
+  {
+    name: 'a WIDENED verb form — "remains" rather than "is"',
+    options: { evStatus: 'PENDING', quotedEvStatus: 'COLLECTED', verb: 'remains' },
+    expect: [/says EV-001 is COLLECTED, but .*records PENDING/],
+    why:
+      'the rule matched `is` alone and reached 16 of 42 status assertions in the corpus, ' +
+      'which is how four documents went on naming a status that had moved',
+  },
+  {
+    name: 'a NEGATION is not an assertion',
+    options: { extraLine: 'EV-001 records the run, and no evidence row anywhere is REVIEWED.' },
+    expect: [],
+    forbid: /says EV-001 is REVIEWED/,
+    why:
+      '"no evidence row anywhere is REVIEWED" is a true sentence about the corpus and this ' +
+      "corpus's house phrasing; reading it as a claim ABOUT the nearest id is how widening " +
+      'the verb set bought false positives',
+  },
+  {
+    name: 'a status in the NEXT SENTENCE belongs to the next sentence',
+    options: { extraLine: 'EV-001 records the run. The whole family stays COLLECTED.' },
+    expect: [],
+    forbid: /says EV-001 is COLLECTED/,
+    why:
+      'the original pattern could not cross a full stop and the widened one silently could, ' +
+      'so a sentence about something else became a claim about the id before it',
+  },
+  {
+    name: 'the clean tree',
+    options: {},
+    expect: [],
+    forbid: /./,
+    why: 'every id resolves, the path exists, the quoted status matches, and the dated block is history',
+  },
+  {
+    // SEEDED FROM THE PRE-FIX BYTES, not from the sentence the fix wrote.
+    //
+    // A fifth reviewer recovered cycle 4's blocker verbatim and ran the rule
+    // against it: 0 of 5 shapes matched. Every case in this list had been
+    // written from the CORRECTED corpus, so the self-test proved the rule
+    // accepts a repaired document rather than that it rejects a broken one —
+    // and the two spots nobody could read as prose survived another cycle.
+    //
+    // These are the literal shapes the blocker took.
+    name: 'the blocker VERBATIM — the plural copula, as it was written',
+    options: { extraLine: '| KAR-RSK-001 and CI-001 are CLOSED |' },
+    expect: [/says CI-001 is CLOSED, but .*continual-improvement\.md records OPEN/],
+    why: 'three of the blocker’s five spots took this shape and the rule that replaced it could not see any of them',
+  },
+  {
+    name: 'the blocker VERBATIM — bare adjacency in a table cell, as it survived',
+    options: { extraLine: '| N5 | a finding | KAR-RSK-001 CLOSED, CI-001 CLOSED | — |' },
+    expect: [/says CI-001 is CLOSED, but .*continual-improvement\.md records OPEN/],
+    why: 'the two spots that survived cycle 4 took this shape: no verb at all, inside a status cell',
+  },
+  {
+    name: 'a TRANSITION in a cell is not a status claim',
+    options: { extraLine: '| CI-001 OPEN → CLOSED at the gate | — |' },
+    expect: [],
+    forbid: /says CI-001 is OPEN/,
+    why: 'the status left of an arrow is the one it moved FROM, and reporting it would flag every record of a move',
+  },
+  {
+    name: 'the FOURTH register — an improvement entry quoted against its log',
+    options: { quotedCiStatus: 'CLOSED' },
+    expect: [/says CI-001 is CLOSED, but .*continual-improvement\.md records OPEN/],
+    why:
+      'the rule shipped covering three registers and describing the class, and the next ' +
+      "cycle's BLOCKING finding landed in the fourth: an entry re-opened in the log and " +
+      'left reading CLOSED in four live documents, two of which discharged a Phase 6 entry ' +
+      'criterion on it',
+  },
+  {
+    name: 'the register moves and the quote does not',
+    options: { evStatus: 'COLLECTED', quotedEvStatus: 'PENDING' },
+    expect: [/says EV-001 is PENDING, but .*records COLLECTED/],
+    why:
+      'MUTATION: the same prose that passed against PENDING must fail against COLLECTED, which ' +
+      'is what proves the rule reads the register rather than a constant',
+  },
+];
+
+function selfTestCaseCount() {
+  return (
+    SELF_TEST_CASES.length +
+    NEGATIVE_SELF_TEST_CASES.length +
+    COMPLIANCE_SELF_TEST_CASES.length +
+    COMPLIANCE_NEGATIVE_CASES.length +
+    COMPLIANCE_MUTATION_CASES.length +
+    TRACEABILITY_CASES.length
+  );
+}
 
 function runSelfTest() {
   const fixtureRoot = buildSelfTestFixture();
@@ -866,7 +2889,85 @@ function runSelfTest() {
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
   }
-  return { cases: SELF_TEST_CASES.length + NEGATIVE_SELF_TEST_CASES.length, failures };
+
+  // compliance-current-state, on its own fixture.
+  const complianceRoot = buildComplianceFixture();
+  try {
+    const problems = checkComplianceCurrentState(complianceRoot);
+    if (problems.length === 0) {
+      failures.push(
+        'compliance-current-state: reported nothing on a fixture seeded with eight ' +
+          'contradictions — the check is vacuous',
+      );
+    }
+    for (const { expect, why } of COMPLIANCE_SELF_TEST_CASES) {
+      if (!problems.some((p) => expect.test(p))) {
+        failures.push(
+          `compliance-current-state: missed the seeded contradiction ${expect} (${why}); got: ${problems.join(' | ')}`,
+        );
+      }
+    }
+    for (const { forbid, why } of COMPLIANCE_NEGATIVE_CASES) {
+      const wrong = problems.find((p) => forbid.test(p));
+      if (wrong) {
+        failures.push(
+          `compliance-current-state: flagged a legitimate shape (${forbid}) — ${why}: ${wrong}`,
+        );
+      }
+    }
+  } finally {
+    fs.rmSync(complianceRoot, { recursive: true, force: true });
+  }
+
+  for (const { name, options, expect, forbid, why } of TRACEABILITY_CASES) {
+    const traceRoot = buildTraceabilityFixture(options);
+    try {
+      const problems = checkRegisterTraceability(traceRoot);
+      for (const pattern of expect) {
+        if (!problems.some((p) => pattern.test(p))) {
+          failures.push(
+            `register-traceability "${name}": did not report ${pattern} (${why}); ` +
+              `got: ${problems.join(' | ') || '<nothing>'}`,
+          );
+        }
+      }
+      if (forbid && problems.some((p) => forbid.test(p))) {
+        failures.push(
+          `register-traceability "${name}": flagged a legitimate shape (${why}): ${problems.join(' | ')}`,
+        );
+      }
+    } finally {
+      fs.rmSync(traceRoot, { recursive: true, force: true });
+    }
+  }
+
+  for (const { name, options, forbid, expect, why } of COMPLIANCE_MUTATION_CASES) {
+    const mutatedRoot = buildComplianceFixture(options);
+    try {
+      const problems = checkComplianceCurrentState(mutatedRoot);
+      if (forbid && problems.some((p) => forbid.test(p))) {
+        failures.push(
+          `compliance-current-state mutation "${name}": still reported ${forbid} after the ` +
+            `derived fact changed — the rule is not reading the registry (${why})`,
+        );
+      }
+      if (expect && !problems.some((p) => expect.test(p))) {
+        failures.push(
+          `compliance-current-state mutation "${name}": did not report ${expect} after the ` +
+            `derived fact changed (${why}); got: ${problems.join(' | ')}`,
+        );
+      }
+    } finally {
+      fs.rmSync(mutatedRoot, { recursive: true, force: true });
+    }
+  }
+
+  // ONE expression for the count, not two. These two figures were separate
+  // and drifted apart the moment a case list was added: the runner announced
+  // 36 while `selfTestCaseCount` — the number the corpus is checked against —
+  // read 41. A checker that reports its own coverage inconsistently is the
+  // exact defect it exists to catch.
+  return { cases: selfTestCaseCount(), failures };
 }
 
 function main() {
@@ -897,6 +2998,9 @@ function main() {
     { name: 'readme-current-phase', problems: checkReadmePhase(registry) },
     { name: 'phase-report-exists', problems: checkPhaseReport(registry) },
     { name: 'phase-status-consistency', problems: checkPhaseStatusConsistency(files) },
+    { name: 'derived-facts', problems: checkDerivedFacts() },
+    { name: 'compliance-current-state', problems: checkComplianceCurrentState() },
+    { name: 'register-traceability', problems: checkRegisterTraceability() },
     { name: 'adr-references', problems: checkAdrReferences(files) },
     { name: 'module-docs', problems: checkModuleDocs() },
     { name: 'mermaid-sanity', problems: checkMermaid(files) },

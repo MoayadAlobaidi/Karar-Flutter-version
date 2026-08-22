@@ -1,0 +1,287 @@
+// statement-imports module mapping (migrations
+// 0100_statement_imports.sql, 0101_statement_import_rows.sql).
+// Prisma maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma); `make prisma-drift` is what keeps this file honest.
+//
+// MONEY IS bigint MINOR UNITS AND NOTHING ELSE. Three monetary positions
+// exist across these four models — the balance the source stated for the
+// whole file, the balance a line stated, and a line's amount — and all three
+// are BigInt. There is no NUMERIC, no DOUBLE PRECISION, no FLOAT and no
+// Decimal anywhere here, which matters more in this module than in most: the
+// decimal-separator ambiguity the parser exists to REFUSE would be
+// reintroduced by the first float column.
+//
+// Deliberately NOT expressed here, enforced by the migrations and their tests
+// instead: every CHECK constraint, and above all the three that carry this
+// module's central guarantees —
+//   * statement_imports_no_commits_before_review (an import that has not
+//     reached COMMITTING has committed_transaction_count = 0, for every
+//     writer including a direct SQL INSERT),
+//   * statement_import_sources_guard (KAR54: a durable source row cannot
+//     exist while the parent import's retention question is open), and
+//   * statement_imports_guard (KAR51: the state machine, written as an
+//     explicit legal-transition list, so PARSING -> COMMITTED is refused by
+//     the database rather than by whichever use case happens to run)
+// — plus the row completeness rules, the write-once transaction link (KAR56),
+// the ciphertext bounds and part-completeness rules, RLS enable/force with
+// the tenant+user principal policies, and the grants.
+//
+// ALSO NOT EXPRESSIBLE HERE, and worth naming: there is NO plaintext column
+// for a statement's description, merchant, source reference or instrument
+// mask, and there is no column ANYWHERE in StatementImportRowError that could
+// hold a value read out of the file. The error model has four meaningful
+// fields — import, line number, safe field name, reason code — and no detail,
+// message, raw value, context or Json field. A Prisma model cannot assert an
+// absence, so an exhaustive-column test over information_schema.columns does.
+//
+// tenant_id, user_id, account_id, connection_id and committed_transaction_id
+// are plain scalars by design (data-model.md §2): no relation crosses a module
+// boundary, and accountReferenceType / connectionReferenceType declare what
+// those uuids point at without importing another module's types. The import
+// relations below ARE real relations because all four tables belong to this
+// module.
+
+model StatementImport {
+  id                       String   @id @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  userId                   String   @map("user_id") @db.Uuid
+
+  // THE ONE ACCOUNT this import targets, chosen by the person and never
+  // inferred from institution + type + currency (ADR-0028). Immutable by
+  // trigger: re-pointing an import moves every row it is about to commit
+  // into an account nobody chose.
+  accountId                String   @map("account_id") @db.Uuid
+  accountReferenceType     String   @map("account_reference_type")
+
+  // The financial connection the file arrived through, when the person has
+  // one. Optional — a file can be imported before any connection exists.
+  connectionId             String?  @map("connection_id") @db.Uuid
+  connectionReferenceType  String?  @map("connection_reference_type")
+
+  // DRAFT | SOURCE_STORED | PARSING | REVIEW_REQUIRED | COMMITTING |
+  // COMMITTED | REJECTED | FAILED | DUPLICATE | ERASED. The transitions are a
+  // trigger, not a CHECK: the invariant that matters is about ordering.
+  state                    String
+  stateChangedAt           DateTime @map("state_changed_at") @db.Timestamptz(6)
+
+  // text/csv and nothing else this phase.
+  mediaType                String   @map("media_type")
+
+  // The retention question and the answer it received. DECIDED is what
+  // permits a durable source row to exist at all (0100, KAR54), and the
+  // decision is write-once (KAR53).
+  retentionState           String   @default("UNDECIDED") @map("retention_state")
+  retentionDecidedAt       DateTime? @map("retention_decided_at") @db.Timestamptz(6)
+  retentionPeriod          String?  @map("retention_period")
+  retentionBasis           String?  @map("retention_basis")
+  retentionPackVersion     String?  @map("retention_pack_version")
+
+  // The versions that processed this file. Null until the stage that mints
+  // them runs — a DRAFT import has genuinely not been parsed, and a
+  // placeholder version would be a claim that it had.
+  parserVersion            String?  @map("parser_version")
+  mappingVersion           String?  @map("mapping_version")
+  normalizationVersion     String?  @map("normalization_version")
+  // NOT mapped to `fingerprint_version`: public.transactions carries that
+  // name for the dedup identity of a CANONICAL transaction, and that module
+  // asserts against the live catalogue that no other table wears it.
+  stagedRowFingerprintVersion String? @map("staged_row_fingerprint_version")
+
+  // Safe counts: numbers, never values.
+  rowCount                 Int      @default(0) @map("row_count")
+  validRowCount            Int      @default(0) @map("valid_row_count")
+  invalidRowCount          Int      @default(0) @map("invalid_row_count")
+  exactDuplicateCount      Int      @default(0) @map("exact_duplicate_count")
+  probableDuplicateCount   Int      @default(0) @map("probable_duplicate_count")
+  committedTransactionCount Int     @default(0) @map("committed_transaction_count")
+
+  // NOT_AVAILABLE | MATCHED | MISMATCHED. NOT_AVAILABLE is the honest answer
+  // when the file stated no balance, and it does not block a commit.
+  reconciliationStatus     String   @default("NOT_AVAILABLE") @map("reconciliation_status")
+  // Exact minor units of the balance the SOURCE stated — never a figure this
+  // platform derived by summing the rows it just parsed.
+  sourceReportedBalanceMinor    BigInt? @map("source_reported_balance_minor")
+  sourceReportedBalanceKind     String? @map("source_reported_balance_kind")
+  sourceReportedBalanceCurrency String? @map("source_reported_balance_currency") @db.Char(3)
+
+  // A stable code from this module's closed vocabulary. Never driver text,
+  // never a fragment of the file.
+  refusalCode              String?  @map("refusal_code")
+
+  committedAt              DateTime? @map("committed_at") @db.Timestamptz(6)
+  erasedAt                 DateTime? @map("erased_at") @db.Timestamptz(6)
+
+  version                  Int      @default(1)
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @map("updated_at") @db.Timestamptz(6)
+
+  source StatementImportSource?
+  rows   StatementImportRow[]
+  errors StatementImportRowError[]
+
+  @@index([tenantId, userId, createdAt(sort: Desc)], map: "statement_imports_owner_idx")
+  @@index([tenantId, userId, accountId, createdAt(sort: Desc)], map: "statement_imports_account_idx")
+  @@index([tenantId, userId, state], map: "statement_imports_state_idx")
+  @@map("statement_imports")
+}
+
+model StatementImportSource {
+  id                       String   @id @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  userId                   String   @map("user_id") @db.Uuid
+  importId                 String   @unique(map: "statement_import_sources_one_per_import") @map("import_id") @db.Uuid
+
+  mediaType                String   @map("media_type")
+  byteLength               BigInt   @map("byte_length")
+
+  // LOCAL_ENCRYPTED_BUFFER | EXTERNAL_ENCRYPTED_OBJECT, and an OPAQUE handle
+  // the store minted. NEVER a URI — the CHECK in 0100 refuses a scheme
+  // separator, so no provider address reaches a subject-owned row and moving
+  // the store is a composition change rather than a rewrite of history.
+  storeKind                String   @map("store_kind")
+  objectRef                String   @unique @map("object_ref")
+
+  encryptionAlgorithm      String   @map("encryption_algorithm")
+  encryptionKeyVersion     String   @map("encryption_key_version")
+  encryptionNonce          Bytes    @map("encryption_nonce")
+  encryptionAuthTag        Bytes    @map("encryption_auth_tag")
+
+  // Plain SHA-256 over the CIPHERTEXT — safe, because ciphertext is
+  // indistinguishable from random. Re-verified before commit.
+  integrityChecksumAlgorithm String @map("integrity_checksum_algorithm")
+  integrityChecksum        Bytes    @map("integrity_checksum")
+
+  // KEYED, per-subject, versioned MAC over the PLAINTEXT bytes. Recognises
+  // the same file arriving twice without being a confirmation oracle over a
+  // document someone else already holds. Deliberately NOT unique: the same
+  // file may legitimately be uploaded again after a rejection or an erasure,
+  // so duplicate-file detection is a REVIEW outcome, not a write refusal.
+  fileFingerprint          String   @map("file_fingerprint")
+  fileFingerprintVersion   String   @map("file_fingerprint_version")
+
+  storedAt                 DateTime @map("stored_at") @db.Timestamptz(6)
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  import StatementImport @relation(fields: [importId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "statement_import_sources_import_fkey")
+
+  @@index([tenantId, userId, fileFingerprintVersion, fileFingerprint], map: "statement_import_sources_fingerprint_idx")
+  @@map("statement_import_sources")
+}
+
+model StatementImportRow {
+  id                       String   @id @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  userId                   String   @map("user_id") @db.Uuid
+  importId                 String   @map("import_id") @db.Uuid
+
+  // 1-based line number in the DATA rows, so an error can name a line without
+  // quoting anything from it.
+  rowNumber                Int      @map("row_number")
+  // VALID | INVALID | EXACT_DUPLICATE | PROBABLE_DUPLICATE | COMMITTED |
+  // SKIPPED.
+  rowState                 String   @map("row_state")
+
+  // Calendar days, not instants (ADR-0027). Prisma has one TypeScript type
+  // for both, so the row mappers — not this file — convert @db.Date to
+  // CalendarDay and back.
+  bookingDate              DateTime? @map("booking_date") @db.Date
+  valueDate                DateTime? @map("value_date") @db.Date
+  // Only when the source supplied a real instant; nothing derives one from
+  // the booking day, because midnight on a booked day is a moment nobody
+  // observed.
+  eventOccurredAt          DateTime? @map("event_occurred_at") @db.Timestamptz(6)
+  sourceTimezone           String?   @map("source_timezone")
+
+  // Exact minor units, signed under the canonical convention. NULL when the
+  // line's amount could not be read — NEVER zero, because zero is a real
+  // financial fact in a column that is later summed.
+  amountMinor              BigInt?   @map("amount_minor")
+  currencyCode             String?   @map("currency_code") @db.Char(3)
+  // DEBIT | CREDIT | NOT_STATED — what the SOURCE literally said.
+  sourceDirection          String?   @map("source_direction")
+  // How this module arrived at the stored sign from what the source gave.
+  directionMapping         String?   @map("direction_mapping")
+
+  hsfAlgorithm             String?   @map("hsf_algorithm")
+  hsfKeyVersion            String?   @map("hsf_key_version")
+
+  descriptionCiphertext    Bytes?    @map("description_ciphertext")
+  descriptionNonce         Bytes?    @map("description_nonce")
+  descriptionAuthTag       Bytes?    @map("description_auth_tag")
+  merchantCiphertext       Bytes?    @map("merchant_ciphertext")
+  merchantNonce            Bytes?    @map("merchant_nonce")
+  merchantAuthTag          Bytes?    @map("merchant_auth_tag")
+  // The source's own transaction reference and the instrument mask the line
+  // referred to: both are another party's identifiers for this subject, so
+  // both exist only as ciphertext and neither has a plaintext column.
+  sourceReferenceCiphertext Bytes?   @map("source_reference_ciphertext")
+  sourceReferenceNonce      Bytes?   @map("source_reference_nonce")
+  sourceReferenceAuthTag    Bytes?   @map("source_reference_auth_tag")
+  instrumentMaskCiphertext  Bytes?   @map("instrument_mask_ciphertext")
+  instrumentMaskNonce       Bytes?   @map("instrument_mask_nonce")
+  instrumentMaskAuthTag     Bytes?   @map("instrument_mask_auth_tag")
+
+  // The balance this LINE stated, when the file carried a running balance.
+  sourceBalanceMinor       BigInt?   @map("source_balance_minor")
+  sourceBalanceKind        String?   @map("source_balance_kind")
+
+  // Content identity, computed through modules/transactions'
+  // DedupFingerprintPort — the canonical ALGORITHM, never a second one. Only
+  // the column NAMES are local: public.transactions owns dedup_fingerprint,
+  // fingerprint_version and occurrence_ordinal for the dedup identity of a
+  // CANONICAL transaction, and that module asserts against the live catalogue
+  // that no other table wears them. A staged row is a CANDIDATE awaiting
+  // review, so it should not read as though it were that identity anyway.
+  stagedRowFingerprint     String?   @map("staged_row_fingerprint")
+  stagedRowFingerprintVersion String? @map("staged_row_fingerprint_version")
+  // Which occurrence of that content this line claims to be. Separate from
+  // the digest on purpose: two identical coffees in one day are one content
+  // identity occurring twice.
+  stagedRowOrdinal         Int?      @map("staged_row_ordinal")
+
+  // Raw uuid: public.transactions belongs to another module, so no foreign
+  // key crosses the boundary. Write-once by trigger (KAR56) — which is what
+  // makes a retry after an ambiguous response idempotent.
+  committedTransactionId   String?   @map("committed_transaction_id") @db.Uuid
+  committedAt              DateTime? @map("committed_at") @db.Timestamptz(6)
+
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime  @map("updated_at") @db.Timestamptz(6)
+
+  import StatementImport @relation(fields: [importId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "statement_import_rows_import_fkey")
+  errors StatementImportRowError[]
+
+  @@unique([importId, rowNumber], map: "statement_import_rows_line_key")
+  @@index([tenantId, userId, importId, rowNumber], map: "statement_import_rows_import_idx")
+  @@index([tenantId, userId, importId, rowState], map: "statement_import_rows_state_idx")
+  @@index([tenantId, userId, stagedRowFingerprintVersion, stagedRowFingerprint], map: "statement_import_rows_fingerprint_idx")
+  @@map("statement_import_rows")
+}
+
+model StatementImportRowError {
+  id                       String   @id @db.Uuid
+  tenantId                 String   @map("tenant_id") @db.Uuid
+  userId                   String   @map("user_id") @db.Uuid
+  importId                 String   @map("import_id") @db.Uuid
+  // Nullable: a line that could not be split into fields at all never becomes
+  // a staged row, and the person still needs to be told which line it was.
+  rowId                    String?  @map("row_id") @db.Uuid
+  rowNumber                Int      @map("row_number")
+
+  // One of this module's own SAFE field names — never the header text the
+  // file used, because a header is content from the file and can carry an
+  // account number as easily as the word "Amount".
+  safeField                String   @map("safe_field")
+  // One of this module's own stable reason codes. A closed vocabulary, so a
+  // client can translate it and a support engineer can search for it without
+  // anybody quoting the line.
+  reasonCode               String   @map("reason_code")
+
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  import StatementImport @relation(fields: [importId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "statement_import_row_errors_import_fkey")
+  row    StatementImportRow? @relation(fields: [rowId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "statement_import_row_errors_row_fkey")
+
+  @@index([tenantId, userId, importId, rowNumber], map: "statement_import_row_errors_import_idx")
+  @@map("statement_import_row_errors")
+}

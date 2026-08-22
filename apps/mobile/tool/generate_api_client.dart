@@ -35,7 +35,7 @@ import 'package:yaml/yaml.dart';
 
 /// Bumped whenever the emitted shape changes. Recorded in every output file so
 /// a stale checkout is visible in a diff.
-const String generatorVersion = '1.0.0';
+const String generatorVersion = '1.2.0';
 
 /// Component schemas the client does not model as DTOs.
 ///
@@ -141,6 +141,7 @@ final class Contract {
     required this.sourceDigest,
     required this.operations,
     required this.schemas,
+    required this.requestBodySchemas,
   });
 
   final String title;
@@ -154,6 +155,15 @@ final class Contract {
 
   /// Sorted by name.
   final List<SchemaDefinition> schemas;
+
+  /// The names of the schemas an operation names as its REQUEST BODY.
+  ///
+  /// Only a request can distinguish a field that is ABSENT from one sent as an
+  /// explicit `null`; a response either carries a field or does not, and both
+  /// read the same to a caller. The emitter therefore gives the three-state
+  /// encoding to optional-and-nullable properties of these schemas only, so
+  /// every response DTO keeps a plain nullable field.
+  final Set<String> requestBodySchemas;
 }
 
 /// One HTTP operation.
@@ -169,6 +179,8 @@ final class Operation {
     required this.queryParameters,
     required this.requestType,
     required this.requestRequired,
+    required this.unmodelledRequestMediaTypes,
+    required this.rawRequestMediaType,
     required this.successStatus,
     required this.responseType,
   });
@@ -185,6 +197,28 @@ final class Operation {
   /// Null when the operation sends no body.
   final DartType? requestType;
   final bool requestRequired;
+
+  /// Media types the contract declares for the request body that this
+  /// generator does not model, sorted.
+  ///
+  /// The generator emits JSON bodies. An operation whose body is `text/csv` —
+  /// raw bytes streamed to the server — reaches here with the media type
+  /// recorded and no `body` parameter emitted, because `ApiTransport` carries
+  /// a JSON-encodable body and nothing else. The SILENCE was the problem: such
+  /// an operation looked complete and would have issued a request with no body
+  /// at all. The emitted doc comment now says what it cannot send, so a caller
+  /// finds out by reading rather than by watching an upload arrive empty.
+  final List<String> unmodelledRequestMediaTypes;
+
+  /// The media type of a request body that is raw bytes rather than JSON, or
+  /// null.
+  ///
+  /// Set only when the contract declares EXACTLY ONE non-JSON media type for
+  /// the body. One is a statement the contract makes and this generator can
+  /// carry out; two would be a choice, and choosing between two declared
+  /// media types is the kind of guess this generator refuses to make — those
+  /// stay unmodelled and say so.
+  final String? rawRequestMediaType;
   final int successStatus;
 
   /// Null when the contract documents no schema for the success response.
@@ -255,10 +289,22 @@ final class UnionVariant {
 
 /// A string enum.
 final class EnumSchema extends SchemaDefinition {
-  EnumSchema(super.name, super.documentation, this.values);
+  EnumSchema(super.name, super.documentation, this.values, {required this.fallbackMember});
 
   /// Wire value to Dart member name, sorted by wire value.
   final Map<String, String> values;
+
+  /// The name of the member `fromWire` answers with for a value this build has
+  /// never seen.
+  ///
+  /// It is `unknown` unless the CONTRACT declares a value of its own that
+  /// takes that name — `AccountNature.UNKNOWN` does — in which case the
+  /// fallback is `unrecognised` and the two stay distinct. They are NOT the
+  /// same thing and must not collapse: `UNKNOWN` is an answer the platform
+  /// gave, and the fallback is the absence of an answer this build can read.
+  /// Collapsing them would render a nature nobody has shipped support for as
+  /// one the platform stated, which is presenting a guess as a fact.
+  final String fallbackMember;
 }
 
 /// One field of an object.
@@ -270,6 +316,7 @@ final class PropertyDefinition {
     required this.required,
     required this.documentation,
     required this.isDateTime,
+    required this.declaredNullable,
   });
 
   final String wireName;
@@ -278,6 +325,22 @@ final class PropertyDefinition {
   final bool required;
   final String documentation;
   final bool isDateTime;
+
+  /// Whether the CONTRACT itself admits `null` for this property, as opposed
+  /// to the property merely being optional.
+  ///
+  /// `{ type: string }` outside `required` is OPTIONAL: it may be left out.
+  /// `{ type: [string, 'null'] }` outside `required` is optional AND
+  /// nullable: leaving it out and sending `null` are two different requests,
+  /// and on a PATCH they mean "leave this alone" and "clear this". A single
+  /// Dart `String?` cannot say which was meant, which is why the emitter
+  /// reaches for [threeState] here and nowhere else.
+  final bool declaredNullable;
+
+  /// Whether this property needs ABSENT, PRESENT-WITH-VALUE and PRESENT-NULL
+  /// to be distinguishable, which is true exactly when the contract makes it
+  /// optional and nullable at once.
+  bool get threeState => !required && declaredNullable;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,6 +357,10 @@ final class ContractReader {
   final List<String> _sourceContents = <String>[];
   final Map<String, SchemaDefinition> _schemas = <String, SchemaDefinition>{};
   final Map<String, String> _componentClassNames = <String, String>{};
+
+  /// Schemas an operation names as its request body. See
+  /// [Contract.requestBodySchemas].
+  final Set<String> _requestBodySchemas = <String>{};
 
   Contract read() {
     final rootText = File(specPath).readAsStringSync();
@@ -327,12 +394,26 @@ final class ContractReader {
     final schemas = _schemas.values.toList()
       ..sort((SchemaDefinition a, SchemaDefinition b) => a.name.compareTo(b.name));
 
+    // A schema used BOTH as a request body and as a response body would have
+    // to encode a property two ways at once. Nothing in this contract does;
+    // the generator says so out loud rather than picking one silently.
+    for (final operation in operations) {
+      final responseName = operation.responseType?.name;
+      if (responseName != null && _requestBodySchemas.contains(responseName)) {
+        throw ContractError('$responseName is both a request body and a '
+            'response body. Absent and explicit null are distinguishable only '
+            'in a request, so one schema cannot serve as both; split it in the '
+            'contract.');
+      }
+    }
+
     return Contract(
       title: info['title']?.toString() ?? 'API',
       version: info['version']?.toString() ?? '0.0.0',
       sourceDigest: _digest(),
       operations: operations,
       schemas: schemas,
+      requestBodySchemas: _requestBodySchemas,
     );
   }
 
@@ -356,6 +437,28 @@ final class ContractReader {
       return ref.split('#').first;
     }
     return 'openapi.yaml';
+  }
+
+  /// Resolves a `$ref` in a parameter position, in whichever fragment declares it.
+  ///
+  /// Parameters may be shared the same way schemas and path items already are.
+  /// The reader assumed they were always inline and dereferenced `name` with
+  /// `!`, so the first shared parameter crashed the generator with a null-check
+  /// error naming no file — a failure that says nothing about the contract that
+  /// caused it. Resolution here is the same pointer walk the schema and
+  /// path-item readers use, so a parameter behaves like every other reference.
+  YamlMap _resolveParameter(Object? raw, String owner, String fragmentKey) {
+    final parameter = _asMap(raw, 'parameter of $owner');
+    final ref = parameter[r'$ref'];
+    if (ref is! String) {
+      return parameter;
+    }
+    final parts = ref.split('#');
+    if (parts.length != 2) {
+      throw ContractError('Parameter of $owner has an unsupported \$ref: $ref');
+    }
+    final fragment = parts[0].isEmpty ? _loadFragment(fragmentKey) : _loadFragment(parts[0]);
+    return _asMap(_resolvePointer(fragment, parts[1], ref), 'parameter $ref');
   }
 
   YamlMap _resolvePathItem(Object? value, String path) {
@@ -421,9 +524,18 @@ final class ContractReader {
     final parameters = operation['parameters'];
     if (parameters is YamlList) {
       for (final raw in parameters) {
-        final parameter = _asMap(raw, 'parameter of $id');
-        final name = parameter['name']!.toString();
-        final location = parameter['in']!.toString();
+        final parameter = _resolveParameter(raw, id, fragmentKey);
+        final rawName = parameter['name'];
+        final rawLocation = parameter['in'];
+        if (rawName == null || rawLocation == null) {
+          throw ContractError(
+            'A parameter of $id declares no name or no location. A \$ref that '
+            'does not resolve to a parameter object reaches here as an empty '
+            'map, so the reference is the thing to check.',
+          );
+        }
+        final name = rawName.toString();
+        final location = rawLocation.toString();
         final schema = parameter['schema'];
         final type = schema is YamlMap
             ? _typeOf(schema, owner: _pascal(id), property: name, fragmentKey: fragmentKey)
@@ -447,10 +559,24 @@ final class ContractReader {
 
     DartType? requestType;
     var requestRequired = false;
+    final unmodelledRequestMediaTypes = <String>[];
+    String? rawRequestMediaType;
     final requestBody = operation['requestBody'];
     if (requestBody is YamlMap) {
       requestRequired = requestBody['required'] == true;
       final schema = _jsonSchemaOf(requestBody['content'], '$id request body');
+      final content = requestBody['content'];
+      if (schema == null && content is YamlMap) {
+        final declared = content.keys.map((Object? key) => key.toString()).toList()..sort();
+        if (declared.length == 1) {
+          // The contract names one media type for the body. Carrying bytes
+          // under the type the contract states is not a guess.
+          rawRequestMediaType = declared.single;
+          requestRequired = requestBody['required'] == true;
+        } else {
+          unmodelledRequestMediaTypes.addAll(declared);
+        }
+      }
       if (schema != null) {
         requestType = _typeOf(
           schema,
@@ -459,6 +585,9 @@ final class ContractReader {
           fragmentKey: fragmentKey,
           preferOwnerName: true,
         );
+        if (requestType.isDto) {
+          _requestBodySchemas.add(requestType.name);
+        }
       }
     }
 
@@ -515,6 +644,8 @@ final class ContractReader {
       queryParameters: queryParameters,
       requestType: requestType,
       requestRequired: requestRequired,
+      unmodelledRequestMediaTypes: unmodelledRequestMediaTypes,
+      rawRequestMediaType: rawRequestMediaType,
       successStatus: chosenStatus,
       responseType: responseType,
     );
@@ -630,6 +761,35 @@ final class ContractReader {
         ? _asMap(loadYaml(File(specPath).readAsStringSync()), 'openapi.yaml')
         : _loadFragment(fragmentPath);
     final resolved = _asMap(_resolvePointer(document, pointer, ref), 'component $ref');
+
+    // A named component that declares a NON-OBJECT type is an ALIAS with
+    // constraints attached, not a type of its own: `CategoryCode` is a string
+    // with a pattern and `MinorUnitString` is a string with a length bound.
+    //
+    // Emitting a class for one was the same defect the named-enum branch below
+    // fixes, and it failed the same way — a field-less DTO whose `fromJson`
+    // cast the wire's string to a Map, so a well-formed response threw inside
+    // the generated decoder and, had the cast somehow succeeded, the value
+    // would have been discarded because the class had nowhere to put it. The
+    // constraints belong to the platform that enforces them; the client
+    // carries the value.
+    final declaredType = resolved['type'];
+    if (declaredType != null &&
+        resolved['enum'] == null &&
+        resolved['oneOf'] == null) {
+      final concrete =
+          _typeNames(declaredType).where((String name) => name != 'null').toList();
+      if (concrete.length == 1 && concrete.single != 'object') {
+        return _typeOf(
+          resolved,
+          owner: _pascal(componentName),
+          property: null,
+          fragmentKey: fragmentPath,
+          preferOwnerName: true,
+        );
+      }
+    }
+
     final className = '${_pascal(componentName)}Dto';
     final previousOwner = _componentClassNames[className];
     if (previousOwner != null && previousOwner != '$fragmentPath#$componentName') {
@@ -643,6 +803,7 @@ final class ContractReader {
       // terminates.
       _schemas[className] = ObjectSchema(className, '', const <PropertyDefinition>[]);
       final oneOf = resolved['oneOf'];
+      final componentEnum = resolved['enum'];
       if (oneOf is YamlList) {
         _schemas[className] = _buildUnion(
           className,
@@ -650,6 +811,18 @@ final class ContractReader {
           resolved,
           fragmentKey: fragmentPath,
         );
+      } else if (componentEnum is YamlList && resolved['type'] == 'string') {
+        // A NAMED string enum is an enum, exactly as an inline one is.
+        //
+        // This branch was missing, and the consequence was not a compile error
+        // but a runtime one: every `type: string, enum:` component became a
+        // field-less DTO whose `fromJson` cast the wire's string to a Map. A
+        // well-formed response threw, and had the cast somehow succeeded the
+        // value would have been discarded — the class had nowhere to put it.
+        // Twenty vocabularies on the financial surface are declared that way,
+        // so the generated client could not decode its own contract.
+        _schemas.remove(className);
+        _registerEnum(className, componentEnum, resolved['description']?.toString() ?? '');
       } else {
         _registerObject(className, resolved, fragmentKey: fragmentPath, force: true);
       }
@@ -822,6 +995,7 @@ final class ContractReader {
           required: isRequired,
           documentation: propertySchema['description']?.toString() ?? '',
           isDateTime: type.name == 'DateTime',
+          declaredNullable: _declaresNull(propertySchema),
         ),
       );
     }
@@ -840,10 +1014,6 @@ final class ContractReader {
       }
       final wire = raw.toString();
       final member = _camel(wire.toLowerCase());
-      if (member == 'unknown') {
-        throw ContractError('Enum $className declares a value that collides with '
-            'the generated "unknown" member.');
-      }
       // A wire value made only of separators, or one starting with a digit,
       // cannot become a Dart identifier. Fail here with the offending value
       // rather than emitting source that will not parse.
@@ -872,7 +1042,40 @@ final class ContractReader {
     final sorted = <String, String>{
       for (final key in members.keys.toList()..sort()) key: members[key]!,
     };
-    _schemas[className] = EnumSchema(className, documentation, sorted);
+    // The fallback member is synthesized and must not collide with a value the
+    // contract declares. A contract that DECLARES `UNKNOWN` means it — the
+    // value is an answer the platform gives, not the client's stand-in for a
+    // value it has never heard of — so the fallback steps aside.
+    final taken = sorted.values.toSet();
+    final fallback = <String>['unknown', 'unrecognised']
+        .where((String candidate) => !taken.contains(candidate))
+        .firstOrNull;
+    if (fallback == null) {
+      throw ContractError('Enum $className declares values that take both '
+          '`unknown` and `unrecognised`, leaving no name for the member a '
+          'value this build has never seen falls back to. Rename one in the '
+          'contract.');
+    }
+    _schemas[className] =
+        EnumSchema(className, documentation, sorted, fallbackMember: fallback);
+  }
+
+  /// Whether a property schema admits `null` as a value.
+  ///
+  /// Two spellings mean the same thing in this contract and both count:
+  /// `type: [string, 'null']`, and a `oneOf` with a `type: 'null'` branch —
+  /// the second is how a nullable `\$ref` has to be written.
+  bool _declaresNull(YamlMap propertySchema) {
+    if (_typeNames(propertySchema['type']).contains('null')) {
+      return true;
+    }
+    final oneOf = propertySchema['oneOf'];
+    if (oneOf is YamlList) {
+      return oneOf
+          .whereType<YamlMap>()
+          .any((YamlMap branch) => _typeNames(branch['type']).contains('null'));
+    }
+    return false;
   }
 
   List<String> _typeNames(Object? declared) {
@@ -911,6 +1114,109 @@ final class DartEmitter {
 
   final Contract contract;
 
+  /// The three-state request field, emitted verbatim into `models.dart`.
+  ///
+  /// It is a source constant rather than something assembled per run: it has
+  /// no contract-derived part, so generating it piecewise would only make the
+  /// output harder to read against the contract.
+  static const String _omittableSource = """
+/// A request field that may be OMITTED, or sent carrying a value, or sent
+/// carrying an explicit `null`.
+///
+/// The three are three different requests. On a PATCH the contract reads an
+/// absent field as "leave this alone" and a `null` field as "clear this", and
+/// a plain `T?` cannot tell the two apart — a client holding one would either
+/// clear every field it did not set or never be able to clear any.
+///
+/// The generator emits this type for exactly the properties a REQUEST schema
+/// declares optional AND nullable. Every other field keeps its plain type: a
+/// required field is always sent, an optional non-nullable field is omitted
+/// when null, and a response field has nothing to distinguish because a reader
+/// cannot act on the difference.
+@immutable
+final class Omittable<T extends Object> {
+  /// The field does not appear in the encoded body at all.
+  const Omittable.omitted()
+      : valueOrNull = null,
+        isSent = false;
+
+  /// The field appears in the encoded body carrying [valueOrNull], which is
+  /// null to send an explicit `null`.
+  const Omittable.sent(this.valueOrNull) : isSent = true;
+
+  /// Whether the field is encoded at all.
+  final bool isSent;
+
+  /// The value to encode. Null while [isSent] means an explicit `null` on the
+  /// wire; null while it is not sent means nothing at all.
+  final T? valueOrNull;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Omittable<T> &&
+      other.isSent == isSent &&
+      other.valueOrNull == valueOrNull;
+
+  @override
+  int get hashCode => Object.hash(isSent, valueOrNull);
+
+  /// Carries no value: an omittable field routinely holds a display name, a
+  /// merchant or a masked tail.
+  @override
+  String toString() => 'Omittable()';
+}
+""";
+
+  /// The field-decoding helper, emitted verbatim into `models.dart`.
+  static const String _fieldDecodingSource = """
+/// A response that does not match the contract, naming the field that drifted.
+///
+/// It extends `FormatException` so every repository that already catches one
+/// keeps working unchanged. What it adds is [path]: a caller that wants to say
+/// WHICH field drifted, rather than only which call did, reads it. That
+/// distinction is the difference between an incident somebody can act on and a
+/// line that says a response was wrong.
+final class ContractFormatException extends FormatException {
+  ContractFormatException(this.path)
+      : super('A response field does not match the contract.');
+
+  /// `Schema.field`, for example `FinancialAccountView.currency`.
+  ///
+  /// A NAME and never a value. The field that drifted is contract vocabulary;
+  /// what it carried is a person's money, and neither a log line nor a crash
+  /// dump may hold it.
+  final String path;
+
+  /// The type name only.
+  ///
+  /// Even the field NAME stays out of it: an exception's `toString` is what a
+  /// framework prints into a crash dump, and a generated type renders nothing
+  /// but itself there. Callers that want the location read [path].
+  @override
+  String toString() => 'ContractFormatException()';
+}
+
+/// Decodes one field, naming it if the response does not match the contract.
+///
+/// Both failure shapes a decoder can produce are caught: a wrongly typed or
+/// absent field raises a `TypeError` through the cast or the null check, and a
+/// malformed instant raises a `FormatException`. Either way the contract was
+/// not honoured, and the answer says which field it was.
+T decodeField<T>(String path, T Function() read) {
+  try {
+    return read();
+  } on ContractFormatException {
+    // Already named, by the schema closest to the drift. Re-wrapping would
+    // replace a precise location with a coarser one.
+    rethrow;
+  } on TypeError {
+    throw ContractFormatException(path);
+  } on FormatException {
+    throw ContractFormatException(path);
+  }
+}
+""";
+
   String _header(String purpose) => '''
 // GENERATED CODE — DO NOT MODIFY BY HAND.
 //
@@ -937,7 +1243,10 @@ final class DartEmitter {
 // address, a display name or an identifier, and none of that may reach a log
 // through an interpolated string.
 ''')
-      ..writeln("import 'package:meta/meta.dart';");
+      ..writeln("import 'package:meta/meta.dart';")
+      ..writeln()
+      ..writeln(_omittableSource)
+      ..writeln(_fieldDecodingSource);
 
     for (final schema in contract.schemas) {
       buffer.writeln();
@@ -947,10 +1256,35 @@ final class DartEmitter {
         case ObjectSchema():
           _writeObject(buffer, schema);
         case UnionSchema():
+          _guardUnionRequestBody(schema);
           _writeUnion(buffer, schema);
       }
     }
     return buffer.toString();
+  }
+
+  /// Refuses a request body that is a union carrying an optional-and-nullable
+  /// property.
+  ///
+  /// The three-state wrapper is emitted for object schemas; a union branch
+  /// would silently fall back to a plain nullable field and lose the
+  /// difference between "left out" and "cleared". Nothing in the contract does
+  /// this today, and the day something does, it fails here rather than
+  /// producing a client that quietly clears fields.
+  void _guardUnionRequestBody(UnionSchema schema) {
+    if (!contract.requestBodySchemas.contains(schema.name)) {
+      return;
+    }
+    for (final variant in schema.variants) {
+      for (final property in variant.properties) {
+        if (property.threeState) {
+          throw ContractError('${schema.name} is a request body whose branch '
+              '${variant.className} declares "${property.wireName}" optional '
+              'and nullable. The generator models that distinction on object '
+              'schemas only; give the operation an object body.');
+        }
+      }
+    }
   }
 
   void _writeEnum(StringBuffer buffer, EnumSchema schema) {
@@ -959,32 +1293,49 @@ final class DartEmitter {
     for (final entry in schema.values.entries) {
       buffer.writeln("  ${entry.value}('${entry.key}'),");
     }
+    final fallback = schema.fallbackMember;
     buffer
       ..writeln()
       ..writeln('  /// A value this build does not know.')
       ..writeln('  ///')
       ..writeln('  /// The server may add enumeration values at any time; a client that')
       ..writeln('  /// threw on one would break on a deployment it did not ship with.')
-      ..writeln("  unknown('');")
+      ..writeln('  ///')
+      ..writeln('  /// It carries NO wire value and is never sent: a client that echoed a')
+      ..writeln('  /// value it does not understand would be asserting a meaning it does')
+      ..writeln('  /// not have.')
+      ..writeln("  $fallback('');")
       ..writeln()
       ..writeln('  const ${schema.name}(this.wireValue);')
       ..writeln()
       ..writeln('  final String wireValue;')
       ..writeln()
-      ..writeln('  /// Parses a wire value, falling back to [unknown].')
+      ..writeln('  /// Parses a wire value, falling back to [$fallback].')
       ..writeln('  static ${schema.name} fromWire(String? value) {')
       ..writeln('    for (final candidate in values) {')
+      ..writeln('      if (candidate == $fallback) {')
+      ..writeln('        continue;')
+      ..writeln('      }')
       ..writeln('      if (candidate.wireValue == value) {')
       ..writeln('        return candidate;')
       ..writeln('      }')
       ..writeln('    }')
-      ..writeln('    return unknown;')
+      ..writeln('    return $fallback;')
       ..writeln('  }')
       ..writeln()
-      ..writeln('  /// The wire value, or null for [unknown].')
-      ..writeln('  String? toWire() => this == unknown ? null : wireValue;')
+      ..writeln('  /// The wire value, or null for [$fallback], which has none.')
+      ..writeln('  String? toWire() => this == $fallback ? null : wireValue;')
       ..writeln('}');
   }
+
+  /// Whether [property] of [schemaName] needs the three-state encoding.
+  ///
+  /// Only a REQUEST body can express the difference between a field left out
+  /// and a field sent as `null`, so the wrapper appears there and nowhere
+  /// else. A response DTO keeps a plain nullable field: a reader that received
+  /// no field and a reader that received `null` have the same information.
+  bool _isOmittable(String schemaName, PropertyDefinition property) =>
+      property.threeState && contract.requestBodySchemas.contains(schemaName);
 
   void _writeObject(StringBuffer buffer, ObjectSchema schema) {
     _writeDoc(buffer, schema.documentation.isEmpty ? 'Contract object.' : schema.documentation);
@@ -1002,6 +1353,14 @@ final class DartEmitter {
     } else {
       buffer.writeln('  const ${schema.name}({');
       for (final property in schema.properties) {
+        if (_isOmittable(schema.name, property)) {
+          // Defaulting to OMITTED is what makes a partial update safe to
+          // build: a caller that says nothing about a field sends nothing
+          // about it, and clearing one is an explicit `Omittable.sent(null)`.
+          buffer.writeln('    this.${property.dartName} = '
+              'const Omittable<${property.type.name}>.omitted(),');
+          continue;
+        }
         final prefix = property.type.nullable ? '' : 'required ';
         buffer.writeln('    ${prefix}this.${property.dartName},');
       }
@@ -1013,7 +1372,8 @@ final class DartEmitter {
           '  factory ${schema.name}.fromJson(Map<String, Object?> json) => ${schema.name}(',
         );
       for (final property in schema.properties) {
-        buffer.writeln('        ${property.dartName}: ${_decode(property)},');
+        buffer.writeln('        ${property.dartName}: '
+            '${_decodeGuarded(schema.name, schema.name, property)},');
       }
       buffer
         ..writeln('      );')
@@ -1025,14 +1385,14 @@ final class DartEmitter {
         _writeDoc(buffer, property.documentation, indent: '  ');
       }
       buffer
-        ..writeln('  final ${property.type.declaration} ${property.dartName};')
+        ..writeln('  final ${_fieldType(schema.name, property)} ${property.dartName};')
         ..writeln();
     }
 
     buffer.writeln('  /// Encodes the contract representation.');
     buffer.writeln('  Map<String, Object?> toJson() => <String, Object?>{');
     for (final property in schema.properties) {
-      buffer.writeln("        '${property.wireName}': ${_encode(property)},");
+      buffer.writeln(_encodeEntry(schema.name, property));
     }
     buffer
       ..writeln('      };')
@@ -1040,6 +1400,72 @@ final class DartEmitter {
       ..writeln('  @override')
       ..writeln("  String toString() => '${schema.name}()';")
       ..writeln('}');
+  }
+
+  /// The Dart type the DTO field is declared with.
+  String _fieldType(String schemaName, PropertyDefinition property) =>
+      _isOmittable(schemaName, property)
+          ? 'Omittable<${property.type.name}>'
+          : property.type.declaration;
+
+  /// One line of a `toJson` map literal.
+  ///
+  /// A required property is always written. An optional one is written only
+  /// when it carries a value, because leaving it out is what OPTIONAL means —
+  /// writing `null` for it would ask the server to clear a field the caller
+  /// never mentioned. An omittable one is written exactly when the caller said
+  /// to, `null` included.
+  String _encodeEntry(String schemaName, PropertyDefinition property) {
+    final key = "'${property.wireName}'";
+    if (_isOmittable(schemaName, property)) {
+      final value = _encodeExpression(
+        property.type,
+        '${property.dartName}.valueOrNull',
+        nullable: true,
+      );
+      return '        if (${property.dartName}.isSent) $key: $value,';
+    }
+    if (property.required) {
+      return '        $key: ${_encode(property)},';
+    }
+    return '        if (${property.dartName} != null) $key: ${_encode(property)},';
+  }
+
+  /// One property decode, wrapped so a drift names the field.
+  ///
+  /// [ownerSchema] decides whether the property carries the three-state
+  /// wrapper; [reportedAs] is the name a violation is reported under, which is
+  /// the branch class for a union so the location says which branch drifted.
+  String _decodeGuarded(
+    String ownerSchema,
+    String reportedAs,
+    PropertyDefinition property,
+  ) {
+    final type = _fieldType(ownerSchema, property);
+    final owner = reportedAs.endsWith('Dto')
+        ? reportedAs.substring(0, reportedAs.length - 3)
+        : reportedAs;
+    // Schema and field travel as ONE dotted literal. It reads as the location
+    // it is, and it cannot be mistaken for an opaque token by the scan that
+    // refuses long literals in generated code.
+    return "decodeField<$type>('$owner.${property.wireName}',\n"
+        '            () => ${_decodeValue(ownerSchema, property)})';
+  }
+
+  /// The expression that reads one property out of a decoded JSON object.
+  ///
+  /// An omittable property reads the KEY rather than the value: a body without
+  /// the key and a body carrying `null` decode to different things, which is
+  /// the whole point of the wrapper. Decoding matters because a request DTO
+  /// round-trips in tests.
+  String _decodeValue(String schemaName, PropertyDefinition property) {
+    if (!_isOmittable(schemaName, property)) {
+      return _decode(property);
+    }
+    final type = property.type.name;
+    return "json.containsKey('${property.wireName}')\n"
+        '            ? Omittable<$type>.sent(${_decode(property)})\n'
+        '            : const Omittable<$type>.omitted()';
   }
 
   void _writeUnion(StringBuffer buffer, UnionSchema schema) {
@@ -1108,7 +1534,8 @@ final class DartEmitter {
           ..writeln('  factory ${variant.className}.fromJson(Map<String, Object?> json) =>')
           ..writeln('      ${variant.className}(');
         for (final property in variant.properties) {
-          buffer.writeln('        ${property.dartName}: ${_decode(property)},');
+          buffer.writeln('        ${property.dartName}: '
+              '${_decodeGuarded(schema.name, variant.className, property)},');
         }
         buffer
           ..writeln('      );')
@@ -1130,7 +1557,7 @@ final class DartEmitter {
         ..writeln('  Map<String, Object?> toJson() => <String, Object?>{')
         ..writeln("        '${schema.discriminator}': '${variant.discriminatorValue}',");
       for (final property in variant.properties) {
-        buffer.writeln("        '${property.wireName}': ${_encode(property)},");
+        buffer.writeln(_encodeEntry(variant.className, property));
       }
       buffer
         ..writeln('      };')
@@ -1213,6 +1640,8 @@ final class DartEmitter {
 // JSON object as `JsonMap`. That is deliberate: inventing a type for a
 // prose-only response would be a claim the contract does not make.
 ''')
+      ..writeln("import 'dart:typed_data';")
+      ..writeln('')
       ..writeln("import '../../utilities/cancellation.dart';")
       ..writeln("import '../api_transport.dart';")
       ..writeln("import '../http_method.dart';")
@@ -1242,6 +1671,10 @@ final class DartEmitter {
     final documentation = <String>[
       if (operation.summary.isNotEmpty) operation.summary,
       if (operation.description.isNotEmpty) ...<String>['', operation.description],
+      if (operation.unmodelledRequestMediaTypes.isNotEmpty) ...<String>[
+        '',
+        _unmodelledBodyNote(operation.unmodelledRequestMediaTypes),
+      ],
       '',
       signature,
     ];
@@ -1257,6 +1690,10 @@ final class DartEmitter {
         operation.requestRequired
             ? 'required ${operation.requestType!.declaration} body'
             : '${operation.requestType!.declaration}? body',
+      );
+    } else if (operation.rawRequestMediaType != null) {
+      parameters.add(
+        operation.requestRequired ? 'required Uint8List body' : 'Uint8List? body',
       );
     }
     for (final parameter in operation.queryParameters) {
@@ -1284,7 +1721,7 @@ final class DartEmitter {
     if (operation.queryParameters.isNotEmpty) {
       buffer.writeln('        query: <String, Object?>{');
       for (final parameter in operation.queryParameters) {
-        buffer.writeln("          '${parameter.name}': ${parameter.dartName},");
+        buffer.writeln("          '${parameter.name}': ${_queryValue(parameter)},");
       }
       buffer.writeln('        },');
     }
@@ -1293,6 +1730,15 @@ final class DartEmitter {
         operation.requestRequired
             ? '        body: body.toJson(),'
             : '        body: body?.toJson(),',
+      );
+    } else if (operation.rawRequestMediaType != null) {
+      final mediaType = operation.rawRequestMediaType!;
+      buffer.writeln(
+        operation.requestRequired
+            ? "        rawBody: RawRequestBody(bytes: body, mediaType: '$mediaType'),"
+            : '        rawBody: body == null\n'
+                '            ? null\n'
+                "            : RawRequestBody(bytes: body, mediaType: '$mediaType'),",
       );
     }
     buffer.writeln('        requiresAuthentication: ${operation.requiresAuthentication},');
@@ -1323,6 +1769,34 @@ final class DartEmitter {
     }
     buffer.writeln('  }');
   }
+
+  /// The expression a query parameter is sent as.
+  ///
+  /// An enumeration goes on the wire as its CONTRACT value. Handing the Dart
+  /// enum to the transport instead let the HTTP layer call `toString()` on it,
+  /// which sent `MoneyDirectionDto.moneyOut` where the contract says
+  /// `MONEY_OUT` — a filter the server could only reject or ignore. An instant
+  /// goes as ISO-8601 in UTC for the same reason.
+  String _queryValue(Parameter parameter) {
+    final access = parameter.dartName;
+    if (parameter.type.isEnum) {
+      return parameter.type.nullable ? '$access?.toWire()' : '$access.toWire()';
+    }
+    if (parameter.type.name == 'DateTime') {
+      return parameter.type.nullable
+          ? '$access?.toUtc().toIso8601String()'
+          : '$access.toUtc().toIso8601String()';
+    }
+    return access;
+  }
+
+  /// The doc-comment line that states a request body the generator cannot
+  /// send, so the gap is visible in the generated source.
+  String _unmodelledBodyNote(List<String> mediaTypes) =>
+      'NOT MODELLED: the contract declares this request body as '
+      '`${mediaTypes.join('`, `')}`, which is not JSON. This method sends NO '
+      'BODY. Sending one needs a transport that carries raw bytes; until '
+      'there is one, this operation cannot be called for its intended effect.';
 
   String _pathExpression(Operation operation) {
     if (operation.pathParameters.isEmpty) {

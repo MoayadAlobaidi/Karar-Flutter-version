@@ -49,9 +49,21 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
 const REGISTRY_REL = path.join('docs', 'testing', 'architecture-test-registry.json');
 
-const PURE_PACKAGES = ['shared-kernel', 'financial-engine', 'jurisdiction-policy', 'state-machine'];
+//  is pure for the reason the others are: every layer needs to
+// ask what an input may be used for, and a package that dragged a framework
+// behind it could not be asked from a domain file.
+const PURE_PACKAGES = [
+  'shared-kernel',
+  'financial-engine',
+  'jurisdiction-policy',
+  'state-machine',
+  'content-trust',
+];
 const KERNEL_EXPORTS = [
   'Money',
+  // Tenth universal, ADR-0027: a calendar day is not an instant. Added once,
+  // with a decision record; the cap is not "whatever is useful next".
+  'CalendarDay',
   'Currency',
   'Percentage',
   'ExchangeRate',
@@ -112,7 +124,28 @@ function loadStripped(file) {
 }
 
 function violationsResult(violations, scanned, note) {
-  return { violations, scanned, ...(note ? { note } : {}) };
+  return { violations, scanned, applicable: true, ...(note ? { note } : {}) };
+}
+
+/**
+ * The result a control returns when it no longer has anything to say.
+ *
+ * A historical guard that has outlived its window used to return
+ * `violationsResult([], 0)` — zero files scanned, zero violations — and the
+ * runner, which decides PASS by asking whether the violation list is empty,
+ * counted it among the passes. A row reading `PASS ... (files scanned: 0)`
+ * therefore appeared in the headline beside twenty-eight checks that had
+ * actually looked at something, and the summary total included it. That is a
+ * pass that proves nothing: the control could not have failed, because it
+ * never ran.
+ *
+ * `NOT_APPLICABLE` is the honest answer, and it is a THIRD status rather than
+ * a quiet pass: it is printed as `N/A`, counted in its own tally, and excluded
+ * from `passed`. The reason travels with it so a reader never has to guess why
+ * a control went quiet.
+ */
+function notApplicableResult(reason, note) {
+  return { violations: [], scanned: 0, applicable: false, reason, ...(note ? { note } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -1457,13 +1490,69 @@ export function checkApprovalPolicy(ctx) {
 export function checkMoneyDiscipline(ctx) {
   const { root } = ctx;
   const violations = [];
+  // Scope: the pure packages, EVERY module layer, and the API/worker apps.
+  //
+  // It used to stop at domain and application, which left out exactly the two
+  // boundaries where a float would enter from outside — the DB-to-domain
+  // row-mappers under `infrastructure`, and the wire-to-domain input readers
+  // under `apps/api/src`. Nothing else scanned them either, so the guarantee
+  // `docs/testing/architecture-tests.md` states was wider than the check.
+  //
+  // NOT `packages/*/src` wholesale: `packages/platform/src/outbox/relay.ts`
+  // records an outbox lag GAUGE in seconds with `Number.parseFloat`, which is a
+  // duration and not money. Widening to every package would make this check
+  // fire on it, and a check that cries wolf is one somebody switches off.
   const files = codeFiles([
     ...PURE_PACKAGES.map((p) => path.join(root, 'packages', p, 'src')),
-    ...moduleLayerDirs(root, ['domain', 'application']),
+    ...moduleLayerDirs(root, ['domain', 'application', 'infrastructure', 'presentation']),
+    path.join(root, 'apps', 'api', 'src'),
+    path.join(root, 'apps', 'worker', 'src'),
   ]);
   const monetaryNumber =
     /\b(minorUnits|basisPoints|amount|amounts|balance|balances|price|prices|fee|fees|monetaryValue)\s*\??\s*:\s*number\b/g;
-  const floatOps = [/\bparseFloat\s*\(/g, /\bNumber\.parseFloat\b/g, /\.toFixed\s*\(/g];
+  /**
+   * The ONE sanctioned shape, named exactly, with its reason.
+   *
+   * `Money.allocate` converts a remainder to a Number to use it as a count:
+   * the algorithm has already proved `0 <= leftover < weights.length`, and an
+   * array index is not a monetary value. It lives inside `Money` itself, which
+   * is the type that owns exact arithmetic — nowhere else gets this.
+   *
+   * Liveness is checked: an allowance that has stopped matching is a hole left
+   * open for the next violation, so a stale one FAILS the check rather than
+   * lingering. Same rule the documentation style allowances are held to.
+   */
+  const MONEY_ALLOWANCES = [
+    {
+      file: 'packages/shared-kernel/src/money.ts',
+      shape: /Number\(this\.minorUnits - assigned\)/,
+      why: 'a bounded remainder used as an array count, proved < weights.length by the lines above it',
+    },
+  ];
+  const allowanceUsed = new Set();
+
+  // Shapes, not only files. Widening the SCOPE added the layers where a float
+  // enters and left the DETECTION unchanged, so the commonest row-mapper
+  // mistake — `Number(row.amount_minor_units) / 100` — was in scope and
+  // invisible. Each pattern below is anchored on a money-named operand so an
+  // ordinary count, index or duration is not swept up.
+  const money =
+    '(?:minorUnits|minor_units|basisPoints|amount|amounts|balance|balances|price|prices|fee|fees|monetaryValue)';
+  const floatOps = [
+    /\bparseFloat\s*\(/g,
+    /\bNumber\.parseFloat\b/g,
+    /\.toFixed\s*\(/g,
+    // `Number(...)` over a money-named expression: the row-mapper float.
+    new RegExp(`\\bNumber\\s*\\([^)]*${money}`, 'gi'),
+    // `parseInt` over money: exact, but a base-10 parse of a minor-unit string
+    // is the client-side total in TypeScript clothing.
+    new RegExp(`\\bparseInt\\s*\\([^)]*${money}`, 'gi'),
+    // Division or multiplication of a money-named operand by a scale factor —
+    // major/minor conversion, which belongs in Money and nowhere else.
+    new RegExp(`${money}[A-Za-z0-9_]*\\s*[/*]\\s*[0-9]`, 'gi'),
+    // Rounding a money expression at all.
+    new RegExp(`Math\\.(?:round|floor|ceil|abs)\\s*\\([^)]*${money}`, 'gi'),
+  ];
   for (const file of files) {
     const src = loadStripped(file);
     for (const m of src.matchAll(monetaryNumber)) {
@@ -1475,6 +1564,15 @@ export function checkMoneyDiscipline(ctx) {
     }
     for (const re of floatOps) {
       for (const m of src.matchAll(re)) {
+        const allowance = MONEY_ALLOWANCES.find(
+          (candidate) =>
+            rel(root, file) === candidate.file &&
+            candidate.shape.test(m[0] + src.slice(m.index, m.index + 80)),
+        );
+        if (allowance !== undefined) {
+          allowanceUsed.add(allowance.file);
+          continue;
+        }
         violations.push({
           file: rel(root, file),
           line: lineOf(src, m.index),
@@ -1483,10 +1581,17 @@ export function checkMoneyDiscipline(ctx) {
       }
     }
   }
+  for (const allowance of MONEY_ALLOWANCES) {
+    if (allowanceUsed.has(allowance.file)) continue;
+    violations.push({
+      file: allowance.file,
+      detail: `money-discipline allowance no longer matches anything (${allowance.why}) — a stale allowance is a hole left open for the next violation; remove it`,
+    });
+  }
   return violationsResult(
     violations,
     files.length,
-    'lexical check; type-level enforcement deepens with the financial engine',
+    `lexical check over ${String(MONEY_ALLOWANCES.length)} sanctioned shape; type-level enforcement deepens with the financial engine`,
   );
 }
 
@@ -1892,7 +1997,7 @@ export function checkStorageBoundary(ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 20 — Kernel surface (exactly the nine universals)
+// Test 20 — Kernel surface (exactly the ten universals)
 // ---------------------------------------------------------------------------
 function collectExports(file, resolveReexports) {
   const src = stripComments(readText(file));
@@ -1942,7 +2047,7 @@ export function checkKernelSurface(ctx) {
     if (!expected.has(name)) {
       violations.push({
         file: relPath,
-        detail: `exports '${name}' — the kernel surface is capped at the nine universals (additions require an ADR)`,
+        detail: `exports '${name}' — the kernel surface is capped at the ten universals (additions require an ADR)`,
       });
     }
   }
@@ -1950,7 +2055,7 @@ export function checkKernelSurface(ctx) {
     if (!actual.has(name)) {
       violations.push({
         file: relPath,
-        detail: `universal '${name}' is missing — the kernel surface must be exactly the nine`,
+        detail: `universal '${name}' is missing — the kernel surface must be exactly the ten`,
       });
     }
   }
@@ -2509,6 +2614,541 @@ export function checkAdminNoDbDriver(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Supplementary — no Phase 5 ingestion may be mounted before test 24 activates
+// ---------------------------------------------------------------------------
+//
+// Architecture test 24 (resource limits) activates at phase 5 and is what
+// guarantees every ingestion path declares byte, row, page, deadline and buffer
+// bounds. Until the registry says phase 5, that guarantee does not exist.
+//
+// The gap this closes is narrow and real: an ingestion endpoint could be
+// mounted while `currentPhase` still reads 4, and nothing would object. The
+// limits would be unenforced by the architecture suite, the path would be
+// reachable, and the phase marker would move later in a tidy documentation
+// commit that made it look as though the guarantee had been there all along.
+//
+// So the marker and the first mounted ingestion path are held together from
+// BOTH sides. Test 24 refuses a phase-5 tree whose ingestion paths declare no
+// limits; this refuses a pre-phase-5 tree that mounts an ingestion path at all.
+// The next commit that mounts one must move the marker in the same change.
+// ---------------------------------------------------------------------------
+// Test 24 — Resource limits declared
+// ---------------------------------------------------------------------------
+// Every REAL ingestion path declares every bound, in the CENTRAL policy, and
+// every central policy belongs to a real path.
+//
+// The failure this exists to prevent is not an unbounded upload — it is an
+// unbounded upload that nobody notices, because the path was added months
+// after the limits were written and simply never joined the inventory. So the
+// check works from the paths that actually exist in the tree rather than from
+// a list somebody maintains, and it fails in BOTH directions: a mounted path
+// with no policy, and a policy naming a path that no longer exists.
+//
+// It also fails when the tree contains no real path at all while the registry
+// claims phase 5. A resource-limit test that scans nothing passes vacuously,
+// which is the exact shape of failure this repository has been bitten by
+// before — and the phase marker is supposed to move only WITH a real mounted
+// ingestion path, so zero paths means the marker moved without one.
+const INGESTION_LIMIT_FIELDS = [
+  'maxBytes',
+  'maxRows',
+  'maxColumns',
+  'maxFieldBytes',
+  'maxPageSize',
+  'defaultPageSize',
+  'maxBufferedRows',
+  'maxBufferedBytes',
+  'deadlineMs',
+  'maxReportedErrors',
+  'maxBatchSize',
+];
+const CENTRAL_LIMITS_REL = path.join('packages', 'platform', 'src', 'ingestion', 'limits.ts');
+const CENTRAL_POLICY_REFERENCE =
+  /\bINGESTION_LIMIT_POLICIES\s*(?:\.\s*([A-Za-z_$][\w$]*)|\[\s*'([^']+)'\s*\])/g;
+// A bound written INTO a path instead of taken from the policy. Matching the
+// assignment shape rather than the bare number keeps ordinary arithmetic and
+// array indexes out of it.
+const INLINE_LIMIT =
+  /\b(max(?:Bytes|Rows|Columns|FieldBytes|PageSize|BufferedRows|BufferedBytes|ReportedErrors|BatchSize)|deadlineMs)\b\s*[:=]\s*(?!.*INGESTION_LIMIT_POLICIES)[0-9_]/;
+
+/** The declared policies, by object key, with the fields each actually carries. */
+function readCentralPolicies(root) {
+  const file = path.join(root, CENTRAL_LIMITS_REL);
+  if (!fs.existsSync(file)) return null;
+  const src = loadStripped(file);
+  const start = src.indexOf('INGESTION_LIMIT_POLICIES');
+  if (start === -1) return new Map();
+  const policies = new Map();
+  // Each entry is `key: { ... }` inside the registry object.
+  const entry = /([A-Za-z_$][\w$]*)\s*:\s*\{([\s\S]*?)\n\s{2}\}/g;
+  // NO `entry.lastIndex = start` here. `matchAll` copies `lastIndex` onto the
+  // iterator's own regex, so setting it AND slicing applies the offset twice:
+  // matching would begin at `2 * start`, past the end of a registry that sits
+  // near the end of the file. It read ZERO policies, silently, and every rule
+  // below that walks them became unreachable while the check went on passing
+  // and reporting a scanned count that hid the zero.
+  for (const match of src.slice(start).matchAll(entry)) {
+    const [, key, body] = match;
+    const fields = new Map();
+    for (const field of INGESTION_LIMIT_FIELDS) {
+      const found = new RegExp(`\\b${field}\\s*:\\s*([^,\n]+)`).exec(body);
+      if (found) fields.set(field, found[1].trim());
+    }
+    const pathId = /\bpathId\s*:\s*'([^']+)'/.exec(body);
+    policies.set(key, { pathId: pathId ? pathId[1] : null, fields, body });
+  }
+  return policies;
+}
+
+/** A numeric limit that is a real bound: finite, positive, integral. */
+function limitIsSound(raw) {
+  if (raw === undefined) return false;
+  const cleaned = raw.replace(/_/g, '').trim();
+  if (/Infinity|Number\.MAX|NaN|null|undefined/.test(cleaned)) return false;
+  // Allow simple products such as `10 * 1024 * 1024`.
+  if (!/^[0-9\s*+]+$/.test(cleaned)) return false;
+  let value;
+  try {
+    value = Function(`"use strict";return (${cleaned});`)();
+  } catch {
+    return false;
+  }
+  return Number.isFinite(value) && Number.isInteger(value) && value > 0;
+}
+
+export function checkResourceLimits(ctx) {
+  const { root } = ctx;
+  const violations = [];
+
+  const policies = readCentralPolicies(root);
+  if (policies === null) {
+    return violationsResult(
+      [{ file: CENTRAL_LIMITS_REL, detail: 'the central ingestion limit policy file is missing' }],
+      0,
+    );
+  }
+
+  // Real paths: a mounted write route, or a composition that wires an
+  // ingestion use case. Same definition the pre-phase-5 guard uses, so the two
+  // controls cannot disagree about what counts.
+  const candidates = ingestionSurfaceFiles(root);
+
+  const realPaths = [];
+  // The inline-bound scan covers the WHOLE ingestion surface, not only the
+  // files that mount a route. A controller that dutifully references the
+  // central policy can still call a helper that hardcodes a byte bound, and
+  // that helper is where the bound actually bites — scanning only the mounting
+  // file would miss it, which a mutation of exactly that shape proved.
+  const surface = [];
+  for (const file of candidates) {
+    if (file.endsWith('.test.ts') || file.endsWith('.d.ts')) continue;
+    const source = loadStripped(file);
+    surface.push({ file, rel: rel(root, file), source });
+    const mountsRoute = /@Controller\s*\(/.test(source) && INGESTION_WRITE_ROUTE.test(source);
+    if (mountsRoute || INGESTION_USE_CASE.test(source)) {
+      realPaths.push({ file, rel: rel(root, file), source });
+    }
+  }
+
+  // Non-vacuity. Deferred phases are handled by the registry, so reaching here
+  // at all means the suite claims to be enforcing this.
+  if (realPaths.length === 0) {
+    violations.push({
+      file: CENTRAL_LIMITS_REL,
+      detail:
+        'no real ingestion path exists in the tree, so this check would pass without examining ' +
+        'anything. The phase marker moves only WITH a first real mounted ingestion path; zero ' +
+        'paths means it moved without one',
+    });
+  }
+
+  const referenced = new Set();
+  for (const { rel: relative, source } of realPaths) {
+    const names = [...source.matchAll(CENTRAL_POLICY_REFERENCE)].map((m) => m[1] ?? m[2]);
+    for (const name of names) referenced.add(name);
+    if (names.length === 0) {
+      violations.push({
+        file: relative,
+        detail:
+          'mounts a real ingestion path but references no policy from INGESTION_LIMIT_POLICIES — ' +
+          'its byte, row, column, field, page, buffer, deadline, error and batch bounds are ' +
+          'therefore unenforced',
+      });
+    }
+  }
+
+  for (const { rel: relative, source } of surface) {
+    if (INLINE_LIMIT.test(source)) {
+      violations.push({
+        file: relative,
+        detail:
+          'writes a numeric ingestion bound inline instead of taking it from the central policy. ' +
+          'A limit that lives beside the path it guards drifts from every other path and from ' +
+          'this check',
+      });
+    }
+  }
+
+  const seenPathIds = new Map();
+  for (const [key, policy] of policies) {
+    const where = `${CENTRAL_LIMITS_REL} (${key})`;
+    for (const field of INGESTION_LIMIT_FIELDS) {
+      const raw = policy.fields.get(field);
+      if (raw === undefined) {
+        violations.push({ file: where, detail: `declares no ${field}` });
+      } else if (!limitIsSound(raw)) {
+        violations.push({
+          file: where,
+          detail: `${field} is '${raw}', which is not a finite positive integer bound`,
+        });
+      }
+    }
+    if (policy.pathId === null) {
+      violations.push({ file: where, detail: 'declares no pathId' });
+    } else if (seenPathIds.has(policy.pathId)) {
+      violations.push({
+        file: where,
+        detail: `duplicate pathId '${policy.pathId}', already declared by '${seenPathIds.get(policy.pathId)}'`,
+      });
+    } else {
+      seenPathIds.set(policy.pathId, key);
+    }
+    if (realPaths.length > 0 && !referenced.has(key)) {
+      violations.push({
+        file: where,
+        detail:
+          `declares limits for a path nothing references. Either the path was removed and this ` +
+          `policy is dead, or it was renamed and some real path is now running unbounded`,
+      });
+    }
+  }
+
+  return violationsResult(violations, surface.length + policies.size);
+}
+
+const PHASE5_INGESTION_MODULES = [
+  'financial-accounts',
+  'transactions',
+  'statement-imports',
+  'financial-connections',
+  'payment-instruments',
+  'transfer-matching',
+];
+const INGESTION_WRITE_ROUTE = /@(Post|Put|Patch)\s*\(/;
+const INGESTION_USE_CASE =
+  /\b(CreateManual\w*|StartStatementImport|CommitStatementImport|UploadStatementSource|ParseStatement\w*)\b/;
+
+/**
+ * Every directory an ingestion path can be mounted or wired from.
+ *
+ * ONE function, used by the historical pre-phase-5 guard AND by test 24, so
+ * the two controls cannot disagree about what counts as the surface. They
+ * used to carry two copies of this list, and the copies had drifted: the
+ * guard scanned `modules/<name>/presentation` and the composition root, test
+ * 24 scanned those PLUS `apps/api/src/financial`. Every financial controller
+ * in this repository lives in the directory only test 24 knew about, so the
+ * guard's controller arm reached nothing real — it caught the composition
+ * file and would have missed a controller mounted straight into
+ * `apps/api/src/financial` at phase 4, which is the exact thing it exists to
+ * refuse.
+ */
+function ingestionSurfaceFiles(root) {
+  const candidates = [];
+  for (const moduleName of PHASE5_INGESTION_MODULES) {
+    const dir = path.join(root, 'modules', moduleName, 'presentation');
+    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
+  }
+  for (const dir of [
+    path.join(root, 'apps', 'api', 'src', 'composition'),
+    path.join(root, 'apps', 'api', 'src', 'financial'),
+  ]) {
+    if (fs.existsSync(dir)) candidates.push(...codeFiles([dir]));
+  }
+  return candidates;
+}
+
+/**
+ * A HISTORICAL guard, and the runner is told so rather than left to infer it.
+ *
+ * Its window is `currentPhase < 5`. From phase 5 onward the tree it was
+ * written to protect is the tree architecture test 24 owns, and this control
+ * has nothing left to check — so it returns `NOT_APPLICABLE` with a reason,
+ * NOT an empty violation list. The difference is the whole point: an empty
+ * violation list is indistinguishable from a control that looked and found
+ * nothing, and the runner used to print it as `PASS (files scanned: 0)` and
+ * add it to the pass total. A control that cannot fail must not be able to
+ * inflate the headline that says how many controls held.
+ *
+ * `ctx.currentPhase` overrides the registry, so a self-test can exercise BOTH
+ * arms — the live window and the retired one — without rewriting the fixture
+ * registry underneath other checkers that read it.
+ */
+export function checkIngestionNotMountedBeforePhase5(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  let scanned = 0;
+
+  let currentPhase = ctx.currentPhase;
+  if (typeof currentPhase !== 'number') {
+    currentPhase = null;
+    const registryPath = path.join(root, REGISTRY_REL);
+    if (fs.existsSync(registryPath)) {
+      try {
+        currentPhase = readJson(registryPath).currentPhase ?? null;
+      } catch {
+        currentPhase = null;
+      }
+    }
+  }
+  if (typeof currentPhase !== 'number') {
+    return notApplicableResult(
+      `${REGISTRY_REL} declares no numeric currentPhase, so the window this guard applies to ` +
+        `cannot be determined`,
+    );
+  }
+  if (currentPhase >= 5) {
+    return notApplicableResult(
+      `RETIRED at phase 5. This guard's window is currentPhase < 5; the registry reads ` +
+        `${currentPhase}. Architecture test 24 (resource limits) is ACTIVE and owns the ingestion ` +
+        `surface from here on — it is the control that must fail if a path is mounted without a ` +
+        `declared bound, and it scans that surface on every run`,
+    );
+  }
+
+  const candidates = ingestionSurfaceFiles(root);
+
+  for (const file of candidates) {
+    if (file.endsWith('.test.ts') || file.endsWith('.d.ts')) continue;
+    scanned += 1;
+    const source = loadStripped(file);
+    const rel = path.relative(root, file);
+    const mountsRoute = /@Controller\s*\(/.test(source) && INGESTION_WRITE_ROUTE.test(source);
+    const wiresUseCase = INGESTION_USE_CASE.test(source);
+    if (mountsRoute || wiresUseCase) {
+      violations.push({
+        file: rel,
+        detail:
+          `mounts or wires a Phase 5 ingestion path while the architecture registry still reads ` +
+          `currentPhase ${currentPhase}. Architecture test 24 (resource limits) activates at phase 5, so this ` +
+          `path would be reachable with its byte, row, page, deadline and buffer limits unenforced by the ` +
+          `suite. Move currentPhase to 5, implement and activate test 24, and register this path's limit ` +
+          `policy in the SAME commit that mounts it`,
+      });
+    }
+  }
+
+  // INSIDE its window, a scan that reached nothing is a FAILURE, not a pass.
+  //
+  // Every candidate comes from two lists in this file — the six module names
+  // above and the composition directory. Rename a module, move the composition
+  // root, or narrow either list, and the loop finds no files: the check then
+  // reports zero violations having examined nothing, which is the same vacuous
+  // green this control was rewritten to stop producing. The guard against that
+  // has to live INSIDE the check, because nothing outside it knows how many
+  // files it should have seen.
+  if (scanned === 0) {
+    violations.push({
+      file: REGISTRY_REL,
+      detail:
+        `this guard is INSIDE its window (currentPhase ${currentPhase} < 5) and its discovery rule ` +
+        `reached zero files. Either the six ingestion modules and the composition root have all ` +
+        `moved, or PHASE5_INGESTION_MODULES no longer names them — a guard that scans nothing ` +
+        `cannot catch anything, and reporting that as a pass is how the control silently dies`,
+    });
+  }
+
+  return violationsResult(violations, scanned);
+}
+
+// ---------------------------------------------------------------------------
+// Supplementary — a MODULE.md permission table may not name a right the
+// authorization catalogue does not hold
+// ---------------------------------------------------------------------------
+//
+// The drift this exists to catch is documentation asserting authority the
+// system never had. Six Phase 5 financial modules declared twelve permissions
+// between them — `accounts.account.read`, `transactions.import.write` and the
+// rest — in `MODULE.md` permission tables that named `USER` as the holder.
+// None was in `modules/authorization/domain/catalogue.ts`, none was seeded by
+// any migration, and no route or use case ever consulted one. The tables read
+// exactly like the tables of modules whose permissions are real, so the claim
+// survived four phases of review: a permission table is the one place a reader
+// looks to answer "what rights exist here", and nothing checked that its rows
+// corresponded to anything.
+//
+// The catalogue is the closed universe (access-control.md §2): a permission
+// exists because a reviewed migration seeded it AND the compile-time catalogue
+// lists it, and an integration test holds those two equal. So the catalogue is
+// the right thing to check a table against — a name absent from it is a name
+// that grants nothing and denies nothing.
+//
+// TWO NARROWINGS, both deliberate, both stated so a reader can see the edge.
+//
+//   * Only modules that have shipped code are in scope. A `MODULE.md` for a
+//     module with no implementation is a forward design document, and its
+//     permission table is a plan for a later phase (`ai`, `goals`, `budgets`,
+//     `zakat` and the rest are in that state). The moment such a module gains
+//     its first source file, its table stops being a plan and becomes a claim
+//     about running software — and this check starts holding it to one.
+//
+//   * A row that SAYS the permission is not granted yet is honest and passes.
+//     `capability` and `jurisdiction` write `_none — declared, deliberately
+//     unseeded_` in the role column; `control-plane` writes "(planned, Phase 8
+//     — not in the seeded catalogue)" in the permission cell; `tenancy` marks
+//     its Phase 8 row "(planned …)". Each of those tells the reader the right
+//     does not exist, which is the opposite of the failure above. The marker
+//     has to be IN THE ROW: a caveat further down the page is not attached to
+//     the row a reader is looking at.
+// ---------------------------------------------------------------------------
+const CATALOGUE_REL = path.join('modules', 'authorization', 'domain', 'catalogue.ts');
+/** `name: 'x.y.z'` entries of PERMISSION_CATALOGUE — the closed universe. */
+const CATALOGUE_PERMISSION = /\bname:\s*'([a-z][a-z_]*\.[a-z][a-z_]*\.[a-z][a-z_]*)'/g;
+/** A backticked permission identifier inside a table cell. */
+const CELL_PERMISSION = /`([a-z][a-z_]*\.[a-z][a-z_]*\.[a-z][a-z_]*)`/g;
+/** The row's own statement that the right is not granted yet. */
+const NOT_YET_GRANTED = /unseeded|planned|not (?:yet )?(?:in|seeded in) the (?:seeded )?catalogue/i;
+
+// Declarations that predate this check, in modules outside the change that
+// added it. Each is real drift and each is listed here rather than silently
+// scoped out, so it appears in the check's own output on every run. An entry
+// that stops describing the tree FAILS (below): the exemption cannot outlive
+// the drift it was written for.
+const UNRECONCILED_MODULE_PERMISSIONS = [
+  // Empty, and that is the point.
+  //
+  // It held four entries when this check was written: two in audit and two in
+  // identity, each a MODULE.md table claiming a right the catalogue never
+  // defined — the same drift as the twelve financial permissions that prompted
+  // the check. All four were reconciled by marking the rows as declared and
+  // deliberately unseeded, which is what they always were: deny-by-default
+  // means a right nobody holds denies, and these arrive by forward migration
+  // with the surface that invokes them.
+  //
+  // A STALE entry here FAILS this check, so an exemption cannot outlive the
+  // drift it excuses. That is why the list emptied itself the moment the
+  // tables were corrected, rather than sitting here as a permanent apology.
+];
+
+/** The permission names the closed catalogue actually defines. */
+function readCataloguePermissions(root) {
+  const file = path.join(root, CATALOGUE_REL);
+  if (!fs.existsSync(file)) return null;
+  const names = new Set();
+  for (const m of loadStripped(file).matchAll(CATALOGUE_PERMISSION)) names.add(m[1]);
+  return names;
+}
+
+export function checkModulePermissionsInCatalogue(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  let scanned = 0;
+
+  const catalogued = readCataloguePermissions(root);
+  // A check that cannot read the closed universe must not pass by scanning
+  // nothing — that is the vacuous pass this suite exists to refuse.
+  if (catalogued === null || catalogued.size === 0) {
+    violations.push({
+      file: CATALOGUE_REL,
+      detail:
+        catalogued === null
+          ? 'is missing — the permission catalogue is what MODULE.md tables are checked against, so its absence cannot be a pass'
+          : 'defines no permissions — PERMISSION_CATALOGUE parsed empty, which would make every declaration look like drift and every drift look checked',
+    });
+    return violationsResult(violations, 0);
+  }
+
+  const exempted = new Set();
+  // Injectable so the self-test can seed a STALE exemption. The production
+  // list is empty — correctly, the drift it excused is fixed — and a self-test
+  // that read it directly would silently stop exercising the arm that makes
+  // these exemptions self-cleaning. A test whose coverage disappears when the
+  // code gets healthier is a test that will not notice when it gets sick.
+  const exemptions = new Map(
+    (ctx.unreconciledPermissions ?? UNRECONCILED_MODULE_PERMISSIONS).map((e) => [
+      `${e.module}/${e.permission}`,
+      e,
+    ]),
+  );
+  let markedNotYetGranted = 0;
+  let modulesInScope = 0;
+
+  for (const mod of moduleNames(root)) {
+    const moduleDir = path.join(root, 'modules', mod);
+    const docPath = path.join(moduleDir, 'MODULE.md');
+    if (!fs.existsSync(docPath)) continue;
+    // Specification-only modules are out of scope — see the header.
+    if (codeFiles([moduleDir]).length === 0) continue;
+    const section = extractSection(readText(docPath), 'Permissions');
+    if (section === null) continue;
+    const table = parseMdTable(section);
+    // A module that states its permissions in prose ('_None._', 'None this
+    // phase.') declares no row for anything to be wrong about.
+    if (table === null) continue;
+    modulesInScope += 1;
+
+    const column = Math.max(
+      0,
+      table.headers.findIndex((h) => /permission/i.test(h)),
+    );
+    const relPath = `modules/${mod}/MODULE.md`;
+    for (const row of table.rows) {
+      const cell = row[column] ?? '';
+      const rowText = row.join(' | ');
+      for (const match of cell.matchAll(CELL_PERMISSION)) {
+        const permission = match[1];
+        scanned += 1;
+        if (catalogued.has(permission)) continue;
+        if (NOT_YET_GRANTED.test(rowText)) {
+          markedNotYetGranted += 1;
+          continue;
+        }
+        const key = `${mod}/${permission}`;
+        if (exemptions.has(key)) {
+          exempted.add(key);
+          continue;
+        }
+        violations.push({
+          file: relPath,
+          detail:
+            `declares permission '${permission}', which ${CATALOGUE_REL} does not define and no ` +
+            `migration seeds — so no role holds it, no code can check it, and the row documents ` +
+            `authority the system does not have. Either add it to the catalogue in a reviewed ` +
+            `migration AND the compile-time catalogue together, or mark the row as planned/unseeded ` +
+            `if it is a future right, or delete the row if the operation is owner self-service and ` +
+            `RBAC decides nothing (access-control.md §2)`,
+        });
+      }
+    }
+  }
+
+  for (const [key, entry] of exemptions) {
+    if (exempted.has(key)) continue;
+    violations.push({
+      file: `modules/${entry.module}/MODULE.md`,
+      detail:
+        `the unreconciled-declaration exemption for '${entry.permission}' no longer describes this ` +
+        `tree — the row is gone, the module lost its code, or the permission is now catalogued. It was ` +
+        `exempted because: ${entry.reason}. Delete the entry from UNRECONCILED_MODULE_PERMISSIONS in ` +
+        `scripts/checks/architecture.mjs — an exemption that outlives its drift is a hole nobody is watching`,
+    });
+  }
+
+  const live = [...exemptions.values()].filter((e) => exempted.has(`${e.module}/${e.permission}`));
+  const named = live.map((e) => `${e.module}/${e.permission}`).join(', ');
+  return {
+    ...violationsResult(
+      violations,
+      scanned,
+      `module tables checked: ${modulesInScope}; marked planned/unseeded: ${markedNotYetGranted}; ` +
+        `pre-existing unreconciled declarations: ${live.length}${named === '' ? '' : ` (${named})`}`,
+    ),
+    // Carried into the report so each exemption's REASON travels with the run
+    // that relied on it, rather than living only in this file.
+    exemptions: live,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Check registry (function map)
 // ---------------------------------------------------------------------------
 const CHECKS = {
@@ -2534,7 +3174,297 @@ const CHECKS = {
   checkGuardCallSites,
   checkLifecycleDeclarations,
   checkAssuranceClaims,
+  checkResourceLimits,
 };
+
+// The supplementary checks are not among the canonical 26 and so are not in
+// the registry, which left them resolvable only by name in the self-test. They
+// resolve through this map instead: one place that main() and the self-test
+// both read, so a supplementary check cannot be wired into the run and quietly
+// left out of the proof that it is not vacuous.
+
+// ---------------------------------------------------------------------------
+// Supplementary — capability registry truth
+// ---------------------------------------------------------------------------
+
+/**
+ * The registry must answer "does this capability's code exist?" honestly, and
+ * must not be read as answering anything else.
+ *
+ * TRANSACTIONS sat at NOT_IMPLEMENTED while seven bounded contexts, 27 mounted
+ * operations and seven Flutter feature folders answered for it. That was
+ * defended in prose as conservatism, on a redefinition of IMPLEMENTED that
+ * contradicted the type's own doc comment and its document's own dimension
+ * table. It is a false answer, and a false answer in the direction of "less"
+ * still teaches a reader to distrust the field.
+ *
+ * Two arms, because the failure has two directions:
+ *
+ *   A. UNDERSTATEMENT — phase >= 5 with the financial surface mounted, while
+ *      TRANSACTIONS still claims NOT_IMPLEMENTED.
+ *   B. OVERSTATEMENT — a capability that is IMPLEMENTED must not thereby carry
+ *      a DEPLOYED environment or a declared jurisdiction. Being built grants
+ *      nothing; deployment and declaration are separate reviewed acts.
+ */
+/**
+ * The jurisdictions a descriptor literal declares, however it is written.
+ *
+ * Returns `[]` only when the list is DEMONSTRABLY empty. An unrecognised shape
+ * — a spread, a named constant, anything this cannot read — is reported as
+ * unknown rather than as empty, because "I could not parse it" and "it declares
+ * nothing" are different answers and only one of them is safe to assume.
+ */
+/**
+ * The environments a descriptor literal marks DEPLOYED, however it is written.
+ *
+ * Keyed on proximity rather than on one spelling: `{ ['production']:
+ * 'DEPLOYED' }` and `{ production: DEPLOYED }` are the same claim as
+ * `{ production: 'DEPLOYED' }`, and a check that only reads the third is a
+ * check somebody can format their way past.
+ */
+function deployedEnvironmentsIn(body) {
+  const found = new Set();
+  for (const match of body.matchAll(/\b(local|dev|staging|production)\b/g)) {
+    if (/DEPLOYED/.test(body.slice(match.index, match.index + 48))) found.add(match[1]);
+  }
+  return [...found];
+}
+
+function declaredJurisdictionsIn(body) {
+  const match = /declaredJurisdictions\s*:\s*([^\n]*)/.exec(body);
+  if (match === null) return [];
+  const value = match[1];
+  if (/(?:Object\.freeze\(\s*)?\[\s*\]\s*\)?\s*,?\s*$/.test(value.trim())) return [];
+  const literals = [...value.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  return literals.length > 0 ? literals : ['<unparseable>'];
+}
+
+export function checkCapabilityRegistryTruth(ctx) {
+  const { root } = ctx;
+  const violations = [];
+  const registryRel = 'packages/capability-registry/src/index.ts';
+  const source = readText(path.join(root, registryRel));
+  if (source === null) {
+    return violationsResult(
+      [
+        {
+          file: registryRel,
+          detail: 'the capability registry is missing — nothing can be derived',
+        },
+      ],
+      0,
+    );
+  }
+
+  // Descriptors, parsed from the literal rather than imported: this runner is
+  // dependency-free and must not execute the tree it judges.
+  const descriptors = new Map();
+  for (const match of source.matchAll(/id:\s*'([A-Z_]+)'/g)) {
+    // Bracket-matched, not "up to the next `}),`". `deployment:
+    // Object.freeze({})` supplies exactly that sequence BEFORE
+    // declaredJurisdictions, so a naive slice cut the literal in half and the
+    // jurisdiction arm below could never fire — a mutation proved it silent.
+    const start = source.lastIndexOf('{', match.index);
+    if (start < 0) continue;
+    let depth = 0;
+    let end = -1;
+    for (let i = start; i < source.length; i += 1) {
+      const ch = source[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end < 0) continue;
+    const body = source.slice(start, end + 1);
+    descriptors.set(match[1], {
+      implementation: /implementation:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      lifecycle: /lifecycle:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      deployedKeys: deployedEnvironmentsIn(body),
+      declared: declaredJurisdictionsIn(body),
+    });
+  }
+
+  // The shared helper builds every capability that has no inline literal. Parse
+  // its body too and attribute it to each id it builds, so flipping the DEFAULT
+  // to IMPLEMENTED cannot move six capabilities past arm B unnoticed.
+  const helper = /function descriptor\([^)]*\)[^{]*\{([\s\S]*?)\n\}/.exec(source);
+  if (helper !== null) {
+    const body = helper[1];
+    const helperFacts = {
+      implementation: /implementation:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      lifecycle: /lifecycle:\s*'([A-Z_]+)'/.exec(body)?.[1] ?? null,
+      deployedKeys: deployedEnvironmentsIn(body),
+      declared: declaredJurisdictionsIn(body),
+    };
+    for (const built of source.matchAll(/([A-Z_]+):\s*descriptor\('([A-Z_]+)'\)/g)) {
+      if (!descriptors.has(built[2]))
+        descriptors.set(built[2], { ...helperFacts, viaHelper: true });
+    }
+  }
+
+  // Is the financial surface actually mounted? Measured from the tree, never
+  // from a list somebody maintains.
+  const financialDir = path.join(root, 'apps', 'api', 'src', 'financial');
+  const controllers = fs.existsSync(financialDir)
+    ? fs.readdirSync(financialDir).filter((f) => f.endsWith('.controller.ts'))
+    : [];
+  let routeCount = 0;
+  for (const file of controllers) {
+    const src = readText(path.join(financialDir, file)) ?? '';
+    routeCount += [...src.matchAll(/@(Get|Post|Put|Patch|Delete)\s*\(/g)].length;
+  }
+  const moduleSource = readText(path.join(financialDir, 'financial.module.ts')) ?? '';
+  const composition =
+    readText(path.join(root, 'apps', 'api', 'src', 'composition', 'phase5-modules.ts')) ?? '';
+  const mounted =
+    controllers.length > 0 &&
+    routeCount > 0 &&
+    /controllers\s*:\s*\[/.test(moduleSource) &&
+    composition.includes('FinancialApiModule');
+
+  let currentPhase = ctx.currentPhase;
+  if (typeof currentPhase !== 'number') {
+    try {
+      currentPhase = readJson(path.join(root, REGISTRY_REL))?.currentPhase ?? null;
+    } catch {
+      currentPhase = null;
+    }
+  }
+
+  // ARM A — understatement.
+  const transactions = descriptors.get('TRANSACTIONS');
+  if (typeof currentPhase === 'number' && currentPhase >= 5 && mounted && transactions) {
+    if (transactions.implementation === 'NOT_IMPLEMENTED') {
+      violations.push({
+        file: registryRel,
+        detail:
+          `TRANSACTIONS is NOT_IMPLEMENTED while the financial surface is mounted — ` +
+          `${controllers.length} controllers carrying ${routeCount} routes, registered through ` +
+          `FinancialApiModule at the composition root. 'implementation' asks whether the code ` +
+          `exists in this repository; it does`,
+      });
+    }
+  }
+
+  // ARM B — overstatement. Being IMPLEMENTED grants nothing.
+  for (const [id, descriptor] of descriptors) {
+    if (descriptor.implementation !== 'IMPLEMENTED') continue;
+    if (descriptor.deployedKeys.length > 0) {
+      violations.push({
+        file: registryRel,
+        detail:
+          `${id} is IMPLEMENTED and claims DEPLOYED in ${descriptor.deployedKeys.join(', ')} — ` +
+          `IMPLEMENTED is a fact about this repository and grants nothing; deployment is a ` +
+          `separate reviewed act with no corroborating evidence here`,
+      });
+    }
+    if (descriptor.declared.length > 0) {
+      violations.push({
+        file: registryRel,
+        detail:
+          `${id} is IMPLEMENTED and declares jurisdictions ${descriptor.declared.join(', ')} — ` +
+          `a jurisdiction declaration is a separate reviewed act, not a consequence of the code ` +
+          `existing`,
+      });
+    }
+  }
+
+  return violationsResult(
+    violations,
+    descriptors.size,
+    `descriptors parsed: ${descriptors.size}; financial controllers: ${controllers.length}; ` +
+      `routes: ${routeCount}; phase: ${currentPhase ?? 'unknown'}`,
+  );
+}
+
+const SUPPLEMENTARY_CHECKS = {
+  checkAdminNoDbDriver,
+  checkIngestionNotMountedBeforePhase5,
+  checkModulePermissionsInCatalogue,
+  checkCapabilityRegistryTruth,
+};
+
+/**
+ * The supplementary checks the runner executes, in printed order.
+ *
+ * A table rather than four hand-written blocks, so the status decision and the
+ * tally arithmetic live in exactly one place (`tallySupplementary`) and a
+ * self-test can drive that place directly.
+ */
+const SUPPLEMENTARY_RUNS = [
+  {
+    name: 'admin-no-db-driver',
+    fn: checkAdminNoDbDriver,
+    describe: (r) => `deps checked: ${r.scanned}`,
+  },
+  {
+    name: 'phase5-ingestion-not-mounted-early',
+    fn: checkIngestionNotMountedBeforePhase5,
+    describe: (r) => (r.applicable ? `files scanned: ${r.scanned}` : 'historical guard, retired'),
+  },
+  {
+    name: 'module-permissions-in-catalogue',
+    fn: checkModulePermissionsInCatalogue,
+    describe: (r) => `declarations checked: ${r.scanned}; ${r.note}`,
+  },
+  {
+    name: 'capability-registry-truth',
+    fn: checkCapabilityRegistryTruth,
+    describe: (r) => `${r.note}`,
+  },
+];
+
+/**
+ * The status of ONE check result, and the only place that decision is made.
+ *
+ * Extracted so the zero-scan rule cannot be removed without a self-test
+ * failing, which is the property KAR-RSK-044 claims for the whole runner and
+ * had for exactly one check. A control that examined nothing did not hold
+ * anything: it is a FAIL, not a PASS. A control whose window is legitimately
+ * empty says so by returning `applicable: false` and is reported N/A, which is
+ * a third status excluded from the pass count.
+ */
+function statusForResult(result) {
+  if (result.applicable === false) return 'N/A';
+  if (result.scanned === 0) return 'FAIL';
+  return result.violations.length === 0 ? 'PASS' : 'FAIL';
+}
+
+/**
+ * Turns supplementary results into statuses and counts — the ONE place that
+ * decides what a supplementary row contributes to the headline.
+ *
+ * Three statuses, and the third exists because two were not enough:
+ *
+ *   PASS  the control ran and found nothing wrong
+ *   FAIL  the control ran and found something wrong
+ *   N/A   the control had nothing to check, and says why
+ *
+ * `N/A` is counted in `notApplicable` and NOWHERE else. It is deliberately not
+ * folded into `passed`: the pass total is a reader's shorthand for "how many
+ * controls held", and a control that could not have failed did not hold
+ * anything. Folding it back in is precisely the defect this function was
+ * extracted to make un-reintroducible without a self-test failing — see
+ * `RUNNER_TALLY_CASES`.
+ */
+function tallySupplementary(runs) {
+  let passed = 0;
+  let failed = 0;
+  let notApplicable = 0;
+  const rows = runs.map(({ name, result, detail }) => {
+    const status = statusForResult(result);
+    if (status === 'N/A') notApplicable += 1;
+    else if (status === 'PASS') passed += 1;
+    else failed += 1;
+    return { name, status, detail, result };
+  });
+  return { rows, passed, failed, notApplicable };
+}
 
 // ---------------------------------------------------------------------------
 // Registry loading, validation, activation gate
@@ -2622,14 +3552,183 @@ function buildSelfTestFixture() {
     fs.writeFileSync(full, content);
   };
 
+  // capability-registry-truth fixtures. Arm A needs a mounted financial
+  // surface and a TRANSACTIONS descriptor that denies its own code exists;
+  // arm B needs a built capability that helps itself to a deployment and a
+  // jurisdiction. Both were mutation-proved by hand when the check landed and
+  // by NOTHING afterwards, which is the state every other checker here exists
+  // to refuse.
+  write(
+    'apps/api/src/financial/fixture-financial.controller.ts',
+    [
+      "@Controller('financial/fixture')",
+      'export class FixtureFinancialController {',
+      '  @Get()',
+      '  list() {}',
+      '}',
+    ].join('\n'),
+  );
+  write(
+    'apps/api/src/financial/financial.module.ts',
+    'export class FinancialApiModule { static register() { return { controllers: [FixtureFinancialController] }; } }',
+  );
+  write('apps/api/src/composition/phase5-modules.ts', 'export const wired = FinancialApiModule;');
+
+  // checkMoneyDiscipline: a float in each of the layers the WIDENED scope
+  // added. The single pre-existing seed lives in a pure package, which was in
+  // scope before the widening — so narrowing the scope back would not have
+  // failed the self-test, and the widening was proved by nothing.
+  write(
+    'modules/beta/infrastructure/persistence/row-mappers.ts',
+    'export function toDomain(row) { return { balance: Number.parseFloat(row.balance_minor) }; }',
+  );
+  write('apps/worker/src/money-boundary.ts', 'export interface Wire { readonly amount: number; }');
+
+  // Test 24 fixture: every failure shape at once, so a single seeded tree
+  // proves each arm rather than only the first one the checker happens to hit.
+  //
+  //   * a mounted path that references NO central policy
+  //   * a mounted path that writes its bound INLINE, bypassing the policy
+  //   * a policy missing a required field (no maxBatchSize)
+  //   * a policy whose deadline is zero, and one whose rows are Infinity
+  //   * two policies sharing one pathId
+  //   * a policy no real path references
+  write(
+    'modules/statement-imports/presentation/http/unbounded-import.controller.ts',
+    [
+      `@Controller('imports')`,
+      `export class UnboundedImportController {`,
+      `  @Post('source')`,
+      `  upload() { return null; }`,
+      `}`,
+    ].join('\n'),
+  );
+  write(
+    'modules/transactions/presentation/http/inline-limit.controller.ts',
+    [
+      `import { INGESTION_LIMIT_POLICIES } from '@karar/platform';`,
+      `@Controller('manual')`,
+      `export class InlineLimitController {`,
+      `  private readonly maxBytes = 5242880;`,
+      `  @Post('entry')`,
+      `  create() { return INGESTION_LIMIT_POLICIES.manualTransaction; }`,
+      `}`,
+    ].join('\n'),
+  );
+  write(
+    'packages/platform/src/ingestion/limits.ts',
+    [
+      // A HEADER, deliberately, so the registry does not begin at offset zero.
+      // The real file opens with a long explanatory comment and the registry
+      // sits two thirds of the way down it. This fixture used to start with
+      // the registry, which made every offset bug in the reader invisible:
+      // a defect that skipped `start` characters twice still landed inside a
+      // fixture whose `start` was 0, so the self-test passed while the reader
+      // read nothing from the real file. A fixture that is easier to parse
+      // than the thing it stands for tests the fixture.
+      `/**`,
+      ` * Ingestion limit policies.`,
+      ` *`,
+      ` * Padding that mirrors the real file's shape: the registry below must`,
+      ` * not be the first thing in this source, or an offset applied twice`,
+      ` * still lands before it and the reader appears to work.`,
+      ` */`,
+      `export const INGESTION_PATH_IDS = ['fixture/manual', 'fixture/zero'] as const;`,
+      ``,
+      `export const INGESTION_LIMIT_POLICIES = {`,
+      `  manualTransaction: {`,
+      `    pathId: 'fixture/manual',`,
+      `    maxBytes: 1024,`,
+      `    maxRows: 1,`,
+      `    maxColumns: 8,`,
+      `    maxFieldBytes: 256,`,
+      `    maxPageSize: 50,`,
+      `    defaultPageSize: 25,`,
+      `    maxBufferedRows: 1,`,
+      `    maxBufferedBytes: 1024,`,
+      `    deadlineMs: 1000,`,
+      `    maxReportedErrors: 10,`,
+      `  },`,
+      `  zeroDeadline: {`,
+      `    pathId: 'fixture/zero',`,
+      `    maxBytes: 1024,`,
+      `    maxRows: 10,`,
+      `    maxColumns: 8,`,
+      `    maxFieldBytes: 256,`,
+      `    maxPageSize: 50,`,
+      `    defaultPageSize: 25,`,
+      `    maxBufferedRows: 1,`,
+      `    maxBufferedBytes: 1024,`,
+      `    deadlineMs: 0,`,
+      `    maxReportedErrors: 10,`,
+      `    maxBatchSize: 5,`,
+      `  },`,
+      `  infiniteRows: {`,
+      `    pathId: 'fixture/zero',`,
+      `    maxBytes: 1024,`,
+      `    maxRows: Infinity,`,
+      `    maxColumns: 8,`,
+      `    maxFieldBytes: 256,`,
+      `    maxPageSize: 50,`,
+      `    defaultPageSize: 25,`,
+      `    maxBufferedRows: 1,`,
+      `    maxBufferedBytes: 1024,`,
+      `    deadlineMs: 1000,`,
+      `    maxReportedErrors: 10,`,
+      `    maxBatchSize: 5,`,
+      `  },`,
+      `};`,
+    ].join('\n'),
+  );
+
+  // Pre-activation guard fixture: registry still at phase 4 while a Phase 5
+  // ingestion controller is mounted — exactly the state that would let an
+  // ingestion path go live with test 24 still deferred.
+  write(
+    path.join('docs', 'testing', 'architecture-test-registry.json'),
+    JSON.stringify({ currentPhase: 4, tests: [] }),
+  );
+  write(
+    'modules/transactions/presentation/http/fixture-import.controller.ts',
+    [
+      "import { Controller, Post } from '@nestjs/common';",
+      "@Controller('transactions')",
+      'export class FixtureImportController {',
+      '  @Post()',
+      '  create() {',
+      '    return null;',
+      '  }',
+      '}',
+    ].join('\n'),
+  );
+  // The guard's SECOND discovery arm: a composition file wires an ingestion
+  // use case without mounting a route of its own. Seeded separately from the
+  // controller above so narrowing either the `@Controller` arm or the
+  // use-case arm leaves the other case failing, instead of both arms going
+  // quiet together and the guard reporting a clean scan.
+  write(
+    'apps/api/src/composition/fixture-early-wiring.ts',
+    [
+      "import { CreateManualTransaction } from '@karar/transactions';",
+      'export const wired = new CreateManualTransaction();',
+    ].join('\n'),
+  );
+
   write(
     'packages/shared-kernel/package.json',
     JSON.stringify({ name: '@karar/shared-kernel', dependencies: { lodash: '^4.17.0' } }),
   );
+  // The kernel fixture breaks the cap in BOTH directions at once: it OMITS a
+  // universal and ADDS one that does not belong. A fixture that only added an
+  // export would leave the "missing" arm unproven, and that arm is the one
+  // that catches a rename — a renamed universal is simultaneously missing
+  // under its old name and extra under its new one, which is also how an
+  // `export { X as Y }` alias that changes the public surface is caught.
   write(
     'packages/shared-kernel/src/index.ts',
-    KERNEL_EXPORTS.map((n) => `export type ${n} = unknown;`).join('\n') +
-      `\nexport type ExtraTenthExport = never;\n`,
+    KERNEL_EXPORTS.filter((n) => n !== 'CalendarDay')
+      .map((n) => `export type ${n} = unknown;`)
+      .join('\n') + `\nexport type ExtraTenthExport = never;\n`,
   );
   write(
     'packages/financial-engine/package.json',
@@ -2794,6 +3893,62 @@ function buildSelfTestFixture() {
   write(
     'apps/admin/package.json',
     JSON.stringify({ name: '@karar/admin', dependencies: { pg: '^8.0.0' } }),
+  );
+
+  // module-permissions-in-catalogue fixture: one closed catalogue, and three
+  // MODULE.md tables standing in the three relations to it that matter — a
+  // right the catalogue never held, a right the row itself says is unseeded,
+  // and a right declared by a module that has shipped no code at all.
+  write(
+    'modules/authorization/domain/catalogue.ts',
+    [
+      'export const PERMISSION_CATALOGUE = [',
+      "  { name: 'fixture.thing.read', capability: 'fixture', description: 'seeded' },",
+      '];',
+      '',
+    ].join('\n'),
+  );
+  write('modules/gamma/application/list-things.ts', 'export const listThings = () => [];\n');
+  write(
+    'modules/gamma/MODULE.md',
+    [
+      '# Module: gamma',
+      '',
+      '## Permissions',
+      '',
+      '| Permission | Role(s) |',
+      '|---|---|',
+      '| `fixture.thing.read` | `SUPPORT` |',
+      '| `fixture.ghost.write` | `SUPPORT` |',
+      '',
+    ].join('\n'),
+  );
+  write('modules/delta/application/plan-things.ts', 'export const planThings = () => [];\n');
+  write(
+    'modules/delta/MODULE.md',
+    [
+      '# Module: delta',
+      '',
+      '## Permissions',
+      '',
+      '| Permission | Role(s) |',
+      '|---|---|',
+      '| `fixture.later.manage` | _none — declared, deliberately unseeded_ |',
+      '',
+    ].join('\n'),
+  );
+  write(
+    'modules/epsilon/MODULE.md',
+    [
+      '# Module: epsilon',
+      '',
+      '## Permissions',
+      '',
+      '| Permission | Role(s) |',
+      '|---|---|',
+      '| `fixture.future.read` | `USER` |',
+      '',
+    ].join('\n'),
   );
 
   // Tests 9/21/22 seeds: a fixture schema carrying every failure shape.
@@ -2984,10 +4139,82 @@ function buildSelfTestFixture() {
     ].join('\n'),
   );
 
+  // Appended rather than written: `packages/capability-registry/src/index.ts`
+  // is already the fixture for test 19 (disclosure-bearing capabilities), and
+  // overwriting it made THIS check's three cases silently vacuous while test
+  // 19 kept passing. Two checkers sharing one fixture path is fine; the second
+  // one clobbering the first is not.
+  fs.appendFileSync(
+    path.join(root, 'packages', 'capability-registry', 'src', 'index.ts'),
+    [
+      '',
+      'export const CAPABILITY_REGISTRY = Object.freeze({',
+      '  TRANSACTIONS: Object.freeze({',
+      "    id: 'TRANSACTIONS',",
+      "    lifecycle: 'PLANNED',",
+      "    implementation: 'NOT_IMPLEMENTED',",
+      '    deployment: Object.freeze({}),',
+      '    declaredJurisdictions: Object.freeze([]),',
+      '  }),',
+      '  OVERSTATED: Object.freeze({',
+      "    id: 'OVERSTATED',",
+      "    lifecycle: 'ALPHA',",
+      "    implementation: 'IMPLEMENTED',",
+      "    deployment: Object.freeze({ production: 'DEPLOYED' }),",
+      "    declaredJurisdictions: Object.freeze(['QA']),",
+      '  }),',
+      '  HONEST: Object.freeze({',
+      "    id: 'HONEST',",
+      "    lifecycle: 'ALPHA',",
+      "    implementation: 'IMPLEMENTED',",
+      '    deployment: Object.freeze({}),',
+      '    declaredJurisdictions: Object.freeze([]),',
+      '  }),',
+      '});',
+      '',
+    ].join('\n'),
+  );
+
   return root;
 }
 
 const SELF_TEST_CASES = [
+  // ---- The historical pre-activation guard, all of its arms ----------------
+  //
+  // INSIDE its window (phase 4): an ingestion controller mounted while the
+  // registry still reads phase 4 must be caught, or the guard is decorative.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expect: /fixture-import\.controller/,
+  },
+  // …and the SECOND discovery arm, which is not the controller arm: a
+  // composition file that wires an ingestion use case mounts nothing itself
+  // and must still be caught. Seeded separately so a narrowing of either
+  // regex leaves the other case failing rather than both going quiet at once.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expect: /fixture-early-wiring\.ts/,
+  },
+  // …and the guard's own blindness: inside the window, a discovery rule that
+  // reaches zero files is a FAILURE. Without this, narrowing
+  // PHASE5_INGESTION_MODULES or moving the composition root would restore
+  // exactly the vacuous green this whole rework exists to remove — the check
+  // would report "no violations" having examined nothing.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4, emptyTree: true },
+    expect: /discovery rule reached zero files/,
+  },
+  // …and the directory every real financial controller in this repository
+  // actually lives in. The guard's list did not include it, so its controller
+  // arm reached nothing real; this case fails if that regression returns.
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expect: /unbounded-import\.controller/,
+  },
   { fn: 'checkDomainPurity', expect: /express/ },
   { fn: 'checkLayerDirection', expect: /infrastructure/ },
   { fn: 'checkModuleBoundary', expect: /beta/ },
@@ -3046,6 +4273,27 @@ const SELF_TEST_CASES = [
   { fn: 'checkControllerComplexity', expect: /domain/ },
   { fn: 'checkControllerComplexity', expect: /route handlers/ },
   { fn: 'checkMoneyDiscipline', expect: /amount/ },
+  // The WIDENED scope, seeded in each layer it added. Without these, reverting
+  // the scope to domain+application would have kept the self-test green.
+  { fn: 'checkMoneyDiscipline', expect: /row-mappers/ },
+  { fn: 'checkMoneyDiscipline', expect: /money-boundary/ },
+  // capability-registry-truth, both arms. `ctx` gives each case its own cached
+  // run, and the phase is passed in rather than read from the fixture registry.
+  {
+    fn: 'checkCapabilityRegistryTruth',
+    expect: /TRANSACTIONS is NOT_IMPLEMENTED while the financial surface is mounted/,
+    ctx: { currentPhase: 5 },
+  },
+  {
+    fn: 'checkCapabilityRegistryTruth',
+    expect: /OVERSTATED is IMPLEMENTED and claims DEPLOYED/,
+    ctx: { currentPhase: 5 },
+  },
+  {
+    fn: 'checkCapabilityRegistryTruth',
+    expect: /OVERSTATED is IMPLEMENTED and declares jurisdictions/,
+    ctx: { currentPhase: 5 },
+  },
   { fn: 'checkEventCatalogue', expect: /FakeThingHappened/ },
   { fn: 'checkProviderBoundary', expect: /@aws-sdk/ },
   { fn: 'checkDeterministicDomain', expect: /Date\.now/ },
@@ -3057,7 +4305,21 @@ const SELF_TEST_CASES = [
   // …and a filesystem import no manifest would ever show.
   { fn: 'checkPurePackages', expect: /capability-registry imports 'node:fs'/ },
   { fn: 'checkStorageBoundary', expect: /client-s3/ },
+  // Test 20 in both directions: an export that does not belong…
   { fn: 'checkKernelSurface', expect: /ExtraTenthExport/ },
+  // Test 24, every failure shape, each proven separately against one tree.
+  { fn: 'checkResourceLimits', expect: /unbounded-import\.controller.*references no policy/s },
+  {
+    fn: 'checkResourceLimits',
+    expect: /inline-limit\.controller.*numeric ingestion bound inline/s,
+  },
+  { fn: 'checkResourceLimits', expect: /manualTransaction.*declares no maxBatchSize/s },
+  { fn: 'checkResourceLimits', expect: /zeroDeadline.*deadlineMs is '0'/s },
+  { fn: 'checkResourceLimits', expect: /infiniteRows.*maxRows is 'Infinity'/s },
+  { fn: 'checkResourceLimits', expect: /duplicate pathId 'fixture\/zero'/ },
+  { fn: 'checkResourceLimits', expect: /declares limits for a path nothing references/ },
+  // …and a universal that is absent.
+  { fn: 'checkKernelSurface', expect: /universal 'CalendarDay' is missing/ },
   // Test 19: a pack clearing a disclosure-bearing capability with no entry…
   { fn: 'checkApprovalPolicy', expect: /fx\/no-entry.*FIXTURE_DISCLOSING/ },
   // …one whose entry is not DECIDED…
@@ -3079,6 +4341,24 @@ const SELF_TEST_CASES = [
   // …and a malformed evidence id.
   { fn: 'checkAssuranceClaims', expect: /AC-004: evidence id 'EV-4' is malformed/ },
   { fn: 'checkAdminNoDbDriver', expect: /'pg'/ },
+  // A MODULE.md table naming a right the authorization catalogue never held —
+  // the drift that let six Phase 5 modules document twelve permissions nothing
+  // granted, nothing seeded, and no code consulted.
+  { fn: 'checkModulePermissionsInCatalogue', expect: /fixture\.ghost\.write/ },
+  // …and the other arm: an exemption that has stopped describing the tree must
+  // fail, or an allowance outlives the drift it was written for. The fixture
+  // carries none of the exempted modules, so every entry is stale there.
+  {
+    fn: 'checkModulePermissionsInCatalogue',
+    // A stale exemption: the fixture's `delta` marks its right unseeded, so an
+    // entry excusing it describes drift that is gone.
+    ctx: {
+      unreconciledPermissions: [
+        { module: 'delta', permission: 'fixture.later.manage', reason: 'seeded staleness' },
+      ],
+    },
+    expect: /exemption for '[a-z_.]+' no longer/,
+  },
 ];
 
 // Negative cases: seeded shapes a checker must NOT flag — the proof an
@@ -3101,28 +4381,143 @@ const NEGATIVE_SELF_TEST_CASES = [
   // that arms the rule — the check is not "every pack fails".
   { fn: 'checkApprovalPolicy', forbid: /fx\/correct/ },
   { fn: 'checkApprovalPolicy', forbid: /[/\\]armed-activation/ },
+  // A catalogued permission is never drift…
+  { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.thing\.read/ },
+  // …a row that SAYS the right is not granted yet is an honest declaration,
+  // not a claim (the shape capability, jurisdiction, tenancy and control-plane
+  // already use)…
+  { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.later\.manage/ },
+  // …and a specification-only module's table is a plan for a later phase, so
+  // it is out of scope until that module ships its first source file.
+  { fn: 'checkModulePermissionsInCatalogue', forbid: /fixture\.future\.read/ },
+];
+
+/**
+ * Applicability cases — the arm no violation-based case can express.
+ *
+ * A violation case asserts "this check FAILED on the seeded shape". There is
+ * no seeded shape that makes a retired guard say `NOT_APPLICABLE`; the phase
+ * does. So this category asserts the STATUS a check reports rather than its
+ * violations, which is the only way to hold the line that a retired control
+ * must not report PASS.
+ */
+const APPLICABILITY_CASES = [
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 5 },
+    expectApplicable: false,
+    reason: /RETIRED at phase 5/,
+    why: 'at phase 5 the guard has no window left; reporting PASS there is the vacuous green this rework removed',
+  },
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 6 },
+    expectApplicable: false,
+    reason: /RETIRED at phase 5/,
+    why: 'the retirement holds for every later phase too, not only the one it was written at',
+  },
+  {
+    fn: 'checkIngestionNotMountedBeforePhase5',
+    ctx: { currentPhase: 4 },
+    expectApplicable: true,
+    why: 'inside its window the guard must be a real, running control',
+  },
+  // The active control that OWNS the ingestion surface from phase 5 onward is
+  // applicable at phase 5 — the retirement above hands its duty to something
+  // that actually runs, rather than to nothing.
+  {
+    fn: 'checkResourceLimits',
+    ctx: {},
+    expectApplicable: true,
+    why: 'test 24 is the successor control and must be live at every phase the guard is retired at',
+  },
+];
+
+/**
+ * Runner-tally cases — the accounting itself, driven directly.
+ *
+ * The defect this rework closed was never inside a checker. It was in the
+ * runner: it decided PASS by asking whether a violation list was empty, which
+ * is true both of a control that held and of a control that never ran. These
+ * cases feed `tallySupplementary` synthetic results and assert where each one
+ * lands, so restoring the old arithmetic — counting a not-applicable row as a
+ * pass — fails the self-test instead of quietly inflating the headline.
+ */
+const RUNNER_TALLY_CASES = [
+  {
+    name: 'a not-applicable row is N/A and is NOT counted as a pass',
+    runs: [
+      { name: 'retired', result: notApplicableResult('retired'), detail: '' },
+      { name: 'real', result: violationsResult([], 12), detail: '' },
+    ],
+    assert: (t) =>
+      t.passed === 1 &&
+      t.notApplicable === 1 &&
+      t.failed === 0 &&
+      t.rows[0].status === 'N/A' &&
+      t.rows[1].status === 'PASS',
+  },
+  {
+    name: 'a check that scanned NOTHING is FAIL, not PASS',
+    runs: [{ name: 'quiet', result: violationsResult([], 0), detail: '' }],
+    assert: (t) => t.failed === 1 && t.passed === 0 && t.notApplicable === 0,
+  },
+  {
+    name: 'a check whose window is legitimately empty is N/A, not a zero-scan FAIL',
+    runs: [{ name: 'retired', result: notApplicableResult('retired'), detail: '' }],
+    assert: (t) => t.notApplicable === 1 && t.failed === 0 && t.passed === 0,
+  },
+  {
+    name: 'a failing row is FAIL and is counted once',
+    runs: [
+      { name: 'broken', result: violationsResult([{ file: 'f', detail: 'd' }], 3), detail: '' },
+    ],
+    assert: (t) => t.failed === 1 && t.passed === 0 && t.notApplicable === 0,
+  },
+  {
+    name: 'the live guard at phase 4 is tallied as a real control, not as N/A',
+    runs: null,
+    assertLive: (fixtureRoot) => {
+      const result = checkIngestionNotMountedBeforePhase5({ root: fixtureRoot, currentPhase: 4 });
+      const t = tallySupplementary([{ name: 'guard', result, detail: '' }]);
+      return t.notApplicable === 0 && t.failed === 1;
+    },
+  },
+  {
+    name: 'the retired guard at phase 5 lands in N/A and adds nothing to passed',
+    runs: null,
+    assertLive: (fixtureRoot) => {
+      const result = checkIngestionNotMountedBeforePhase5({ root: fixtureRoot, currentPhase: 5 });
+      const t = tallySupplementary([{ name: 'guard', result, detail: '' }]);
+      return t.notApplicable === 1 && t.passed === 0 && t.failed === 0;
+    },
+  },
 ];
 
 function runSelfTest() {
   const fixtureRoot = buildSelfTestFixture();
+  const emptyTreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'karar-arch-empty-'));
   const failures = [];
   try {
     const results = new Map();
-    const resultFor = (fn) => {
-      if (!results.has(fn)) {
-        results.set(
-          fn,
-          CHECKS[fn]
-            ? CHECKS[fn]({ root: fixtureRoot })
-            : fn === 'checkAdminNoDbDriver'
-              ? checkAdminNoDbDriver({ root: fixtureRoot })
-              : null,
-        );
+    // Keyed by function AND by any extra context a case supplies, so a case
+    // that seeds different inputs gets its own run rather than a cached one
+    // from a different set of inputs.
+    const resultFor = (fn, extra) => {
+      const key = `${fn}|${extra === undefined ? '' : JSON.stringify(extra)}`;
+      if (!results.has(key)) {
+        const check = CHECKS[fn] ?? SUPPLEMENTARY_CHECKS[fn] ?? null;
+        // `emptyTree` points a case at a directory with nothing in it, which is
+        // how a "your discovery rule found nothing" arm is seeded without
+        // deleting the fixture every other case reads.
+        const { emptyTree, ...rest } = extra ?? {};
+        const root = emptyTree === true ? emptyTreeRoot : fixtureRoot;
+        results.set(key, check === null ? null : check({ root, ...rest }));
       }
-      return results.get(fn);
+      return results.get(key);
     };
-    for (const { fn, expect } of SELF_TEST_CASES) {
-      const result = resultFor(fn);
+    for (const { fn, expect, ctx } of SELF_TEST_CASES) {
+      const result = resultFor(fn, ctx);
       if (!result) {
         failures.push(`${fn}: unknown check`);
         continue;
@@ -3140,8 +4535,8 @@ function runSelfTest() {
         );
       }
     }
-    for (const { fn, forbid } of NEGATIVE_SELF_TEST_CASES) {
-      const result = resultFor(fn);
+    for (const { fn, forbid, ctx } of NEGATIVE_SELF_TEST_CASES) {
+      const result = resultFor(fn, ctx);
       if (!result) {
         failures.push(`${fn}: unknown check (negative case)`);
         continue;
@@ -3153,10 +4548,57 @@ function runSelfTest() {
         );
       }
     }
+    for (const { fn, ctx, expectApplicable, reason, why } of APPLICABILITY_CASES) {
+      const result = resultFor(fn, ctx);
+      if (!result) {
+        failures.push(`${fn}: unknown check (applicability case)`);
+        continue;
+      }
+      const applicable = result.applicable !== false;
+      if (applicable !== expectApplicable) {
+        failures.push(
+          `${fn}: reported applicable=${applicable}, expected ${expectApplicable} — ${why}`,
+        );
+        continue;
+      }
+      if (!expectApplicable) {
+        if (typeof result.reason !== 'string' || result.reason.trim() === '') {
+          failures.push(`${fn}: reported NOT_APPLICABLE with no reason — ${why}`);
+        } else if (reason && !reason.test(result.reason)) {
+          failures.push(
+            `${fn}: NOT_APPLICABLE for the wrong reason (${reason}); got: ${result.reason}`,
+          );
+        }
+        if (result.violations.length > 0) {
+          failures.push(`${fn}: reported NOT_APPLICABLE yet carried violations`);
+        }
+      }
+    }
+    for (const testCase of RUNNER_TALLY_CASES) {
+      try {
+        const held =
+          testCase.runs === null
+            ? testCase.assertLive(fixtureRoot)
+            : testCase.assert(tallySupplementary(testCase.runs));
+        if (!held) {
+          failures.push(`runner tally: ${testCase.name} — the accounting does not hold`);
+        }
+      } catch (err) {
+        failures.push(`runner tally: ${testCase.name} — threw: ${err.message}`);
+      }
+    }
   } finally {
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    fs.rmSync(emptyTreeRoot, { recursive: true, force: true });
   }
-  return { cases: SELF_TEST_CASES.length + NEGATIVE_SELF_TEST_CASES.length, failures };
+  return {
+    cases:
+      SELF_TEST_CASES.length +
+      NEGATIVE_SELF_TEST_CASES.length +
+      APPLICABILITY_CASES.length +
+      RUNNER_TALLY_CASES.length,
+    failures,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -3184,6 +4626,9 @@ function main() {
   let failCount = 0;
   let passCount = 0;
   let skipCount = 0;
+  // Not-applicable rows: controls that had nothing to check. Kept apart from
+  // `passCount` on purpose — see `tallySupplementary`.
+  let naCount = 0;
 
   console.log(
     `Architecture tests — ${REGISTRY_REL} (currentPhase ${registry?.currentPhase ?? '?'})`,
@@ -3216,7 +4661,47 @@ function main() {
         }
         if (!fnCache.has(fnName)) fnCache.set(fnName, CHECKS[fnName]({ root: REPO_ROOT }));
         const result = fnCache.get(fnName);
-        const status = result.violations.length === 0 ? 'PASS' : 'FAIL';
+        // A CHECK THAT EXAMINED NOTHING DID NOT PASS.
+        //
+        // KAR-RSK-044 and CI-017 both record the class as fixed — "every
+        // checker that can go quiet now fails on a zero-scan inside its own
+        // window" — and an independent review measured what that meant: ONE
+        // `scanned === 0` guard, inside one retired historical guard, in 4760
+        // lines. The reviewer reproduced the original defect on a different
+        // check by making `modules/` read as empty and got
+        // `PASS test 16 Module ownership (scanned: 0)` counted in the headline
+        // with the self-test green. The instance was fixed; the class was not,
+        // and the register stated the class.
+        //
+        // THIS COMMENT CLAIMED "the ONE place every numbered check's status is
+        // decided" WHILE DUPLICATING THE DECISION INLINE. `statusForResult`
+        // was called only from `tallySupplementary`, so the two self-test cases
+        // added to protect the rule reached the supplementary path — which had
+        // a guard already — and not this one. Deleting the rule here left the
+        // 88-case self-test entirely green. A delta reviewer measured that on
+        // the commit that introduced the sentence.
+        //
+        // It calls the shared decision now, which is what the sentence said.
+        const status = statusForResult(result);
+        if (status === 'N/A') {
+          // A numbered check that declares an empty window is N/A, and N/A is
+          // counted nowhere near `passed`. The inline version had no N/A arm
+          // at all, so such a check reported PASS — reproducing, on the fixing
+          // commit, the exact headline the fix was written to make impossible.
+          naCount += 1;
+          console.log(
+            `N/A     ${label} ${test.name} — ${result.reason ?? 'the check declared its window empty'}`,
+          );
+          results.push({ id: test.id, name: test.name, status, scanned: result.scanned });
+          continue;
+        }
+        if (status === 'FAIL' && result.violations.length === 0) {
+          console.log(
+            `          scanned 0 files inside its own window — a control that ` +
+              `examined nothing did not hold anything. If the window is legitimately ` +
+              `empty, the check must say so with applicable:false and be reported N/A.`,
+          );
+        }
         if (status === 'PASS') passCount += 1;
         else failCount += 1;
         const scanNote = `scanned: ${result.scanned}${result.note ? `; ${result.note}` : ''}`;
@@ -3249,15 +4734,29 @@ function main() {
   }
 
   // Supplementary structural checks not numbered in the canonical 26.
+  //
+  // Table-driven, and that is the repair rather than a tidy-up. Each of these
+  // used to be four hand-written blocks with their own tally arithmetic, and
+  // one of them — `phase5-ingestion-not-mounted-early` — returned an empty
+  // violation list at phase 5 because it had nothing left to check. The
+  // arithmetic could not tell that apart from a control that looked and found
+  // nothing, so it printed `PASS (files scanned: 0)` and added it to the
+  // headline. `tallySupplementary` below is the single place that decides, it
+  // reads `applicable`, and the self-test drives it directly.
   console.log('');
-  const adminResult = checkAdminNoDbDriver({ root: REPO_ROOT });
-  const adminStatus = adminResult.violations.length === 0 ? 'PASS' : 'FAIL';
-  if (adminStatus === 'FAIL') failCount += 1;
-  else passCount += 1;
-  console.log(
-    `${adminStatus.padEnd(7)} supplementary     admin-no-db-driver (deps checked: ${adminResult.scanned})`,
-  );
-  for (const v of adminResult.violations) console.log(`          ${v.file} — ${v.detail}`);
+  const supplementaryRuns = SUPPLEMENTARY_RUNS.map(({ name, fn, describe }) => {
+    const result = fn({ root: REPO_ROOT });
+    return { name, result, detail: describe(result) };
+  });
+  const supplementaryTally = tallySupplementary(supplementaryRuns);
+  passCount += supplementaryTally.passed;
+  failCount += supplementaryTally.failed;
+  naCount += supplementaryTally.notApplicable;
+  for (const row of supplementaryTally.rows) {
+    console.log(`${row.status.padEnd(7)} supplementary     ${row.name} (${row.detail})`);
+    for (const v of row.result.violations) console.log(`          ${v.file} — ${v.detail}`);
+    if (row.status === 'N/A') console.log(`          not applicable: ${row.result.reason}`);
+  }
 
   // Self-test at the end of every normal run: prove the passes above are not
   // vacuous by asserting each checker fails on seeded violations.
@@ -3275,7 +4774,9 @@ function main() {
   const ok = failCount === 0 && registryErrors.length === 0 && selfTestFailures.length === 0;
   console.log('');
   console.log(
-    `Summary: ${passCount} passed, ${failCount} failed, ${skipCount} skipped (deferred by activation phase); registry errors: ${registryErrors.length}; self-test: ${selfTestFailures.length === 0 ? 'ok' : 'FAILED'}`,
+    `Summary: ${passCount} passed, ${failCount} failed, ${skipCount} skipped (deferred by activation phase), ` +
+      `${naCount} not applicable (retired guards, excluded from the pass count); ` +
+      `registry errors: ${registryErrors.length}; self-test: ${selfTestFailures.length === 0 ? 'ok' : 'FAILED'}`,
   );
 
   const outDir = ensureOutDir(REPO_ROOT);
@@ -3283,13 +4784,28 @@ function main() {
     generatedAt: new Date().toISOString(),
     currentPhase: registry?.currentPhase ?? null,
     ok,
-    summary: { passed: passCount, failed: failCount, skipped: skipCount },
+    summary: {
+      passed: passCount,
+      failed: failCount,
+      skipped: skipCount,
+      notApplicable: naCount,
+    },
     registryErrors,
     selfTest: { cases, failures: selfTestFailures },
     results,
-    supplementary: [
-      { name: 'admin-no-db-driver', status: adminStatus, violations: adminResult.violations },
-    ],
+    // Every supplementary row, derived from the same tally the console printed.
+    // The hand-written array this replaced listed three of the four and omitted
+    // `capability-registry-truth` entirely, so the machine-readable evidence
+    // disagreed with the run it was evidence of.
+    supplementary: supplementaryTally.rows.map((row) => ({
+      name: row.name,
+      status: row.status,
+      violations: row.result.violations,
+      scanned: row.result.scanned,
+      ...(row.result.note ? { note: row.result.note } : {}),
+      ...(row.result.reason ? { notApplicableReason: row.result.reason } : {}),
+      ...(row.result.exemptions ? { exemptions: row.result.exemptions } : {}),
+    })),
   };
   fs.writeFileSync(
     path.join(outDir, 'architecture-report.json'),

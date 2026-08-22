@@ -3,11 +3,11 @@
  * platform db foundation (bootstrap + migrations + app-role adapter), plus
  * the REAL rate-limit store.
  *
- * Gated behind KARAR_INTEGRATION=1 because they require Docker and mutate the
+ * Gated behind KARAR_READINESS_SUITE=1 because they require Docker and mutate the
  * compose postgres and redis services. Run them with:
  *
  *   POSTGRES_PORT=5433 REDIS_PORT=6380 docker compose up -d postgres redis otel-collector --wait
- *   POSTGRES_PORT=5433 REDIS_PORT=6380 KARAR_INTEGRATION=1 pnpm --filter @karar/api test
+ *   POSTGRES_PORT=5433 REDIS_PORT=6380 KARAR_READINESS_SUITE=1 pnpm --filter @karar/api test
  *
  * The suite bootstraps roles/database and migrates to latest first (Agent B's
  * CLI), so the ready path asserts the full truth: postgres up, applied ==
@@ -36,7 +36,16 @@ import { createDbReadinessProbes } from './health/readiness-probes.js';
 
 // __dirname: this package compiles to CommonJS (vitest provides it in-runner).
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
-const integrationEnabled = process.env['KARAR_INTEGRATION'] === '1';
+// Gated on its OWN variable, not on KARAR_INTEGRATION.
+//
+// That flag means "an unreachable database is a failure, not a skip", and it
+// belongs on every lane that runs database suites. This suite means something
+// different and incompatible: it STOPS AND RESTARTS the compose containers, so
+// running it alongside the other 80+ database suites kills their connections
+// mid-test. While the two shared one variable, the main CI lane could not
+// declare the database required without also turning this suite loose on it --
+// so it declared nothing, and every one of those suites was free to skip green.
+const integrationEnabled = process.env['KARAR_READINESS_SUITE'] === '1';
 const postgresPort = process.env['POSTGRES_PORT'] ?? process.env['PGPORT'] ?? '5433';
 const redisPort = process.env['REDIS_PORT'] ?? '6380';
 /** Nothing listens here: a store that is unreachable for a whole test. */

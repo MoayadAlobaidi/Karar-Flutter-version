@@ -40,8 +40,11 @@ An accepted ADR is not revisited without new information. If new information arr
 | [0024](0024-operating-entity.md) | Legal / Operating Entity as a distinct platform dimension, and legal-document lifecycle | 3 |
 | [0025](0025-event-governance.md) | Domain event governance and identifier-only payload rules | 2 |
 | [0026](0026-data-lifecycle.md) | Data lifecycle — subject relationship, purpose, retention, export, and erasure | 5 |
+| [0027](0027-calendar-day-and-instant.md) | Calendar days and instants are different types | 5 |
+| [0028](0028-multi-rail-financial-sources.md) | Multi-rail financial data sources, wallet issuers and account-source identity | 5 |
+| [0029](0029-untrusted-external-financial-content.md) | Untrusted external financial content and future AI instruction boundaries | 5 |
 
-**Numbering is continuous, 0001–0026.** The data-lifecycle ADR was numbered 0027 when raised in Phase 0 (0026 was briefly reserved for subject-elected policy, which was instead folded into [0015](0015-policy-packs.md) per the one-rule-per-decision principle); the Phase 0.5 consolidation renumbered it to 0026.
+**Numbering is continuous, 0001–0029.** The data-lifecycle ADR was numbered 0027 when raised in Phase 0 (0026 was briefly reserved for subject-elected policy, which was instead folded into [0015](0015-policy-packs.md) per the one-rule-per-decision principle); the Phase 0.5 consolidation renumbered it to 0026.
 
 ---
 

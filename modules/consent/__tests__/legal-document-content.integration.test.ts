@@ -22,6 +22,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -65,6 +66,7 @@ import { NoContentSourceConfigured } from '../infrastructure/content/no-content-
 import { Sha256ContentDigest } from '../infrastructure/providers/sha256-content-digest.js';
 import { ConsentDocumentContentController } from '../presentation/document-content.controller.js';
 import { AllowAllPolicyService } from './fakes/allow-all-policy-service.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -90,6 +92,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('consent legal document content suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -329,7 +332,7 @@ describe.skipIf(unreachable !== null)('legal-document content (live PostgreSQL)'
     await migratorAdapter?.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }

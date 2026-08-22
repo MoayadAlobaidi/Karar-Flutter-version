@@ -45,6 +45,8 @@ import { LocalDevEncryptionProvider } from '@karar/platform/dist/keys/index.js';
 import { LocalMailSink } from '@karar/platform/dist/notifications/index.js';
 import {
   RateLimitRedisConnection,
+  RateLimitKeyHasher,
+  RateLimitService,
   RedisSlidingWindowRateLimiter,
   createRateLimitRedisClient,
 } from '@karar/platform/dist/ratelimit/index.js';
@@ -120,6 +122,7 @@ import {
 import { PrincipalEnrichmentGuard } from '../auth/request-principal.js';
 import { JurisdictionConsentPinSource } from './consent-pin-source.js';
 import { composePhase35Modules } from './phase35-modules.js';
+import { composePhase5Modules } from './phase5-modules.js';
 
 export interface ShutdownResource {
   readonly name: string;
@@ -167,8 +170,18 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       logger.debug({ err: error }, 'rate-limit store connection error');
     },
   });
+  const identityConfig = loadIdentityConfig(config.env, env);
+  // ONE Redis client, one lifecycle, one readiness probe. The financial
+  // surface shares the client identity already opened rather than adding a
+  // second connection whose outage nothing would report.
+  const rateLimits = new RateLimitService({ primary: new RedisSlidingWindowRateLimiter(redis) });
+  // The SAME pepper identity uses. identity-config.ts already documents
+  // KARAR_DIGEST_PEPPER as the pepper for rate-limit subject keys, and a second
+  // deployment secret would buy nothing: the `subject:` domain tag and the
+  // per-policy storage-key prefix already keep the namespaces disjoint.
+  const rateLimitKeys = new RateLimitKeyHasher(identityConfig.digestPepper);
   const identityRuntime = createIdentityRuntime({
-    config: loadIdentityConfig(config.env, env),
+    config: identityConfig,
     prisma,
     recordAudit,
     notifications: new LocalMailSink({ env: config.env }),
@@ -282,6 +295,28 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
     new Set([AuthController, PasswordController, MfaController, SessionsController]),
   );
 
+  // Phase 3.5 is composed before the list below rather than inline in it,
+  // because Phase 5 consumes something it builds: the capability resolver the
+  // bootstrap document is projected from. Sharing the instance is the point —
+  // a financial route must refuse from the same facts the client was told,
+  // not from a second availability lookup that could drift from them.
+  const phase35 = composePhase35Modules({
+    environment: config.env,
+    prisma,
+    recordAudit,
+    clock,
+    logger,
+    resolveTenantContext,
+    switchTenant,
+    bindSession: identityRuntime.useCases.bindSessionTenant,
+    revokeSession: identityRuntime.useCases.revokeSession,
+    consentStatus: consentUseCases.getOwnConsentStatus,
+    resolveEntity,
+    entities: new PrismaOperatingEntityRepository(prisma.client),
+    licences: new PrismaEntityLicenceRepository(prisma.client),
+    edgeContext: new IdentityEdgeContext(trustedProxies, identityRuntime.deps.digester),
+  });
+
   const modules: DynamicModule[] = [
     IdentityApiModule.forRoot({ runtime: identityRuntime, trustedProxies, killSwitches }),
     UsersApiModule.register({
@@ -302,21 +337,24 @@ export function composePhase3Modules(input: Phase3CompositionInput): Phase3Compo
       principalSource: { fromRequest: policyActorFrom },
     }),
     ControlPlaneModule.register({ killSwitchPort: killSwitches }),
-    ...composePhase35Modules({
+    ...phase35.modules,
+    // Phase 5: the financial surface. Its composition resolves every
+    // encryption, retention and source-store port through the modules' OWN
+    // fail-closed resolvers, so a deployed environment with no approved
+    // provider refuses to boot here rather than discovering it at the first
+    // write (phase5-modules.ts states the ordering that makes that hold).
+    // It also takes the SHARED capability resolver: no financial route
+    // executes for a principal the resolver does not report the capability as
+    // available for, and that decision is the bootstrap document's, not a
+    // second one.
+    ...composePhase5Modules({
       environment: config.env,
       prisma,
-      recordAudit,
       clock,
-      logger,
-      resolveTenantContext,
-      switchTenant,
-      bindSession: identityRuntime.useCases.bindSessionTenant,
-      revokeSession: identityRuntime.useCases.revokeSession,
-      consentStatus: consentUseCases.getOwnConsentStatus,
-      resolveEntity,
-      entities: new PrismaOperatingEntityRepository(prisma.client),
-      licences: new PrismaEntityLicenceRepository(prisma.client),
-      edgeContext: new IdentityEdgeContext(trustedProxies, identityRuntime.deps.digester),
+      producer: config.service.name,
+      capabilityResolution: phase35.capabilityResolution,
+      rateLimits,
+      rateLimitKeys,
     }),
   ];
 

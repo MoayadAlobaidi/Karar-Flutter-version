@@ -7,6 +7,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -34,6 +35,7 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import { JurisdictionRef, ProfileRef } from '../domain/refs.js';
 import type { SubjectOptionSet } from '../domain/option-set.js';
 import { FixedOptionSource } from './fakes/fixed-option-source.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // Live-PostgreSQL evidence for the subject-policy module (migration 0083):
 // restrict-only recording against pack option sets, version pinning with the
@@ -73,6 +75,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('subject-policy subject policy suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -197,7 +200,7 @@ describe.skipIf(unreachable !== null)('subject-policy (live PostgreSQL)', () => 
     await superuserAdapter?.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, database);
     } finally {
       await maintenance.end();
     }

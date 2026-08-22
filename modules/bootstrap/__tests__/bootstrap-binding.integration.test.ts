@@ -72,6 +72,8 @@ import type {
 import type { AuditTrail } from '../application/ports/audit-trail.js';
 import type { BootstrapPrincipal } from '../application/principal.js';
 import { enrichment, fixedClock } from './helpers/fakes.js';
+import { dropScratchDatabase } from '@karar/platform/dist/db/index.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const maintenance = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -97,6 +99,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('bootstrap binding suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
@@ -285,7 +288,7 @@ describe.skipIf(unreachable !== null)('bootstrap tenant binding (live PostgreSQL
     await handle.end();
     const admin = new PostgresPersistenceAdapter(maintenance);
     try {
-      await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+      await dropScratchDatabase(admin, database);
     } finally {
       await admin.end();
     }

@@ -1,7 +1,7 @@
 # Backend Architecture
 
 **Stack:** NestJS · strict TypeScript · PostgreSQL · node-postgres in the platform foundation · Prisma for domain repositories since Phase 3 (both confined to infrastructure code — §6)
-**ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–3.5
+**ADRs:** 0004, 0005, 0012, 0013 · **Phase:** 1–5
 
 ---
 
@@ -29,15 +29,20 @@ karar/
 │   ├── worker/
 │   └── admin/              — Super Admin SPA. CI-enforced: no database driver
 ├── packages/
-│   ├── shared-kernel/      — 9 universals. Zero framework deps
+│   ├── shared-kernel/      — 10 universals. Zero framework deps
 │   ├── financial-engine/   — pure. Zero framework deps
 │   ├── jurisdiction-policy/— pure. Zero framework deps
 │   ├── state-machine/      — pure. ~100 lines
+│   ├── capability-registry/— purity-constrained by manifest and source
 │   ├── api-contracts/      — OpenAPI spec + event catalogue
-│   └── platform/           — backend platform library: config, DB foundation,
-│                             errors, observability, events/outbox/jobs (Phase 2);
-│                             Prisma runtime, principal context, rate limiting,
-│                             trusted-proxy http, notifications port (Phase 3)
+│   ├── platform/           — backend platform library: config, DB foundation,
+│   │                         errors, observability, events/outbox/jobs (Phase 2);
+│   │                         Prisma runtime, principal context, rate limiting,
+│   │                         trusted-proxy http, notifications port (Phase 3);
+│   │                         ingestion limit policies (Phase 5, enforced on the
+│   │                         mounted CSV upload and held by architecture test 24)
+│   ├── consent-local-fixtures/            — devDependency only. Never installed
+│   └── financial-retention-local-fixtures/  in a deployed build
 ├── modules/                — bounded contexts
 ├── infra/terraform/        — contracts + provider modules + per-deployment compositions
 └── docs/
@@ -45,7 +50,9 @@ karar/
 
 `apps/admin` carrying no database driver is enforced, not assumed: the Super Admin talks to the control plane over HTTP and never to Postgres.
 
-`packages/` holds seven packages. `@karar/platform` (Phase 2) is the backend platform library `api` and `worker` share; it is deliberately **not** one of the pure packages — it depends on `pg`, `pino`, and `@opentelemetry/api`. `shared-kernel`, `financial-engine`, `jurisdiction-policy`, and `state-machine` stay framework-free under architecture test 17; `jurisdiction-policy` gained its real contents in Phase 3.5 and `capability-registry` joined alongside it, declaring `@karar/jurisdiction-policy` as its only dependency.
+`packages/` holds nine packages. `@karar/platform` (Phase 2) is the backend platform library `api` and `worker` share; it is deliberately **not** one of the pure packages — it depends on `pg`, `pino`, and `@opentelemetry/api`. `shared-kernel`, `financial-engine`, `jurisdiction-policy`, and `state-machine` stay framework-free under architecture test 17; `jurisdiction-policy` gained its real contents in Phase 3.5 and `capability-registry` joined alongside it, purity-constrained by both manifest and source, declaring `@karar/jurisdiction-policy` as its only dependency.
+
+Two of the nine are **local-only test-fixture packages** — `consent-local-fixtures` and `financial-retention-local-fixtures` — and they exist for a reason worth stating, because they look like clutter. Values that must never reach a deployed build were once constants inside a module's own `infrastructure/providers/`, guarded by an environment check in the same file. The guard was real and the values shipped anyway: `tsc` emits them into the JavaScript, the declaration files and the source maps of every environment that installs the module. A synthetic retention decision is shaped exactly like a real one and names an approval nobody gave. As **devDependency-only** packages resolved at runtime inside a local-only branch, a production install simply does not have them, and a closure test walks the production dependency graph to prove it.
 
 ## 3. Module anatomy
 
@@ -70,9 +77,9 @@ modules/<name>/
 
 Wiring is **ordinary NestJS module imports**. The capability registry governs availability and entitlement; it does not resolve dependencies and performs no dynamic loading (ADR-0016). The static descriptor is an entry in `packages/capability-registry` rather than a per-module file, and permissions are declared in `MODULE.md` and seeded by migration — see [`extension-pattern.md` §5](extension-pattern.md).
 
-### Modules with code, as of Phase 3.5
+### Modules with code
 
-Twelve bounded contexts have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. One phrase each:
+Nineteen of the twenty-nine module directories have implementations; each `MODULE.md` is the authority on its behavior, data, and permissions. Twelve are listed below with the HTTP surface and mechanics they landed; the seven Phase 5 contexts follow in their own table, kept separate because their surface arrived in one piece and is read as one. One phrase each:
 
 | Module | Landed mechanics (Phase) |
 |---|---|
@@ -88,6 +95,20 @@ Twelve bounded contexts have implementations; each `MODULE.md` is the authority 
 | `capability` | Deny-by-default availability resolution over eight ordered gates, availability rows and tenant entitlements with trigger-written ledgers, the one client-safe projection; no HTTP surface (3.5) |
 | `subject-policy` | Immutable, version-pinned records of a subject's pack-permitted elections; option content stays capability-owned; no events, no HTTP surface (3.5) |
 | `bootstrap` | `GET /platform/bootstrap` and `POST /platform/tenant-binding`; composes client-safe views and owns no data (3.5). Since Phase 4 every enrichment port returns a **tagged outcome**, so a store fault and a legitimately empty answer are different values rather than the same one (4) |
+
+The seven Phase 5 contexts. Six of them are reached by **27 operations over 21 `/financial/*` paths**, composed in `apps/api/src/composition/phase5-modules.ts` and served by eight controllers; the seventh owns no table and serves nothing. The generated Dart client carries the matching 27 methods because it is generated from the whole contract, and seven Flutter feature folders now call them — each route gated on the platform's own capability answer, none of it deployed:
+
+| Module | Landed mechanics (Phase) |
+|---|---|
+| `financial-accounts` | Reviewed issuer catalogue with per-country `institution_markets`; accounts and wallets identified by id alone; source-reported balance snapshots with `balance_kind` `NOT NULL` and no default; holder-sensitive fields as ciphertext only; deletion that erases across three other modules through required inward ports (5) |
+| `transactions` | Signed `BIGINT` minor units, booked dates as `CalendarDay` rather than instants (ADR-0027), append-only revisions and provenance, keyed versioned dedup fingerprints with an occurrence rule enforced by trigger and by repository, category assignments with one `ACTIVE` row (5) |
+| `financial-connections` | Thirteen named acquisition rails with only `MANUAL` and `USER_FILE_UPLOAD` writable — refused otherwise by database CHECK; account source links as a many-to-many; a keyed, per-subject, versioned source-account fingerprint; **no credential column anywhere**, proved against `information_schema` (5) |
+| `payment-instruments` | What spends from an account, with **no balance column** and six independent mechanisms holding that absence; the account an instrument spends from frozen by trigger (5) |
+| `transfer-matching` | Two of a person's transactions recorded as one movement of their own money, carrying **no amount**; erased before the transactions it names, through a port `transactions` declares; the cross-side race closed with ordered advisory locks (5) |
+| `statement-imports` | A CSV statement staged behind review: draft, upload, parse, preview, commit or erase, with the arrows enforced by a trigger (SQLSTATE `KAR51`) rather than by a use case. **Parsing writes no financial record**; only a reviewed commit does, atomically and idempotently. The uploaded bytes are encrypted and their locator never leaves the server (5) |
+| `provider-capabilities` | Typed profiles of what a rail *could* do. **No table, and it executes nothing** — a described rail is not an executable one, an app is not an API, and `VERIFIED` requires named evidence. No real provider appears anywhere in it (5) |
+
+**The permissions these seven declare are a special case worth naming.** They declare **none**. Every financial operation is owner self-service — a principal acting on their own record — and RBAC is this system's mechanism for acting on somebody ELSE or on the platform, so it decides nothing here. Six of these modules once documented twelve permissions between them; none was ever in the catalogue, none was seeded, and none was consulted, so they were removed rather than retrofitted. What denies instead is in [`../security/access-control.md` §2](../security/access-control.md): the session-bound principal, the account-ownership ports, RLS, and the capability gate. A supplementary architecture check now fails any MODULE.md that names a permission the catalogue does not define.
 
 Phase 4 added four client-facing operations and no table. `GET /tenancy/memberships` lists the caller's own active memberships and is deliberately **tenantless** — mounted through its own module with a principal source that drops the tenant id, so it cannot receive the tenant-bound principal and onboarding can call it before a binding exists. `GET /jurisdiction/declarable-references` and `POST /jurisdiction/self-declaration` let a subject declare a jurisdiction as `USER_DECLARED` / `UNVERIFIED`, which exists because both operator write paths are gated on a deliberately unseeded permission and bootstrap otherwise reported no jurisdiction forever; the offered set and the accepted set share **one predicate**, so they cannot drift apart. `GET /consent/documents/{documentId}/content` serves a legal document's text, hash-verified against the version that published it — and answers an unknown document and another entity's document **byte-identically**, so the catalogue is not an oracle.
 
@@ -218,7 +239,7 @@ Use cases return `Result<T, DomainError>`. Exceptions are for genuinely exceptio
 
 Separately, all seventeen `/auth` operations described their response bodies in **prose** and attached no schema, which meant the generated Dart client decoded them as untyped JSON and no runtime check could hold the server to anything. They now carry full schemas built from shared components, including the login 200 as a `oneOf` over the authenticated and MFA-required branches. That ledger asserts empty too.
 
-Both are held by the runtime conformance suite, which validates real serialized responses from the composed application against the OpenAPI document across 82 of the 128 declared operation/status pairs ([`flutter.md` §8](flutter.md)).
+Both are held by the runtime conformance suite, which validates real serialized responses from the composed application against the OpenAPI document across 82 of the 128 non-financial and 145 of the 199 financial non-financial declared operation/status pairs ([`flutter.md` §8](flutter.md)). The Phase 5 financial surface brought its own file rather than joining that one, because the Phase 3 suite drives a single long ordered scenario and adding twenty-seven operations to it would let one failure hide the rest. It carries its own ledger, asserted the same way, over **145 of the 199 pairs the financial fragments declare** — so the merged contract's 327 pairs are 227 covered and 100 not.
 
 **What reaches a client is a narrower set, decided in one place.** Since Phase 3.5 only actionable reasons cross the edge — `CONSENT_REQUIRED`, `RECONSENT_REQUIRED`, `ENTITLEMENT_MISSING`, `ENTITLEMENT_EXPIRED`, and `PENDING_PROVIDER` where the descriptor opts in. Legal, jurisdictional, and not-yet-built reasons are not rendered as an unavailable capability; the capability is **omitted entirely**, because naming the reason would advertise that it exists ([`capability-registry.md` §5](capability-registry.md)).
 
@@ -265,7 +286,8 @@ Production log level must retain the forensic timeline the incident plan depends
 | `application/` | Use case tests with in-memory port fakes |
 | `infrastructure/` | Integration against a real PostgreSQL in Docker |
 | Tenant isolation | **Adversarial** cross-tenant tests asserting on **non-empty expected data** |
-| Architecture | 26 tests, CI-blocking |
+| Architecture | 26 tests plus a canary-purity check, CI-blocking; of the 27 registry entries, 24 are ACTIVE and pass, 0 fail, and 3 are deferred to phase 13 |
+| Database sessions | Pinned to UTC at connection startup, and verified against **PostgreSQL 17.11 with the server default left at `Asia/Qatar`** — CI's `postgres:17-alpine` runs UTC and would agree with the code's assumption rather than test it |
 
 The non-empty assertion is not pedantry. The legacy's tenant roster returns empty for everyone because a policy is missing, and *an empty result is indistinguishable from correct isolation* — so the isolation claim on that endpoint has never actually been tested.
 

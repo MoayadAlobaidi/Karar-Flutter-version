@@ -8,23 +8,66 @@
 |---|---|
 | **Authentication** | Who is this? |
 | **Capability availability** | Does this capability exist for this context at all? |
-| **Authorization (RBAC)** | May this actor perform this operation? |
+| **Authorization — owner self-service** | Is this principal acting on their OWN record? |
+| **Authorization — RBAC** | May this actor act on a subject OTHER than themselves, or on the platform? |
 | **Tenant isolation (RLS)** | Whose data is this? |
 | **Sealed grants** | Is there an explicit, approved grant to read this payload? |
 
 **Availability comes before authorization.** A capability unavailable in a jurisdiction is unreachable regardless of the actor's permissions — asking "may this admin read it?" is meaningless if the capability has no legal basis to exist there.
 
-## 2. Permission naming
+**The two authorisation rows are two models, not two steps.** An operation is governed by one or the other: the owner reading their own account is decided by identity, ownership and RLS and no permission is consulted, while a staff or platform operation is decided by the closed permission catalogue. §2 says which is which, and why a permission that only the owner could hold would decide nothing.
+
+## 2. Two authorisation models
+
+Karar authorises in **two different ways**. They are not two layers of one mechanism and they are not interchangeable; keeping them apart is what stops the system acquiring checks that decide nothing.
+
+| Model | Governs | The question | What denies |
+|---|---|---|---|
+| **Owner self-service** | A principal acting on their OWN records | Is this the owner, and is this their row? | The session-bound principal, the application-layer ownership ports, RLS, and the capability gate ahead of all three |
+| **RBAC** | Staff, cross-subject, and platform operations | May this actor act on a subject OTHER than themselves, or on the platform? | The closed permission catalogue, resolved deny-by-default by `PolicyService` |
+
+**RBAC is not the general case with self-service as an exception — it is the mechanism for acting on somebody else.** The catalogue says so structurally: `USER` is granted **nothing at all** (`modules/authorization/domain/catalogue.ts`: "Own-data authority comes from identity + RLS, never from an RBAC grant"), and `users.profile.read` — the one permission whose name sounds self-scoped — is granted to `SUPPORT`, for reading *other people's* profiles.
+
+### Permission naming
 
 ```
 <capability>.<resource>.<action>
 ```
 
-`transactions.transaction.read` · `amanat.record.create` · `amanat.case.approve`
+`users.profile.read` · `amanat.record.create` · `amanat.case.approve`
+
+A permission exists because a reviewed migration seeded it **and** the compile-time catalogue lists it — an integration test asserts the two are equal, so they cannot drift silently. **A module file mentioning a name does not create a right**, and a supplementary architecture check (`scripts/checks/architecture.mjs`, `module-permissions-in-catalogue`) now refuses a `MODULE.md` permission table that names an identifier the catalogue does not define.
 
 **`MODULE.md` states which permissions deliberately do not exist**, which is as much a design statement as the ones that do:
 
 > Amanat: **no `amanat.content.read` for any admin role.** Not restricted — absent.
+
+### The financial surface is owner self-service, and declares no permission
+
+Six bounded contexts — `financial-accounts`, `financial-connections`, `payment-instruments`, `transactions`, `transfer-matching`, `statement-imports` — mount 27 operations over 21 `/financial/*` paths, and **not one of them declares a permission.** Every operation there is the owner acting on their own record, which is the model RBAC does not govern.
+
+Twelve permissions were declared across those six `MODULE.md` files until this phase — `accounts.account.read` / `.write`, `accounts.connection.read` / `.write`, `accounts.instrument.read` / `.write`, `accounts.transfer.read` / `.write`, `transactions.transaction.read` / `.write`, `transactions.import.read` / `.write`. **None was in the catalogue, none was seeded by any migration, and no code ever consulted one.** Each would have been held by `USER` and by nobody else, so a policy check against it would have been a tautology for the only role that could hold it — ceremony, not safety. They have been **removed rather than annotated**: a permission table that lists rights nothing grants and nothing checks documents authority the system does not have, and that claim is the thing being withdrawn. Adding the twelve to the catalogue instead was considered and rejected for the same reason; the model that governs this surface is the one below.
+
+**What actually denies there** is four things, and together they are the owner self-service model in full:
+
+| Control | What it refuses |
+|---|---|
+| The principal | Subject and tenant come **exclusively** from the session's server-side binding, resolved in one file (`apps/api/src/financial/principal.ts`). No principal answers **401**; a session bound to no tenant answers **403** — different remedies, deliberately distinguished. No `userId` or `tenantId` is read from a path, query, header, or body, because no code path exists that would consult one |
+| Ownership ports | Every write resolves its target through an application-layer port that answers only about records the caller owns — `FinancialAccountAccessPort`, `CanonicalAccountAccessPort`, `BalanceBearingAccountAccessPort`, `MatchableTransactionAccessPort`. Each returns `null` for absent, another user's, another tenant's, and never-minted **alike**, so a foreign id answers **404** identically to an unknown one and the surface is not an existence oracle |
+| RLS | Every repository binds the principal's RLS context per transaction — the boundary that still holds when the layers above it are wrong |
+| The capability gate | Whether the capability exists for this context at all, which §1 puts **before** any question of authority. A server-side capability gate for this surface is being added in this phase by a separate workstream |
+
+### `requirePermission` is mounted nowhere, and that is a fact about the whole repository
+
+The `requirePermission(...)` guard factory in `modules/authorization/presentation/http/` is **declared and has no production call site anywhere in the repository**; the only code that mints one is the authorization module's own guard test. The Phase 3 and 3.5 modules — `tenancy`, `authorization`, `operating-entity`, `consent`, `jurisdiction`, `capability`, `control-plane` — enforce **inside their use cases**, calling `PolicyService.authorize(...)` before acting, because HTTP is not the only caller.
+
+So the financial surface is **not skipping a control that other surfaces apply at the route: nothing applies it at the route.** Any text describing route-level `requirePermission` as the convention is describing an aspiration rather than the tree; [`../architecture/extension-pattern.md`](../architecture/extension-pattern.md) §5 states the convention actually followed, and names the divergence.
+
+### The staff permissions that do not exist
+
+**There is no staff permission that returns one customer's accounts, connections, source links, instruments, transactions, statement imports or transfer matches, and none may be added.** Each of those sets is a different disclosure about the same person. A source link says which institutions someone deals with and, through its fingerprint, which of their accounts are the same account; an instrument list says which products they hold and which accounts they spend from; a transfer-match set says which of their accounts feed which, and how often; a statement import is the raw file a bank sent them.
+
+Removing the twelve does not touch that prohibition and must not be read as touching it. The twelve were `USER`-scoped and were never staff rights; **what is forbidden is adding a staff one**, and that is unchanged. And **no `?userId=` or `?tenantId=` parameter is accepted anywhere on the mounted surface** — not in a path, a query, a header or a body. That is proved three ways rather than asserted: a mutation-checked source scan, a contract check that no operation declares such a parameter, and a runtime request carrying `?userId=`, `?tenantId=` and `x-tenant-id` that returns byte-for-byte what the same request returns without them.
 
 ## 3. Roles
 
@@ -94,6 +137,8 @@ See [`sealed-access.md`](sealed-access.md).
 | Repository | Tenant scope |
 | **PostgreSQL RLS** | Tenant isolation — the actual boundary |
 | `SealedRecordStore` | Grant, at the type level |
+
+**No permission check runs at a route.** `requirePermission(...)` exists and is mounted nowhere; the modules that enforce permissions do it in the use case, through `PolicyService.authorize(...)`. The rows above describe where enforcement happens, not a second route-level permission gate — see §2.
 
 ### Phase 3.5 additions
 

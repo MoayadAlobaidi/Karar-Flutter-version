@@ -38,6 +38,7 @@ import pg from 'pg';
 import { loadConfig } from '@karar/platform/dist/config/index.js';
 import { redisEndpointFromEnv } from '@karar/platform/dist/config/index.js';
 import {
+  dropScratchDatabase,
   bootstrapRolesAndDatabase,
   LocalPostgresConnectionProfile,
   maintenanceDatabase,
@@ -55,7 +56,9 @@ import { LOCAL_SEED_CONTENT, LOCAL_SEED_STORAGE_REF } from '@karar/consent-local
 
 import { AppModule } from '@karar/api/dist/app.module.js';
 import { composePhase3Modules } from '@karar/api/dist/composition/phase3-modules.js';
+import { FINANCIAL_USE_CASES } from '@karar/api/dist/financial/use-cases.js';
 import { createDbReadinessProbes } from '@karar/api/dist/health/readiness-probes.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 /** Any header a caller may set; `inject` accepts exactly this shape. */
 type Headers = Record<string, string>;
@@ -71,7 +74,7 @@ export interface WireResponse {
 }
 
 export interface RequestSpec {
-  readonly method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly url: string;
   readonly accessToken?: string;
   readonly payload?: unknown;
@@ -172,9 +175,22 @@ async function probeRedis(): Promise<string | null> {
   });
 }
 
-/** Null when the composed app can be booted; otherwise why it cannot. */
+/**
+ * Null when the composed app can be booted; otherwise why it cannot.
+ *
+ * ROUTED THROUGH THE GLOBAL REQUIREMENT. `KARAR_INTEGRATION=1` declares that
+ * the run must exercise its infrastructure, and the run-level setup that
+ * enforces it opens a bare socket — which cannot tell a PostgreSQL server from
+ * anything else listening on the port, and cannot see a wrong credential, a
+ * missing database, or a connection limit already reached. This probe opens a
+ * REAL authenticated connection, so it sees all of those; asking
+ * `skipUnlessDatabaseRequired` here is what turns what it sees into a failure
+ * instead of a skip.
+ */
 export async function probeInfrastructure(): Promise<string | null> {
-  return (await probePostgres()) ?? (await probeRedis());
+  const reason = (await probePostgres()) ?? (await probeRedis());
+  skipUnlessDatabaseRequired('runtime conformance suite', reason);
+  return reason;
 }
 
 export function skipBanner(reason: string): string {
@@ -240,6 +256,45 @@ export interface Caller {
   readonly password: string;
   readonly userId: string;
   readonly accessToken: string;
+}
+
+/** One HSF column's stored triple, exactly as the persistence port produces it. */
+export interface EncryptedFieldFixture {
+  readonly ciphertext: Uint8Array;
+  readonly nonce: Uint8Array;
+  readonly algorithm: string;
+  readonly keyVersion: string;
+  readonly authTag: Uint8Array;
+}
+
+/**
+ * The narrow slice of `HsfFieldEncryptionPort` a fixture needs. Structural on
+ * purpose: `tests/conformance` depends on `@karar/api`, not on the financial
+ * modules behind it, so the port is named by its shape rather than imported
+ * across a package boundary this suite has no business declaring.
+ */
+export interface HsfFieldEncryptor {
+  encryptField(
+    principal: { readonly tenantId: string; readonly userId: string },
+    field: { reveal(): string },
+    context: { readonly table: string; readonly rowId: string; readonly field: string },
+  ): Promise<EncryptedFieldFixture>;
+}
+
+/** The two HSF ports the composed application built for itself, per module. */
+export interface FinancialFieldEncryptors {
+  /** Writes `financial_connections` and `account_source_links`. */
+  readonly connections: HsfFieldEncryptor;
+  /** Writes `payment_instruments`. */
+  readonly instruments: HsfFieldEncryptor;
+}
+
+/** The shape `financialFieldEncryptors` walks. Nothing else is read from it. */
+interface FinancialUseCaseBundleShape {
+  readonly listOwnConnections: { readonly connections: { readonly encryption: HsfFieldEncryptor } };
+  readonly listOwnPaymentInstruments: {
+    readonly instruments: { readonly encryption: HsfFieldEncryptor };
+  };
 }
 
 export class ComposedApp {
@@ -321,7 +376,7 @@ export class ComposedApp {
     await this.superuser.end();
     const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
     try {
-      await maintenance.query(`DROP DATABASE IF EXISTS "${this.database}" WITH (FORCE)`);
+      await dropScratchDatabase(maintenance, this.database);
     } finally {
       await maintenance.end();
     }
@@ -331,7 +386,13 @@ export class ComposedApp {
   async request(spec: RequestSpec): Promise<WireResponse> {
     const headers: Headers = { ...(spec.headers ?? {}) };
     if (spec.accessToken !== undefined) headers['authorization'] = `Bearer ${spec.accessToken}`;
-    if (spec.payload !== undefined) headers['content-type'] = 'application/json';
+    // JSON is the DEFAULT, not an override. A caller that states its own
+    // content type means it: the CSV statement route accepts `text/csv` and
+    // nothing else, and a harness that silently relabelled the body would
+    // have "proved" that route works while never once exercising it.
+    if (spec.payload !== undefined && headers['content-type'] === undefined) {
+      headers['content-type'] = 'application/json';
+    }
     const response = await this.app
       .getHttpAdapter()
       .getInstance()
@@ -356,6 +417,39 @@ export class ComposedApp {
       contentType: String(response.headers['content-type'] ?? ''),
       raw,
       body,
+    };
+  }
+
+  /**
+   * The HSF field-encryption ports THIS BOOT built, reached through the Nest
+   * container the routes are served from.
+   *
+   * WHY THIS SEAM EXISTS, and why it is not cheating. Three Phase 5 tables —
+   * `financial_connections`, `account_source_links` and `payment_instruments`
+   * — have no mounted write route, by a decision the contract records: their
+   * use cases are deliberately absent from the surface bundle. Every column
+   * that carries a label or an external reference on them exists ONLY as
+   * ciphertext + nonce + auth tag, under a key the composition root generates
+   * per boot and never serializes. So a fixture has exactly two options: seed
+   * nothing and validate the read routes against empty pages, which proves
+   * roughly nothing, or encrypt with the SAME port the read path will decrypt
+   * with. This returns that port. The bytes a fixture writes are produced by
+   * the application's own adapter, under its own key version, bound to the
+   * same tenant, user, table, row and field as associated data — so a row
+   * seeded here is readable exactly to the extent a row written by a future
+   * write route would be, and unreadable in every way such a row would be.
+   *
+   * Nothing here fabricates a RESPONSE: the response still comes from the
+   * real repository, the real use case, the real controller and the real
+   * serializer.
+   */
+  financialFieldEncryptors(): FinancialFieldEncryptors {
+    const bundle = this.app.get<FinancialUseCaseBundleShape>(FINANCIAL_USE_CASES, {
+      strict: false,
+    });
+    return {
+      connections: bundle.listOwnConnections.connections.encryption,
+      instruments: bundle.listOwnPaymentInstruments.instruments.encryption,
     };
   }
 

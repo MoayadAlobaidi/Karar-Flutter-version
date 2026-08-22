@@ -25,6 +25,7 @@ import {
   maintenanceDatabase,
   migrateToLatest,
   PostgresPersistenceAdapter,
+  skipUnlessDatabaseRequired,
 } from '@karar/platform/dist/db/index.js';
 import { createPrismaClient, type PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 import { InMemoryTestEncryptionProvider } from '@karar/platform/dist/keys/index.js';
@@ -40,6 +41,7 @@ import { loadIdentityConfig } from '../../infrastructure/config/identity-config.
 import { LocalDevKeyProvider } from '../../infrastructure/providers/local-dev-key-provider.js';
 import { uuidv7 } from '../../infrastructure/crypto/uuidv7.js';
 import type { ClientContext } from '../../application/identity-deps.js';
+import { dropScratchDatabase } from '@karar/platform/dist/db/index.js';
 
 export const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -60,7 +62,13 @@ export async function probePostgres(): Promise<string | null> {
     return null;
   } catch (error) {
     await client.end().catch(() => {});
-    return error instanceof Error ? error.message : String(error);
+    const reason = error instanceof Error ? error.message : String(error);
+    // KARAR_INTEGRATION=1 declares that this run MUST exercise the database.
+    // Under it an unreachable server throws instead of producing a skip,
+    // because a skipped integration suite lands in the same green summary as a
+    // passing one and proves nothing.
+    skipUnlessDatabaseRequired('identity integration suite', reason);
+    return reason;
   }
 }
 
@@ -172,7 +180,7 @@ export async function createIdentityHarness(options: HarnessOptions): Promise<Id
       await prisma.end();
       const maintenance = new PostgresPersistenceAdapter(superuserMaintenanceProfile);
       try {
-        await maintenance.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+        await dropScratchDatabase(maintenance, database);
       } finally {
         await maintenance.end();
       }

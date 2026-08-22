@@ -11,11 +11,12 @@
 // workstreams that each call `overrideWithValue` independently would leave
 // only the last one standing.
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/misc.dart' show Override, ProviderOrFamily;
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:go_router/go_router.dart';
 
 import '../../../app/dependency_injection/providers.dart';
 import '../../../app/lifecycle/startup_state.dart';
+import '../../../app/lifecycle/tenant_data_scope.dart';
 import '../../../app/routing/app_router.dart';
 import '../../consent/presentation/consent_providers.dart';
 import '../../consent/presentation/consent_routes.dart';
@@ -26,7 +27,6 @@ import '../../profile/presentation/profile_screen.dart';
 import '../../settings/presentation/settings_routes.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../tenant_selection/presentation/organisation_screen.dart';
-import '../../tenant_selection/presentation/tenant_providers.dart';
 import '../../tenant_selection/presentation/tenant_routes.dart';
 import '../../tenant_selection/presentation/tenant_selection_screen.dart';
 import 'home_screen.dart';
@@ -70,17 +70,21 @@ Map<StartupStage, StartupScreenBuilder> platformStartupScreens() =>
       StartupStage.bootstrapUnavailable: buildServiceUnavailableScreen,
     };
 
-/// Providers whose value belongs to one organisation.
+/// Providers whose value belongs to one organisation, with the operation that
+/// discards each one.
 ///
-/// A tenant switch invalidates every entry here. A tenant-scoped provider that
-/// is not listed survives the switch and will be read under the wrong
-/// organisation, which is the specific defect this list prevents.
-List<ProviderOrFamily> platformTenantScopedProviders() => <ProviderOrFamily>[
-      consentSurfaceControllerProvider,
-      consentActionControllerProvider,
-      ownProfileProvider,
-      profileEditControllerProvider,
-      accountDisableControllerProvider,
+/// A tenant switch DISCARDS every entry here — empties it, then re-reads it.
+/// A tenant-scoped provider that is not listed survives the switch and will be
+/// read under the wrong organisation, which is the specific defect this list
+/// prevents. Naming the kind is what makes the discard real: `ref.invalidate`
+/// alone reloads an asynchronous provider and leaves its previous value
+/// readable, so only a [TenantScopedAsyncNotifier] may be registered as one.
+List<TenantScopedProvider> platformTenantScopedProviders() => <TenantScopedProvider>[
+      tenantScopedAsync(consentSurfaceControllerProvider),
+      tenantScopedNotifier(consentActionControllerProvider),
+      tenantScopedAsync(ownProfileProvider),
+      tenantScopedNotifier(profileEditControllerProvider),
+      tenantScopedNotifier(accountDisableControllerProvider),
     ];
 
 /// The overrides that install this workstream.
@@ -91,7 +95,8 @@ List<Override> platformSurfaceOverrides({
   List<RouteBase> additionalRoutes = const <RouteBase>[],
   Map<StartupStage, StartupScreenBuilder> additionalStartupScreens =
       const <StartupStage, StartupScreenBuilder>{},
-  List<ProviderOrFamily> additionalTenantScopedProviders = const <ProviderOrFamily>[],
+  List<TenantScopedProvider> additionalTenantScopedProviders =
+      const <TenantScopedProvider>[],
 }) =>
     <Override>[
       featureRoutesProvider.overrideWithValue(<RouteBase>[
@@ -105,7 +110,7 @@ List<Override> platformSurfaceOverrides({
         },
       ),
       homeScreenBuilderProvider.overrideWithValue(buildPlatformHomeScreen),
-      tenantScopedProvidersProvider.overrideWithValue(<ProviderOrFamily>[
+      tenantScopedDataProvider.overrideWithValue(<TenantScopedProvider>[
         ...platformTenantScopedProviders(),
         ...additionalTenantScopedProviders,
       ]),

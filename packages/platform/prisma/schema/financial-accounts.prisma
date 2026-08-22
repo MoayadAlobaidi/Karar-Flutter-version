@@ -1,0 +1,163 @@
+// financial-accounts module mapping (migrations 0087_institutions.sql,
+// 0088_financial_accounts.sql, 0089_financial_account_balance_snapshots.sql,
+// 0094_institution_markets.sql, 0095_financial_account_wallets.sql).
+// Prisma maps the canonical SQL — it is NOT a second migration system (see
+// base.prisma); `make prisma-drift` is what keeps this file honest.
+//
+// Money: amount_minor_units is BIGINT in PostgreSQL and BigInt here, and it
+// stays BigInt all the way to the domain, where it becomes a shared-kernel
+// Money together with currency_code (ADR-0006). It is never mapped to a
+// JavaScript number: 2^53 is not a safe bound for minor units, and a float
+// cannot represent 0.10 exactly. There is no NUMERIC, DOUBLE PRECISION, or
+// FLOAT anywhere on this module's money path.
+//
+// Subject narrative is Bytes: ciphertext, nonce and auth tag per field, with
+// the algorithm and key version per row. No plaintext field exists for the
+// account's display name, its user-supplied institution label, or its mask,
+// because no plaintext column exists for them in the table — all three are
+// HIGHLY_SENSITIVE_FINANCIAL, exactly like the transactions module's
+// narrative columns, and are treated the same way.
+//
+// Deliberately NOT expressed here, enforced by the migrations and their
+// tests instead: every CHECK constraint (the closed currency, account-type,
+// status, origin-kind, wallet-kind, account-nature and issuer-kind
+// vocabularies; the all-or-nothing ciphertext triples; the eight-byte mask
+// bound that makes a full account number unrepresentable even encrypted; the
+// wallet-kind biconditional (present IF AND ONLY IF accountType = WALLET);
+// the one-way-to-name-an-institution rule; the market table's
+// evidence-or-UNVERIFIED and AVAILABLE-requires-evidence rules), the
+// version-increment and immutability triggers, RLS enable/force with the
+// tenant+user principal policies, and the grants.
+//
+// ALSO NOT EXPRESSIBLE HERE, and the most important absence in this file:
+// there is NO @@unique over institution + user, institution + type,
+// institution + currency, institution + type + currency, or issuer + wallet
+// kind on FinancialAccount, and none may be added (ADR-0028). An account is
+// identified by its id. The single @@unique below is (id, currencyCode),
+// which restricts nothing — id is the primary key — and exists only to be
+// the target of the snapshot table's composite foreign key. Every repository statement runs inside a
+// principal-context transaction (SET LOCAL app.tenant_id / app.user_id) or
+// the policies return nothing — failing closed.
+//
+// tenant_id and user_id are plain scalars by design (data-model.md §2): no
+// relation crosses a module boundary. institution_ref, the market table's
+// institution reference, and the snapshot's account reference are real
+// relations because all three targets are owned by this module;
+// InstitutionMarket.countryCode is a plain scalar for the same boundary
+// reason (public.countries belongs to modules/jurisdiction).
+
+model Institution {
+  id             String   @id @db.Uuid
+  code           String   @unique(map: "institutions_code_key")
+  // What the issuer IS (BANK, E_MONEY_ISSUER, MOBILE_MONEY_OPERATOR, ...).
+  // Never a capability flag, and never an individual provider (ADR-0028).
+  kind           String
+  displayNameEn  String   @map("display_name_en")
+  displayNameAr  String   @map("display_name_ar")
+  status         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @map("updated_at") @db.Timestamptz(6)
+
+  accounts FinancialAccount[]
+  markets  InstitutionMarket[]
+
+  @@map("institutions")
+}
+
+// One issuer, many countries. The unique key here is what keeps a global
+// issuer from being duplicated into one catalogue row per market (0094);
+// COUNTRY, deliberately not Jurisdiction (jurisdiction-policy.md §1).
+model InstitutionMarket {
+  id                          String   @id @db.Uuid
+  institutionRef              String   @map("institution_ref") @db.Uuid
+  countryCode                 String   @map("country_code")
+  marketStatus                String   @default("UNKNOWN") @map("market_status")
+  // Named evidence, or the literal UNVERIFIED. No bare regulatory claim is
+  // representable.
+  regulatoryStatusEvidenceRef String   @default("UNVERIFIED") @map("regulatory_status_evidence_ref")
+  localDisplayNameEn          String?  @map("local_display_name_en")
+  localDisplayNameAr          String?  @map("local_display_name_ar")
+  displayReviewRef            String   @map("display_review_ref")
+  providerAccessStatus        String   @default("NOT_IMPLEMENTED") @map("provider_access_status")
+  providerAccessEvidenceRef   String   @default("UNVERIFIED") @map("provider_access_evidence_ref")
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime @map("updated_at") @db.Timestamptz(6)
+
+  institution Institution @relation(fields: [institutionRef], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "institution_markets_institution_ref_fkey")
+
+  @@unique([institutionRef, countryCode], map: "institution_markets_institution_country_key")
+  @@index([countryCode, marketStatus], map: "institution_markets_country_idx")
+  @@map("institution_markets")
+}
+
+model FinancialAccount {
+  id                           String   @id @db.Uuid
+  tenantId                     String   @map("tenant_id") @db.Uuid
+  userId                       String   @map("user_id") @db.Uuid
+  institutionRef               String?  @map("institution_ref") @db.Uuid
+  accountType                  String   @map("account_type")
+  currencyCode                 String   @map("currency_code")
+
+  hsfAlgorithm                 String   @map("hsf_algorithm")
+  hsfKeyVersion                String   @map("hsf_key_version")
+  displayNameCiphertext        Bytes    @map("display_name_ciphertext")
+  displayNameNonce             Bytes    @map("display_name_nonce")
+  displayNameAuthTag           Bytes    @map("display_name_auth_tag")
+  userSuppliedInstitutionLabelCiphertext Bytes? @map("user_supplied_institution_label_ciphertext")
+  userSuppliedInstitutionLabelNonce      Bytes? @map("user_supplied_institution_label_nonce")
+  userSuppliedInstitutionLabelAuthTag    Bytes? @map("user_supplied_institution_label_auth_tag")
+  maskCiphertext               Bytes?   @map("mask_ciphertext")
+  maskNonce                    Bytes?   @map("mask_nonce")
+  maskAuthTag                  Bytes?   @map("mask_auth_tag")
+
+  status                       String
+  // How the account FIRST came to exist. Immutable, and never the current
+  // data source — the one-source columns were removed (ADR-0028).
+  originKind                   String   @map("origin_kind")
+  // Present IF AND ONLY IF accountType = WALLET, by CHECK in 0095.
+  walletKind                   String?  @map("wallet_kind")
+  // ASSET | LIABILITY | UNKNOWN. Nothing in this module totals these.
+  accountNature                String   @default("UNKNOWN") @map("account_nature")
+  version                      Int      @default(1)
+  createdAt                    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                    DateTime @map("updated_at") @db.Timestamptz(6)
+
+  institution Institution?                       @relation(fields: [institutionRef], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "financial_accounts_institution_ref_fkey")
+  snapshots   FinancialAccountBalanceSnapshot[]
+
+  // Sole purpose: the target of the snapshot table's composite foreign key,
+  // which is what makes "an account's currency cannot change once records
+  // exist" a referential fact rather than an application convention. It
+  // restricts nothing on its own — see the header on why no other uniqueness
+  // may be added to this model.
+  @@unique([id, currencyCode], map: "financial_accounts_id_currency_key")
+  @@index([tenantId, userId, createdAt], map: "financial_accounts_owner_idx")
+  @@index([institutionRef], map: "financial_accounts_institution_idx")
+  @@map("financial_accounts")
+}
+
+model FinancialAccountBalanceSnapshot {
+  id               String   @id @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  accountId        String   @map("account_id") @db.Uuid
+  // BIGINT minor units. BigInt in the client, Money in the domain.
+  amountMinorUnits BigInt   @map("amount_minor_units")
+  currencyCode     String   @map("currency_code")
+  asOf             DateTime @map("as_of") @db.Timestamptz(6)
+  sourceKind       String   @map("source_kind")
+  // WHICH balance the source quoted. No @default, matching the NOT NULL /
+  // no-DEFAULT column in 0089: a default would be a guess written on the
+  // caller's behalf, invisibly, into a stored row.
+  balanceKind      String   @map("balance_kind")
+  // uuid, not text: the column is structurally incapable of holding source
+  // narrative on a HIGHLY_SENSITIVE_FINANCIAL table (migration 0089 header).
+  sourceReference  String   @map("source_reference") @db.Uuid
+  capturedAt       DateTime @map("captured_at") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account FinancialAccount @relation(fields: [accountId, currencyCode], references: [id, currencyCode], onDelete: Cascade, onUpdate: NoAction, map: "financial_account_balance_snapshots_account_fkey")
+
+  @@index([tenantId, userId, accountId, asOf], map: "financial_account_balance_snapshots_owner_idx")
+  @@map("financial_account_balance_snapshots")
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@karar/transfer-matching",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A relationship between TWO of one subject's transactions that are one movement of their own money. A suggestion changes nothing; only the person's confirmation makes it authoritative. No amount, no total, no net worth and no category is computed anywhere.",
+  "type": "module",
+  "main": "dist/public-api.js",
+  "types": "dist/public-api.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/node_modules/**\" --exclude \"**/dist/**\""
+  },
+  "dependencies": {
+    "@karar/platform": "workspace:*",
+    "@karar/shared-kernel": "workspace:*",
+    "@karar/transactions": "workspace:*"
+  },
+  "devDependencies": {
+    "@karar/financial-accounts": "workspace:*",
+    "@karar/financial-retention-local-fixtures": "workspace:*",
+    "@types/node": "^25.9.5",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.16.0"
+  }
+}

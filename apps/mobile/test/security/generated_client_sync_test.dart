@@ -129,13 +129,34 @@ void main() {
     });
 
     test('generated code is never hand-edited into carrying a credential', () {
-      // The generator emits no literals other than paths and field names. A
-      // long opaque literal here would mean either a hand edit or a contract
-      // carrying material it should not.
+      // The generator emits no literals other than paths, field names and the
+      // wire values of vocabularies the contract declares. A long OPAQUE
+      // literal would mean either a hand edit or a contract carrying material
+      // it should not.
+      //
+      // The exemption is the set of wire values the generated enums THEMSELVES
+      // declare, read out of the same files being scanned. Not "anything in
+      // SCREAMING_SNAKE_CASE": a secret can be uppercase with separators, and a
+      // shape-based exemption would wave it through. Deriving the set from the
+      // declarations means a token nobody declared is still caught however it
+      // is cased, while EQUAL_AND_OPPOSITE_SAME_CURRENCY_WITHIN_WINDOW — 45
+      // characters of ordinary declared vocabulary — is not a finding.
+      //
+      // This suite deliberately does not read the contract (see the header).
+      // It does not need to: a generated enum member IS the contract's wire
+      // value, and a hand edit that invented one would have to invent the
+      // enum around it, which the drift check catches separately.
+      final declaredWireValues = <String>{
+        for (final entry in generated.entries)
+          ...RegExp(r"^\s+[a-zA-Z_$][\w$]*\('([^']*)'\),?\s*$", multiLine: true)
+              .allMatches(stripCodeComments(entry.value))
+              .map((RegExpMatch match) => match.group(1)!),
+      };
       for (final entry in generated.entries) {
         final literals = RegExp(r"'([A-Za-z0-9+/_-]{40,}={0,2})'")
             .allMatches(stripCodeComments(entry.value))
             .map((RegExpMatch match) => match.group(1)!)
+            .where((String literal) => !declaredWireValues.contains(literal))
             .toList(growable: false);
         expect(
           literals,

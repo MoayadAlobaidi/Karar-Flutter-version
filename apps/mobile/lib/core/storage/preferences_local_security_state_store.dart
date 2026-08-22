@@ -26,6 +26,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logging/app_logger.dart';
+import '../platform/bounded_platform_call.dart';
 import '../security/local_security_state_store.dart';
 
 /// Namespace applied to every security flag.
@@ -56,8 +57,16 @@ final class PreferencesLocalSecurityStateStore implements LocalSecurityStateStor
     final CategoryLogger log = logger.forCategory('security');
     try {
       final SharedPreferencesAsync preferences = SharedPreferencesAsync();
-      await preferences.getBool(
-        '$securityStateNamespace${LocalSecurityFlag.appLockEnabled.storageName}',
+      // BOUNDED. The probe below is the first platform call the process makes
+      // and it is awaited BEFORE `runApp`, so a platform that never answers it
+      // leaves the application with no widget tree at all — a blank window,
+      // not even a spinner. See `boundedPlatformCall`.
+      await boundedPlatformCall<bool?>(
+        operation: 'security_state.open',
+        timeout: PlatformCallTimeouts.storeOpen,
+        run: () => preferences.getBool(
+          '$securityStateNamespace${LocalSecurityFlag.appLockEnabled.storageName}',
+        ),
       );
       return PreferencesLocalSecurityStateStore._(preferences, log);
     } on Object catch (error, stackTrace) {
@@ -78,7 +87,11 @@ final class PreferencesLocalSecurityStateStore implements LocalSecurityStateStor
   @override
   Future<SecurityStateRead> read(LocalSecurityFlag flag) async {
     try {
-      final bool? value = await _preferences.getBool(_qualify(flag));
+      final bool? value = await boundedPlatformCall<bool?>(
+        operation: 'security_state.read',
+        timeout: PlatformCallTimeouts.storage,
+        run: () => _preferences.getBool(_qualify(flag)),
+      );
       return value == null ? const SecurityStateAbsent() : SecurityStateValue(value);
     } on TypeError catch (error) {
       // Something is stored under this key and it is not a boolean. Reported as
@@ -96,7 +109,11 @@ final class PreferencesLocalSecurityStateStore implements LocalSecurityStateStor
   @override
   Future<SecurityStateWrite> write(LocalSecurityFlag flag, {required bool value}) async {
     try {
-      await _preferences.setBool(_qualify(flag), value);
+      await boundedPlatformCall<void>(
+        operation: 'security_state.write',
+        timeout: PlatformCallTimeouts.storage,
+        run: () => _preferences.setBool(_qualify(flag), value),
+      );
       return const SecurityStateWritten();
     } on Object catch (error) {
       _report(flag, 'write', 'failed', error);
@@ -107,7 +124,11 @@ final class PreferencesLocalSecurityStateStore implements LocalSecurityStateStor
   @override
   Future<SecurityStateRemoval> remove(LocalSecurityFlag flag) async {
     try {
-      await _preferences.remove(_qualify(flag));
+      await boundedPlatformCall<void>(
+        operation: 'security_state.remove',
+        timeout: PlatformCallTimeouts.storage,
+        run: () => _preferences.remove(_qualify(flag)),
+      );
       return const SecurityStateRemoved();
     } on Object catch (error) {
       _report(flag, 'remove', 'failed', error);

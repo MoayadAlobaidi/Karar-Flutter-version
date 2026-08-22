@@ -45,7 +45,7 @@ Looking up a term: [`glossary.md`](glossary.md).
 
 ## Decisions
 
-[`adr/`](adr/README.md) — **26 records**, each with context, decision, consequences, and alternatives rejected.
+[`adr/`](adr/README.md) — **29 records**, each with context, decision, consequences, and alternatives rejected.
 
 ## Security
 
