@@ -247,6 +247,28 @@ The 12 skipped are the whole of `apps/api/src/readiness.integration.test.ts`, wh
 | iOS **simulator** bundle (Debug, LOCAL) | The counterpart case, read to prove the exception mechanism is not merely absent everywhere: this artifact **does** carry `NSAppTransportSecurity` with `NSAllowsArbitraryLoads` false, a single `localhost` exception domain, and no blanket key — exactly what `ios/Runner/ATSLocalDevelopment.plist` says the build phase merges into a Debug LOCAL build and into nothing else |
 
 **Nothing was signed and nothing was deployed.** An artifact test is not a device test, and this report does not treat them as interchangeable in either direction.
+
+### Clean-clone verification
+
+Run against the candidate head from a **fresh `git clone` of the remote branch** into a scratch directory — not a copy of the working tree, and depending on no ignored artifact, no prior `dist`, no local migration state, no stale Flutter generated file, no `.claude` worktree and no manually seeded database object. `git status --short --ignored` in the fresh checkout is empty before anything runs.
+
+```
+git clone --branch claude/karar-v2-phase-5-financial-foundation <remote> karar
+pnpm install --frozen-lockfile
+pnpm format:check && pnpm lint && pnpm typecheck && pnpm build
+pnpm arch:test && pnpm docs:check && pnpm db:canonical-check
+docker compose down -v && docker compose up -d postgres redis --wait
+pnpm --filter @karar/platform db:create && db:migrate && db:verify
+node scripts/db/prisma-mapping-check.mjs
+KARAR_INTEGRATION=1 pnpm test
+KARAR_INTEGRATION=1 KARAR_READINESS_SUITE=1 pnpm --filter @karar/api exec vitest run src/readiness.integration.test.ts
+cd apps/mobile && flutter pub get && flutter analyze && flutter test --exclude-tags golden
+dart run tool/generate_api_client.dart --check
+```
+
+**Every step exited 0.** Migrations: **53 applied from zero**, `db:verify` `status: clean`. Prisma mapping: **61 mapped tables match the live database**. Workspace: **3146 passed / 12 skipped** across 222 files. Readiness: **12/12**. `flutter analyze`: no issues. Generated client: in sync at **62 operations / 203 schemas**.
+
+**The Flutter figure in the clean clone is 2051 passed / 19 skipped, and that is the expected number rather than a discrepancy.** A fresh checkout holds no build artifacts, so the eighteen artifact-gated assertions plus the deployed-rules case mark themselves skipped — the same shape CI's `mobile` lane runs, and the same eighteen that **fail rather than skip** on `mobile-android` and `mobile-ios`. A clean clone reporting 2069 would have meant it was reading artifacts it should not have had.
 ## The second independent review
 
 Two fresh reviewers, neither of which implemented any of this remediation, read
