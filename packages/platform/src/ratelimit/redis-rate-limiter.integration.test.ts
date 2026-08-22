@@ -21,6 +21,7 @@ import {
   RedisSlidingWindowRateLimiter,
 } from './redis-rate-limiter.js';
 import { RateLimitKeyHasher, storageKey } from './keys.js';
+import { skipUnlessDatabaseRequired } from '../db/connection-budget.js';
 
 const redisPort = Number(process.env['REDIS_PORT'] ?? '6379');
 const redisHost = process.env['REDIS_HOST'] ?? '127.0.0.1';
@@ -46,6 +47,7 @@ async function probeRedis(): Promise<string | null> {
 }
 
 const unreachable = await probeRedis();
+skipUnlessDatabaseRequired('platform redis rate limiter suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

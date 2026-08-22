@@ -16,6 +16,7 @@ import { AuditMetadataViolation } from '../application/audit-metadata-guard.js';
 import { RecordAuditEvent } from '../application/use-cases/record-audit-event.js';
 import { PostgresAuditWriter } from '../infrastructure/persistence/postgres-audit-writer.js';
 import { Uuidv7AuditEventIdSource } from '../infrastructure/persistence/uuidv7-audit-event-id-source.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // Append-only audit foundation against a real PostgreSQL (data-model.md §10;
 // migration 0010). One file, serial execution, same pattern and reasoning as
@@ -50,6 +51,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('audit append only suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

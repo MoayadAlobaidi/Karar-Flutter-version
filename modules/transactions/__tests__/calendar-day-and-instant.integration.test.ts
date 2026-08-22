@@ -73,6 +73,7 @@ import {
   qar,
   syntheticMerchant,
 } from './fakes/synthetic-fixtures.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -98,6 +99,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('transactions calendar day and instant suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

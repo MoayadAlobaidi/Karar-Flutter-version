@@ -325,6 +325,52 @@ export class CommitStatementImport {
     }
     const committable = rows.filter((row) => row.rowState === 'VALID');
 
+    // REVALIDATION 8b — THE CURRENCY, COMPARED RATHER THAN ASSUMED.
+    //
+    // The account's currency was re-read a few dozen lines above (REVALIDATION
+    // 3) and, until this gate existed, was never compared to anything. The
+    // staged rows carry the currency the FILE stated, and the write below took
+    // `row.currencyCode ?? currency.code` — so a row that disagreed with the
+    // account was written verbatim, in the account's own ledger, under a
+    // currency the account is not held in.
+    //
+    // The gate that was supposed to catch this runs at PARSE time, against the
+    // account currency as it was THEN. Between parse and commit the currency
+    // can legitimately change: `checkCurrencyChange` in the accounts module
+    // permits it while the account holds no financial records, and "financial
+    // records" is answered by a query over `public.transactions` and
+    // `public.transaction_provenance` — neither of which knows about rows
+    // staged in `statement_import_rows`. So an account with a fully staged,
+    // fully previewed QAR statement reads as empty, its currency moves to KWD,
+    // and the commit writes QAR minor units onto a KWD account. A line of
+    // 120.50 QAR lands as 12050 minor units and renders as 12.050 KWD, because
+    // the two currencies do not share an exponent.
+    //
+    // `CurrencyMismatch` was declared in this use case's error union and given
+    // an RFC 7807 mapping (409, CURRENCY_MISMATCH) from the beginning, and was
+    // constructed nowhere in the repository. This is the construction. The
+    // manual write path already refuses the identical case with
+    // ACCOUNT_CURRENCY_MISMATCH; the two write paths now agree.
+    //
+    // It refuses rather than converts, and it refuses rather than rewriting
+    // the row to the account's currency: an amount is a number in a currency,
+    // and relabelling it is the corruption, not the fix.
+    for (const row of committable) {
+      const stated = row.currencyCode;
+      if (stated !== null && stated !== undefined && stated !== currency.code) {
+        return Result.err({
+          kind: 'currency_mismatch',
+          accountCurrency: currency.code,
+          sourceCurrency: stated,
+          message:
+            `line ${String(row.rowNumber)} states ${stated} and this account is held in ` +
+            `${currency.code}. Nothing here converts between currencies, and writing the ` +
+            'amount unchanged would put one currency\u2019s minor units on the other\u2019s ' +
+            'ledger. Nothing was written',
+        } satisfies CurrencyMismatch);
+      }
+    }
+
     // REVALIDATION 9 — reconciliation, recomputed from the staged rows and
     // the balance the FILE stated. Never from a total this platform derived.
     const outcome = reconcile({

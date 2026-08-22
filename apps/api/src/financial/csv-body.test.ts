@@ -119,18 +119,30 @@ describe('the catch-all parser answers only for the route it exists for', () => 
       payload: unknown,
       done: (error: Error | null, body?: unknown) => void,
     ) => void;
+    /** The refusal hang-up hook, captured so its own behaviour is asserted. */
+    readonly onResponse: (
+      request: { url?: string; raw?: { readableEnded?: boolean; destroy(): unknown } },
+      reply: { statusCode: number },
+      done: () => void,
+    ) => void;
   }
 
   function register(): Registered {
     let captured: Registered['parser'] | null = null;
+    let hook: Registered['onResponse'] | null = null;
     registerCsvContentTypeParser({
       addContentTypeParser: (_matcher: RegExp, parser: Registered['parser']) => {
         captured = parser;
         return undefined;
       },
+      addHook: (_event: string, handler: Registered['onResponse']) => {
+        hook = handler;
+        return undefined;
+      },
     } as never);
     if (captured === null) throw new Error('no parser registered');
-    return { parser: captured };
+    if (hook === null) throw new Error('no refusal hang-up hook registered');
+    return { parser: captured, onResponse: hook };
   }
 
   /**
@@ -193,6 +205,86 @@ describe('the catch-all parser answers only for the route it exists for', () => 
       expect(error).not.toBeNull();
       expect((error as { statusCode?: number } | null)?.statusCode).toBe(415);
     }
+  });
+
+  describe('the refusal hang-up', () => {
+    // WHAT THE HANDLER CANNOT REACH.
+    //
+    // The parser hands the upload route its stream UNREAD so that a valid CSV
+    // is not consumed before the capability and rate-limit guards decide. The
+    // cost is that a refusal happening BEFORE the handler runs — an
+    // unauthenticated caller, an unavailable capability, an exhausted budget —
+    // leaves the body unread and unclosed, and Node drains the whole declared
+    // body itself once the response finishes. Measured before this hook
+    // existed: a caller declaring 200 MiB and continuing to send received a
+    // prompt 429, and the server read 200 MiB anyway.
+    //
+    // Three properties, and the third is the one that keeps the hook narrow.
+    const hangUpCase = (
+      statusCode: number,
+      url: string | undefined,
+      readableEnded: boolean,
+    ): boolean => {
+      const { onResponse } = register();
+      let destroyed = false;
+      onResponse(
+        {
+          ...(url === undefined ? {} : { url }),
+          raw: { readableEnded, destroy: () => (destroyed = true) },
+        },
+        { statusCode },
+        () => undefined,
+      );
+      return destroyed;
+    };
+
+    it('hangs up on a refused upload whose body was never read', () => {
+      for (const status of [401, 403, 413, 415, 429, 500, 503]) {
+        expect({
+          status,
+          destroyed: hangUpCase(status, '/financial/statement-imports/abc/source', false),
+        }).toEqual({ status, destroyed: true });
+      }
+    });
+
+    it('leaves a SUCCESSFUL upload alone — its body was read to completion', () => {
+      expect(hangUpCase(200, '/financial/statement-imports/abc/source', true)).toBe(false);
+      // …and a refusal whose body WAS fully read has nothing left to hang up on.
+      expect(hangUpCase(409, '/financial/statement-imports/abc/source', true)).toBe(false);
+    });
+
+    it('touches no other route, because no other route was handed an unread stream', () => {
+      for (const url of ['/auth/login', '/financial/transactions', '/users/me', undefined]) {
+        expect({ url, destroyed: hangUpCase(429, url, false) }).toEqual({ url, destroyed: false });
+      }
+    });
+  });
+
+  it('carries the shape Nest requires to HONOUR the 415, not merely a statusCode', () => {
+    // THE HALF THE TEST ABOVE COULD NOT SEE.
+    //
+    // Asserting `statusCode === 415` proves what this file intends. It does
+    // not prove what the caller receives, because Nest installs its own
+    // exception proxy as Fastify's error handler and converts a Fastify-level
+    // error into an HttpException only when `statusCode` is set AND
+    // `error.name === 'FastifyError'` (`isHttpFastifyError` in
+    // `@nestjs/core/router/routes-resolver.js`). With any other name the error
+    // reaches the global filter as an unrecognised throw and is answered 500
+    // and logged at error level.
+    //
+    // This error named itself `UnsupportedMediaTypeError`, so every request in
+    // the SERVICE carrying a media type Fastify has no exact parser for — on
+    // `/auth/login`, on `/users/me`, on any route — became an unauthenticated
+    // 500 in the error log. The name below is the fix, and this assertion is
+    // what keeps it from being tidied away as a cosmetic string.
+    const { error } = answer('/auth/login', 'application/xml');
+    expect(error).toBeInstanceOf(Error);
+    const asFastify = error as (Error & { statusCode?: number }) | null;
+    expect({
+      name: asFastify?.name,
+      statusCode: asFastify?.statusCode,
+      isError: asFastify instanceof Error,
+    }).toEqual({ name: 'FastifyError', statusCode: 415, isError: true });
   });
 
   it('does not treat a lookalike path as the upload route', () => {

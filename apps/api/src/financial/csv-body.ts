@@ -75,10 +75,23 @@ interface ParserRequest {
 
 type ParserDone = (error: Error | null, body?: unknown) => void;
 
+interface HookRequest {
+  readonly url?: string;
+  readonly raw?: { readonly readableEnded?: boolean; destroy(error?: Error): unknown };
+}
+
+interface HookReply {
+  readonly statusCode: number;
+}
+
 interface ContentTypeParserHost {
   addContentTypeParser(
     matcher: RegExp,
     parser: (request: ParserRequest, payload: ByteStream, done: ParserDone) => void,
+  ): unknown;
+  addHook(
+    event: 'onResponse',
+    handler: (request: HookRequest, reply: HookReply, done: () => void) => void,
   ): unknown;
 }
 
@@ -196,6 +209,39 @@ function targetsSourceUpload(request: ParserRequest): boolean {
 }
 
 export function registerCsvContentTypeParser(host: ContentTypeParserHost): void {
+  // THE REFUSAL HANG-UP, for every refusal the HANDLER never sees.
+  //
+  // The parser hands the upload route its request stream unread, so that a
+  // valid CSV is not consumed before the capability and rate-limit guards
+  // decide. The cost is that a refusal which happens BEFORE the handler runs
+  // — an unauthenticated caller, an unavailable capability, an exhausted
+  // budget — leaves the body unread and unclosed, and Node then drains the
+  // whole declared body itself once the response finishes. Measured: a caller
+  // declaring 200 MiB and continuing to send received a prompt 429 and the
+  // server read 200 MiB anyway.
+  //
+  // The handler destroys the stream on its own refusal paths. This hook is
+  // the half the handler cannot reach: it fires for every response on this
+  // route, and on any non-2xx with an unread body it hangs up. A successful
+  // upload has already been read to completion, so `readableEnded` is true
+  // and nothing here touches it.
+  //
+  // This bounds what THIS process reads. It does not bound what the network
+  // delivers before identity exists, and nothing in a single process can:
+  // that is an edge or IP-level control, recorded as such in the phase report
+  // rather than claimed here.
+  host.addHook('onResponse', (request, reply, done) => {
+    if (
+      reply.statusCode >= 400 &&
+      typeof request.url === 'string' &&
+      SOURCE_UPLOAD_PATH.test(request.url) &&
+      request.raw?.readableEnded !== true
+    ) {
+      request.raw?.destroy();
+    }
+    done();
+  });
+
   // ANCHORED, and Fastify asks for that in a security warning rather than a
   // style note: an unanchored matcher leaves it unable to tell the essence
   // MIME type from its parameters, which is how a body labelled
@@ -222,13 +268,35 @@ export function registerCsvContentTypeParser(host: ContentTypeParserHost): void 
 /**
  * What a route outside this parser's scope gets: the same 415 Fastify would
  * have produced itself, carrying the status code it sets on the error.
+ *
+ * `name` IS `'FastifyError'`, AND THAT IS NOT COSMETIC.
+ *
+ * Nest installs its own exception proxy as Fastify's error handler, and it
+ * converts a Fastify-level error into an `HttpException` only when BOTH
+ * `statusCode` is set and `error.name === 'FastifyError'`
+ * (`@nestjs/core/router/routes-resolver.js`, `isHttpFastifyError`). Fastify's
+ * own `FST_ERR_CTP_INVALID_MEDIA_TYPE` carries that name, which is why the
+ * framework's 415 survives the trip.
+ *
+ * This class named itself `'UnsupportedMediaTypeError'`, so the check failed,
+ * the error reached the global filter as an unrecognised throw, and every
+ * request in the SERVICE carrying a media type Fastify has no exact parser
+ * for — on `/auth/login`, `/users/me`, anywhere — was answered **500
+ * INTERNAL_ERROR** and logged at error level, because the filter treats an
+ * unrecognised throw as a server fault. An unauthenticated caller could
+ * therefore fill the error log at will, and no operation in the contract
+ * declares 500 for a media-type mismatch.
+ *
+ * The `code` is Fastify's own, so a reader who greps the framework for this
+ * behaviour finds the same string.
  */
 class UnsupportedMediaTypeError extends Error {
   readonly statusCode = 415;
+  readonly code = 'FST_ERR_CTP_INVALID_MEDIA_TYPE';
 
   constructor() {
     super('Unsupported Media Type');
-    this.name = 'UnsupportedMediaTypeError';
+    this.name = 'FastifyError';
   }
 }
 

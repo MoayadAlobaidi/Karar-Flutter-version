@@ -26,6 +26,8 @@ import {
   MerchantRuleEvaluator,
   PrismaMerchantRuleDirectory,
   PrismaStatementCommitWriter,
+  PrismaTransactionRepository,
+  TransactionId,
 } from '@karar/transactions';
 import type { PrismaHandle } from '@karar/platform/dist/db/prisma.js';
 
@@ -112,6 +114,19 @@ const STATEMENT = [
   '2026-08-10,SYNTHETIC MERCHANT ONE,-45.00',
   '2026-08-11,SYNTHETIC MERCHANT TWO,120.50',
   '2026-08-12,SYNTHETIC MERCHANT THREE,not-a-number',
+  '',
+].join('\n');
+
+/**
+ * A statement distinct from `STATEMENT`, for the tests that must import a file
+ * this suite has not already imported. The dedup rules are per-content and per
+ * file fingerprint, so reusing `STATEMENT` would land in DUPLICATE and the
+ * test would be asserting the wrong refusal.
+ */
+const OTHER_STATEMENT = [
+  'Booking Date,Description,Amount',
+  '2026-09-01,SYNTHETIC MERCHANT FOUR,-77.25',
+  '2026-09-02,SYNTHETIC MERCHANT FIVE,310.40',
   '',
 ].join('\n');
 
@@ -912,6 +927,141 @@ describe.skipIf(unreachable !== null)('statement-imports pipeline', () => {
 
       const after = await counts();
       expect(after).toEqual(before);
+    }, 60_000);
+  });
+
+  describe('the account currency moves while rows are staged', () => {
+    // THE GAP BETWEEN THE PARSE-TIME GATE AND THE COMMIT.
+    //
+    // The currency is checked at PARSE, against the account currency as it was
+    // then. `checkCurrencyChange` in the accounts module permits a change while
+    // the account holds no financial records, and "financial records" is
+    // answered by a query over `public.transactions` and
+    // `public.transaction_provenance` — neither of which knows about rows
+    // staged in `statement_import_rows`. So a fully staged, fully previewed QAR
+    // statement leaves the account reading as empty, its currency moves, and
+    // the commit used to write QAR minor units onto a KWD account without a
+    // word: 120.50 QAR became 12050 minor units and rendered as 12.050 KWD,
+    // because the two currencies do not share an exponent.
+    //
+    // The refusal is a 409 CURRENCY_MISMATCH — an error this use case declared
+    // and the HTTP layer mapped from the beginning, and that nothing in the
+    // repository constructed.
+    it('REFUSES the commit rather than writing one currency onto another ledger', async () => {
+      const pipeline = wire(handle, clock);
+      const started = await pipeline.start.execute({ accountId }, ACTOR_A1);
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+
+      const stored = await pipeline.store.execute(
+        {
+          importId: started.value.id,
+          content: streamOf(bytesOf(OTHER_STATEMENT)),
+          mediaType: 'text/csv',
+          maxBytes: LIMITS.maxBytes,
+        },
+        ACTOR_A1,
+      );
+      expect(stored.ok).toBe(true);
+      if (!stored.ok) return;
+      const parsed = await pipeline.parse.execute(
+        { importId: started.value.id, mapping: MAPPING, limits: LIMITS },
+        ACTOR_A1,
+      );
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      expect(parsed.value.state).toBe('REVIEW_REQUIRED');
+
+      // The account moves to a currency with a DIFFERENT exponent, which is
+      // what makes the silent write a corruption rather than a mislabelling.
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query(
+          // The version bump is what the accounts table's own optimistic-
+          // concurrency trigger requires of ANY update, including this one.
+          `UPDATE public.financial_accounts
+              SET currency_code = 'KWD', version = version + 1
+            WHERE id = $1`,
+          [accountId],
+        ),
+      );
+
+      const before = await counts();
+      const committed = await pipeline.commit.execute(
+        { importId: started.value.id, expectedVersion: parsed.value.version },
+        ACTOR_A1,
+      );
+      expect(committed.ok).toBe(false);
+      if (committed.ok) return;
+      expect(committed.error.kind).toBe('currency_mismatch');
+      // Nothing was written — not a subset, not a relabelled row.
+      expect(await counts()).toEqual(before);
+
+      await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query(
+          `UPDATE public.financial_accounts
+              SET currency_code = 'QAR', version = version + 1
+            WHERE id = $1`,
+          [accountId],
+        ),
+      );
+    }, 60_000);
+  });
+
+  describe('an imported transaction can be READ BACK, which nothing here used to check', () => {
+    // THE TEST THAT WAS MISSING, and the shape of the defect it exists for.
+    //
+    // Every test in this module asserted what the commit WROTE — row counts,
+    // provenance columns, outbox rows, category assignments — and none asked
+    // the transactions module to hand the record back. So a commit could
+    // succeed, write every column, satisfy every count, and produce a record
+    // that module could never open, and the whole suite stayed green.
+    //
+    // It did. The narrative on `public.transactions` was sealed under the AEAD
+    // context `{table: 'transactions'}` and the narrative on
+    // `public.transaction_revisions` under the SAME one, while the reader
+    // opens a revision under `{table: 'transaction_revisions'}`. Authenticated
+    // decryption failed, `ReadOwnTransaction` lists revisions unconditionally,
+    // and the person was told — permanently, retryably — that persistence was
+    // unavailable for every line they had imported.
+    //
+    // The assertions below are deliberately about the PLAINTEXT rather than
+    // about an absence of throwing: a decrypt that returned the wrong bytes
+    // would satisfy "it did not throw".
+    it('returns the same narrative the CSV carried, on the transaction AND on its revision', async () => {
+      const encryption = testTransactionsEncryption();
+      const transactions = new PrismaTransactionRepository(handle, encryption);
+      const actor = { tenantId: ACTOR_A1.tenantId, userId: ACTOR_A1.userId };
+
+      const committed = await withAdapter(database, 'superuser', (adapter) =>
+        adapter.query<{ id: string }>(
+          `SELECT t.id FROM public.transactions t
+             JOIN public.transaction_provenance p ON p.transaction_id = t.id
+            WHERE p.source_kind = 'CSV'
+            ORDER BY t.id`,
+        ),
+      );
+      expect(committed.rows.length).toBeGreaterThan(0);
+
+      for (const { id } of committed.rows) {
+        const transaction = await transactions.findById(actor, TransactionId.of(id));
+        expect(transaction).not.toBeNull();
+        if (transaction === null) continue;
+        // The canonical row opens, and carries real text rather than a blank.
+        expect(transaction.description.reveal().length).toBeGreaterThan(0);
+
+        // The revision row opens too, and says the same thing. This is the
+        // assertion the defect failed: it threw here, every time, for every
+        // imported transaction.
+        const revisions = await transactions.listRevisions(actor, TransactionId.of(id));
+        expect(revisions.length).toBeGreaterThan(0);
+        const first = revisions[0];
+        expect(first).toBeDefined();
+        if (first === undefined) continue;
+        expect(first.values.description.reveal()).toBe(transaction.description.reveal());
+        expect(first.values.merchant?.reveal() ?? null).toBe(
+          transaction.merchant?.reveal() ?? null,
+        );
+      }
     }, 60_000);
   });
 

@@ -35,6 +35,7 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import { JurisdictionRef, ProfileRef } from '../domain/refs.js';
 import type { SubjectOptionSet } from '../domain/option-set.js';
 import { FixedOptionSource } from './fakes/fixed-option-source.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // Live-PostgreSQL evidence for the subject-policy module (migration 0083):
 // restrict-only recording against pack option sets, version pinning with the
@@ -74,6 +75,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('subject-policy subject policy suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

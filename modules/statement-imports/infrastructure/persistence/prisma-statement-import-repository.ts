@@ -63,6 +63,7 @@ import {
   type StagedRowRecord,
   type StatementImportRow,
 } from './row-mappers.js';
+import { ingestionLimitPolicyFor } from '@karar/platform/dist/ingestion/limits.js';
 
 /**
  * The staged row's encrypted columns as the driver wants them: `Buffer`s,
@@ -270,17 +271,42 @@ export class PrismaStatementImportRepository implements StatementImportRepositor
     // Encryption runs OUTSIDE the database transaction: it may call a key
     // provider, and holding a transaction open across a network call to a KMS
     // is how a connection pool starves under load.
-    const encrypted = await Promise.all(
-      staging.rows.map(async (row) => ({
-        row,
-        narrative: await encryptRowNarrative(this.encryption, actor, row.id, {
-          description: row.description,
-          merchant: row.merchant,
-          sourceReference: row.sourceReference,
-          instrumentMask: row.instrumentMask,
-        }),
-      })),
-    );
+    //
+    // BOUNDED FAN-OUT, in batches of the CENTRAL `maxBatchSize` — the same
+    // bound and the same reason as the commit path in
+    // `prisma-statement-commit-unit-of-work.ts`, and it belongs here MORE than
+    // there. This was one unbounded `Promise.all` over `staging.rows`, which
+    // is four `encryptField` calls per row with no ceiling: a statement may
+    // carry `maxRows` = 50,000, so one parse could put 200,000 key-provider
+    // calls in flight — twice what the commit path was putting in flight when
+    // that was recorded as a defect and fixed, on a path that runs FIRST and
+    // carries a larger per-hour budget.
+    //
+    // The read path in this same file goes fully sequential 80 lines below and
+    // says why in as many words: "a key-management provider is rate-limited
+    // everywhere but local, and a statement can be thousands of rows". The
+    // write path in between did the opposite, and
+    // `LocalAesGcmFieldEncryptionProvider` being in-process is why nothing
+    // local ever showed it — the same reason the commit-path defect survived.
+    const batchSize = ingestionLimitPolicyFor('csv-statement-import').maxBatchSize;
+    type StagedNarrative = Awaited<ReturnType<typeof encryptRowNarrative>>;
+    const encrypted: Array<{ row: (typeof staging.rows)[number]; narrative: StagedNarrative }> = [];
+    for (let offset = 0; offset < staging.rows.length; offset += batchSize) {
+      const batch = staging.rows.slice(offset, offset + batchSize);
+      encrypted.push(
+        ...(await Promise.all(
+          batch.map(async (row) => ({
+            row,
+            narrative: await encryptRowNarrative(this.encryption, actor, row.id, {
+              description: row.description,
+              merchant: row.merchant,
+              sourceReference: row.sourceReference,
+              instrumentMask: row.instrumentMask,
+            }),
+          })),
+        )),
+      );
+    }
 
     await this.inContext(actor, async (tx) => {
       // REPLACE, not append. The errors go first: they reference rows.

@@ -51,10 +51,32 @@ export interface EncryptedNarrativeColumns {
   readonly noteAuthTag: null;
 }
 
+/**
+ * WHICH ROW THE NARRATIVE IS BEING SEALED FOR, and it is not optional.
+ *
+ * A commit writes the same narrative twice: once onto `public.transactions`
+ * and once onto the `public.transaction_revisions` row that records how the
+ * transaction came to hold those values. The transactions module's readers
+ * bind the TABLE NAME into the AEAD context of each — `toTransaction` opens
+ * under `transactions`, `toRevision` under `transaction_revisions`.
+ *
+ * This type exists because the port used to take only a `rowId`, and the
+ * adapter behind it sealed BOTH rows under `transactions` on the reasoning
+ * that the row id already distinguishes them. The row id does distinguish
+ * them; the reader still binds the table, and so every imported transaction's
+ * revision narrative was written under a context nothing would ever open it
+ * with. A closed union in a required position makes the choice one a caller
+ * has to make rather than one an adapter can assume.
+ */
+export type CanonicalNarrativeTarget = {
+  readonly table: 'transactions' | 'transaction_revisions';
+  readonly rowId: string;
+};
+
 export interface CanonicalNarrativeEncryptorPort {
   encrypt(
     actor: ImportsPrincipal,
-    rowId: string,
+    target: CanonicalNarrativeTarget,
     narrative: { readonly description: string; readonly merchant: string | null },
   ): Promise<EncryptedNarrativeColumns>;
 }

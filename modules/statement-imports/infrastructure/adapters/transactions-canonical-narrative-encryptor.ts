@@ -35,6 +35,7 @@ import {
 
 import type {
   CanonicalNarrativeEncryptorPort,
+  CanonicalNarrativeTarget,
   EncryptedNarrativeColumns,
 } from '../../application/ports/canonical-narrative-encryptor.js';
 import type { ImportsPrincipal } from '../../application/principal.js';
@@ -44,9 +45,10 @@ export class TransactionsCanonicalNarrativeAdapter implements CanonicalNarrative
 
   async encrypt(
     actor: ImportsPrincipal,
-    rowId: string,
+    target: CanonicalNarrativeTarget,
     narrative: { readonly description: string; readonly merchant: string | null },
   ): Promise<EncryptedNarrativeColumns> {
+    const { table, rowId } = target;
     // Restated field by field rather than cast, for the reason the account
     // adapter gives: a cast would keep compiling if either principal shape
     // gained a field.
@@ -56,12 +58,25 @@ export class TransactionsCanonicalNarrativeAdapter implements CanonicalNarrative
       ...(actor.sessionId !== undefined ? { sessionId: actor.sessionId } : {}),
       ...(actor.requestId !== undefined ? { requestId: actor.requestId } : {}),
     };
-    // The table is `transactions` for both a transaction row and a revision
-    // row, because the AEAD context binds the ROW ID, and the two ids differ.
-    // Binding two different table names for the same narrative would mean a
-    // revision could not be decrypted by anything expecting a transaction's
-    // context, which is a distinction with no security value and a real cost.
-    const table = 'transactions';
+    // THE TABLE COMES FROM THE CALLER, and this is the correction of a defect
+    // that made every CSV-imported transaction permanently unreadable.
+    //
+    // This line used to be `const table = 'transactions';`, applied to BOTH
+    // the transaction row and the revision row, defended in a comment as "a
+    // distinction with no security value and a real cost" on the grounds that
+    // the AEAD context already binds the row id. The row id does distinguish
+    // the two rows. It is not what the reader binds: `toTransaction` in the
+    // transactions module opens under `transactions`, and `toRevision` opens
+    // under `transaction_revisions`. So the revision narrative was sealed
+    // under a context nothing would ever present, and `ReadOwnTransaction` —
+    // which lists revisions unconditionally — turned every imported
+    // transaction into a permanent, retryable 503 telling the person their
+    // database was unavailable.
+    //
+    // Nothing caught it because no test in the repository read an imported
+    // transaction back; the module's own commit fixture built the revision
+    // narrative with the same wrong context, so it reproduced the defect
+    // rather than exposing it. `reads-back.integration.test.ts` is that test.
     const description = await this.encryption.encryptField(
       principal,
       HsfField.of(narrative.description),

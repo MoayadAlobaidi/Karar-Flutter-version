@@ -29,6 +29,7 @@ import {
   type TransactionClient,
 } from '@karar/platform/dist/db/index.js';
 import { createPrismaClient, type PrismaHandle } from '@karar/platform/dist/db/prisma.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // --- Synthetic principals (patterned, obviously non-production) -------------
 
@@ -86,7 +87,15 @@ export async function probePostgres(): Promise<string | null> {
     return null;
   } catch (error) {
     await client.end().catch(() => {});
-    return error instanceof Error ? error.message : String(error);
+    const reason = error instanceof Error ? error.message : String(error);
+    // ROUTED THROUGH THE GLOBAL REQUIREMENT, at the definition rather than at
+    // each call site, so a suite added later inherits it. The run-level setup
+    // opens a bare socket and therefore cannot see a wrong credential, a
+    // missing database, or an exhausted connection limit; this probe opens a
+    // real authenticated connection and hands what it finds to the one
+    // decision that knows whether the run declared the database required.
+    skipUnlessDatabaseRequired('security suite', reason);
+    return reason;
   }
 }
 

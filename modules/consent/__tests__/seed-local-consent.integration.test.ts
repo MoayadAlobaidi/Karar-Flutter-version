@@ -50,6 +50,7 @@ import { PrismaConsentGrantRepository } from '../infrastructure/persistence/pris
 import { PrismaLegalDocumentRepository } from '../infrastructure/persistence/prisma-legal-document-repository.js';
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import { OperatingEntityDirectoryAdapter } from '../infrastructure/operating-entity/operating-entity-directory-adapter.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -75,6 +76,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('consent seed local consent suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

@@ -18,6 +18,7 @@ import {
   withPrincipalContext,
   withTenant,
 } from './principal-context.js';
+import { skipUnlessDatabaseRequired } from './connection-budget.js';
 
 // Principal context against a real PostgreSQL: the GUC binding that RLS
 // policies read. Same live-database pattern and skip discipline as
@@ -50,6 +51,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('platform principal context suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

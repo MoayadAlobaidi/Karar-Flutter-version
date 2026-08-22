@@ -23,6 +23,7 @@ import {
 } from './migrations.js';
 import { SecretValue } from '../config/secret-value.js';
 import { dropScratchDatabase } from './scratch-database.js';
+import { skipUnlessDatabaseRequired } from './connection-budget.js';
 
 // Contract tests against a real PostgreSQL (docs/architecture/
 // database-portability.md section 7). All database tests live in this one
@@ -70,6 +71,7 @@ const realFilenames = realMigrations.map((file) => file.filename);
 const realVersions = realMigrations.map((file) => file.version);
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('platform contract suite', unreachable);
 if (unreachable !== null) {
   const target = `${superuserMaintenanceProfile.host}:${superuserMaintenanceProfile.port}`;
 

@@ -94,6 +94,7 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import { Sha256ContentDigest } from '../infrastructure/providers/sha256-content-digest.js';
 import { ConsentDocumentContentController } from '../presentation/document-content.controller.js';
 import { AllowAllPolicyService } from './fakes/allow-all-policy-service.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -119,6 +120,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('consent local seed content suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

@@ -210,14 +210,28 @@ export class PrismaStatementCommitUnitOfWork implements StatementCommitPort {
         ...(await Promise.all(
           batch.map(async (row) => ({
             row,
-            canonical: await this.canonicalEncryption.encrypt(actor, row.transactionId, {
-              description: row.description.reveal(),
-              merchant: row.merchant?.reveal() ?? null,
-            }),
-            revision: await this.canonicalEncryption.encrypt(actor, row.revisionId, {
-              description: row.description.reveal(),
-              merchant: row.merchant?.reveal() ?? null,
-            }),
+            // The TABLE is named at each call, because the transactions
+            // module's readers bind it: `toTransaction` opens the canonical
+            // row under `transactions` and `toRevision` opens the revision
+            // row under `transaction_revisions`. Both calls used to pass a
+            // row id alone and the adapter sealed both under `transactions`,
+            // which left every imported revision narrative unopenable.
+            canonical: await this.canonicalEncryption.encrypt(
+              actor,
+              { table: 'transactions', rowId: row.transactionId },
+              {
+                description: row.description.reveal(),
+                merchant: row.merchant?.reveal() ?? null,
+              },
+            ),
+            revision: await this.canonicalEncryption.encrypt(
+              actor,
+              { table: 'transaction_revisions', rowId: row.revisionId },
+              {
+                description: row.description.reveal(),
+                merchant: row.merchant?.reveal() ?? null,
+              },
+            ),
           })),
         )),
       );

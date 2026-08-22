@@ -62,6 +62,7 @@ import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.j
 import { OperatingEntityDirectoryAdapter } from '../infrastructure/operating-entity/operating-entity-directory-adapter.js';
 import { JurisdictionRef, PurposeRef } from '../domain/refs.js';
 import { AllowAllPolicyService } from './fakes/allow-all-policy-service.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // Live-PostgreSQL evidence for the consent module (migrations 0064-0065):
 // the versioned grant lifecycle, the immutability triggers, the publication
@@ -94,6 +95,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('consent suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

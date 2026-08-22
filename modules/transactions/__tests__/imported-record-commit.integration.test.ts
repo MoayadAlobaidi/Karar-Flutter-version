@@ -57,6 +57,7 @@ import { OccurrenceOrdinalNotNextError } from '../application/ports/transaction-
 import { PrismaStatementCommitWriter } from '../infrastructure/persistence/prisma-statement-commit-writer.js';
 import { LocalAesGcmFieldEncryptionProvider } from '../infrastructure/providers/local-aes-gcm-field-encryption-provider.js';
 import { BOOKED, NOW, principal, syntheticMerchant } from './fakes/synthetic-fixtures.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -82,6 +83,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('transactions imported record commit suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

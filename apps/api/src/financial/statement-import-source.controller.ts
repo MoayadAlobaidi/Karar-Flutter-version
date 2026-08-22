@@ -59,6 +59,38 @@ interface ReplyLike {
 
 interface RequestLike {
   readonly headers: Record<string, string | string[] | undefined>;
+  /** The Node request, present on a Fastify request. Used only to hang up on a refusal. */
+  readonly raw?: { destroy(error?: Error): unknown };
+}
+
+/**
+ * Hangs up on a body this route has already decided to refuse.
+ *
+ * WHY A REFUSAL HAS TO DESTROY THE STREAM, and it is not tidiness.
+ *
+ * The content-type parser hands the handler the request stream UNREAD, which
+ * is what keeps a valid upload from being consumed before the capability and
+ * rate-limit guards have run. The cost of that choice is that on every path
+ * where the handler refuses BEFORE consuming the stream — a wrong media type,
+ * a `Content-Length` over the bound, a guard refusal, a use-case refusal —
+ * nothing has read the body and nothing has closed it. Node then drains the
+ * whole declared body itself after the response is written (`_dump` on
+ * response finish), so a caller that declares 200 MiB and keeps sending gets
+ * a prompt 413 or 429 and the server reads 200 MiB anyway.
+ *
+ * That falsified three claims at once: that a large upload is "rejected on
+ * its header instead of being streamed through the process first"; that the
+ * refusal drain is bounded, which was true only of the wrong-media-type
+ * branch and never of `text/csv`; and that the per-principal upload budget
+ * caps bytes, which it does only for bytes that reach storage. An
+ * unauthenticated caller has no budget at all.
+ *
+ * Destroying the socket is the only thing that actually stops the read. It is
+ * safe here because the response has already been written or is about to be:
+ * this is a refusal, and there is nothing further to say to the caller.
+ */
+function hangUp(request: RequestLike): void {
+  request.raw?.destroy();
 }
 
 /** Every bound this ingestion path obeys, from the CENTRAL registry. */
@@ -84,9 +116,25 @@ export class StatementImportSourceController {
     @Body() body: unknown,
     @Res() reply: ReplyLike,
   ): Promise<void> {
-    const principal = requirePrincipal(this.principals, request);
-    const id = this.importId(importId);
+    // Every refusal below hangs up before it answers. See `hangUp`: the
+    // parser deliberately hands over an unread stream, so a refusal that does
+    // not close it leaves Node to drain the whole declared body afterwards.
+    let principal;
+    try {
+      principal = requirePrincipal(this.principals, request);
+    } catch (error) {
+      hangUp(request);
+      throw error;
+    }
+    let id;
+    try {
+      id = this.importId(importId);
+    } catch (error) {
+      hangUp(request);
+      throw error;
+    }
     if (isUnsupportedBody(body) || !isByteStream(body)) {
+      hangUp(request);
       refuse(
         codedProblem(
           415,
@@ -99,6 +147,7 @@ export class StatementImportSourceController {
     // CHECK ONE: the declared length, before a byte is read.
     const declared = request.headers['content-length'];
     if (declaredLengthExceedsBound(typeof declared === 'string' ? declared : undefined)) {
+      hangUp(request);
       refuse(this.tooLarge());
     }
 
@@ -117,10 +166,14 @@ export class StatementImportSourceController {
         principal,
       );
     } catch (error) {
+      hangUp(request);
       if (error instanceof StatementSourceTooLargeError) refuse(this.tooLarge());
       throw error;
     }
-    if (!result.ok) refuse(problemForImportsError(result.error));
+    if (!result.ok) {
+      hangUp(request);
+      refuse(problemForImportsError(result.error));
+    }
     reply.status(200).send(this.serialize(result.value));
   }
 

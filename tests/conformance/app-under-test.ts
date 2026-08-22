@@ -58,6 +58,7 @@ import { AppModule } from '@karar/api/dist/app.module.js';
 import { composePhase3Modules } from '@karar/api/dist/composition/phase3-modules.js';
 import { FINANCIAL_USE_CASES } from '@karar/api/dist/financial/use-cases.js';
 import { createDbReadinessProbes } from '@karar/api/dist/health/readiness-probes.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 /** Any header a caller may set; `inject` accepts exactly this shape. */
 type Headers = Record<string, string>;
@@ -174,9 +175,22 @@ async function probeRedis(): Promise<string | null> {
   });
 }
 
-/** Null when the composed app can be booted; otherwise why it cannot. */
+/**
+ * Null when the composed app can be booted; otherwise why it cannot.
+ *
+ * ROUTED THROUGH THE GLOBAL REQUIREMENT. `KARAR_INTEGRATION=1` declares that
+ * the run must exercise its infrastructure, and the run-level setup that
+ * enforces it opens a bare socket — which cannot tell a PostgreSQL server from
+ * anything else listening on the port, and cannot see a wrong credential, a
+ * missing database, or a connection limit already reached. This probe opens a
+ * REAL authenticated connection, so it sees all of those; asking
+ * `skipUnlessDatabaseRequired` here is what turns what it sees into a failure
+ * instead of a skip.
+ */
 export async function probeInfrastructure(): Promise<string | null> {
-  return (await probePostgres()) ?? (await probeRedis());
+  const reason = (await probePostgres()) ?? (await probeRedis());
+  skipUnlessDatabaseRequired('runtime conformance suite', reason);
+  return reason;
 }
 
 export function skipBanner(reason: string): string {

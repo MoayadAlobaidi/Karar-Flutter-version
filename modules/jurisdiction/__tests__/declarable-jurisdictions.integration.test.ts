@@ -45,6 +45,7 @@ import { PrismaJurisdictionDirectory } from '../infrastructure/persistence/prism
 import { Uuidv7IdSource } from '../infrastructure/persistence/uuidv7-id-source.js';
 import { JurisdictionApiModule } from '../presentation/jurisdiction-api.module.js';
 import type { JurisdictionPrincipal } from '../presentation/http/principal-source.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -70,6 +71,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('jurisdiction declarable jurisdictions suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

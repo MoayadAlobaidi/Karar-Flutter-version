@@ -30,6 +30,7 @@ import { GetOwnProfile } from '../application/use-cases/get-own-profile.js';
 import { UpdateOwnProfile } from '../application/use-cases/update-own-profile.js';
 import { RequestAccountDisable } from '../application/use-cases/request-account-disable.js';
 import type { PrincipalActor } from '../application/principal.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 // ADVERSARIAL CROSS-TENANT ISOLATION for the users tables (tenancy.md §2
 // layer 4; ADR-0022): two tenants, both NON-EMPTY, and every cross-tenant
@@ -75,6 +76,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('users isolation suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [

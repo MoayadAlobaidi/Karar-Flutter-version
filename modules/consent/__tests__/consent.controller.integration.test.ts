@@ -104,6 +104,7 @@ import {
 } from '../presentation/consent.controller.js';
 import { AllowAllPolicyService } from './fakes/allow-all-policy-service.js';
 import { dropScratchDatabase } from '@karar/platform/dist/db/index.js';
+import { skipUnlessDatabaseRequired } from '@karar/platform/dist/db/index.js';
 
 const superuserMaintenanceProfile = LocalPostgresConnectionProfile.fromEnv('superuser', {
   database: maintenanceDatabase(),
@@ -129,6 +130,7 @@ async function probePostgres(): Promise<string | null> {
 }
 
 const unreachable = await probePostgres();
+skipUnlessDatabaseRequired('consent consent.controller suite', unreachable);
 if (unreachable !== null) {
   process.stderr.write(
     [
