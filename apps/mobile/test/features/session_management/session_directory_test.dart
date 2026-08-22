@@ -18,14 +18,13 @@ UserSession _session({
   bool isCurrent = false,
   DateTime? lastSeenAt,
   String? summary,
-}) =>
-    UserSession(
-      sessionId: id,
-      createdAt: DateTime.utc(2026, 1, 1),
-      isCurrent: isCurrent,
-      lastSeenAt: lastSeenAt,
-      userAgentSummary: summary,
-    );
+}) => UserSession(
+  sessionId: id,
+  createdAt: DateTime.utc(2026, 1, 1),
+  isCurrent: isCurrent,
+  lastSeenAt: lastSeenAt,
+  userAgentSummary: summary,
+);
 
 void main() {
   group('SessionDirectory', () {
@@ -36,10 +35,11 @@ void main() {
         _session(id: 'a', isCurrent: true, lastSeenAt: DateTime.utc(2025, 12, 1)),
       ]).sortedForDisplay();
 
-      expect(
-        directory.sessions.map((UserSession session) => session.sessionId),
-        <String>['a', 'c', 'b'],
-      );
+      expect(directory.sessions.map((UserSession session) => session.sessionId), <String>[
+        'a',
+        'c',
+        'b',
+      ]);
     });
 
     test('falls back to the creation time when a session was never seen again', () {
@@ -57,10 +57,8 @@ void main() {
         isFalse,
       );
       expect(
-        SessionDirectory(<UserSession>[
-          _session(id: 'a', isCurrent: true),
-          _session(id: 'b'),
-        ]).hasOthers,
+        SessionDirectory(<UserSession>[_session(id: 'a', isCurrent: true), _session(id: 'b')])
+            .hasOthers,
         isTrue,
       );
       expect(const SessionDirectory(<UserSession>[]).isEmpty, isTrue);
@@ -68,9 +66,7 @@ void main() {
 
     test('finds the current session, or reports none', () {
       expect(
-        SessionDirectory(<UserSession>[_session(id: 'a', isCurrent: true)])
-            .current
-            ?.sessionId,
+        SessionDirectory(<UserSession>[_session(id: 'a', isCurrent: true)]).current?.sessionId,
         'a',
       );
       expect(SessionDirectory(<UserSession>[_session(id: 'a')]).current, isNull);
@@ -97,8 +93,9 @@ void main() {
         ],
       });
 
-      final Result<SessionDirectory> outcome =
-          await harness.container.read(sessionDirectoryRepositoryProvider).list();
+      final Result<SessionDirectory> outcome = await harness.container
+          .read(sessionDirectoryRepositoryProvider)
+          .list();
 
       final UserSession session = outcome.valueOrNull!.sessions.single;
       expect(session.sessionId, 'a');
@@ -115,16 +112,13 @@ void main() {
       await harness.signInFixture();
       harness.transport.onGet('/auth/sessions', <String, Object?>{
         'sessions': <Object?>[
-          <String, Object?>{
-            'sessionId': 'a',
-            'createdAt': '2026-01-01T09:00:00Z',
-            'current': true,
-          },
+          <String, Object?>{'sessionId': 'a', 'createdAt': '2026-01-01T09:00:00Z', 'current': true},
         ],
       });
 
-      final Result<SessionDirectory> outcome =
-          await harness.container.read(sessionDirectoryRepositoryProvider).list();
+      final Result<SessionDirectory> outcome = await harness.container
+          .read(sessionDirectoryRepositoryProvider)
+          .list();
 
       expect(outcome.failureOrNull, isA<ContractViolationFailure>());
     });
@@ -142,8 +136,9 @@ void main() {
         ],
       });
 
-      final Result<SessionDirectory> outcome =
-          await harness.container.read(sessionDirectoryRepositoryProvider).list();
+      final Result<SessionDirectory> outcome = await harness.container
+          .read(sessionDirectoryRepositoryProvider)
+          .list();
 
       expect(outcome.failureOrNull, isA<ContractViolationFailure>());
     });
@@ -151,10 +146,10 @@ void main() {
     test('revoke-others reports the count the server stated', () async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      harness.transport.onPost(
-        '/auth/sessions/revoke-others',
-        <String, Object?>{'status': 'revoked', 'revokedCount': 3},
-      );
+      harness.transport.onPost('/auth/sessions/revoke-others', <String, Object?>{
+        'status': 'revoked',
+        'revokedCount': 3,
+      });
 
       final Result<int> outcome = await harness.container
           .read(sessionDirectoryRepositoryProvider)
@@ -184,15 +179,23 @@ void main() {
   });
 
   group('screen', () {
-    testEveryDirectionAndScale('lists sessions in the locale direction',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('lists sessions in the locale direction', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.onGet('/auth/sessions', sessionListPayload());
 
-      await pumpIdentity(tester, const SessionsScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const SessionsScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text(l10n.sessionsSubtitle), findsOneWidget);
@@ -205,8 +208,11 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testEveryDirectionAndScale('offers a retry when the list will not load',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('offers a retry when the list will not load', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
@@ -217,8 +223,13 @@ void main() {
         statusCode: 503,
       );
 
-      await pumpIdentity(tester, const SessionsScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const SessionsScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text(l10n.failureServiceUnavailable), findsOneWidget);
@@ -233,24 +244,31 @@ void main() {
       expect(find.text(l10n.sessionsCurrentBadge), findsOneWidget);
     });
 
-    testEveryDirectionAndScale('shows the empty state when only this device is live',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('shows the empty state when only this device is live', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
-      harness.transport.onGet('/auth/sessions', <String, Object?>{
-        'sessions': <Object?>[],
-      });
+      harness.transport.onGet('/auth/sessions', <String, Object?>{'sessions': <Object?>[]});
 
-      await pumpIdentity(tester, const SessionsScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const SessionsScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text(l10n.sessionsEmptyMessage), findsOneWidget);
     });
 
-    testWidgets('a revoke confirms first, then reloads from the server',
-        (WidgetTester tester) async {
+    testWidgets('a revoke confirms first, then reloads from the server', (
+      WidgetTester tester,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
@@ -290,14 +308,10 @@ void main() {
       await tester.tap(find.text(_shared(tester).actionCancel));
       await tester.pumpAndSettle();
 
-      expect(
-        harness.transport.callsTo('/auth/sessions/9f1d0f6a-0000-4000-8000-000000000002'),
-        0,
-      );
+      expect(harness.transport.callsTo('/auth/sessions/9f1d0f6a-0000-4000-8000-000000000002'), 0);
     });
 
-    testWidgets('is wrapped in the sensitive-content cover',
-        (WidgetTester tester) async {
+    testWidgets('is wrapped in the sensitive-content cover', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       harness.transport.onGet('/auth/sessions', sessionListPayload());
@@ -308,8 +322,7 @@ void main() {
       expect(find.byType(SensitiveScreen), findsOneWidget);
     });
 
-    testWidgets('no session identifier or token is rendered as text',
-        (WidgetTester tester) async {
+    testWidgets('no session identifier or token is rendered as text', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       harness.transport.onGet('/auth/sessions', sessionListPayload());
@@ -323,8 +336,7 @@ void main() {
       }
     });
 
-    testWidgets('every interactive control carries a name',
-        (WidgetTester tester) async {
+    testWidgets('every interactive control carries a name', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final SemanticsHandle handle = tester.ensureSemantics();

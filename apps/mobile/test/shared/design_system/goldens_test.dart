@@ -28,11 +28,7 @@ void main() {
     final String suffix = locale.languageCode;
 
     testWidgets('button family [$suffix]', (WidgetTester tester) async {
-      await pumpKarar(
-        tester,
-        const _Frame(width: 320, child: _ButtonMatrix()),
-        locale: locale,
-      );
+      await pumpKarar(tester, const _Frame(width: 320, child: _ButtonMatrix()), locale: locale);
       await expectLater(
         find.byType(_Frame),
         matchesGoldenFile('goldens/button_family_$suffix.png'),
@@ -40,11 +36,7 @@ void main() {
     });
 
     testWidgets('form field states [$suffix]', (WidgetTester tester) async {
-      await pumpKarar(
-        tester,
-        const _Frame(width: 320, child: _FormFieldStates()),
-        locale: locale,
-      );
+      await pumpKarar(tester, const _Frame(width: 320, child: _FormFieldStates()), locale: locale);
       await expectLater(
         find.byType(_Frame),
         matchesGoldenFile('goldens/form_field_states_$suffix.png'),
@@ -65,10 +57,7 @@ class _Frame extends StatelessWidget {
       color: context.colors.background,
       child: SizedBox(
         width: width,
-        child: Padding(
-          padding: EdgeInsetsDirectional.all(context.spacing.lg),
-          child: child,
-        ),
+        child: Padding(padding: EdgeInsetsDirectional.all(context.spacing.lg), child: child),
       ),
     );
   }
@@ -112,11 +101,7 @@ class _ButtonMatrix extends StatelessWidget {
           isFullWidth: true,
         ),
         SizedBox(height: context.spacing.sm),
-        KararButton(
-          label: l10n.actionSubmit,
-          onPressed: null,
-          isFullWidth: true,
-        ),
+        KararButton(label: l10n.actionSubmit, onPressed: null, isFullWidth: true),
       ],
     );
   }
@@ -140,15 +125,9 @@ class _FormFieldStates extends StatelessWidget {
           maxLength: 40,
         ),
         SizedBox(height: context.spacing.lg),
-        KararTextField(
-          label: l10n.languageSettingTitle,
-          errorText: l10n.stateErrorTitle,
-        ),
+        KararTextField(label: l10n.languageSettingTitle, errorText: l10n.stateErrorTitle),
         SizedBox(height: context.spacing.lg),
-        KararStatusBadge(
-          label: l10n.statusPending,
-          tone: KararStatusTone.warning,
-        ),
+        KararStatusBadge(label: l10n.statusPending, tone: KararStatusTone.warning),
       ],
     );
   }

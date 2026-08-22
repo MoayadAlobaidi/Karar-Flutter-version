@@ -41,27 +41,25 @@ PlatformContext platformContext({
     ),
   ),
   PolicyPackStatus policyPack = const PolicyPackStatus(version: '1.0.0', status: 'ACTIVE'),
-  CapabilityNavigation navigation = const CapabilityNavigationResolved(
-    <CapabilityDestination>[],
-  ),
-}) =>
-    PlatformContext(
-      userId: testUserId,
-      sessionId: testSessionId,
-      emailVerified: true,
-      tenant: tenant ??
-          const TenantContextBound(
-            TenantMembershipOption(
-              tenantId: testTenantId,
-              name: 'Example Organisation',
-              roleHint: 'MEMBER',
-            ),
-          ),
-      jurisdiction: jurisdiction,
-      operatingEntity: operatingEntity,
-      policyPack: policyPack,
-      navigation: navigation,
-    );
+  CapabilityNavigation navigation = const CapabilityNavigationResolved(<CapabilityDestination>[]),
+}) => PlatformContext(
+  userId: testUserId,
+  sessionId: testSessionId,
+  emailVerified: true,
+  tenant:
+      tenant ??
+      const TenantContextBound(
+        TenantMembershipOption(
+          tenantId: testTenantId,
+          name: 'Example Organisation',
+          roleHint: 'MEMBER',
+        ),
+      ),
+  jurisdiction: jurisdiction,
+  operatingEntity: operatingEntity,
+  policyPack: policyPack,
+  navigation: navigation,
+);
 
 /// Two memberships, exactly as the platform would list them.
 const List<TenantChoice> twoTenantChoices = <TenantChoice>[
@@ -78,23 +76,22 @@ LegalDocument legalDocument({
   List<String>? purposeRefs,
   String kind = 'LOCAL_SEED_SYNTHETIC_NOTICE',
   bool published = true,
-}) =>
-    LegalDocument(
-      documentId: testDocumentId,
-      kind: kind,
-      entityId: testEntityId,
-      jurisdictionRef: 'jurisdiction-a',
-      purposeRefs: purposeRefs ?? const <String>[testPurposeRef],
-      effectiveVersion: published
-          ? (effectiveVersion ??
-              LegalDocumentVersion(
-                versionId: testVersionId,
-                version: '1.0.0',
-                action: LegalDocumentAction.reacceptanceRequired,
-                effectiveAt: DateTime.utc(2026, 1, 1),
-              ))
-          : null,
-    );
+}) => LegalDocument(
+  documentId: testDocumentId,
+  kind: kind,
+  entityId: testEntityId,
+  jurisdictionRef: 'jurisdiction-a',
+  purposeRefs: purposeRefs ?? const <String>[testPurposeRef],
+  effectiveVersion: published
+      ? (effectiveVersion ??
+            LegalDocumentVersion(
+              versionId: testVersionId,
+              version: '1.0.0',
+              action: LegalDocumentAction.reacceptanceRequired,
+              effectiveAt: DateTime.utc(2026, 1, 1),
+            ))
+      : null,
+);
 
 /// A consent status record in the state the caller asks for.
 ConsentStatusRecord consentStatus({
@@ -104,19 +101,18 @@ ConsentStatusRecord consentStatus({
   String? grantedVersion,
   String? documentId = testDocumentId,
   String? effectiveVersionId = testVersionId,
-}) =>
-    ConsentStatusRecord(
-      purposeRef: testPurposeRef,
-      state: state,
-      noticeRequired: noticeRequired,
-      operatingEntityId: testEntityId,
-      documentId: documentId,
-      effectiveVersion: '1.0.0',
-      effectiveVersionId: effectiveVersionId,
-      grantId: grantId,
-      grantedVersion: grantedVersion,
-      jurisdictionRef: 'jurisdiction-a',
-    );
+}) => ConsentStatusRecord(
+  purposeRef: testPurposeRef,
+  state: state,
+  noticeRequired: noticeRequired,
+  operatingEntityId: testEntityId,
+  documentId: documentId,
+  effectiveVersion: '1.0.0',
+  effectiveVersionId: effectiveVersionId,
+  grantId: grantId,
+  grantedVersion: grantedVersion,
+  jurisdictionRef: 'jurisdiction-a',
+);
 
 /// Every prerequisite satisfied.
 const ConsentPrerequisites metPrerequisites = ConsentPrerequisites(
@@ -129,14 +125,13 @@ const ConsentPrerequisites metPrerequisites = ConsentPrerequisites(
 UserProfile userProfile({
   AccountStatus status = AccountStatus.active,
   String displayName = 'Example Person',
-}) =>
-    UserProfile(
-      userId: testUserId,
-      tenantId: testTenantId,
-      displayName: displayName,
-      locale: 'en',
-      status: status,
-      residencyJurisdictionRef: 'jurisdiction-a',
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 2, 1),
-    );
+}) => UserProfile(
+  userId: testUserId,
+  tenantId: testTenantId,
+  displayName: displayName,
+  locale: 'en',
+  status: status,
+  residencyJurisdictionRef: 'jurisdiction-a',
+  createdAt: DateTime.utc(2026, 1, 1),
+  updatedAt: DateTime.utc(2026, 2, 1),
+);

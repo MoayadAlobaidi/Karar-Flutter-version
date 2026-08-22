@@ -37,16 +37,16 @@ import 'support/financial_connections_harness.dart';
 /// Every location this feature contributes, DERIVED from the route table so a
 /// route added later is covered without anyone editing this file.
 List<String> everyConnectionPath() => <String>[
-      for (final route in financialConnectionRoutes())
-        if (route is GoRoute) route.path,
-    ];
+  for (final route in financialConnectionRoutes())
+    if (route is GoRoute) route.path,
+];
 
 /// The same locations with their parameters filled in, so a deep link can
 /// actually be opened at one.
 List<String> everyOpenableConnectionLocation() => <String>[
-      for (final path in everyConnectionPath())
-        path.replaceAll(':${ConnectionRoutes.accountIdParameter}', fedAccountId),
-    ];
+  for (final path in everyConnectionPath())
+    path.replaceAll(':${ConnectionRoutes.accountIdParameter}', fedAccountId),
+];
 
 Future<void> pumpAt(
   WidgetTester tester,
@@ -100,7 +100,8 @@ void main() {
       expect(
         path.startsWith('/financial'),
         isFalse,
-        reason: '$path resembles a contract path; this feature takes its own '
+        reason:
+            '$path resembles a contract path; this feature takes its own '
             'prefix rather than asking for a second allowlist exemption',
       );
     }
@@ -133,24 +134,21 @@ void main() {
   test('the built path for one account is one of the declared locations', () {
     expect(
       ConnectionRoutes.accountSourcesPath(fedAccountId),
-      ConnectionRoutes.accountSources
-          .replaceAll(':${ConnectionRoutes.accountIdParameter}', fedAccountId),
+      ConnectionRoutes.accountSources.replaceAll(
+        ':${ConnectionRoutes.accountIdParameter}',
+        fedAccountId,
+      ),
     );
   });
 
   testWidgets('the capability opens the listing', (WidgetTester tester) async {
-    await pumpAt(
-      tester,
-      ConnectionRoutes.dataSources,
-      overrides: financialConnectionOverrides(),
-    );
+    await pumpAt(tester, ConnectionRoutes.dataSources, overrides: financialConnectionOverrides());
 
     expect(find.byType(DataSourcesScreen), findsOneWidget);
     expect(find.byType(FinancialUnavailableScreen), findsNothing);
   });
 
-  testWidgets('the capability opens one account\'s sources',
-      (WidgetTester tester) async {
+  testWidgets('the capability opens one account\'s sources', (WidgetTester tester) async {
     await pumpAt(
       tester,
       ConnectionRoutes.accountSourcesPath(fedAccountId),
@@ -161,8 +159,9 @@ void main() {
     expect(find.byType(FinancialUnavailableScreen), findsNothing);
   });
 
-  testWidgets('without the capability every location renders the refusal',
-      (WidgetTester tester) async {
+  testWidgets('without the capability every location renders the refusal', (
+    WidgetTester tester,
+  ) async {
     for (final location in everyOpenableConnectionLocation()) {
       final connections = ScriptedFinancialConnectionsRepository();
       final accounts = accountsWithSources();
@@ -176,14 +175,14 @@ void main() {
         ),
       );
 
-      expect(find.byType(FinancialUnavailableScreen), findsOneWidget,
-          reason: location);
+      expect(find.byType(FinancialUnavailableScreen), findsOneWidget, reason: location);
       expect(find.byType(DataSourcesScreen), findsNothing, reason: location);
       expect(find.byType(AccountSourcesScreen), findsNothing, reason: location);
       expect(
         connections.calls,
         isEmpty,
-        reason: 'the gate decides before the screen is constructed, so a '
+        reason:
+            'the gate decides before the screen is constructed, so a '
             'refused deep link reads no provider and issues no request '
             '($location)',
       );
@@ -191,8 +190,7 @@ void main() {
     }
   });
 
-  test('every provider this feature contributes is registered as tenant-scoped',
-      () {
+  test('every provider this feature contributes is registered as tenant-scoped', () {
     // Typed entries: `tenantScopedAsync` accepts only a
     // `TenantScopedAsyncNotifier`, so a provider that could not empty itself
     // cannot be registered here at all.

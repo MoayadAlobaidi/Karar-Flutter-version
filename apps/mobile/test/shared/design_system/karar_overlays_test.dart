@@ -30,9 +30,7 @@ void main() {
       await tester.tap(find.byType(ElevatedButton));
       await tester.pumpAndSettle();
 
-      final AppLocalizations l10n = AppLocalizations.of(
-        tester.element(find.byType(KararDialog)),
-      );
+      final AppLocalizations l10n = AppLocalizations.of(tester.element(find.byType(KararDialog)));
       expect(find.text('Sign out'), findsOneWidget);
       expect(find.text(l10n.actionConfirm), findsOneWidget);
       expect(find.text(l10n.actionCancel), findsOneWidget);
@@ -64,9 +62,7 @@ void main() {
       await tester.tap(find.byType(ElevatedButton));
       await tester.pumpAndSettle();
 
-      final AppLocalizations l10n = AppLocalizations.of(
-        tester.element(find.byType(KararDialog)),
-      );
+      final AppLocalizations l10n = AppLocalizations.of(tester.element(find.byType(KararDialog)));
       expect(
         tester.getSemantics(find.byType(KararDialog)),
         isSemantics(label: l10n.a11yDialog, namesRoute: true),
@@ -213,8 +209,7 @@ class _DialogOpener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
-      onPressed: () =>
-          showKararDialog<void>(context: context, builder: builder),
+      onPressed: () => showKararDialog<void>(context: context, builder: builder),
       child: const SizedBox(width: 80, height: 24),
     );
   }
@@ -228,8 +223,7 @@ class _SheetOpener extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
-      onPressed: () =>
-          showKararBottomSheet<void>(context: context, builder: builder),
+      onPressed: () => showKararBottomSheet<void>(context: context, builder: builder),
       child: const SizedBox(width: 80, height: 24),
     );
   }

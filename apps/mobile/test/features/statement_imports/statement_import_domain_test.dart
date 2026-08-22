@@ -21,15 +21,12 @@ import 'support/statement_import_harness.dart';
 
 /// A mapping that is valid, so each test can break exactly one thing.
 StatementColumnMapping validMapping() => const StatementColumnMapping(
-      bookingDateColumn: 0,
-      descriptionColumn: 1,
-      amount: SignedAmountMapping(
-        amountColumn: 2,
-        signFrame: AmountSignFrame.accountHolder,
-      ),
-      hasHeaderRow: true,
-      statedCurrencyCode: 'QAR',
-    );
+  bookingDateColumn: 0,
+  descriptionColumn: 1,
+  amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
+  hasHeaderRow: true,
+  statedCurrencyCode: 'QAR',
+);
 
 void main() {
   group('the byte bound is the platform bound', () {
@@ -57,10 +54,7 @@ void main() {
     });
 
     test('an empty file is refused as empty rather than as too large', () {
-      final source = SelectedStatementSource(
-        bytes: Uint8List(0),
-        declaredMediaType: 'text/csv',
-      );
+      final source = SelectedStatementSource(bytes: Uint8List(0), declaredMediaType: 'text/csv');
       expect(source.problem, SourceProblem.empty);
     });
 
@@ -101,18 +95,12 @@ void main() {
 
     test('one column mapped to two fields is refused', () {
       final mapping = validMapping().copyWith(merchantColumn: () => 1);
-      expect(
-        checkMapping(mapping, columnCount: 4),
-        contains(MappingViolation.columnUsedTwice),
-      );
+      expect(checkMapping(mapping, columnCount: 4), contains(MappingViolation.columnUsedTwice));
     });
 
     test('a column past the end of the file is refused', () {
       final mapping = validMapping().copyWith(merchantColumn: () => 9);
-      expect(
-        checkMapping(mapping, columnCount: 4),
-        contains(MappingViolation.columnIndexInvalid),
-      );
+      expect(checkMapping(mapping, columnCount: 4), contains(MappingViolation.columnIndexInvalid));
     });
 
     test('a balance column with no stated kind is refused', () {
@@ -159,10 +147,7 @@ void main() {
         hasHeaderRow: true,
         statedCurrencyCode: 'QAR',
       );
-      expect(
-        checkMapping(mapping, columnCount: 4),
-        contains(MappingViolation.columnUsedTwice),
-      );
+      expect(checkMapping(mapping, columnCount: 4), contains(MappingViolation.columnUsedTwice));
     });
 
     test('an unknown column count still checks everything else', () {
@@ -188,14 +173,8 @@ void main() {
     });
 
     test('an unreadable value sends the person back to their bank', () {
-      expect(
-        RowIssueReason.unreadableDate.remedy,
-        RowIssueRemedy.correctTheFile,
-      );
-      expect(
-        RowIssueReason.decimalPlacesExceedCurrency.remedy,
-        RowIssueRemedy.correctTheFile,
-      );
+      expect(RowIssueReason.unreadableDate.remedy, RowIssueRemedy.correctTheFile);
+      expect(RowIssueReason.decimalPlacesExceedCurrency.remedy, RowIssueRemedy.correctTheFile);
     });
 
     test('a bound is named as a bound', () {
@@ -227,7 +206,8 @@ void main() {
       expect(
         snapshot.canCommit,
         isFalse,
-        reason: 'the platform refuses this commit; offering it teaches people '
+        reason:
+            'the platform refuses this commit; offering it teaches people '
             'that refusals are noise',
       );
     });
@@ -235,10 +215,7 @@ void main() {
     test('no version withholds the commit', () {
       // The contract does not carry `version` on a read, so an import reached
       // by identifier cannot be committed blind.
-      final snapshot = snapshotFixture(
-        state: ImportLifecycleState.reviewRequired,
-        version: null,
-      );
+      final snapshot = snapshotFixture(state: ImportLifecycleState.reviewRequired, version: null);
       expect(snapshot.canCommit, isFalse);
     });
 
@@ -273,8 +250,11 @@ void main() {
       final sample = readOrFail('a,b,c\n1,2,3\n');
       expect(sample.rows.length, 2);
       expect(sample.columnCount, 3);
-      expect(sample.rows.first.cells.map((UntrustedCell c) => c.exactText),
-          <String>['a', 'b', 'c']);
+      expect(sample.rows.first.cells.map((UntrustedCell c) => c.exactText), <String>[
+        'a',
+        'b',
+        'c',
+      ]);
     });
 
     test('a quoted field keeps its commas and newlines', () {

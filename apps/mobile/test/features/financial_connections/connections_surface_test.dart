@@ -58,9 +58,9 @@ bool isInteractive(Widget widget) =>
     widget is Radio<Object?>;
 
 List<String> renderedStrings(WidgetTester tester) => <String>[
-      for (final widget in tester.allWidgets)
-        if (widget is Text && widget.data != null) widget.data!,
-    ];
+  for (final widget in tester.allWidgets)
+    if (widget is Text && widget.data != null) widget.data!,
+];
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(DataSourcesScreen)));
@@ -73,17 +73,15 @@ Future<ScriptedFinancialConnectionsRepository> pumpSurface(
   Locale locale = KararLocalization.english,
   double textScale = 1.0,
 }) async {
-  final scripted = repository ??
+  final scripted =
+      repository ??
       ScriptedFinancialConnectionsRepository(
         connections: held ?? <FinancialConnection>[connectionFixture()],
       );
   await pumpFeatureScreen(
     tester,
     const DataSourcesScreen(),
-    overrides: financialConnectionOverrides(
-      connections: scripted,
-      accounts: accounts,
-    ),
+    overrides: financialConnectionOverrides(connections: scripted, accounts: accounts),
     locale: locale,
     textScale: textScale,
     surfaceSize: tallSurface,
@@ -93,30 +91,34 @@ Future<ScriptedFinancialConnectionsRepository> pumpSurface(
 
 void main() {
   group('no unimplemented rail offers anything', () {
-    testWidgets('the whole unbuilt-rail section contains no interactive widget',
-        (WidgetTester tester) async {
+    testWidgets('the whole unbuilt-rail section contains no interactive widget', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
 
       final section = find.byKey(unbuiltRailsSectionKey);
       expect(section, findsOneWidget);
 
       final offenders = <String>[
-        for (final element in find
-            .descendant(of: section, matching: find.byWidgetPredicate(isInteractive))
-            .evaluate())
+        for (final element
+            in find
+                .descendant(of: section, matching: find.byWidgetPredicate(isInteractive))
+                .evaluate())
           element.widget.runtimeType.toString(),
       ];
       expect(
         offenders,
         isEmpty,
-        reason: 'an affordance beside a rail that does not exist is a promise '
+        reason:
+            'an affordance beside a rail that does not exist is a promise '
             'nobody made. A DISABLED control is one too — it says "later". '
             'Found: ${offenders.join(', ')}',
       );
     });
 
-    testWidgets('every rail this platform never built is named and refused',
-        (WidgetTester tester) async {
+    testWidgets('every rail this platform never built is named and refused', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
 
@@ -129,20 +131,17 @@ void main() {
         expect(
           find.text(connectionRailLabel(rail, l10n)),
           findsOneWidget,
-          reason: '$rail must be NAMED: a person cannot check a claim about '
+          reason:
+              '$rail must be NAMED: a person cannot check a claim about '
               'something the product will not mention',
         );
       }
       // One sentence, said once per rail, and it is the never-built one.
-      expect(
-        find.text(l10n.railStandingNotBuilt),
-        findsNWidgets(unbuilt.length),
-      );
+      expect(find.text(l10n.railStandingNotBuilt), findsNWidgets(unbuilt.length));
       expect(find.text(l10n.dataSourcesRailsExplanation), findsOneWidget);
     });
 
-    testWidgets('the two rails that exist are named as things YOU do',
-        (WidgetTester tester) async {
+    testWidgets('the two rails that exist are named as things YOU do', (WidgetTester tester) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
 
@@ -157,8 +156,7 @@ void main() {
       expect(
         find.descendant(
           of: section,
-          matching:
-              find.text(connectionRailLabel(ConnectionRail.userFileUpload, l10n)),
+          matching: find.text(connectionRailLabel(ConnectionRail.userFileUpload, l10n)),
         ),
         findsOneWidget,
       );
@@ -170,8 +168,9 @@ void main() {
   });
 
   group('a response that claims a capability changes nothing on screen', () {
-    testWidgets('a bank interface claiming EXECUTABLE still reads as not built',
-        (WidgetTester tester) async {
+    testWidgets('a bank interface claiming EXECUTABLE still reads as not built', (
+      WidgetTester tester,
+    ) async {
       // Past the repository on purpose. The repository refuses this response;
       // this asserts the SCREEN would not be fooled even if it did not.
       await pumpSurface(
@@ -194,7 +193,8 @@ void main() {
       expect(
         find.text(l10n.railStandingNotBuilt),
         findsNWidgets(12),
-        reason: 'the standing is derived from the RAIL, so an availability '
+        reason:
+            'the standing is derived from the RAIL, so an availability '
             'field cannot grant a capability',
       );
       expect(find.text('My bank'), findsOneWidget);
@@ -207,8 +207,9 @@ void main() {
   });
 
   group('the three unavailable reasons stay three', () {
-    testWidgets('each connection states its own reason, and no two share one',
-        (WidgetTester tester) async {
+    testWidgets('each connection states its own reason, and no two share one', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(
         tester,
         held: <FinancialConnection>[
@@ -239,20 +240,13 @@ void main() {
         find.text(connectionStatusLabel(ConnectionStatus.notConfigured, l10n)),
         findsOneWidget,
       );
-      expect(
-        find.text(connectionStatusLabel(ConnectionStatus.unavailable, l10n)),
-        findsOneWidget,
-      );
-      expect(
-        find.text(connectionStatusLabel(ConnectionStatus.notImplemented, l10n)),
-        findsWidgets,
-      );
+      expect(find.text(connectionStatusLabel(ConnectionStatus.unavailable, l10n)), findsOneWidget);
+      expect(find.text(connectionStatusLabel(ConnectionStatus.notImplemented, l10n)), findsWidgets);
     });
   });
 
   group('no credential field exists', () {
-    testWidgets('there is no editable text anywhere, in any state',
-        (WidgetTester tester) async {
+    testWidgets('there is no editable text anywhere, in any state', (WidgetTester tester) async {
       for (final held in <List<FinancialConnection>>[
         <FinancialConnection>[connectionFixture()],
         const <FinancialConnection>[],
@@ -261,15 +255,15 @@ void main() {
         expect(
           find.byType(EditableText),
           findsNothing,
-          reason: 'no field of any kind belongs on this surface, and a '
+          reason:
+              'no field of any kind belongs on this surface, and a '
               'credential field belongs nowhere in this product',
         );
         expect(find.byType(KararTextField), findsNothing);
       }
     });
 
-    testWidgets('there is none once a connection is opened either',
-        (WidgetTester tester) async {
+    testWidgets('there is none once a connection is opened either', (WidgetTester tester) async {
       await pumpSurface(tester);
       await tester.tap(find.text(mountedL10n(tester).connectionShowDetailAction));
       await tester.pumpAndSettle();
@@ -295,8 +289,9 @@ void main() {
   });
 
   group('no date on this screen is a freshness claim', () {
-    testWidgets('the record-changed date carries the sentence that limits it',
-        (WidgetTester tester) async {
+    testWidgets('the record-changed date carries the sentence that limits it', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
       await tester.tap(find.text(mountedL10n(tester).connectionShowDetailAction));
       await tester.pumpAndSettle();
@@ -311,38 +306,34 @@ void main() {
   });
 
   group('the surface reads and never writes', () {
-    testWidgets('rendering a page of connections issues only reads',
-        (WidgetTester tester) async {
+    testWidgets('rendering a page of connections issues only reads', (WidgetTester tester) async {
       final repository = await pumpSurface(tester);
       expect(repository.calls, <String>['list']);
     });
 
-    testWidgets('a filter narrows the read rather than the rendered list',
-        (WidgetTester tester) async {
+    testWidgets('a filter narrows the read rather than the rendered list', (
+      WidgetTester tester,
+    ) async {
       final repository = await pumpSurface(tester);
       final l10n = mountedL10n(tester);
 
       await tester.tap(find.text(l10n.dataSourcesFilterNotImplemented));
       await tester.pumpAndSettle();
 
-      expect(repository.requestedStatuses.last,
-          ConnectionStatusFilter.notImplemented);
+      expect(repository.requestedStatuses.last, ConnectionStatusFilter.notImplemented);
     });
   });
 
   group('Arabic is first-class', () {
-    testWidgets('the tree is right to left because the LOCALE is Arabic',
-        (WidgetTester tester) async {
+    testWidgets('the tree is right to left because the LOCALE is Arabic', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester, locale: KararLocalization.arabic);
 
-      expect(
-        Directionality.of(tester.element(find.byType(DataSourcesScreen))),
-        TextDirection.rtl,
-      );
+      expect(Directionality.of(tester.element(find.byType(DataSourcesScreen))), TextDirection.rtl);
     });
 
-    testWidgets('the Arabic catalogue is what is rendered',
-        (WidgetTester tester) async {
+    testWidgets('the Arabic catalogue is what is rendered', (WidgetTester tester) async {
       await pumpSurface(tester, locale: KararLocalization.arabic);
       final l10n = mountedL10n(tester);
 
@@ -360,8 +351,9 @@ void main() {
       }
     });
 
-    testWidgets('no unimplemented rail offers anything in Arabic either',
-        (WidgetTester tester) async {
+    testWidgets('no unimplemented rail offers anything in Arabic either', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester, locale: KararLocalization.arabic);
 
       expect(
@@ -376,8 +368,9 @@ void main() {
   });
 
   group('the surface is usable without sight and at twice the text size', () {
-    testWidgets('every rail card is one labelled node rather than loose strings',
-        (WidgetTester tester) async {
+    testWidgets('every rail card is one labelled node rather than loose strings', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
       final handle = tester.ensureSemantics();
@@ -394,28 +387,26 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('the detail control names the connection it belongs to',
-        (WidgetTester tester) async {
+    testWidgets('the detail control names the connection it belongs to', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
       final handle = tester.ensureSemantics();
 
       expect(
         find.bySemanticsLabel(
-          l10n.a11yTitleWithSubtitle(
-            l10n.connectionShowDetailAction,
-            'Statements I upload',
-          ),
+          l10n.a11yTitleWithSubtitle(l10n.connectionShowDetailAction, 'Statements I upload'),
         ),
         findsOneWidget,
-        reason: 'a column of identical "Show details" buttons is unusable '
+        reason:
+            'a column of identical "Show details" buttons is unusable '
             'without sight',
       );
       handle.dispose();
     });
 
-    testWidgets('nothing is clipped or lost at twice the text size',
-        (WidgetTester tester) async {
+    testWidgets('nothing is clipped or lost at twice the text size', (WidgetTester tester) async {
       await pumpSurface(tester, textScale: 2.0);
       final l10n = mountedL10n(tester);
 
@@ -446,5 +437,4 @@ void main() {
       handle.dispose();
     });
   });
-
 }

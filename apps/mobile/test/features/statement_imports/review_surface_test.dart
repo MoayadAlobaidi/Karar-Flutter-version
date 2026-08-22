@@ -34,33 +34,30 @@ AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(StatementImportReviewScreen)));
 
 List<String> renderedStrings(WidgetTester tester) => <String>[
-      for (final widget in tester.allWidgets)
-        if (widget is Text && widget.data != null) widget.data!,
-    ];
+  for (final widget in tester.allWidgets)
+    if (widget is Text && widget.data != null) widget.data!,
+];
 
 Future<void> pumpReview(
   WidgetTester tester, {
   required StatementImportPreview preview,
   Locale locale = const Locale('en'),
   double textScale = 1.0,
-}) =>
-    pumpFeatureScreen(
-      tester,
-      const StatementImportReviewScreen(importId: reviewImportId),
-      locale: locale,
-      textScale: textScale,
-      overrides: statementImportOverrides(
-        repository: ScriptedStatementImportsRepository(
-          previewResult: Success<StatementImportPreview>(preview),
-        ),
-      ),
-    );
+}) => pumpFeatureScreen(
+  tester,
+  const StatementImportReviewScreen(importId: reviewImportId),
+  locale: locale,
+  textScale: textScale,
+  overrides: statementImportOverrides(
+    repository: ScriptedStatementImportsRepository(
+      previewResult: Success<StatementImportPreview>(preview),
+    ),
+  ),
+);
 
 void main() {
   group('a typed refusal gets its own sentence', () {
-    testWidgets('a spreadsheet refusal names the spreadsheet remedy', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('a spreadsheet refusal names the spreadsheet remedy', (WidgetTester tester) async {
       await pumpReview(
         tester,
         preview: previewFixture(
@@ -70,15 +67,9 @@ void main() {
       );
       final l10n = mountedL10n(tester);
 
-      expect(
-        renderedStrings(tester),
-        contains(l10n.statementImportRefusalSpreadsheetContent),
-      );
+      expect(renderedStrings(tester), contains(l10n.statementImportRefusalSpreadsheetContent));
       // The neighbouring code must NOT be what a person is shown.
-      expect(
-        renderedStrings(tester),
-        isNot(contains(l10n.statementImportRefusalSourceTooLarge)),
-      );
+      expect(renderedStrings(tester), isNot(contains(l10n.statementImportRefusalSourceTooLarge)));
     });
 
     testWidgets('a size refusal names the size, not a generic failure', (
@@ -92,14 +83,12 @@ void main() {
         ),
       );
       final l10n = mountedL10n(tester);
-      expect(
-        renderedStrings(tester),
-        contains(l10n.statementImportRefusalSourceTooLarge),
-      );
+      expect(renderedStrings(tester), contains(l10n.statementImportRefusalSourceTooLarge));
       expect(
         renderedStrings(tester),
         isNot(contains(l10n.statementImportUnavailableDescription)),
-        reason: 'a refusal is the platform saying no for a stated reason; it '
+        reason:
+            'a refusal is the platform saying no for a stated reason; it '
             'must never be presented as a failure to reach the platform',
       );
     });
@@ -125,9 +114,7 @@ void main() {
       expect(sentences.length, ImportRefusal.values.length);
     });
 
-    testWidgets('every row reason has a distinct, non-empty sentence', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('every row reason has a distinct, non-empty sentence', (WidgetTester tester) async {
       await pumpReview(tester, preview: previewFixture());
       final l10n = mountedL10n(tester);
 
@@ -154,10 +141,7 @@ void main() {
         ),
       );
       final l10n = mountedL10n(tester);
-      expect(
-        renderedStrings(tester),
-        contains(l10n.statementImportRefusalUnrecognised),
-      );
+      expect(renderedStrings(tester), contains(l10n.statementImportRefusalUnrecognised));
     });
   });
 
@@ -181,19 +165,14 @@ void main() {
       final rendered = renderedStrings(tester);
 
       expect(rendered, contains(l10n.statementImportFieldAmount));
-      expect(
-        rendered,
-        contains(l10n.statementImportReasonAmbiguousDecimalSeparator),
-      );
+      expect(rendered, contains(l10n.statementImportReasonAmbiguousDecimalSeparator));
       // The remedy for an unstated convention is to state it, not to edit the
       // bank export.
       expect(rendered, contains(l10n.statementImportRemedyStateAConvention));
       expect(rendered.any((String value) => value.contains('14')), isTrue);
     });
 
-    testWidgets('the surface says it shows no values from the file', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the surface says it shows no values from the file', (WidgetTester tester) async {
       await pumpReview(
         tester,
         preview: previewFixture(
@@ -206,15 +185,10 @@ void main() {
           ],
         ),
       );
-      expect(
-        renderedStrings(tester),
-        contains(mountedL10n(tester).statementImportNoValuesShown),
-      );
+      expect(renderedStrings(tester), contains(mountedL10n(tester).statementImportNoValuesShown));
     });
 
-    testWidgets('a truncated report says how many it is not showing', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('a truncated report says how many it is not showing', (WidgetTester tester) async {
       await pumpReview(
         tester,
         preview: previewFixture(
@@ -232,24 +206,20 @@ void main() {
       expect(
         rendered.any((String value) => value.contains('900')),
         isTrue,
-        reason: 'the real total must travel with the page, so a truncated '
+        reason:
+            'the real total must travel with the page, so a truncated '
             'report cannot read as a complete one',
       );
     });
 
     testWidgets('no refused rows says so plainly', (WidgetTester tester) async {
       await pumpReview(tester, preview: previewFixture());
-      expect(
-        renderedStrings(tester),
-        contains(mountedL10n(tester).statementImportRowIssuesNone),
-      );
+      expect(renderedStrings(tester), contains(mountedL10n(tester).statementImportRowIssuesNone));
     });
   });
 
   group('no value from the file reaches the review surface', () {
-    testWidgets('a merchant string on the wire never renders', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('a merchant string on the wire never renders', (WidgetTester tester) async {
       // The contract carries no cell on this boundary. This drives the REAL
       // client over a transport that (wrongly) attaches one, and proves the
       // client has nowhere to put it: `RowIssue` has three fields.
@@ -311,7 +281,8 @@ void main() {
       expectNothingMatching(
         tester,
         merchant,
-        because: 'the preview boundary carries no cell, and the client must '
+        because:
+            'the preview boundary carries no cell, and the client must '
             'have nowhere to put one even when the wire supplies it',
       );
       // The refusal itself still reaches the person.
@@ -323,33 +294,33 @@ void main() {
   });
 
   group('the surface is bilingual and lays out by locale', () {
-    testInBothDirections(
-      'the review surface renders in the direction of its locale',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpReview(
-          tester,
-          preview: previewFixture(
-            issues: const <RowIssue>[
-              RowIssue(
-                rowNumber: 3,
-                field: StatementField.currency,
-                reason: RowIssueReason.unknownCurrency,
-              ),
-            ],
-          ),
-          locale: locale,
-          textScale: scale,
-        );
+    testInBothDirections('the review surface renders in the direction of its locale', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpReview(
+        tester,
+        preview: previewFixture(
+          issues: const <RowIssue>[
+            RowIssue(
+              rowNumber: 3,
+              field: StatementField.currency,
+              reason: RowIssueReason.unknownCurrency,
+            ),
+          ],
+        ),
+        locale: locale,
+        textScale: scale,
+      );
 
-        final direction = directionUnder(tester, find.byType(RowIssueTile).first);
-        expect(
-          direction,
-          locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-          reason: 'direction is derived from the locale, never passed in',
-        );
-      },
-      textScales: featureTextScales,
-    );
+      final direction = directionUnder(tester, find.byType(RowIssueTile).first);
+      expect(
+        direction,
+        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        reason: 'direction is derived from the locale, never passed in',
+      );
+    }, textScales: featureTextScales);
 
     testWidgets('Arabic renders Arabic copy, not the English fallback', (
       WidgetTester tester,
@@ -368,8 +339,10 @@ void main() {
       expect(renderedStrings(tester), contains(arabic));
       expect(
         arabic,
-        isNot('The file covers more than one account. Karar refuses it rather '
-            'than mixing them into the account you chose.'),
+        isNot(
+          'The file covers more than one account. Karar refuses it rather '
+          'than mixing them into the account you chose.',
+        ),
         reason: 'the Arabic catalogue must carry a real translation',
       );
     });
@@ -395,5 +368,4 @@ void main() {
       handle.dispose();
     });
   });
-
 }

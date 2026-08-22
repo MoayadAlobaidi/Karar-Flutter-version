@@ -47,8 +47,7 @@ void main() {
   });
 
   test('Arabic translates every English message', () {
-    final Set<String> missing = _messageKeys(template)
-        .difference(_messageKeys(arabic));
+    final Set<String> missing = _messageKeys(template).difference(_messageKeys(arabic));
     expect(
       missing,
       isEmpty,
@@ -59,8 +58,7 @@ void main() {
   });
 
   test('Arabic defines no message English does not', () {
-    final Set<String> extra = _messageKeys(arabic)
-        .difference(_messageKeys(template));
+    final Set<String> extra = _messageKeys(arabic).difference(_messageKeys(template));
     expect(
       extra,
       isEmpty,
@@ -71,11 +69,10 @@ void main() {
   });
 
   test('no message is blank in either language', () {
-    for (final MapEntry<String, Map<String, dynamic>> file
-        in <String, Map<String, dynamic>>{
-          'app_en.arb': template,
-          'app_ar.arb': arabic,
-        }.entries) {
+    for (final MapEntry<String, Map<String, dynamic>> file in <String, Map<String, dynamic>>{
+      'app_en.arb': template,
+      'app_ar.arb': arabic,
+    }.entries) {
       for (final String key in _messageKeys(file.value)) {
         expect(
           (file.value[key] as String).trim(),
@@ -89,13 +86,8 @@ void main() {
   test('every template message carries a description', () {
     for (final String key in _messageKeys(template)) {
       final Object? metadata = template['@$key'];
-      expect(
-        metadata,
-        isA<Map<String, dynamic>>(),
-        reason: '$key has no @$key metadata block.',
-      );
-      final Object? description =
-          (metadata! as Map<String, dynamic>)['description'];
+      expect(metadata, isA<Map<String, dynamic>>(), reason: '$key has no @$key metadata block.');
+      final Object? description = (metadata! as Map<String, dynamic>)['description'];
       expect(
         description,
         isA<String>(),
@@ -154,8 +146,7 @@ void main() {
   });
 
   test('the committed generated Dart matches the ARB files', () {
-    final String generated = File('lib/l10n/generated/app_localizations.dart')
-        .readAsStringSync();
+    final String generated = File('lib/l10n/generated/app_localizations.dart').readAsStringSync();
     for (final String key in _messageKeys(template)) {
       expect(
         generated.contains(RegExp('\\b$key\\b')),
@@ -189,9 +180,7 @@ Set<String> _placeholdersIn(String message) {
       // matched separately below, so only bare substitutions are compared.
       .toSet()
     ..addAll(
-      RegExp(r'\{(\w+),\s*plural')
-          .allMatches(message)
-          .map((RegExpMatch match) => match.group(1)!),
+      RegExp(r'\{(\w+),\s*plural').allMatches(message).map((RegExpMatch match) => match.group(1)!),
     );
 }
 

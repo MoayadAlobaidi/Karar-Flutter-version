@@ -93,9 +93,7 @@ Future<void> pumpFinancialRouter(
         localeResolutionCallback: KararLocalization.resolve,
         theme: KararTheme.light(locale: locale),
         builder: (BuildContext context, Widget? child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(textScale),
-          ),
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
           child: KararThemeScope(child: child ?? const SizedBox.shrink()),
         ),
       ),
@@ -109,18 +107,13 @@ void main() {
     test('is closed until bootstrap reports the capability as available', () {
       ProviderContainer containerFor(BootstrapSnapshot? bootstrap) {
         final container = ProviderContainer(
-          overrides: <Override>[
-            financialBootstrapProvider.overrideWithValue(bootstrap),
-          ],
+          overrides: <Override>[financialBootstrapProvider.overrideWithValue(bootstrap)],
         );
         addTearDown(container.dispose);
         return container;
       }
 
-      expect(
-        containerFor(syntheticBootstrap()).read(financialSurfaceEnabledProvider),
-        isTrue,
-      );
+      expect(containerFor(syntheticBootstrap()).read(financialSurfaceEnabledProvider), isTrue);
       expect(
         containerFor(syntheticBootstrap(withTransactions: false))
             .read(financialSurfaceEnabledProvider),
@@ -130,9 +123,8 @@ void main() {
       expect(containerFor(null).read(financialSurfaceEnabledProvider), isFalse);
       // Resolution did not complete, so nothing is granted.
       expect(
-        containerFor(
-          syntheticBootstrap(resolution: CapabilityResolutionState.unknown),
-        ).read(financialSurfaceEnabledProvider),
+        containerFor(syntheticBootstrap(resolution: CapabilityResolutionState.unknown))
+            .read(financialSurfaceEnabledProvider),
         isFalse,
       );
       // Present but not available.
@@ -152,42 +144,35 @@ void main() {
       // not by registering a destination in the platform's navigation
       // allowlist. That allowlist is deliberately empty and stays that way.
       expect(navigableCapabilityIds, isEmpty);
-      expect(
-        const CapabilityNavigationResolver().isNavigable(transactionsCapabilityId),
-        isFalse,
-      );
+      expect(const CapabilityNavigationResolver().isNavigable(transactionsCapabilityId), isFalse);
     });
   });
 
   group('without the capability', () {
-    testInBothDirections(
-      'the home surface names nothing financial',
-      (WidgetTester tester, Locale locale, double scale) async {
-        final accounts = ScriptedAccountsRepository(accounts: wholePortfolio());
-        await pumpFeatureScreen(
-          tester,
-          const FinancialHomeShell(state: homeState),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            ...financialOverrides(
-              accounts: accounts,
-              bootstrap: syntheticBootstrap(withTransactions: false),
-            ),
-            platformContextProvider.overrideWithValue(platformContext()),
-          ],
-        );
+    testInBothDirections('the home surface names nothing financial', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      final accounts = ScriptedAccountsRepository(accounts: wholePortfolio());
+      await pumpFeatureScreen(
+        tester,
+        const FinancialHomeShell(state: homeState),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          ...financialOverrides(
+            accounts: accounts,
+            bootstrap: syntheticBootstrap(withTransactions: false),
+          ),
+          platformContextProvider.overrideWithValue(platformContext()),
+        ],
+      );
 
-        expect(find.byType(KararNavigationBar), findsNothing);
-        expect(find.byType(AccountsAndWalletsScreen), findsNothing);
-        expect(
-          accounts.reads,
-          isEmpty,
-          reason: 'a closed surface must issue no financial read',
-        );
-      },
-      textScales: featureTextScales,
-    );
+      expect(find.byType(KararNavigationBar), findsNothing);
+      expect(find.byType(AccountsAndWalletsScreen), findsNothing);
+      expect(accounts.reads, isEmpty, reason: 'a closed surface must issue no financial read');
+    }, textScales: featureTextScales);
 
     testWidgets('every financial deep link is refused', (WidgetTester tester) async {
       for (final path in everyFinancialPath) {
@@ -220,66 +205,62 @@ void main() {
       }
     });
 
-    testInBothDirections(
-      'the refusal describes nothing that is behind it',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFinancialRouter(
-          tester,
-          FinancialRoutes.accounts,
-          locale: locale,
-          textScale: scale,
-          overrides: financialOverrides(
-            accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
-            bootstrap: syntheticBootstrap(withTransactions: false),
-          ),
-        );
+    testInBothDirections('the refusal describes nothing that is behind it', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFinancialRouter(
+        tester,
+        FinancialRoutes.accounts,
+        locale: locale,
+        textScale: scale,
+        overrides: financialOverrides(
+          accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
+          bootstrap: syntheticBootstrap(withTransactions: false),
+        ),
+      );
 
-        // No account, wallet, issuer, amount or currency is named.
-        for (final forbidden in <String>[
-          'Everyday account',
-          issuerOneNameEn,
-          issuerOneNameAr,
-          unlistedIssuerLabel,
-          'QAR',
-          'USD',
-          '1,250',
-        ]) {
-          expectNothingMatching(
-            tester,
-            forbidden,
-            because: 'a refusal must not describe what it is refusing',
-          );
-        }
-      },
-      textScales: featureTextScales,
-    );
+      // No account, wallet, issuer, amount or currency is named.
+      for (final forbidden in <String>[
+        'Everyday account',
+        issuerOneNameEn,
+        issuerOneNameAr,
+        unlistedIssuerLabel,
+        'QAR',
+        'USD',
+        '1,250',
+      ]) {
+        expectNothingMatching(
+          tester,
+          forbidden,
+          because: 'a refusal must not describe what it is refusing',
+        );
+      }
+    }, textScales: featureTextScales);
   });
 
   group('with the capability', () {
-    testInBothDirections(
-      'the home surface offers the financial destination',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const FinancialHomeShell(state: homeState),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            ...financialOverrides(
-              accounts: ScriptedAccountsRepository(accounts: wholePortfolio()),
-            ),
-            platformContextProvider.overrideWithValue(platformContext()),
-          ],
-        );
+    testInBothDirections('the home surface offers the financial destination', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const FinancialHomeShell(state: homeState),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          ...financialOverrides(accounts: ScriptedAccountsRepository(accounts: wholePortfolio())),
+          platformContextProvider.overrideWithValue(platformContext()),
+        ],
+      );
 
-        expect(find.byType(KararNavigationBar), findsOneWidget);
-        final l10n = AppLocalizations.of(
-          tester.element(find.byType(KararNavigationBar)),
-        );
-        expect(find.text(l10n.financialHomeTabAccounts), findsOneWidget);
-      },
-      textScales: featureTextScales,
-    );
+      expect(find.byType(KararNavigationBar), findsOneWidget);
+      final l10n = AppLocalizations.of(tester.element(find.byType(KararNavigationBar)));
+      expect(find.text(l10n.financialHomeTabAccounts), findsOneWidget);
+    }, textScales: featureTextScales);
 
     testWidgets('a deep link into the portfolio opens it', (WidgetTester tester) async {
       final accounts = ScriptedAccountsRepository(accounts: wholePortfolio());

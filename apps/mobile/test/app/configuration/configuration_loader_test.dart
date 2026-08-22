@@ -21,10 +21,7 @@ void main() {
 
   group('environment identifier', () {
     test('is required; an absent value never defaults to a profile', () {
-      final result = loader.load(
-        values: <String, String>{},
-        isReleaseBuild: true,
-      );
+      final result = loader.load(values: <String, String>{}, isReleaseBuild: true);
 
       expect(result.isFailure, isTrue);
       expect(violationsOf(result), contains(ConfigurationViolation.environmentMissing));
@@ -144,10 +141,7 @@ void main() {
         isReleaseBuild: true,
       );
 
-      expect(
-        violationsOf(result),
-        contains(ConfigurationViolation.apiBaseUrlCredentialsPresent),
-      );
+      expect(violationsOf(result), contains(ConfigurationViolation.apiBaseUrlCredentialsPresent));
     });
 
     test('accepts a complete, secure, non-local configuration', () {
@@ -258,10 +252,7 @@ void main() {
         'KARAR_ACCESS_TOKEN',
       ]) {
         final result = loader.load(
-          values: <String, String>{
-            ConfigurationKeys.environment: 'LOCAL',
-            key: 'anything',
-          },
+          values: <String, String>{ConfigurationKeys.environment: 'LOCAL', key: 'anything'},
           isReleaseBuild: false,
         );
 

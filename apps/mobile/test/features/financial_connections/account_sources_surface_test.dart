@@ -37,9 +37,9 @@ const Size tallSurface = Size(1200, 9000);
 final DateTime landedAt = DateTime.utc(2026, 2, 14, 9, 30);
 
 List<String> renderedStrings(WidgetTester tester) => <String>[
-      for (final widget in tester.allWidgets)
-        if (widget is Text && widget.data != null) widget.data!,
-    ];
+  for (final widget in tester.allWidgets)
+    if (widget is Text && widget.data != null) widget.data!,
+];
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(AccountSourcesScreen)));
@@ -56,31 +56,28 @@ const String instantSentinel = '\u0000';
 /// The fixed part of the arrival sentence, derived from the catalogue rather
 /// than typed here, so the assertion holds in Arabic without a translated
 /// string being pinned into this file.
-String arrivalSentencePrefix(AppLocalizations l10n) => l10n
-    .sourceArrivalYouSupplied(instantSentinel)
-    .split(instantSentinel)
-    .first;
+String arrivalSentencePrefix(AppLocalizations l10n) =>
+    l10n.sourceArrivalYouSupplied(instantSentinel).split(instantSentinel).first;
 
 Future<void> pumpSources(
   WidgetTester tester, {
   List<AccountSourceLink>? links,
   Locale locale = KararLocalization.english,
   double textScale = 1.0,
-}) =>
-    pumpFeatureScreen(
-      tester,
-      const AccountSourcesScreen(accountId: fedAccountId),
-      overrides: financialConnectionOverrides(
-        accounts: accountsWithSources(
-          sourceLinks: <String, List<AccountSourceLink>>{
-            fedAccountId: links ?? <AccountSourceLink>[sourceLinkFixture()],
-          },
-        ),
-      ),
-      locale: locale,
-      textScale: textScale,
-      surfaceSize: tallSurface,
-    );
+}) => pumpFeatureScreen(
+  tester,
+  const AccountSourcesScreen(accountId: fedAccountId),
+  overrides: financialConnectionOverrides(
+    accounts: accountsWithSources(
+      sourceLinks: <String, List<AccountSourceLink>>{
+        fedAccountId: links ?? <AccountSourceLink>[sourceLinkFixture()],
+      },
+    ),
+  ),
+  locale: locale,
+  textScale: textScale,
+  surfaceSize: tallSurface,
+);
 
 void main() {
   group('a coverage range is never a freshness guarantee', () {
@@ -107,8 +104,9 @@ void main() {
       }
     });
 
-    testWidgets('the coverage row carries the sentence that limits it',
-        (WidgetTester tester) async {
+    testWidgets('the coverage row carries the sentence that limits it', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -119,12 +117,12 @@ void main() {
 
       expect(find.text(l10n.sourceCoverageLabel), findsOneWidget);
       expect(find.text(l10n.accountSourcesCoverageNote), findsOneWidget);
-      expect(find.text(l10n.sourceCoverageRange('2026-01-01', '2026-09-30')),
-          findsOneWidget);
+      expect(find.text(l10n.sourceCoverageRange('2026-01-01', '2026-09-30')), findsOneWidget);
     });
 
-    testWidgets('nothing supplied at all is stated rather than left blank',
-        (WidgetTester tester) async {
+    testWidgets('nothing supplied at all is stated rather than left blank', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(tester);
       final l10n = mountedL10n(tester);
 
@@ -134,8 +132,9 @@ void main() {
   });
 
   group('being seen is not receiving', () {
-    testWidgets('the last recorded activity has its own label and its own note',
-        (WidgetTester tester) async {
+    testWidgets('the last recorded activity has its own label and its own note', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -150,28 +149,25 @@ void main() {
       expect(find.text(l10n.sourceArrivalNone), findsOneWidget);
     });
 
-    testWidgets('an import that did land is stated as something YOU supplied',
-        (WidgetTester tester) async {
+    testWidgets('an import that did land is stated as something YOU supplied', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
-        links: <AccountSourceLink>[
-          sourceLinkFixture(lastSuccessfulImportAt: landedAt),
-        ],
+        links: <AccountSourceLink>[sourceLinkFixture(lastSuccessfulImportAt: landedAt)],
       );
       final l10n = mountedL10n(tester);
 
       expect(find.text(l10n.sourceArrivalNone), findsNothing);
-      expect(
-        find.textContaining(arrivalSentencePrefix(l10n)),
-        findsOneWidget,
-      );
+      expect(find.textContaining(arrivalSentencePrefix(l10n)), findsOneWidget);
       expect(find.text(l10n.accountSourcesArrivalNote), findsOneWidget);
     });
   });
 
   group('priority is echoed, never decided here', () {
-    testWidgets('sources render in the order given, each with its own rank',
-        (WidgetTester tester) async {
+    testWidgets('sources render in the order given, each with its own rank', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -199,8 +195,9 @@ void main() {
       expect(strong.dy, lessThan(weaker.dy));
     });
 
-    testWidgets('two sources claiming one rank say the precedence is undecided',
-        (WidgetTester tester) async {
+    testWidgets('two sources claiming one rank say the precedence is undecided', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -219,8 +216,9 @@ void main() {
   });
 
   group('what a source can do is what was SEEN', () {
-    testWidgets('never offered and not seen are two different answers',
-        (WidgetTester tester) async {
+    testWidgets('never offered and not seen are two different answers', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -237,13 +235,12 @@ void main() {
       expect(find.text(l10n.accountSourcesCapabilitiesNote), findsOneWidget);
     });
 
-    testWidgets('no confidence figure is offered for a probable match',
-        (WidgetTester tester) async {
+    testWidgets('no confidence figure is offered for a probable match', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
-        links: <AccountSourceLink>[
-          sourceLinkFixture(matchBasis: MatchBasis.probable),
-        ],
+        links: <AccountSourceLink>[sourceLinkFixture(matchBasis: MatchBasis.probable)],
       );
       final l10n = mountedL10n(tester);
 
@@ -256,8 +253,9 @@ void main() {
   });
 
   group('nothing here asks a person to connect or to confirm', () {
-    testWidgets('there is no editable text and no button on the source cards',
-        (WidgetTester tester) async {
+    testWidgets('there is no editable text and no button on the source cards', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -277,8 +275,9 @@ void main() {
       expect(find.byType(KararButton), findsNothing);
     });
 
-    testWidgets('a bank rail on a source link still reads as never built',
-        (WidgetTester tester) async {
+    testWidgets('a bank rail on a source link still reads as never built', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         links: <AccountSourceLink>[
@@ -297,8 +296,9 @@ void main() {
       expect(find.byType(KararButton), findsNothing);
     });
 
-    testWidgets('an account with no source says so rather than offering one',
-        (WidgetTester tester) async {
+    testWidgets('an account with no source says so rather than offering one', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(tester, links: const <AccountSourceLink>[]);
       final l10n = mountedL10n(tester);
 
@@ -309,8 +309,9 @@ void main() {
   });
 
   group('Arabic is first-class', () {
-    testWidgets('the tree is right to left because the LOCALE is Arabic',
-        (WidgetTester tester) async {
+    testWidgets('the tree is right to left because the LOCALE is Arabic', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(tester, locale: KararLocalization.arabic);
 
       expect(
@@ -319,8 +320,9 @@ void main() {
       );
     });
 
-    testWidgets('the coverage range is not a freshness claim in Arabic either',
-        (WidgetTester tester) async {
+    testWidgets('the coverage range is not a freshness claim in Arabic either', (
+      WidgetTester tester,
+    ) async {
       await pumpSources(
         tester,
         locale: KararLocalization.arabic,
@@ -350,10 +352,7 @@ void main() {
 
       expect(find.text(l10n.accountSourcesCardHeading(1)), findsOneWidget);
       expect(
-        tester
-            .getSemantics(find.text(l10n.accountSourcesCardHeading(1)))
-            .flagsCollection
-            .isHeader,
+        tester.getSemantics(find.text(l10n.accountSourcesCardHeading(1))).flagsCollection.isHeader,
         isTrue,
       );
       handle.dispose();
@@ -390,5 +389,4 @@ void main() {
       handle.dispose();
     });
   });
-
 }

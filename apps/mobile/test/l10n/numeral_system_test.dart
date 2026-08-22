@@ -83,10 +83,8 @@ String _characterCount(AppLocalizations l10n) => l10n.fieldCharacterCount(3, 20)
 String _tabPosition(AppLocalizations l10n) => l10n.a11yTabPosition(2, 5);
 String _passwordTooShort(AppLocalizations l10n) => l10n.passwordTooShort(12);
 String _passwordTooLong(AppLocalizations l10n) => l10n.passwordTooLong(128);
-String _revokedOthers(AppLocalizations l10n) =>
-    l10n.sessionsRevokedOthersNotice(3);
-String _recoveryCodePosition(AppLocalizations l10n) =>
-    l10n.a11yRecoveryCodePosition(1, 10);
+String _revokedOthers(AppLocalizations l10n) => l10n.sessionsRevokedOthersNotice(3);
+String _recoveryCodePosition(AppLocalizations l10n) => l10n.a11yRecoveryCodePosition(1, 10);
 
 bool _containsWesternDigits(String value) => RegExp('[0-9]').hasMatch(value);
 
@@ -96,11 +94,8 @@ bool _containsWesternDigits(String value) => RegExp('[0-9]').hasMatch(value);
 /// subtree under a region-specific one.
 Widget _inLocale(Locale locale, Widget child) {
   return Builder(
-    builder: (BuildContext context) => Localizations.override(
-      context: context,
-      locale: locale,
-      child: child,
-    ),
+    builder: (BuildContext context) =>
+        Localizations.override(context: context, locale: locale, child: child),
   );
 }
 
@@ -109,12 +104,8 @@ void main() {
   // outside a widget tree nothing has installed it yet.
   setUpAll(initializeDateFormatting);
 
-  final AppLocalizations english = lookupAppLocalizations(
-    KararLocalization.english,
-  );
-  final AppLocalizations arabic = lookupAppLocalizations(
-    KararLocalization.arabic,
-  );
+  final AppLocalizations english = lookupAppLocalizations(KararLocalization.english);
+  final AppLocalizations arabic = lookupAppLocalizations(KararLocalization.arabic);
   final Map<Locale, AppLocalizations> catalogues = <Locale, AppLocalizations>{
     KararLocalization.english: english,
     KararLocalization.arabic: arabic,
@@ -130,9 +121,7 @@ void main() {
           numerals: KararNumeralSystem.arabicIndic,
         );
         for (final _NumericMessage message in _numericMessages) {
-          final String rendered = formatter.applyNumerals(
-            message.render(entry.value),
-          );
+          final String rendered = formatter.applyNumerals(message.render(entry.value));
           expect(
             ArabicNumerals.containsArabicIndicDigits(rendered),
             isTrue,
@@ -154,9 +143,7 @@ void main() {
           numerals: KararNumeralSystem.western,
         );
         for (final _NumericMessage message in _numericMessages) {
-          final String rendered = formatter.applyNumerals(
-            message.render(entry.value),
-          );
+          final String rendered = formatter.applyNumerals(message.render(entry.value));
           expect(
             _containsWesternDigits(rendered),
             isTrue,
@@ -174,17 +161,11 @@ void main() {
 
       test('[$language] a count and a date agree on their digits', () {
         for (final KararNumeralSystem system in KararNumeralSystem.values) {
-          final KararFormatter formatter = KararFormatter(
-            locale: entry.key,
-            numerals: system,
-          );
+          final KararFormatter formatter = KararFormatter(locale: entry.key, numerals: system);
           final String date = formatter.dateTime(DateTime(2026, 8, 16, 14, 30));
-          final bool dateIsArabicIndic =
-              ArabicNumerals.containsArabicIndicDigits(date);
+          final bool dateIsArabicIndic = ArabicNumerals.containsArabicIndicDigits(date);
           for (final _NumericMessage message in _numericMessages) {
-            final String rendered = formatter.applyNumerals(
-              message.render(entry.value),
-            );
+            final String rendered = formatter.applyNumerals(message.render(entry.value));
             expect(
               ArabicNumerals.containsArabicIndicDigits(rendered),
               dateIsArabicIndic,
@@ -240,19 +221,13 @@ void main() {
         );
       }
     });
-
   });
 
   group('surfaces', () {
-    testWidgets('the character counter follows the formatter', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the character counter follows the formatter', (WidgetTester tester) async {
       await pumpKarar(
         tester,
-        _inLocale(
-          arabicIndicLocale,
-          const KararTextField(label: 'Nickname', maxLength: 20),
-        ),
+        _inLocale(arabicIndicLocale, const KararTextField(label: 'Nickname', maxLength: 20)),
         locale: KararLocalization.arabic,
       );
 
@@ -304,9 +279,7 @@ void main() {
       );
     });
 
-    testWidgets('the tab position hint follows the formatter', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the tab position hint follows the formatter', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       await pumpKarar(
         tester,
@@ -315,10 +288,7 @@ void main() {
           KararNavigationBar(
             destinations: const <KararNavigationDestination>[
               KararNavigationDestination(icon: Icons.home_outlined, label: 'Home'),
-              KararNavigationDestination(
-                icon: Icons.settings_outlined,
-                label: 'Settings',
-              ),
+              KararNavigationDestination(icon: Icons.settings_outlined, label: 'Settings'),
             ],
             selectedIndex: 1,
             onDestinationSelected: (_) {},
@@ -343,19 +313,15 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('the revoked-devices notice follows the formatter', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the revoked-devices notice follows the formatter', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final AppLocalizations l10n = lookupAppLocalizations(
-        KararLocalization.arabic,
-      );
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.arabic);
       harness.transport.onGet('/auth/sessions', sessionListPayload(others: 3));
-      harness.transport.onPost(
-        '/auth/sessions/revoke-others',
-        <String, Object?>{'status': 'revoked', 'revokedCount': 3},
-      );
+      harness.transport.onPost('/auth/sessions/revoke-others', <String, Object?>{
+        'status': 'revoked',
+        'revokedCount': 3,
+      });
 
       await pumpIdentity(
         tester,
@@ -382,15 +348,11 @@ void main() {
       expect(find.text(bundleText), findsNothing);
     });
 
-    testWidgets('the recovery-code position follows the formatter', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the recovery-code position follows the formatter', (WidgetTester tester) async {
       final SemanticsHandle handle = tester.ensureSemantics();
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      final AppLocalizations l10n = lookupAppLocalizations(
-        KararLocalization.arabic,
-      );
+      final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.arabic);
       harness.transport.onPost('/auth/mfa/enroll', <String, Object?>{
         'status': 'enrolment_started',
         'secret': 'JBSWY3DPEHPK3PXP',

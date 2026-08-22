@@ -103,6 +103,14 @@ dev_dependencies:
   # same rule as everything else, and it must move with shared_preferences.
   shared_preferences_platform_interface: 2.4.2
 
+  # The federated platform interface behind flutter_secure_storage, declared for
+  # the same reason and under the same rule. `FlutterSecureStore` is the seam a
+  # non-completing keychain call hangs at, and there was no test of the real
+  # adapter at all until one was written — a fake platform registered here is
+  # the only way a host test can make the keychain misbehave. It must move with
+  # flutter_secure_storage.
+  flutter_secure_storage_platform_interface: 2.0.3
+
 flutter:
   uses-material-design: true
   # Required by `flutter gen-l10n`: without it the generator refuses to run.

@@ -22,43 +22,42 @@ import '../platform_bootstrap/support/feature_harness.dart';
 import '../platform_bootstrap/support/fixtures.dart';
 
 Map<String, Object?> boundResponse({String tenantId = testTenantId}) => <String, Object?>{
-      'kind': 'BOUND',
-      'binding': <String, Object?>{
-        'kind': 'BOUND',
-        'tenant': <String, Object?>{
-          'tenantId': tenantId,
-          'name': 'Example Organisation',
-          'roleHint': 'MEMBER',
-        },
-      },
-    };
+  'kind': 'BOUND',
+  'binding': <String, Object?>{
+    'kind': 'BOUND',
+    'tenant': <String, Object?>{
+      'tenantId': tenantId,
+      'name': 'Example Organisation',
+      'roleHint': 'MEMBER',
+    },
+  },
+};
 
-Map<String, Object?> switchedResponse({String sessionId = 'session-0002'}) =>
-    <String, Object?>{
-      'kind': 'SWITCHED',
-      'binding': <String, Object?>{
-        'kind': 'BOUND',
-        'tenant': <String, Object?>{
-          'tenantId': 'tenant-0002',
-          'name': 'Second Organisation',
-          'roleHint': 'OWNER',
-        },
-      },
-      'tokens': <String, Object?>{
-        'accessToken': 'new-access',
-        'accessTokenExpiresAt': '2999-01-01T00:00:00.000Z',
-        'refreshToken': 'new-refresh',
-        'refreshTokenExpiresAt': '2999-01-01T00:00:00.000Z',
-        'sessionId': sessionId,
-      },
-    };
+Map<String, Object?> switchedResponse({String sessionId = 'session-0002'}) => <String, Object?>{
+  'kind': 'SWITCHED',
+  'binding': <String, Object?>{
+    'kind': 'BOUND',
+    'tenant': <String, Object?>{
+      'tenantId': 'tenant-0002',
+      'name': 'Second Organisation',
+      'roleHint': 'OWNER',
+    },
+  },
+  'tokens': <String, Object?>{
+    'accessToken': 'new-access',
+    'accessTokenExpiresAt': '2999-01-01T00:00:00.000Z',
+    'refreshToken': 'new-refresh',
+    'refreshTokenExpiresAt': '2999-01-01T00:00:00.000Z',
+    'sessionId': sessionId,
+  },
+};
 
 /// A repository under test, with an in-memory session it can replace.
 final class BindingHarness {
   BindingHarness({Object? body, Failure? failure})
-      : tokens = InMemoryTokenStore(),
-        _body = body,
-        _failure = failure {
+    : tokens = InMemoryTokenStore(),
+      _body = body,
+      _failure = failure {
     sessions = SessionManager(store: tokens, logger: AppLogger.silent);
     repository = ApiTenantBindingRepository(
       client: KararApiClient(
@@ -306,10 +305,9 @@ void main() {
         ),
       );
 
-      final result = await SwitchTenant(
-        repository: repository,
-        scopedState: scopedState,
-      )(twoTenantChoices.last);
+      final result = await SwitchTenant(repository: repository, scopedState: scopedState)(
+        twoTenantChoices.last,
+      );
 
       expect(result.isFailure, isTrue);
       expect(scopedState.discards, 1);
@@ -318,11 +316,11 @@ void main() {
     test('a first bind does not discard, because nothing changed tenant', () async {
       final scopedState = RecordingScopedState();
       final repository = _RecordingRepository(
-        () => Success<TenantBindingOutcome>(const TenantBound(TenantChoice(
-          tenantId: testTenantId,
-          name: 'Example Organisation',
-          roleHint: 'MEMBER',
-        ))),
+        () => Success<TenantBindingOutcome>(
+          const TenantBound(
+            TenantChoice(tenantId: testTenantId, name: 'Example Organisation', roleHint: 'MEMBER'),
+          ),
+        ),
       );
 
       await BindTenant(repository)(twoTenantChoices.first);
@@ -364,8 +362,7 @@ void main() {
       expect(token.toString(), isNot(contains('super-secret-code')));
     });
 
-    test('the tenant comes from the invitation record, never from the request',
-        () async {
+    test('the tenant comes from the invitation record, never from the request', () async {
       final transport = FakeApiTransport(
         (ApiRequest request) async => ApiResponse(
           statusCode: 200,

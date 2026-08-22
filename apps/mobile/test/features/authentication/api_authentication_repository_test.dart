@@ -36,11 +36,10 @@ void main() {
 
   group('register', () {
     test('maps an accepted registration to a neutral receipt', () async {
-      harness.transport.onPost(
-        '/auth/register',
-        <String, Object?>{'status': 'accepted', 'detail': 'Verification sent.'},
-        statusCode: 202,
-      );
+      harness.transport.onPost('/auth/register', <String, Object?>{
+        'status': 'accepted',
+        'detail': 'Verification sent.',
+      }, statusCode: 202);
 
       final Result<NeutralReceipt> outcome = await repository.register(
         email: _email(),
@@ -50,40 +49,34 @@ void main() {
       expect(outcome, isA<Success<NeutralReceipt>>());
     });
 
-    test(
-      'a new address and an already-registered address produce the same value',
-      () async {
-        // The platform answers 202 for both. If the client ever distinguished
-        // them it would hand the difference back to an attacker, so the two
-        // outcomes must be indistinguishable at the domain boundary — not
-        // merely rendered alike further up.
-        harness.transport.onPost(
-          '/auth/register',
-          <String, Object?>{'status': 'accepted', 'detail': 'A brand new account.'},
-          statusCode: 202,
-        );
-        final Result<NeutralReceipt> fresh =
-            await repository.register(email: _email(), password: _password());
+    test('a new address and an already-registered address produce the same value', () async {
+      // The platform answers 202 for both. If the client ever distinguished
+      // them it would hand the difference back to an attacker, so the two
+      // outcomes must be indistinguishable at the domain boundary — not
+      // merely rendered alike further up.
+      harness.transport.onPost('/auth/register', <String, Object?>{
+        'status': 'accepted',
+        'detail': 'A brand new account.',
+      }, statusCode: 202);
+      final Result<NeutralReceipt> fresh = await repository.register(
+        email: _email(),
+        password: _password(),
+      );
 
-        final IdentityHarness second = IdentityHarness();
-        second.transport.onPost(
-          '/auth/register',
-          <String, Object?>{
-            'status': 'accepted',
-            'detail': 'This address is already registered.',
-            'alreadyRegistered': true,
-          },
-          statusCode: 202,
-        );
-        final Result<NeutralReceipt> existing = await second.container
-            .read(authenticationRepositoryProvider)
-            .register(email: _email(), password: _password());
+      final IdentityHarness second = IdentityHarness();
+      second.transport.onPost('/auth/register', <String, Object?>{
+        'status': 'accepted',
+        'detail': 'This address is already registered.',
+        'alreadyRegistered': true,
+      }, statusCode: 202);
+      final Result<NeutralReceipt> existing = await second.container
+          .read(authenticationRepositoryProvider)
+          .register(email: _email(), password: _password());
 
-        expect(fresh, equals(existing));
-        expect(fresh.valueOrNull, equals(existing.valueOrNull));
-        expect(fresh.valueOrNull.toString(), equals(existing.valueOrNull.toString()));
-      },
-    );
+      expect(fresh, equals(existing));
+      expect(fresh.valueOrNull, equals(existing.valueOrNull));
+      expect(fresh.valueOrNull.toString(), equals(existing.valueOrNull.toString()));
+    });
 
     test('maps a rejected registration to its typed failure', () async {
       harness.transport.failWith(
@@ -93,8 +86,10 @@ void main() {
         statusCode: 429,
       );
 
-      final Result<NeutralReceipt> outcome =
-          await repository.register(email: _email(), password: _password());
+      final Result<NeutralReceipt> outcome = await repository.register(
+        email: _email(),
+        password: _password(),
+      );
 
       expect(outcome.failureOrNull, isA<RateLimitedFailure>());
     });
@@ -106,8 +101,10 @@ void main() {
         (_) async => throw const FormatException('unexpected union branch'),
       );
 
-      final Result<NeutralReceipt> outcome =
-          await repository.register(email: _email(), password: _password());
+      final Result<NeutralReceipt> outcome = await repository.register(
+        email: _email(),
+        password: _password(),
+      );
 
       expect(outcome.failureOrNull, isA<ContractViolationFailure>());
     });
@@ -117,15 +114,14 @@ void main() {
     test('adopts the session and returns only the session id', () async {
       harness.transport.onPost('/auth/login', sessionPayload(now: harness.clock.nowUtc()));
 
-      final Result<AuthenticationOutcome> outcome =
-          await repository.signIn(email: _email(), password: _password());
+      final Result<AuthenticationOutcome> outcome = await repository.signIn(
+        email: _email(),
+        password: _password(),
+      );
 
       final AuthenticationOutcome value = outcome.valueOrNull!;
       expect(value, isA<SessionEstablished>());
-      expect(
-        (value as SessionEstablished).sessionId,
-        '9f1d0f6a-0000-4000-8000-000000000001',
-      );
+      expect((value as SessionEstablished).sessionId, '9f1d0f6a-0000-4000-8000-000000000001');
       expect(harness.container.read(sessionManagerProvider).hasSession, isTrue);
     });
 
@@ -164,13 +160,12 @@ void main() {
     });
 
     test('an MFA challenge is retained without reaching the caller', () async {
-      harness.transport.onPost(
-        '/auth/login',
-        mfaChallengePayload(now: harness.clock.nowUtc()),
-      );
+      harness.transport.onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
 
-      final Result<AuthenticationOutcome> outcome =
-          await repository.signIn(email: _email(), password: _password());
+      final Result<AuthenticationOutcome> outcome = await repository.signIn(
+        email: _email(),
+        password: _password(),
+      );
 
       final AuthenticationOutcome value = outcome.valueOrNull!;
       expect(value, isA<MfaChallengeIssued>());
@@ -193,8 +188,10 @@ void main() {
         statusCode: 401,
       );
 
-      final Result<AuthenticationOutcome> outcome =
-          await repository.signIn(email: _email(), password: _password());
+      final Result<AuthenticationOutcome> outcome = await repository.signIn(
+        email: _email(),
+        password: _password(),
+      );
 
       expect(outcome.failureOrNull, isA<AuthenticationRequiredFailure>());
       expect(harness.container.read(sessionManagerProvider).hasSession, isFalse);
@@ -210,8 +207,10 @@ void main() {
         'sessionId': 's',
       });
 
-      final Result<AuthenticationOutcome> outcome =
-          await repository.signIn(email: _email(), password: _password());
+      final Result<AuthenticationOutcome> outcome = await repository.signIn(
+        email: _email(),
+        password: _password(),
+      );
 
       expect(outcome.failureOrNull, isA<ContractViolationFailure>());
       expect(harness.container.read(sessionManagerProvider).hasSession, isFalse);
@@ -223,8 +222,10 @@ void main() {
         'challengeToken': 'challenge-token-fixture',
       });
 
-      final Result<AuthenticationOutcome> outcome =
-          await repository.signIn(email: _email(), password: _password());
+      final Result<AuthenticationOutcome> outcome = await repository.signIn(
+        email: _email(),
+        password: _password(),
+      );
 
       expect(outcome.failureOrNull, isA<ContractViolationFailure>());
       expect(
@@ -234,13 +235,14 @@ void main() {
       );
     });
 
-    test('FAILS CLOSED when secure storage will not accept the credential',
-        () async {
+    test('FAILS CLOSED when secure storage will not accept the credential', () async {
       harness.transport.onPost('/auth/login', sessionPayload(now: harness.clock.nowUtc()));
       harness.secureStore.failWith = SecureStorageOperation.write;
 
-      final Result<AuthenticationOutcome> outcome =
-          await repository.signIn(email: _email(), password: _password());
+      final Result<AuthenticationOutcome> outcome = await repository.signIn(
+        email: _email(),
+        password: _password(),
+      );
 
       expect(outcome.failureOrNull, isA<SecureStorageUnavailableFailure>());
       expect(
@@ -264,14 +266,9 @@ void main() {
       expect(harness.secureStore.deleteAllCount, greaterThan(0));
     });
 
-    test('clears local credentials even when the server cannot be reached',
-        () async {
+    test('clears local credentials even when the server cannot be reached', () async {
       await harness.signInFixture();
-      harness.transport.failWith(
-        HttpMethod.post,
-        '/auth/logout',
-        const OfflineFailure(),
-      );
+      harness.transport.failWith(HttpMethod.post, '/auth/logout', const OfflineFailure());
 
       final Result<void> outcome = await repository.signOut();
 
@@ -282,8 +279,7 @@ void main() {
       expect(harness.secureEntries, isEmpty);
     });
 
-    test('carries an idempotency key so a mid-flight refresh can replay it',
-        () async {
+    test('carries an idempotency key so a mid-flight refresh can replay it', () async {
       await harness.signInFixture();
       harness.transport.onPost('/auth/logout', <String, Object?>{'status': 'logged_out'});
 
@@ -297,10 +293,8 @@ void main() {
   group('changePassword', () {
     test('rotates the access token once the password has changed', () async {
       await harness.signInFixture(accessTokenLife: const Duration(minutes: 10));
-      harness.transport
-          .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
-      harness.refreshTransport
-          .onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
+      harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+      harness.refreshTransport.onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
 
       final Result<void> outcome = await repository.changePassword(
         currentPassword: const OpaqueSecret('old-password'),
@@ -319,10 +313,8 @@ void main() {
 
     test('never sends or logs either password beyond the request body', () async {
       await harness.signInFixture();
-      harness.transport
-          .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
-      harness.refreshTransport
-          .onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
+      harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+      harness.refreshTransport.onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
 
       await repository.changePassword(
         currentPassword: const OpaqueSecret('old-password'),
@@ -331,10 +323,7 @@ void main() {
 
       expect(harness.loggedText, isNot(contains('old-password')));
       expect(harness.loggedText, isNot(contains('brand-new-password')));
-      expect(
-        harness.secureEntries.values.join(),
-        isNot(contains('brand-new-password')),
-      );
+      expect(harness.secureEntries.values.join(), isNot(contains('brand-new-password')));
     });
 
     test('an incorrect current password maps to the typed failure', () async {
@@ -359,16 +348,10 @@ void main() {
       );
     });
 
-    test('reports a rotation that could not complete rather than a false success',
-        () async {
+    test('reports a rotation that could not complete rather than a false success', () async {
       await harness.signInFixture();
-      harness.transport
-          .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
-      harness.refreshTransport.failWith(
-        HttpMethod.post,
-        '/auth/refresh',
-        const OfflineFailure(),
-      );
+      harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+      harness.refreshTransport.failWith(HttpMethod.post, '/auth/refresh', const OfflineFailure());
 
       final Result<void> outcome = await repository.changePassword(
         currentPassword: const OpaqueSecret('old-password'),

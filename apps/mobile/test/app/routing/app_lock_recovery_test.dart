@@ -36,13 +36,10 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../../features/authentication/support/identity_harness.dart';
 
-final AppLocalizations _english = lookupAppLocalizations(
-  KararLocalization.english,
-);
+final AppLocalizations _english = lookupAppLocalizations(KararLocalization.english);
 
 /// The location the router is actually showing.
-String _locationOf(GoRouter router) =>
-    router.routerDelegate.currentConfiguration.uri.path;
+String _locationOf(GoRouter router) => router.routerDelegate.currentConfiguration.uri.path;
 
 void main() {
   group('a locked launch can still reach sign-in', () {
@@ -91,23 +88,20 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('the lock gate is reached before anything protected', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the lock gate is reached before anything protected', (WidgetTester tester) async {
       await launchLocked(tester);
 
       expect(
         harness.container.read(startupCoordinatorProvider).state,
         isA<AppLocked>(),
-        reason: 'the fixture must actually lock, or the test below proves '
+        reason:
+            'the fixture must actually lock, or the test below proves '
             'nothing by escaping a lock that was never applied',
       );
       expect(_locationOf(router), RoutePaths.lock);
     });
 
-    testWidgets('pressing the password fallback lands on sign-in', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('pressing the password fallback lands on sign-in', (WidgetTester tester) async {
       await launchLocked(tester);
       expect(_locationOf(router), RoutePaths.lock);
 
@@ -121,14 +115,16 @@ void main() {
       expect(
         _locationOf(router),
         RoutePaths.signIn,
-        reason: 'the password fallback must reach sign-in. Still being on '
+        reason:
+            'the password fallback must reach sign-in. Still being on '
             '${RoutePaths.lock} means the redirect returned the user to the '
             'lock, which is the trap this test exists for.',
       );
       expect(
         harness.container.read(startupCoordinatorProvider).state,
         isA<Unauthenticated>(),
-        reason: 'reaching sign-in by navigation alone would be a screen the '
+        reason:
+            'reaching sign-in by navigation alone would be a screen the '
             'redirect happens not to have bounced yet; the state itself must '
             'have left AppLocked',
       );
@@ -153,14 +149,13 @@ void main() {
       expect(
         harness.secureEntries,
         isEmpty,
-        reason: 'tokens left in the store would mean the lock was bypassed '
+        reason:
+            'tokens left in the store would mean the lock was bypassed '
             'rather than abandoned',
       );
     });
 
-    testWidgets('protected content is not reachable after the escape', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('protected content is not reachable after the escape', (WidgetTester tester) async {
       await launchLocked(tester);
       await tester.tap(find.text(_english.appLockSignInInstead));
       await tester.pumpAndSettle();

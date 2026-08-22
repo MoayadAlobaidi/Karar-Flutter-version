@@ -55,7 +55,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'the server now emits a consent-required code. That is a real '
+        reason:
+            'the server now emits a consent-required code. That is a real '
             'gate arriving: route it in the startup machine, discard financial '
             'state behind it, block the deep links, and delete this test.',
       );

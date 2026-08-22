@@ -73,18 +73,9 @@ void main() {
     });
 
     test('applying a system is a no-op when the locale already decided', () {
-      expect(
-        ArabicNumerals.applySystem('٢٠٢٦', KararNumeralSystem.locale),
-        '٢٠٢٦',
-      );
-      expect(
-        ArabicNumerals.applySystem('٢٠٢٦', KararNumeralSystem.western),
-        '2026',
-      );
-      expect(
-        ArabicNumerals.applySystem('2026', KararNumeralSystem.arabicIndic),
-        '٢٠٢٦',
-      );
+      expect(ArabicNumerals.applySystem('٢٠٢٦', KararNumeralSystem.locale), '٢٠٢٦');
+      expect(ArabicNumerals.applySystem('٢٠٢٦', KararNumeralSystem.western), '2026');
+      expect(ArabicNumerals.applySystem('2026', KararNumeralSystem.arabicIndic), '٢٠٢٦');
     });
   });
 }

@@ -127,9 +127,8 @@ void main() {
         ),
       );
 
-      final result = await ApiTransactionCategoriesRepository(
-        KararApiClient(transport),
-      ).listCategories();
+      final result = await ApiTransactionCategoriesRepository(KararApiClient(transport))
+          .listCategories();
 
       final items = (result as Success<financial.Page<TransactionCategory>>).value.items;
       expect(items, hasLength(2));
@@ -175,22 +174,21 @@ void main() {
   });
 
   group('the picker', () {
-    testInBothDirections(
-      'offers the assignable entries in the reading language',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpPicker(tester, locale: locale, textScale: scale);
-        final isArabic = locale.languageCode == 'ar';
+    testInBothDirections('offers the assignable entries in the reading language', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpPicker(tester, locale: locale, textScale: scale);
+      final isArabic = locale.languageCode == 'ar';
 
-        expect(find.text(isArabic ? 'المنزل' : 'Household'), findsOneWidget);
-        expect(find.text(isArabic ? 'المرافق' : 'Utilities'), findsOneWidget);
-        // The retired entry is not offered.
-        expect(find.text(isArabic ? 'مدخل متقاعد' : 'Retired entry'), findsNothing);
-      },
-      textScales: featureTextScales,
-    );
+      expect(find.text(isArabic ? 'المنزل' : 'Household'), findsOneWidget);
+      expect(find.text(isArabic ? 'المرافق' : 'Utilities'), findsOneWidget);
+      // The retired entry is not offered.
+      expect(find.text(isArabic ? 'مدخل متقاعد' : 'Retired entry'), findsNothing);
+    }, textScales: featureTextScales);
 
-    testWidgets('choosing an entry sends its code and nothing else',
-        (WidgetTester tester) async {
+    testWidgets('choosing an entry sends its code and nothing else', (WidgetTester tester) async {
       final transactions = await pumpPicker(tester);
 
       await tester.tap(find.text('Utilities'));
@@ -209,33 +207,30 @@ void main() {
       expect(find.text('Household'), findsNothing);
     });
 
-    testInBothDirections(
-      'a decision the person already made is not replaced silently',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpPicker(
-          tester,
-          assignResult: const Failed<CategoryAssignment>(
-            ConflictFailure(code: 'USER_ASSIGNMENT_WINS'),
-          ),
-          locale: locale,
-          textScale: scale,
-        );
-
-        await tester.tap(find.text(locale.languageCode == 'ar' ? 'المرافق' : 'Utilities'));
-        await tester.pumpAndSettle();
-
-        expect(find.text(mountedL10n(tester).categoryAssignmentWins), findsOneWidget);
-      },
-      textScales: featureTextScales,
-    );
-
-    testWidgets('an unknown code is refused with its own message',
-        (WidgetTester tester) async {
+    testInBothDirections('a decision the person already made is not replaced silently', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
       await pumpPicker(
         tester,
         assignResult: const Failed<CategoryAssignment>(
-          NotFoundFailure(code: 'CATEGORY_UNKNOWN'),
+          ConflictFailure(code: 'USER_ASSIGNMENT_WINS'),
         ),
+        locale: locale,
+        textScale: scale,
+      );
+
+      await tester.tap(find.text(locale.languageCode == 'ar' ? 'المرافق' : 'Utilities'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(mountedL10n(tester).categoryAssignmentWins), findsOneWidget);
+    }, textScales: featureTextScales);
+
+    testWidgets('an unknown code is refused with its own message', (WidgetTester tester) async {
+      await pumpPicker(
+        tester,
+        assignResult: const Failed<CategoryAssignment>(NotFoundFailure(code: 'CATEGORY_UNKNOWN')),
       );
 
       await tester.tap(find.text('Utilities'));
@@ -244,22 +239,23 @@ void main() {
       expect(find.text(mountedL10n(tester).categoryUnknown), findsOneWidget);
     });
 
-    testInBothDirections(
-      'an empty catalogue says so rather than showing a blank list',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpPicker(
-          tester,
-          entries: const <TransactionCategory>[],
-          locale: locale,
-          textScale: scale,
-        );
-        expect(find.text(mountedL10n(tester).categoriesEmptyTitle), findsOneWidget);
-      },
-      textScales: featureTextScales,
-    );
+    testInBothDirections('an empty catalogue says so rather than showing a blank list', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpPicker(
+        tester,
+        entries: const <TransactionCategory>[],
+        locale: locale,
+        textScale: scale,
+      );
+      expect(find.text(mountedL10n(tester).categoriesEmptyTitle), findsOneWidget);
+    }, textScales: featureTextScales);
 
-    testWidgets('there is no free-text category field and no score anywhere',
-        (WidgetTester tester) async {
+    testWidgets('there is no free-text category field and no score anywhere', (
+      WidgetTester tester,
+    ) async {
       await pumpPicker(tester);
       // One field only: the search box.
       expect(find.byType(TextField), findsOneWidget);
@@ -272,8 +268,9 @@ void main() {
       }
     });
 
-    testWidgets('the catalogue version is shown so an assignment is traceable',
-        (WidgetTester tester) async {
+    testWidgets('the catalogue version is shown so an assignment is traceable', (
+      WidgetTester tester,
+    ) async {
       await pumpPicker(tester);
       expect(find.text('catalogue-1'), findsOneWidget);
     });
@@ -300,5 +297,4 @@ void main() {
       handle.dispose();
     });
   });
-
 }

@@ -54,20 +54,19 @@ FinancialConnection connectionFixture({
   bool impliesLiveInstitutionLink = false,
   bool providerAccessImplemented = false,
   int version = 1,
-}) =>
-    FinancialConnection(
-      connectionId: connectionId,
-      rail: rail,
-      availability: availability,
-      status: status,
-      displayLabel: displayLabel,
-      institutionId: institutionId,
-      impliesLiveInstitutionLink: impliesLiveInstitutionLink,
-      providerAccessImplemented: providerAccessImplemented,
-      createdAt: DateTime.utc(2026, 1, 4, 8),
-      updatedAt: DateTime.utc(2026, 2, 9, 10),
-      version: version,
-    );
+}) => FinancialConnection(
+  connectionId: connectionId,
+  rail: rail,
+  availability: availability,
+  status: status,
+  displayLabel: displayLabel,
+  institutionId: institutionId,
+  impliesLiveInstitutionLink: impliesLiveInstitutionLink,
+  providerAccessImplemented: providerAccessImplemented,
+  createdAt: DateTime.utc(2026, 1, 4, 8),
+  updatedAt: DateTime.utc(2026, 2, 9, 10),
+  version: version,
+);
 
 /// One source feeding one account, with every field this surface renders under
 /// the test author's control.
@@ -87,44 +86,36 @@ AccountSourceLink sourceLinkFixture({
   DateTime? lastSuccessfulImportAt,
   CalendarDayRange? historyCoverage,
   SourceDataObservationState balance = SourceDataObservationState.observed,
-  SourceDataObservationState pendingTransactions =
-      SourceDataObservationState.notProvided,
-}) =>
-    AccountSourceLink(
-      sourceLinkId: sourceLinkId,
-      accountId: accountId,
-      connectionId: connectionId,
-      rail: rail,
-      availability: availability,
-      sourceAuthority: sourceAuthority,
-      matchBasis: matchBasis,
-      status: status,
-      impliesLiveInstitutionLink: false,
-      providerAccessImplemented: false,
-      subjectConfirmedAt: subjectConfirmedAt,
-      sourcePriority: sourcePriority,
-      observation: SourceObservation(
-        firstObservedAt: firstObservedAt ?? DateTime.utc(2026, 1, 4, 8),
-        lastObservedAt: lastObservedAt ?? DateTime.utc(2026, 3, 9, 10),
-        lastSuccessfulImportAt: lastSuccessfulImportAt,
-      ),
-      historyCoverage: historyCoverage,
-      capabilities: SourceCapabilities(
-        balance: balance,
-        pendingTransactions: pendingTransactions,
-      ),
-      version: 1,
-    );
+  SourceDataObservationState pendingTransactions = SourceDataObservationState.notProvided,
+}) => AccountSourceLink(
+  sourceLinkId: sourceLinkId,
+  accountId: accountId,
+  connectionId: connectionId,
+  rail: rail,
+  availability: availability,
+  sourceAuthority: sourceAuthority,
+  matchBasis: matchBasis,
+  status: status,
+  impliesLiveInstitutionLink: false,
+  providerAccessImplemented: false,
+  subjectConfirmedAt: subjectConfirmedAt,
+  sourcePriority: sourcePriority,
+  observation: SourceObservation(
+    firstObservedAt: firstObservedAt ?? DateTime.utc(2026, 1, 4, 8),
+    lastObservedAt: lastObservedAt ?? DateTime.utc(2026, 3, 9, 10),
+    lastSuccessfulImportAt: lastSuccessfulImportAt,
+  ),
+  historyCoverage: historyCoverage,
+  capabilities: SourceCapabilities(balance: balance, pendingTransactions: pendingTransactions),
+  version: 1,
+);
 
 /// A calendar range, from two ISO days.
-CalendarDayRange coverage(String start, String end) => CalendarDayRange(
-      start: CalendarDay.tryParse(start)!,
-      end: CalendarDay.tryParse(end)!,
-    );
+CalendarDayRange coverage(String start, String end) =>
+    CalendarDayRange(start: CalendarDay.tryParse(start)!, end: CalendarDay.tryParse(end)!);
 
 /// Connections, driven by a script.
-final class ScriptedFinancialConnectionsRepository
-    implements FinancialConnectionsRepository {
+final class ScriptedFinancialConnectionsRepository implements FinancialConnectionsRepository {
   ScriptedFinancialConnectionsRepository({
     this.connections = const <FinancialConnection>[],
     this.listFailure,
@@ -168,29 +159,26 @@ final class ScriptedFinancialConnectionsRepository
 /// as identifiers.
 ScriptedAccountsRepository accountsWithSources({
   Map<String, List<AccountSourceLink>>? sourceLinks,
-}) =>
-    ScriptedAccountsRepository(
-      accounts: <FinancialAccount>[
-        account(accountId: fedAccountId, displayName: 'Everyday account'),
-        account(accountId: otherAccountId, displayName: 'Travel wallet'),
-      ],
-      sourceLinks: sourceLinks ??
-          <String, List<AccountSourceLink>>{
-            fedAccountId: <AccountSourceLink>[sourceLinkFixture()],
-          },
-    );
+}) => ScriptedAccountsRepository(
+  accounts: <FinancialAccount>[
+    account(accountId: fedAccountId, displayName: 'Everyday account'),
+    account(accountId: otherAccountId, displayName: 'Travel wallet'),
+  ],
+  sourceLinks:
+      sourceLinks ??
+      <String, List<AccountSourceLink>>{
+        fedAccountId: <AccountSourceLink>[sourceLinkFixture()],
+      },
+);
 
 /// The overrides a data-source test installs.
 List<Override> financialConnectionOverrides({
   ScriptedFinancialConnectionsRepository? connections,
   ScriptedAccountsRepository? accounts,
   BootstrapSnapshot? bootstrap,
-}) =>
-    <Override>[
-      ...financialOverrides(
-        accounts: accounts ?? accountsWithSources(),
-        bootstrap: bootstrap,
-      ),
-      financialConnectionsRepositoryProvider
-          .overrideWithValue(connections ?? ScriptedFinancialConnectionsRepository()),
-    ];
+}) => <Override>[
+  ...financialOverrides(accounts: accounts ?? accountsWithSources(), bootstrap: bootstrap),
+  financialConnectionsRepositoryProvider.overrideWithValue(
+    connections ?? ScriptedFinancialConnectionsRepository(),
+  ),
+];

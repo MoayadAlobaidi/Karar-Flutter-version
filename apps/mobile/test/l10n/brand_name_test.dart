@@ -70,7 +70,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'these Arabic messages contain "$_legacyArabicBrand", which is '
+        reason:
+            'these Arabic messages contain "$_legacyArabicBrand", which is '
             'the legacy system\'s name. The product is "$_arabicBrand". If a '
             'message genuinely needs the ordinary Arabic word, add it to '
             '_commonNounExceptions with the reason:\n'
@@ -81,18 +82,19 @@ void main() {
     test('the documented common-noun exceptions are still real', () {
       // An exception that no longer applies is a hole nobody closed. If the
       // message is reworded so the noun disappears, the entry must go.
-      for (final MapEntry<String, String> exception
-          in _commonNounExceptions.entries) {
+      for (final MapEntry<String, String> exception in _commonNounExceptions.entries) {
         expect(
           arabic.containsKey(exception.key),
           isTrue,
-          reason: '${exception.key} is listed as a common-noun exception but is '
+          reason:
+              '${exception.key} is listed as a common-noun exception but is '
               'no longer in the catalogue; remove the exception',
         );
         expect(
           arabic[exception.key].toString().contains(_legacyArabicBrand),
           isTrue,
-          reason: '${exception.key} no longer contains the word the exception '
+          reason:
+              '${exception.key} no longer contains the word the exception '
               'exists for (${exception.value}); remove the exception so the '
               'rule applies to it again',
         );
@@ -108,9 +110,9 @@ void main() {
       expect(strings.existsSync(), isTrue);
 
       final String contents = strings.readAsStringSync();
-      final String? purpose = RegExp(
-        r'"NSFaceIDUsageDescription"\s*=\s*"([^"]*)"',
-      ).firstMatch(contents)?.group(1);
+      final String? purpose = RegExp(r'"NSFaceIDUsageDescription"\s*=\s*"([^"]*)"')
+          .firstMatch(contents)
+          ?.group(1);
       expect(purpose, isNotNull, reason: 'no Arabic Face ID purpose string');
       expect(
         purpose,
@@ -129,13 +131,13 @@ void main() {
       expect(english['appName'], 'Karar');
       final Map<String, String> offenders = <String, String>{
         for (final MapEntry<String, String> message in _messages(english))
-          if (RegExp(r'\b(Qarar|Karrar)\b').hasMatch(message.value))
-            message.key: message.value,
+          if (RegExp(r'\b(Qarar|Karrar)\b').hasMatch(message.value)) message.key: message.value,
       };
       expect(
         offenders,
         isEmpty,
-        reason: 'the style guide reserves "Qarar" for the legacy system and '
+        reason:
+            'the style guide reserves "Qarar" for the legacy system and '
             'rules out "Karrar" entirely:\n${offenders.keys.join('\n')}',
       );
     });

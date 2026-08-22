@@ -122,11 +122,13 @@ void main() {
       final sink = RecordingLogSink();
       final logger = AppLogger(sink: sink, minimumLevel: LogLevel.trace);
 
-      logger.forCategory('networking').info(
-        'API request completed.',
-        fields: <String, Object?>{'authorization': 'Bearer aaa', 'status': 200},
-        correlationId: 'corr-1',
-      );
+      logger
+          .forCategory('networking')
+          .info(
+            'API request completed.',
+            fields: <String, Object?>{'authorization': 'Bearer aaa', 'status': 200},
+            correlationId: 'corr-1',
+          );
 
       final record = sink.records.single;
       expect(record.fields['authorization'], redactedPlaceholder);
@@ -138,7 +140,9 @@ void main() {
       final sink = RecordingLogSink();
       final logger = AppLogger(sink: sink, minimumLevel: LogLevel.trace);
 
-      logger.forCategory('security').error(
+      logger
+          .forCategory('security')
+          .error(
             'Secure storage operation failed.',
             error: const FormatException('token=super-secret'),
           );
@@ -160,10 +164,10 @@ void main() {
         ..warning('warning')
         ..error('error');
 
-      expect(
-        sink.records.map((LogRecord record) => record.level),
-        <LogLevel>[LogLevel.warning, LogLevel.error],
-      );
+      expect(sink.records.map((LogRecord record) => record.level), <LogLevel>[
+        LogLevel.warning,
+        LogLevel.error,
+      ]);
     });
 
     test('the silent logger writes nothing at all', () {

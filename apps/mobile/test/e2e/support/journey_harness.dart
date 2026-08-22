@@ -74,21 +74,19 @@ final Uri syntheticApiBaseUrl = Uri.parse('https://synthetic-api.invalid');
 /// It is a string that could not be mistaken for a real token, and the journey
 /// asserts it never reaches a log record.
 SessionTokens syntheticCredential() => SessionTokens(
-      accessToken: 'SYNTHETIC-ACCESS-TOKEN-DO-NOT-LOG',
-      accessTokenExpiresAt: DateTime.utc(2099),
-      refreshToken: 'SYNTHETIC-REFRESH-TOKEN-DO-NOT-LOG',
-      refreshTokenExpiresAt: DateTime.utc(2099),
-      sessionId: syntheticSessionId,
-    );
+  accessToken: 'SYNTHETIC-ACCESS-TOKEN-DO-NOT-LOG',
+  accessTokenExpiresAt: DateTime.utc(2099),
+  refreshToken: 'SYNTHETIC-REFRESH-TOKEN-DO-NOT-LOG',
+  refreshTokenExpiresAt: DateTime.utc(2099),
+  sessionId: syntheticSessionId,
+);
 
 /// The application, wired to a synthetic socket.
 final class JourneyHarness {
   JourneyHarness._();
 
   /// Builds the container, installs the world, signs in and runs startup.
-  static Future<JourneyHarness> begin({
-    void Function(SyntheticPlatform platform)? world,
-  }) async {
+  static Future<JourneyHarness> begin({void Function(SyntheticPlatform platform)? world}) async {
     final harness = JourneyHarness._();
     (world ?? installSyntheticWorld)(harness.platform);
     await harness._signIn();
@@ -121,8 +119,7 @@ final class JourneyHarness {
 
   final SyntheticPlatform platform = SyntheticPlatform();
   final InMemorySecureStore secureStore = InMemorySecureStore();
-  final InMemoryLocalSecurityStateStore securityState =
-      InMemoryLocalSecurityStateStore();
+  final InMemoryLocalSecurityStateStore securityState = InMemoryLocalSecurityStateStore();
   final InMemoryKeyValueStore preferences = InMemoryKeyValueStore();
   final RecordingLogSink logSink = RecordingLogSink();
 
@@ -155,9 +152,7 @@ final class JourneyHarness {
     secureStoreProvider.overrideWithValue(secureStore),
     localSecurityStateStoreProvider.overrideWithValue(securityState),
     keyValueStoreProvider.overrideWithValue(preferences),
-    loggerProvider.overrideWithValue(
-      AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
-    ),
+    loggerProvider.overrideWithValue(AppLogger(sink: logSink, minimumLevel: LogLevel.trace)),
     // The document picker is a DEVICE capability. On the host this suite runs
     // on there is no native half, so `UnavailableStatementSourcePicker` is what
     // the provider installs and it reports itself unavailable. Overriding the
@@ -171,10 +166,7 @@ final class JourneyHarness {
   /// The picker, holding the synthetic statement by identity.
   final FakeStatementSourcePicker picker = FakeStatementSourcePicker(
     PickerOutcomeChosen(
-      PickedStatementSource(
-        bytes: syntheticStatementBytes,
-        declaredMediaType: 'text/csv',
-      ),
+      PickedStatementSource(bytes: syntheticStatementBytes, declaredMediaType: 'text/csv'),
     ),
   );
 
@@ -189,14 +181,14 @@ final class JourneyHarness {
     expect(
       coordinator.state,
       isA<Ready>(),
-      reason: 'the journey could not sign in through the real startup '
+      reason:
+          'the journey could not sign in through the real startup '
           'sequence; every later assertion would be about the wrong state',
     );
   }
 
   /// Every string any log record rendered, for the leak assertions.
-  String get renderedLog =>
-      logSink.records.map((LogRecord record) => record.toString()).join('\n');
+  String get renderedLog => logSink.records.map((LogRecord record) => record.toString()).join('\n');
 
   /// Mounts [screen] against THIS container, in the product theme and the
   /// product localization delegates.
@@ -226,13 +218,9 @@ final class JourneyHarness {
       routes: <RouteBase>[
         GoRoute(
           path: '/',
-          builder: (BuildContext context, GoRouterState _) =>
-              const SizedBox.shrink(),
+          builder: (BuildContext context, GoRouterState _) => const SizedBox.shrink(),
         ),
-        GoRoute(
-          path: '/host',
-          builder: (BuildContext context, GoRouterState _) => screen,
-        ),
+        GoRoute(path: '/host', builder: (BuildContext context, GoRouterState _) => screen),
       ],
     );
     addTearDown(router.dispose);
@@ -261,6 +249,6 @@ final class JourneyHarness {
 
 /// Every string the widget tree actually rendered.
 List<String> renderedStrings(WidgetTester tester) => <String>[
-      for (final widget in tester.allWidgets)
-        if (widget is Text && widget.data != null) widget.data!,
-    ];
+  for (final widget in tester.allWidgets)
+    if (widget is Text && widget.data != null) widget.data!,
+];

@@ -29,6 +29,8 @@
 // Registering a platform that can be broken on demand is what lets a host test
 // exercise the fault paths of an adapter whose real platform is a method
 // channel on a device.
+import 'dart:async';
+
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/core/errors/failure.dart';
@@ -77,19 +79,35 @@ final class _ScriptedPreferencesPlatform extends InMemorySharedPreferencesAsync 
   /// platform rather than answering from something it cached at open time.
   final List<String> reads = <String>[];
 
+  /// THE THIRD OUTCOME: the platform accepts the call and never answers.
+  ///
+  /// A fault is a `throw`, which the adapter's `on Object catch` has always
+  /// handled. This is the case it could not reach — no return, no throw, no
+  /// completion ever — and the case the client was observed in on a real iOS
+  /// runtime, where startup sat on the transient indicator past three minutes
+  /// having issued no request at all. A `try`/`catch` cannot catch a `Future`
+  /// that does not complete; only a bound can.
+  bool hangReads = false;
+  bool hangWrites = false;
+  bool hangRemovals = false;
+
+  static Future<Never> _never() => Completer<Never>().future;
+
   @override
   Future<bool?> getBool(String key, SharedPreferencesOptions options) async {
     reads.add(key);
+    if (hangReads) {
+      return _never();
+    }
     _raise(readFault);
     return super.getBool(key, options);
   }
 
   @override
-  Future<bool> setBool(
-    String key,
-    bool value,
-    SharedPreferencesOptions options,
-  ) async {
+  Future<bool> setBool(String key, bool value, SharedPreferencesOptions options) async {
+    if (hangWrites) {
+      return _never();
+    }
     _raise(writeFault);
     return super.setBool(key, value, options);
   }
@@ -99,6 +117,9 @@ final class _ScriptedPreferencesPlatform extends InMemorySharedPreferencesAsync 
     ClearPreferencesParameters parameters,
     SharedPreferencesOptions options,
   ) async {
+    if (hangRemovals) {
+      return _never();
+    }
     _raise(removeFault);
     return super.clear(parameters, options);
   }
@@ -153,6 +174,96 @@ void main() {
   Future<LocalSecurityStateStore> openStore() =>
       PreferencesLocalSecurityStateStore.open(logger: logger);
 
+  group('THE THIRD OUTCOME — a platform that accepts and never answers', () {
+    // The client was executed on an iOS 26.5 simulator against a live local API
+    // answering /readyz 200 and stayed on the transient startup indicator past
+    // three minutes across three launches, issuing no HTTP request at all. Both
+    // of the platform reads that precede the network were unbounded, and a
+    // Future that never completes is neither a value nor a throw — so the
+    // fail-closed machinery below could not run, because nothing reached it.
+    //
+    // Every case here scripts non-completion, not a fault. Remove the bound in
+    // `boundedPlatformCall` and these do not fail with a wrong answer: they
+    // hang, and the suite times out. That is the shape of the defect.
+
+    test('open on a platform that never answers fails CLOSED, and returns', () async {
+      platform.hangReads = true;
+      final store = await openStore().timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => fail('open() never returned — the open probe is unbounded again'),
+      );
+      // Unavailable, not an in-memory store: an in-memory store answers ABSENT
+      // for the lock choice, and ABSENT reads as "the user never turned the
+      // lock on".
+      expect(store, isA<UnavailableLocalSecurityStateStore>());
+      expect(await store.read(LocalSecurityFlag.appLockEnabled), isA<SecurityStateUnavailable>());
+    });
+
+    test('a read that never answers is UNAVAILABLE and specifically NOT ABSENT', () async {
+      final store = await openStore();
+      platform.hangReads = true;
+      final read = await store
+          .read(LocalSecurityFlag.appLockEnabled)
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => fail('read() never returned — the read is unbounded again'),
+          );
+      // The distinction this whole file exists for. ABSENT is an answer;
+      // "did not answer" is not, and defaulting it unlocks the application by
+      // being slow.
+      expect(read, isA<SecurityStateUnavailable>());
+      expect(read, isNot(isA<SecurityStateAbsent>()));
+      expect(read, isNot(isA<SecurityStateValue>()));
+    });
+
+    test('a write that never answers reports FAILURE, never durability', () async {
+      final store = await openStore();
+      platform.hangWrites = true;
+      final written = await store
+          .write(LocalSecurityFlag.appLockEnabled, value: true)
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => fail('write() never returned — the write is unbounded again'),
+          );
+      // A call that did not complete has not been shown to have persisted
+      // anything, and the caller must be free to re-assert it. Reporting
+      // WRITTEN here is worse than reporting failure: it stops the retry.
+      expect(written, isA<SecurityStateWriteFailed>());
+      expect(written, isNot(isA<SecurityStateWritten>()));
+    });
+
+    test('a removal that never answers reports FAILURE, never removal', () async {
+      final store = await openStore();
+      platform.hangRemovals = true;
+      final removed = await store
+          .remove(LocalSecurityFlag.appLockEnabled)
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => fail('remove() never returned — the removal is unbounded again'),
+          );
+      expect(removed, isA<SecurityStateRemoveFailed>());
+      expect(removed, isNot(isA<SecurityStateRemoved>()));
+    });
+
+    test('the diagnostic names the operation and never the flag value', () async {
+      final store = await openStore();
+      platform.hangReads = true;
+      await store.read(LocalSecurityFlag.appLockEnabled);
+      final records = sink.records.map((r) => r.toString()).join(' ');
+      // The record says WHAT KIND of failure it was — the sink prints the error
+      // by type, not by message, so the bound's own operation string never
+      // reaches a log line even though the exception carries it. What a reader
+      // gets is the type and the adapter's own fields: the flag's NAME, the
+      // operation, and the outcome.
+      expect(records, contains('PlatformCallTimedOut'));
+      expect(records, contains('app_lock_enabled'));
+      expect(records, contains('unavailable'));
+      // …and never the value stored under the flag, which would tell a reader
+      // of the device's logs whether this person's lock is on.
+      expect(records, isNot(contains('value:')));
+    });
+  });
+
   group('a store that opened answers from the platform', () {
     test('a flag that was never written is ABSENT, and ABSENT is an answer', () async {
       // THE CONTROL FOR EVERY FAULT TEST BELOW. If this case did not exist,
@@ -168,7 +279,8 @@ void main() {
       expect(
         read.isAnswered,
         isTrue,
-        reason: 'the platform was consulted successfully and held nothing. That '
+        reason:
+            'the platform was consulted successfully and held nothing. That '
             'is the one case a caller may default',
       );
       expect(read.failureOrNull, isNull);
@@ -202,7 +314,8 @@ void main() {
       expect(
         await platform.getBool('karar.security.app_lock_enabled', _options),
         isTrue,
-        reason: 'the write must reach the platform under the documented key, or '
+        reason:
+            'the write must reach the platform under the documented key, or '
             'the round trip above is proving nothing but that the adapter is '
             'self-consistent',
       );
@@ -272,13 +385,15 @@ void main() {
       expect(
         store,
         isNot(isA<InMemoryLocalSecurityStateStore>()),
-        reason: 'an in-memory store is a legitimate fallback for a theme and a '
+        reason:
+            'an in-memory store is a legitimate fallback for a theme and a '
             'fail-open disaster for a lock choice',
       );
       expect(
         store,
         isNot(isA<PreferencesLocalSecurityStateStore>()),
-        reason: 'the probe is a read precisely so that an unreachable store is '
+        reason:
+            'the probe is a read precisely so that an unreachable store is '
             'not handed back to be discovered on first use, after the '
             'coordinator has already decided the gate is evaluable',
       );
@@ -297,16 +412,13 @@ void main() {
         expect(
           read,
           isNot(isA<SecurityStateAbsent>()),
-          reason: '${flag.name}: ABSENT is how "the user never chose" is '
+          reason:
+              '${flag.name}: ABSENT is how "the user never chose" is '
               'spelled, and a store that could not be opened has not earned it',
         );
         expect(read.isAnswered, isFalse, reason: flag.name);
         expect(read.valueOrNull, isNull, reason: flag.name);
-        expect(
-          read.failureOrNull,
-          isA<LocalSecurityStateUnavailableFailure>(),
-          reason: flag.name,
-        );
+        expect(read.failureOrNull, isA<LocalSecurityStateUnavailableFailure>(), reason: flag.name);
 
         final SecurityStateWrite written = await store.write(flag, value: true);
         expect(written, isA<SecurityStateWriteUnavailable>(), reason: flag.name);
@@ -318,8 +430,7 @@ void main() {
       }
     });
 
-    test('nothing written to it is readable back, and nothing reaches the platform',
-        () async {
+    test('nothing written to it is readable back, and nothing reaches the platform', () async {
       // The property that separates the unavailable store from an in-memory
       // one, asserted from both sides: the caller cannot read its own write
       // back, and the platform never saw it either.
@@ -332,13 +443,11 @@ void main() {
       expect(
         await store.read(LocalSecurityFlag.appLockEnabled),
         isA<SecurityStateUnavailable>(),
-        reason: 'an in-memory fallback would hand the write straight back and '
+        reason:
+            'an in-memory fallback would hand the write straight back and '
             'the caller would believe the lock is on for this process only',
       );
-      expect(
-        await platform.getBool(_key(LocalSecurityFlag.appLockEnabled), _options),
-        isNull,
-      );
+      expect(await platform.getBool(_key(LocalSecurityFlag.appLockEnabled), _options), isNull);
     });
 
     test('a platform that is not registered at all is also a failed open', () async {
@@ -351,10 +460,7 @@ void main() {
       final LocalSecurityStateStore store = await openStore();
 
       expect(store, isA<UnavailableLocalSecurityStateStore>());
-      expect(
-        await store.read(LocalSecurityFlag.appLockEnabled),
-        isA<SecurityStateUnavailable>(),
-      );
+      expect(await store.read(LocalSecurityFlag.appLockEnabled), isA<SecurityStateUnavailable>());
     });
 
     test('a failed open is reported once, at error, naming no value', () async {
@@ -369,7 +475,8 @@ void main() {
       expect(
         record.error,
         'PlatformException',
-        reason: 'the type is diagnostic; the platform message is not, because '
+        reason:
+            'the type is diagnostic; the platform message is not, because '
             'it is not this client\'s text',
       );
       expect(record.toString(), isNot(contains('true')));
@@ -391,7 +498,8 @@ void main() {
       expect(
         read,
         isNot(isA<SecurityStateAbsent>()),
-        reason: 'the store opened and has now stopped answering. ABSENT would '
+        reason:
+            'the store opened and has now stopped answering. ABSENT would '
             'be defaulted to "the lock is off" and the gate would be skipped',
       );
       expect(read.isAnswered, isFalse);
@@ -403,7 +511,8 @@ void main() {
           'operation',
           LocalSecurityStateOperation.read,
         ),
-        reason: 'a read that faulted is distinct from a store that never '
+        reason:
+            'a read that faulted is distinct from a store that never '
             'opened; the remedies differ and so must the reports',
       );
     });
@@ -439,11 +548,7 @@ void main() {
       // cannot produce this state: `write` takes a `bool`. What is on the
       // device is what a damaged file or a tampering hand leaves behind.
       final LocalSecurityStateStore store = await openStore();
-      await platform.setString(
-        _key(LocalSecurityFlag.appLockEnabled),
-        _nonBooleanValue,
-        _options,
-      );
+      await platform.setString(_key(LocalSecurityFlag.appLockEnabled), _nonBooleanValue, _options);
 
       final SecurityStateRead read = await store.read(LocalSecurityFlag.appLockEnabled);
 
@@ -451,7 +556,8 @@ void main() {
       expect(
         read,
         isNot(isA<SecurityStateAbsent>()),
-        reason: 'absent is a user who never chose; corrupt is a value that was '
+        reason:
+            'absent is a user who never chose; corrupt is a value that was '
             'written and has since been damaged or tampered with. Only the '
             'first may be defaulted',
       );
@@ -465,8 +571,10 @@ void main() {
       await store.write(LocalSecurityFlag.appLockEnabled, value: true);
       platform.writeFault = _platformFault();
 
-      final SecurityStateWrite written =
-          await store.write(LocalSecurityFlag.appLockEnabled, value: false);
+      final SecurityStateWrite written = await store.write(
+        LocalSecurityFlag.appLockEnabled,
+        value: false,
+      );
 
       expect(written, isA<SecurityStateWriteFailed>());
       expect(
@@ -482,7 +590,8 @@ void main() {
           'operation',
           LocalSecurityStateOperation.write,
         ),
-        reason: 'the store is open and refused this write, which may succeed on '
+        reason:
+            'the store is open and refused this write, which may succeed on '
             'retry. An unopened store reports `open` and never will',
       );
 
@@ -490,7 +599,8 @@ void main() {
       expect(
         await store.read(LocalSecurityFlag.appLockEnabled),
         isA<SecurityStateValue>().having((SecurityStateValue v) => v.value, 'value', isTrue),
-        reason: 'a platform that rejected the call left the previous value '
+        reason:
+            'a platform that rejected the call left the previous value '
             'behind, and the caller has to be able to retain it',
       );
     });
@@ -500,14 +610,16 @@ void main() {
       await store.write(LocalSecurityFlag.persistedSessionAbandoned, value: true);
       platform.removeFault = _platformFault();
 
-      final SecurityStateRemoval removed =
-          await store.remove(LocalSecurityFlag.persistedSessionAbandoned);
+      final SecurityStateRemoval removed = await store.remove(
+        LocalSecurityFlag.persistedSessionAbandoned,
+      );
 
       expect(removed, isA<SecurityStateRemoveFailed>());
       expect(
         removed,
         isNot(isA<SecurityStateRemoved>()),
-        reason: 'an abandonment marker reported as cleared but still on the '
+        reason:
+            'an abandonment marker reported as cleared but still on the '
             'device blocks a restore the user is entitled to; reported as '
             'cleared while it never was is the mirror image and worse',
       );
@@ -560,7 +672,8 @@ void main() {
       expect(
         sink.records,
         hasLength(4),
-        reason: 'one record per fault and none for the successful open or the '
+        reason:
+            'one record per fault and none for the successful open or the '
             'successful write: a suite that asserts what is NOT in the log has '
             'to know the log is not empty for the wrong reason',
       );
@@ -576,37 +689,38 @@ void main() {
             LocalSecurityFlag.appLockEnabled.storageName,
             LocalSecurityFlag.persistedSessionAbandoned.storageName,
           ]),
-          reason: 'the flag is named so the fault is diagnosable; nothing else '
+          reason:
+              'the flag is named so the fault is diagnosable; nothing else '
               'about it is',
         );
         expect(record.fields.keys, containsAll(<String>['flag', 'operation', 'outcome']));
         expect(
           record.fields['value'],
           isNull,
-          reason: 'there is no field for a stored value, and adding one would '
+          reason:
+              'there is no field for a stored value, and adding one would '
               'defeat the whole arrangement',
         );
       }
 
-      expect(
-        sink.records.map((LogRecord r) => r.fields['operation']).toList(),
-        <String>['write', 'remove', 'read', 'read'],
-      );
+      expect(sink.records.map((LogRecord r) => r.fields['operation']).toList(), <String>[
+        'write',
+        'remove',
+        'read',
+        'read',
+      ]);
       expect(
         sink.records.map((LogRecord r) => r.fields['outcome']).toList(),
         <String>['failed', 'failed', 'unavailable', 'corrupt'],
-        reason: 'CORRUPT and UNAVAILABLE are distinguishable in the log, '
+        reason:
+            'CORRUPT and UNAVAILABLE are distinguishable in the log, '
             'because they call for different remedies on the device',
       );
     });
 
     test('the corrupt value itself is never echoed, in any field', () async {
       final LocalSecurityStateStore store = await openStore();
-      await platform.setString(
-        _key(LocalSecurityFlag.appLockEnabled),
-        _nonBooleanValue,
-        _options,
-      );
+      await platform.setString(_key(LocalSecurityFlag.appLockEnabled), _nonBooleanValue, _options);
 
       await store.read(LocalSecurityFlag.appLockEnabled);
 
@@ -617,7 +731,8 @@ void main() {
       expect(
         record.error,
         isNot(contains(_nonBooleanValue)),
-        reason: 'a TypeError renders the offending value in its message, so only '
+        reason:
+            'a TypeError renders the offending value in its message, so only '
             'its runtime type may be recorded',
       );
     });

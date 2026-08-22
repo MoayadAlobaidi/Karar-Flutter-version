@@ -44,12 +44,12 @@ final DateTime launchInstant = DateTime.utc(2026, 8, 19, 9);
 
 /// Session material valid for the whole of a test.
 SessionTokens launchTokens() => SessionTokens(
-      accessToken: 'deep-link-access',
-      accessTokenExpiresAt: launchInstant.add(const Duration(hours: 1)),
-      refreshToken: 'deep-link-refresh',
-      refreshTokenExpiresAt: launchInstant.add(const Duration(days: 30)),
-      sessionId: '9f1d0f6a-0000-4000-8000-0000000000aa',
-    );
+  accessToken: 'deep-link-access',
+  accessTokenExpiresAt: launchInstant.add(const Duration(hours: 1)),
+  refreshToken: 'deep-link-refresh',
+  refreshTokenExpiresAt: launchInstant.add(const Duration(days: 30)),
+  sessionId: '9f1d0f6a-0000-4000-8000-0000000000aa',
+);
 
 /// One process, with the real router and the real startup coordinator.
 final class DeepLinkLaunch {
@@ -101,8 +101,7 @@ final class DeepLinkLaunch {
   }
 
   final InMemorySecureStore secureStore = InMemorySecureStore();
-  final InMemoryLocalSecurityStateStore securityState =
-      InMemoryLocalSecurityStateStore();
+  final InMemoryLocalSecurityStateStore securityState = InMemoryLocalSecurityStateStore();
   final FakeBootstrapGateway bootstrap;
 
   final ScriptedAccountsRepository accounts = ScriptedAccountsRepository();
@@ -113,9 +112,8 @@ final class DeepLinkLaunch {
   /// Records every request that reached the transport, so a refused deep link
   /// can be shown to have issued none.
   final FakeApiTransport transport = FakeApiTransport(
-    (ApiRequest request) async => throw ApiException(
-      const DependencyUnavailableFailure(code: 'NOT_SCRIPTED'),
-    ),
+    (ApiRequest request) async =>
+        throw ApiException(const DependencyUnavailableFailure(code: 'NOT_SCRIPTED')),
   );
 
   late final ProviderContainer container;
@@ -126,10 +124,10 @@ final class DeepLinkLaunch {
 
   /// Every financial read any repository was asked for.
   List<String> get financialReads => <String>[
-        ...accounts.reads,
-        ...transactions.reads,
-        ...instruments.reads,
-      ];
+    ...accounts.reads,
+    ...transactions.reads,
+    ...instruments.reads,
+  ];
 
   /// Puts a credential on disk, as a completed sign-in would have left one.
   Future<void> persistSession() async {
@@ -138,8 +136,7 @@ final class DeepLinkLaunch {
   }
 
   /// Turns the application lock on, durably.
-  Future<void> enableLock() =>
-      securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
+  Future<void> enableLock() => securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
 
   /// Mounts the real router and runs startup to completion.
   Future<void> boot(WidgetTester tester) async {

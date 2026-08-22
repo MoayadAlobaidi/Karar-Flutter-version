@@ -58,10 +58,10 @@ const String generatedRoot = 'lib/core/networking/generated';
 const Map<String, String> financialPathAllowlist = <String, String>{
   'lib/features/financial_accounts/presentation/financial_routes.dart':
       'In-app NAVIGATION routes, which are go_router locations rather than '
-          'API paths. They resemble the contract paths because the product is '
-          'organised the way the contract is. The companion assertion below '
-          'proves this file can issue no request, so it cannot become a place '
-          'to hide one.',
+      'API paths. They resemble the contract paths because the product is '
+      'organised the way the contract is. The companion assertion below '
+      'proves this file can issue no request, so it cannot become a place '
+      'to hide one.',
 };
 
 /// One thing the scan objects to.
@@ -144,12 +144,7 @@ List<ContractReadingFinding> findHardCodedFinancialPaths(
     if (source.path.startsWith(excluding) || allowlist.containsKey(source.path)) {
       continue;
     }
-    findings.addAll(
-      source.matches(
-        'hard-coded financial path',
-        <RegExp>[hardCodedFinancialPath],
-      ),
-    );
+    findings.addAll(source.matches('hard-coded financial path', <RegExp>[hardCodedFinancialPath]));
   }
   return findings;
 }
@@ -158,9 +153,7 @@ List<ContractReadingFinding> findHardCodedFinancialPaths(
 List<ContractReadingFinding> findHandWrittenResponseDecoders(String root) {
   final findings = <ContractReadingFinding>[];
   for (final source in sourcesUnder(root)) {
-    findings.addAll(
-      source.matches('hand-written response decoder', handWrittenResponseDecoding),
-    );
+    findings.addAll(source.matches('hand-written response decoder', handWrittenResponseDecoding));
   }
   return findings;
 }
@@ -169,9 +162,7 @@ List<ContractReadingFinding> findHandWrittenResponseDecoders(String root) {
 List<ContractReadingFinding> findDuplicatedVocabularyTables(String root) {
   final findings = <ContractReadingFinding>[];
   for (final source in sourcesUnder(root)) {
-    findings.addAll(
-      source.matches('duplicated vocabulary table', duplicatedVocabularyTable),
-    );
+    findings.addAll(source.matches('duplicated vocabulary table', duplicatedVocabularyTable));
   }
   return findings;
 }
@@ -193,7 +184,8 @@ void main() {
       expect(
         findings,
         isEmpty,
-        reason: 'the contract states each path once and the generator emits it '
+        reason:
+            'the contract states each path once and the generator emits it '
             'once; a second spelling is a second reading:\n'
             '${findings.join('\n')}',
       );
@@ -205,7 +197,8 @@ void main() {
         expect(
           file.existsSync(),
           isTrue,
-          reason: '${entry.key} is allowlisted but does not exist; a stale '
+          reason:
+              '${entry.key} is allowlisted but does not exist; a stale '
               'exemption is a hole nobody is watching',
         );
         expect(
@@ -223,7 +216,8 @@ void main() {
           expect(
             body.contains(needle),
             isFalse,
-            reason: '${entry.key} is exempted from the path rule because it '
+            reason:
+                '${entry.key} is exempted from the path rule because it '
                 'issues no request, and it names $needle',
           );
         }
@@ -237,7 +231,8 @@ void main() {
       expect(
         findings,
         isEmpty,
-        reason: 'a generated DTO already decodes this schema; a second decoder '
+        reason:
+            'a generated DTO already decodes this schema; a second decoder '
             'is not regenerated when the contract changes:\n'
             '${findings.join('\n')}',
       );
@@ -250,7 +245,8 @@ void main() {
       expect(
         findings,
         isEmpty,
-        reason: 'the generated enumeration already maps every wire value; a '
+        reason:
+            'the generated enumeration already maps every wire value; a '
             'table beside it silently stops covering the vocabulary the day a '
             'member is added:\n${findings.join('\n')}',
       );
@@ -371,9 +367,7 @@ const int answer = 1;
 /// One production file, ready to be matched against the rules.
 final class ScannedSource {
   ScannedSource(this.path, List<String> lines)
-      : lines = <String>[
-          for (final line in lines) line.trimLeft().startsWith('//') ? '' : line,
-        ];
+    : lines = <String>[for (final line in lines) line.trimLeft().startsWith('//') ? '' : line];
 
   final String path;
 

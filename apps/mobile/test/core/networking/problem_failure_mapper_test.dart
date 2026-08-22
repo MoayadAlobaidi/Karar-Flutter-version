@@ -14,17 +14,16 @@ Map<String, Object?> problemBody(
   bool? retryable,
   String? requestId,
   String? detail,
-}) =>
-    <String, Object?>{
-      'type': 'https://errors.example.invalid/$code',
-      'title': 'A title the client must not branch on',
-      'status': status,
-      'code': code,
-      'reason': ?reason,
-      'retryable': ?retryable,
-      'requestId': ?requestId,
-      'detail': ?detail,
-    };
+}) => <String, Object?>{
+  'type': 'https://errors.example.invalid/$code',
+  'title': 'A title the client must not branch on',
+  'status': status,
+  'code': code,
+  'reason': ?reason,
+  'retryable': ?retryable,
+  'requestId': ?requestId,
+  'detail': ?detail,
+};
 
 void main() {
   const mapper = ProblemFailureMapper();
@@ -79,10 +78,7 @@ void main() {
         mapCode(ApiErrorCode.authenticationRequired, status: 401),
         isA<AuthenticationRequiredFailure>(),
       );
-      expect(
-        mapCode(ApiErrorCode.sessionExpired, status: 401),
-        isA<SessionExpiredFailure>(),
-      );
+      expect(mapCode(ApiErrorCode.sessionExpired, status: 401), isA<SessionExpiredFailure>());
     });
 
     test('authorization codes', () {
@@ -94,10 +90,7 @@ void main() {
       expect(notAuthorized, isA<NotAuthorizedFailure>());
       expect((notAuthorized as NotAuthorizedFailure).requirement, 'tenancy.member.read');
 
-      expect(
-        mapCode(ApiErrorCode.membershipRequired, status: 403),
-        isA<NotAuthorizedFailure>(),
-      );
+      expect(mapCode(ApiErrorCode.membershipRequired, status: 403), isA<NotAuthorizedFailure>());
       expect(
         mapCode(ApiErrorCode.operationRestricted, status: 403),
         isA<OperationRestrictedFailure>(),
@@ -110,10 +103,7 @@ void main() {
 
     test('consent codes', () {
       expect(mapCode(ApiErrorCode.consentRequired, status: 409), isA<ConsentRequiredFailure>());
-      expect(
-        mapCode(ApiErrorCode.reConsentRequired, status: 409),
-        isA<ReConsentRequiredFailure>(),
-      );
+      expect(mapCode(ApiErrorCode.reConsentRequired, status: 409), isA<ReConsentRequiredFailure>());
     });
 
     test('tenant binding codes route to one destination', () {
@@ -128,19 +118,11 @@ void main() {
     });
 
     test('bootstrap unavailability carries the retryable flag', () {
-      final retryable = mapCode(
-        ApiErrorCode.bootstrapUnavailable,
-        status: 503,
-        retryable: true,
-      );
+      final retryable = mapCode(ApiErrorCode.bootstrapUnavailable, status: 503, retryable: true);
       expect(retryable, isA<BootstrapUnavailableFailure>());
       expect((retryable as BootstrapUnavailableFailure).retryable, isTrue);
 
-      final terminal = mapCode(
-        ApiErrorCode.bootstrapUnavailable,
-        status: 503,
-        retryable: false,
-      );
+      final terminal = mapCode(ApiErrorCode.bootstrapUnavailable, status: 503, retryable: false);
       expect((terminal as BootstrapUnavailableFailure).retryable, isFalse);
 
       final unstated = mapCode(ApiErrorCode.bootstrapUnavailable, status: 503);
@@ -204,8 +186,7 @@ void main() {
       final problem = ProblemDetails.tryParse(
         problemBody(ApiErrorCode.rateLimited, status: 429),
         statusCode: 429,
-      )!
-          .withRetryAfter(const Duration(seconds: 30));
+      )!.withRetryAfter(const Duration(seconds: 30));
 
       final failure = mapper.map(statusCode: 429, problem: problem);
 

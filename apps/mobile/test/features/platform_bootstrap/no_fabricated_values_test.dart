@@ -41,13 +41,13 @@ final Map<RegExp, String> financialPatterns = <RegExp, String>{
 };
 
 List<File> dartFilesUnder(Iterable<String> roots) => <File>[
-      for (final root in roots)
-        if (Directory(root).existsSync())
-          ...Directory(root)
-              .listSync(recursive: true)
-              .whereType<File>()
-              .where((File file) => file.path.endsWith('.dart')),
-    ];
+  for (final root in roots)
+    if (Directory(root).existsSync())
+      ...Directory(root)
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((File file) => file.path.endsWith('.dart')),
+];
 
 /// File content with comment-only lines blanked, so prose explaining a rule
 /// cannot trip the rule it explains.
@@ -83,7 +83,8 @@ void main() {
     expect(
       offenders,
       isEmpty,
-      reason: 'The platform publishes no financial value in this phase and the client '
+      reason:
+          'The platform publishes no financial value in this phase and the client '
           'invents none, in a screen, a fixture or a test:\n${offenders.join('\n')}',
     );
   });
@@ -93,9 +94,8 @@ void main() {
     // protects only the names someone thought to write down. The rule has to
     // be positive: an identifier renders because this build registered a
     // destination for it, and for no other reason.
-    final source =
-        File('lib/features/platform_bootstrap/domain/platform_capability.dart')
-            .readAsStringSync();
+    final source = File('lib/features/platform_bootstrap/domain/platform_capability.dart')
+        .readAsStringSync();
 
     for (final denylistShape in <RegExp>[
       RegExp(r'\bwithheld\w*\s*=\s*<String>\{'),
@@ -115,9 +115,8 @@ void main() {
   test('no product capability is registered as navigable', () {
     // The moment one is, a screen must exist for it. Keeping this assertion
     // here means the review question is asked at the same time as the change.
-    final source =
-        File('lib/features/platform_bootstrap/domain/platform_capability.dart')
-            .readAsStringSync();
+    final source = File('lib/features/platform_bootstrap/domain/platform_capability.dart')
+        .readAsStringSync();
 
     expect(
       source,
@@ -147,10 +146,7 @@ void main() {
     final offenders = <String>[];
     for (final file in dartFilesUnder(ownedSourceRoots)) {
       final content = withoutCommentLines(file);
-      final logCalls = RegExp(
-        r'\b_logger\.(info|warning|error|debug)\(([^;]*);',
-        dotAll: true,
-      );
+      final logCalls = RegExp(r'\b_logger\.(info|warning|error|debug)\(([^;]*);', dotAll: true);
       for (final match in logCalls.allMatches(content)) {
         final call = match.group(0)!;
         for (final forbidden in forbiddenInLogs) {

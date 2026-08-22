@@ -35,10 +35,7 @@ void inBothLanguages(
   String description,
   void Function(AppLocalizations l10n, String language) body,
 ) {
-  for (final locale in <Locale>[
-    KararLocalization.english,
-    KararLocalization.arabic,
-  ]) {
+  for (final locale in <Locale>[KararLocalization.english, KararLocalization.arabic]) {
     test('$description [${locale.languageCode}]', () async {
       final l10n = await AppLocalizations.delegate.load(locale);
       body(l10n, locale.languageCode);
@@ -53,7 +50,8 @@ void expectAllDistinct(List<String> sentences, String language, String subject) 
   expect(
     sentences.toSet(),
     hasLength(sentences.length),
-    reason: 'two members of $subject share one sentence in $language, so a '
+    reason:
+        'two members of $subject share one sentence in $language, so a '
         'person is told the same thing about two different situations:\n'
         '${sentences.join('\n')}',
   );
@@ -64,13 +62,9 @@ void main() {
     test('RailStanding is exactly these four members', () {
       expect(
         <String>[for (final standing in RailStanding.values) standing.name],
-        <String>[
-          'subjectEntersIt',
-          'subjectUploadsAFile',
-          'notBuilt',
-          'unknownToThisVersion',
-        ],
-        reason: 'a member meaning "coming soon", "available later" or '
+        <String>['subjectEntersIt', 'subjectUploadsAFile', 'notBuilt', 'unknownToThisVersion'],
+        reason:
+            'a member meaning "coming soon", "available later" or '
             '"connect" would let every screen below start making promises. '
             'Adding one has to be a decision made here, in the open.',
       );
@@ -93,65 +87,51 @@ void main() {
 
   inBothLanguages('every lifecycle status has its own sentence', (l10n, language) {
     expectAllDistinct(
-      <String>[
-        for (final status in ConnectionStatus.values)
-          connectionStatusLabel(status, l10n),
-      ],
+      <String>[for (final status in ConnectionStatus.values) connectionStatusLabel(status, l10n)],
       language,
       'ConnectionStatus',
     );
   });
 
-  inBothLanguages(
-    'not set up, not usable now and never built are three different sentences',
-    (l10n, language) {
-      // The pairwise check the general distinctness test would also catch —
-      // stated on its own because this is the one that matters, and a reader of
-      // a failure needs to see which distinction was lost.
-      final notConfigured =
-          connectionStatusLabel(ConnectionStatus.notConfigured, l10n);
-      final unavailable =
-          connectionStatusLabel(ConnectionStatus.unavailable, l10n);
-      final notImplemented =
-          connectionStatusLabel(ConnectionStatus.notImplemented, l10n);
+  inBothLanguages('not set up, not usable now and never built are three different sentences', (
+    l10n,
+    language,
+  ) {
+    // The pairwise check the general distinctness test would also catch —
+    // stated on its own because this is the one that matters, and a reader of
+    // a failure needs to see which distinction was lost.
+    final notConfigured = connectionStatusLabel(ConnectionStatus.notConfigured, l10n);
+    final unavailable = connectionStatusLabel(ConnectionStatus.unavailable, l10n);
+    final notImplemented = connectionStatusLabel(ConnectionStatus.notImplemented, l10n);
 
-      expect(notConfigured, isNot(unavailable), reason: language);
-      expect(notConfigured, isNot(notImplemented), reason: language);
-      expect(
-        unavailable,
-        isNot(notImplemented),
-        reason: '"off right now" and "never built" are the two a person acts '
-            'on differently: one is worth waiting for, the other never is '
-            '($language)',
-      );
-    },
-  );
+    expect(notConfigured, isNot(unavailable), reason: language);
+    expect(notConfigured, isNot(notImplemented), reason: language);
+    expect(
+      unavailable,
+      isNot(notImplemented),
+      reason:
+          '"off right now" and "never built" are the two a person acts '
+          'on differently: one is worth waiting for, the other never is '
+          '($language)',
+    );
+  });
 
   inBothLanguages('every rail has its own name', (l10n, language) {
     expectAllDistinct(
-      <String>[
-        for (final rail in ConnectionRail.values) connectionRailLabel(rail, l10n),
-      ],
+      <String>[for (final rail in ConnectionRail.values) connectionRailLabel(rail, l10n)],
       language,
       'ConnectionRail',
     );
   });
 
-  inBothLanguages('every standing has its own badge and its own sentence',
-      (l10n, language) {
+  inBothLanguages('every standing has its own badge and its own sentence', (l10n, language) {
     expectAllDistinct(
-      <String>[
-        for (final standing in RailStanding.values)
-          railStandingBadge(standing, l10n),
-      ],
+      <String>[for (final standing in RailStanding.values) railStandingBadge(standing, l10n)],
       language,
       'RailStanding badges',
     );
     expectAllDistinct(
-      <String>[
-        for (final standing in RailStanding.values)
-          railStandingSentence(standing, l10n),
-      ],
+      <String>[for (final standing in RailStanding.values) railStandingSentence(standing, l10n)],
       language,
       'RailStanding sentences',
     );
@@ -171,7 +151,8 @@ void main() {
       expect(
         supplied,
         isNot(contains(railStandingSentence(standing, l10n))),
-        reason: '$rail must not be described with a sentence that says a '
+        reason:
+            '$rail must not be described with a sentence that says a '
             'person supplies data through it ($language)',
       );
       expect(
@@ -182,8 +163,7 @@ void main() {
     }
   });
 
-  inBothLanguages('every platform availability answer has its own sentence',
-      (l10n, language) {
+  inBothLanguages('every platform availability answer has its own sentence', (l10n, language) {
     expectAllDistinct(
       <String>[
         for (final availability in RailAvailability.values)
@@ -202,21 +182,18 @@ void main() {
     );
   });
 
-  inBothLanguages('every filter, including no filter, has its own name',
-      (l10n, language) {
+  inBothLanguages('every filter, including no filter, has its own name', (l10n, language) {
     expectAllDistinct(
       <String>[
         connectionFilterLabel(null, l10n),
-        for (final filter in ConnectionStatusFilter.values)
-          connectionFilterLabel(filter, l10n),
+        for (final filter in ConnectionStatusFilter.values) connectionFilterLabel(filter, l10n),
       ],
       language,
       'ConnectionStatusFilter',
     );
   });
 
-  inBothLanguages('the arrival sentence names the person in both arms',
-      (l10n, language) {
+  inBothLanguages('the arrival sentence names the person in both arms', (l10n, language) {
     // The two arms must be different sentences, and neither may be the empty
     // string that a missing translation would produce.
     final arrived = sourceArrivalSentence(

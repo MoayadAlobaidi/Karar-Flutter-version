@@ -31,10 +31,7 @@ const List<String> _generatedFiles = <String>[
 
 /// Reads a `// Label: value` header field from a generated file.
 String? _headerField(String contents, String label) =>
-    RegExp('^//\\s+$label:\\s+(.+)\$', multiLine: true)
-        .firstMatch(contents)
-        ?.group(1)
-        ?.trim();
+    RegExp('^//\\s+$label:\\s+(.+)\$', multiLine: true).firstMatch(contents)?.group(1)?.trim();
 
 void main() {
   group('the generated API client is in sync', () {
@@ -51,7 +48,8 @@ void main() {
         expect(
           entry.value,
           startsWith('// GENERATED CODE — DO NOT MODIFY BY HAND.'),
-          reason: '${entry.key} must announce that it is generated, so a hand edit is '
+          reason:
+              '${entry.key} must announce that it is generated, so a hand edit is '
               'obviously wrong to the next reader',
         );
       }
@@ -73,7 +71,8 @@ void main() {
         expect(
           recorded,
           'tool/generate_api_client.dart $declared',
-          reason: '${entry.key} was produced by a different generator version than the '
+          reason:
+              '${entry.key} was produced by a different generator version than the '
               'one committed. Regenerate with: '
               'dart run tool/generate_api_client.dart',
         );
@@ -82,12 +81,10 @@ void main() {
 
     test('all generated files agree on the contract they came from', () {
       final digests = <String, String?>{
-        for (final entry in generated.entries)
-          entry.key: _headerField(entry.value, 'Digest'),
+        for (final entry in generated.entries) entry.key: _headerField(entry.value, 'Digest'),
       };
       final contracts = <String, String?>{
-        for (final entry in generated.entries)
-          entry.key: _headerField(entry.value, 'Contract'),
+        for (final entry in generated.entries) entry.key: _headerField(entry.value, 'Contract'),
       };
 
       for (final entry in digests.entries) {
@@ -100,7 +97,8 @@ void main() {
       expect(
         digests.values.toSet(),
         hasLength(1),
-        reason: 'the generated files were produced from different contract revisions, '
+        reason:
+            'the generated files were produced from different contract revisions, '
             'which means one of them is stale: $digests',
       );
       expect(
@@ -148,9 +146,10 @@ void main() {
       // enum around it, which the drift check catches separately.
       final declaredWireValues = <String>{
         for (final entry in generated.entries)
-          ...RegExp(r"^\s+[a-zA-Z_$][\w$]*\('([^']*)'\),?\s*$", multiLine: true)
-              .allMatches(stripCodeComments(entry.value))
-              .map((RegExpMatch match) => match.group(1)!),
+          ...RegExp(
+            r"^\s+[a-zA-Z_$][\w$]*\('([^']*)'\),?\s*$",
+            multiLine: true,
+          ).allMatches(stripCodeComments(entry.value)).map((RegExpMatch match) => match.group(1)!),
       };
       for (final entry in generated.entries) {
         final literals = RegExp(r"'([A-Za-z0-9+/_-]{40,}={0,2})'")
@@ -158,11 +157,7 @@ void main() {
             .map((RegExpMatch match) => match.group(1)!)
             .where((String literal) => !declaredWireValues.contains(literal))
             .toList(growable: false);
-        expect(
-          literals,
-          isEmpty,
-          reason: '${entry.key} contains a long opaque literal: $literals',
-        );
+        expect(literals, isEmpty, reason: '${entry.key} contains a long opaque literal: $literals');
       }
     });
   });

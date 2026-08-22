@@ -85,11 +85,7 @@ SessionTokens _tokens({String access = _accessToken, String refresh = _refreshTo
 /// brand-new coordinator reading the disk the first one left behind. Nothing
 /// in-memory survives, which is exactly the property a cold-launch claim needs.
 final class _Launch {
-  _Launch({
-    required this.secureStore,
-    required this.preferences,
-    required this.securityState,
-  }) {
+  _Launch({required this.secureStore, required this.preferences, required this.securityState}) {
     container = ProviderContainer(
       overrides: <Override>[
         ...featureSurfaceOverrides(),
@@ -109,9 +105,7 @@ final class _Launch {
         keyValueStoreProvider.overrideWithValue(preferences),
         localSecurityStateStoreProvider.overrideWithValue(securityState),
         secureStoreProvider.overrideWithValue(secureStore),
-        loggerProvider.overrideWithValue(
-          AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
-        ),
+        loggerProvider.overrideWithValue(AppLogger(sink: logSink, minimumLevel: LogLevel.trace)),
         clockProvider.overrideWithValue(FixedClock(_now)),
         apiTransportProvider.overrideWithValue(ScriptedIdentityTransport()),
         rawApiTransportProvider.overrideWithValue(ScriptedIdentityTransport()),
@@ -127,9 +121,7 @@ final class _Launch {
           // the process unlocked, which would quietly dismantle the very gate
           // these tests are about.
           ScriptedLocalAuthenticator(
-            outcomes: const <LocalAuthOutcome>[
-              LocalAuthFailed(LocalAuthFailureReason.lockedOut),
-            ],
+            outcomes: const <LocalAuthOutcome>[LocalAuthFailed(LocalAuthFailureReason.lockedOut)],
           ),
         ),
       ],
@@ -158,8 +150,7 @@ final class _Launch {
 
   Map<String, String> get secureEntries => secureStore.entries;
 
-  String get loggedText =>
-      logSink.records.map((LogRecord record) => record.toString()).join('\n');
+  String get loggedText => logSink.records.map((LogRecord record) => record.toString()).join('\n');
 
   /// Writes valid, production-encoded session material straight to the secure
   /// store.
@@ -178,8 +169,7 @@ final class _Launch {
     );
   }
 
-  Future<void> enableLock() =>
-      securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
+  Future<void> enableLock() => securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
 
   /// Mounts the real router over this container and runs startup.
   ///
@@ -209,8 +199,7 @@ final class _Launch {
 }
 
 /// The location the router is actually showing.
-String _locationOf(GoRouter router) =>
-    router.routerDelegate.currentConfiguration.uri.path;
+String _locationOf(GoRouter router) => router.routerDelegate.currentConfiguration.uri.path;
 
 Future<void> _pressPasswordFallback(WidgetTester tester) async {
   await tester.tap(find.text(_english.appLockSignInInstead));
@@ -243,9 +232,7 @@ void main() {
       await launch.boot(tester);
     }
 
-    testWidgets('the fixture is genuinely cold, and it locks', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the fixture is genuinely cold, and it locks', (WidgetTester tester) async {
       await coldLaunch(tester);
 
       expect(
@@ -256,7 +243,8 @@ void main() {
       expect(
         launch.sessions.state,
         isA<NoSession>(),
-        reason: 'THE WHOLE POINT: nothing has been adopted or restored. A test '
+        reason:
+            'THE WHOLE POINT: nothing has been adopted or restored. A test '
             'that finds an ActiveSession here is modelling a warm process and '
             'will pass against the defect',
       );
@@ -277,7 +265,8 @@ void main() {
       expect(
         launch.secureEntries,
         isEmpty,
-        reason: 'the credential the user gave up is still in secure storage; a '
+        reason:
+            'the credential the user gave up is still in secure storage; a '
             'lock that can be walked away from without destroying the session '
             'behind it is not a lock',
       );
@@ -295,7 +284,8 @@ void main() {
       expect(
         state,
         isA<Unauthenticated>(),
-        reason: 'still AppLocked means the press emitted no transition at all, '
+        reason:
+            'still AppLocked means the press emitted no transition at all, '
             'which is what a no-op `end` on a cold launch produces',
       );
       expect(
@@ -314,7 +304,8 @@ void main() {
       expect(
         _locationOf(launch.router),
         RoutePaths.signIn,
-        reason: 'staying on ${RoutePaths.lock} means the redirect returned the '
+        reason:
+            'staying on ${RoutePaths.lock} means the redirect returned the '
             'user to the lock, which is the trap this file exists for',
       );
 
@@ -329,9 +320,7 @@ void main() {
       );
     });
 
-    testWidgets('the lock is abandoned, never unlocked', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the lock is abandoned, never unlocked', (WidgetTester tester) async {
       await coldLaunch(tester);
 
       await _pressPasswordFallback(tester);
@@ -339,14 +328,16 @@ void main() {
       expect(
         launch.lock.isLocked,
         isTrue,
-        reason: 'the fallback proves nothing to the device, so the gate must '
+        reason:
+            'the fallback proves nothing to the device, so the gate must '
             'still report locked. Marking it unlocked would turn "I cannot open '
             'this" into a way of opening it',
       );
       expect(
         launch.lock.isEnabled,
         isTrue,
-        reason: "the user's lock preference is theirs; giving up one session "
+        reason:
+            "the user's lock preference is theirs; giving up one session "
             'does not switch their security setting off',
       );
     });
@@ -413,13 +404,15 @@ void main() {
         expect(
           launch.loggedText,
           isNot(contains(secret)),
-          reason: 'the security event describing the abandonment must carry no '
+          reason:
+              'the security event describing the abandonment must carry no '
               'credential',
         );
         expect(
           preferences.writtenText,
           isNot(contains(secret)),
-          reason: 'preferences are unencrypted; nothing that can authenticate '
+          reason:
+              'preferences are unencrypted; nothing that can authenticate '
               'may be written there, marker or not',
         );
       }
@@ -456,9 +449,7 @@ void main() {
       await launch.boot(tester);
     }
 
-    testWidgets('the user is not told the session was removed', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the user is not told the session was removed', (WidgetTester tester) async {
       await coldLaunchWithUneraseableStore(tester);
 
       await _pressPasswordFallback(tester);
@@ -473,7 +464,8 @@ void main() {
       expect(
         (state as Unauthenticated).secureStorageUnavailable,
         isTrue,
-        reason: 'the credential is still on disk. Reporting an ordinary clean '
+        reason:
+            'the credential is still on disk. Reporting an ordinary clean '
             'sign-out would be the client claiming something it did not do',
       );
     });
@@ -525,7 +517,8 @@ void main() {
       expect(
         relaunched.sessions.tokens,
         isNull,
-        reason: 'the credential the user abandoned came back. It is still in the '
+        reason:
+            'the credential the user abandoned came back. It is still in the '
             'keystore because the platform would not erase it, so the durable '
             'marker is the only thing standing between the user and a session '
             'they explicitly gave up',
@@ -536,9 +529,7 @@ void main() {
       expect(_locationOf(relaunched.router), RoutePaths.signIn);
     });
 
-    testWidgets('the erase completes as soon as the store recovers', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the erase completes as soon as the store recovers', (WidgetTester tester) async {
       await coldLaunchWithUneraseableStore(tester);
       await _pressPasswordFallback(tester);
       expect(launch.secureEntries, isNotEmpty);
@@ -566,7 +557,8 @@ void main() {
       expect(
         (state as Unauthenticated).secureStorageUnavailable,
         isFalse,
-        reason: 'the storage is working again and the credential is gone, so '
+        reason:
+            'the storage is working again and the credential is gone, so '
             'there is nothing left to warn about',
       );
     });
@@ -587,7 +579,8 @@ void main() {
       expect(
         launch.coordinator.state,
         isA<Ready>(),
-        reason: 'the fail-closed marker must not lock a user out of the account '
+        reason:
+            'the fail-closed marker must not lock a user out of the account '
             'they just proved they own; a marker that survives a successful '
             'sign-in would be an endless sign-in loop',
       );
@@ -605,13 +598,15 @@ void main() {
         expect(
           launch.loggedText,
           isNot(contains(secret)),
-          reason: 'the failure path logs more than the happy one, and is where a '
+          reason:
+              'the failure path logs more than the happy one, and is where a '
               'credential is most likely to be swept into a diagnostic',
         );
         expect(
           preferences.writtenText,
           isNot(contains(secret)),
-          reason: 'the invalidation marker records an INTENT. A copy of the '
+          reason:
+              'the invalidation marker records an INTENT. A copy of the '
               'credential in unencrypted preferences would be a worse leak than '
               'the failed erase it is compensating for',
         );

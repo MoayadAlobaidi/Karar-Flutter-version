@@ -36,9 +36,9 @@ import 'support/transfer_matching_harness.dart';
 /// Every location this feature contributes, DERIVED from the route table so a
 /// route added later is covered without anyone editing this file.
 List<String> everyTransferMatchingPath() => <String>[
-      for (final route in transferMatchingRoutes())
-        if (route is GoRoute) route.path,
-    ];
+  for (final route in transferMatchingRoutes())
+    if (route is GoRoute) route.path,
+];
 
 Future<void> pumpAt(
   WidgetTester tester,
@@ -91,7 +91,8 @@ void main() {
       expect(
         path.startsWith('/financial'),
         isFalse,
-        reason: '$path resembles a contract path; this feature takes its own '
+        reason:
+            '$path resembles a contract path; this feature takes its own '
             'prefix rather than asking for a second allowlist exemption',
       );
     }
@@ -106,9 +107,7 @@ void main() {
   });
 
   testWidgets('the capability opens the surface', (WidgetTester tester) async {
-    final matches = ScriptedTransferMatchesRepository(
-      matches: <TransferMatch>[matchFixture()],
-    );
+    final matches = ScriptedTransferMatchesRepository(matches: <TransferMatch>[matchFixture()]);
     await pumpAt(
       tester,
       TransferMatchRoutes.matches,
@@ -119,8 +118,9 @@ void main() {
     expect(find.byType(FinancialUnavailableScreen), findsNothing);
   });
 
-  testWidgets('without the capability every location renders the refusal',
-      (WidgetTester tester) async {
+  testWidgets('without the capability every location renders the refusal', (
+    WidgetTester tester,
+  ) async {
     for (final path in everyTransferMatchingPath()) {
       final matches = ScriptedTransferMatchesRepository();
       final accounts = accountsFixture();
@@ -141,15 +141,15 @@ void main() {
       expect(
         matches.calls,
         isEmpty,
-        reason: 'the gate decides before the screen is constructed, so a '
+        reason:
+            'the gate decides before the screen is constructed, so a '
             'refused deep link reads no provider and issues no request ($path)',
       );
       expect(accounts.reads, isEmpty, reason: path);
     }
   });
 
-  test('every provider this feature contributes is registered as tenant-scoped',
-      () {
+  test('every provider this feature contributes is registered as tenant-scoped', () {
     // Typed entries: `tenantScopedAsync` accepts only a
     // `TenantScopedAsyncNotifier`, so a provider that could not empty itself
     // cannot be registered here at all.

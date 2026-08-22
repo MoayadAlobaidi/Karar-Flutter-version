@@ -90,34 +90,34 @@ Map<String, Object?> switchedToTenantB({String sessionId = 'session-tenant-b'}) 
 
 /// A bootstrap answer bound to [tenantId], with the financial capability.
 BootstrapSnapshot boundTo(String tenantId) => BootstrapSnapshot(
-      userId: 'user-0001',
-      emailVerified: true,
-      sessionId: 'session-$tenantId',
-      binding: bootstrap_snapshot.TenantBound(
-        TenantOption(tenantId: tenantId, name: tenantId, roleHint: 'MEMBER'),
-      ),
-      jurisdictionState: JurisdictionState.verified,
-      jurisdictionId: 'jurisdiction-a',
-      operatingEntityState: OperatingEntityState.assigned,
-      operatingEntity: const OperatingEntitySummary(
-        id: 'entity-0001',
-        name: 'Test Operating Entity',
-        jurisdictionRef: 'jurisdiction-a',
-        contactReference: 'privacy@example.invalid',
-      ),
-      policyPackVersion: '1.0.0',
-      policyPackStatus: 'ACTIVE',
-      capabilityState: CapabilityResolutionState.resolved,
-      capabilities: const <CapabilityView>[
-        CapabilityView(id: 'TRANSACTIONS', status: 'AVAILABLE', requirements: <String>[]),
-      ],
-    );
+  userId: 'user-0001',
+  emailVerified: true,
+  sessionId: 'session-$tenantId',
+  binding: bootstrap_snapshot.TenantBound(
+    TenantOption(tenantId: tenantId, name: tenantId, roleHint: 'MEMBER'),
+  ),
+  jurisdictionState: JurisdictionState.verified,
+  jurisdictionId: 'jurisdiction-a',
+  operatingEntityState: OperatingEntityState.assigned,
+  operatingEntity: const OperatingEntitySummary(
+    id: 'entity-0001',
+    name: 'Test Operating Entity',
+    jurisdictionRef: 'jurisdiction-a',
+    contactReference: 'privacy@example.invalid',
+  ),
+  policyPackVersion: '1.0.0',
+  policyPackStatus: 'ACTIVE',
+  capabilityState: CapabilityResolutionState.resolved,
+  capabilities: const <CapabilityView>[
+    CapabilityView(id: 'TRANSACTIONS', status: 'AVAILABLE', requirements: <String>[]),
+  ],
+);
 
 /// One page with no successor.
 Page<T> _page<T>(List<T> items) => Page<T>(
-      items: items,
-      cursor: PageCursor(limit: 50, returned: items.length, hasMore: false, nextCursor: null),
-    );
+  items: items,
+  cursor: PageCursor(limit: 50, returned: items.length, hasMore: false, nextCursor: null),
+);
 
 /// An accounts repository whose every read is held open until the test says
 /// otherwise.
@@ -130,8 +130,7 @@ final class HeldAccountsRepository
   HeldAccountsRepository();
 
   /// Completers for `listOwnAccounts`, in call order.
-  final List<Completer<List<FinancialAccount>>> pending =
-      <Completer<List<FinancialAccount>>>[];
+  final List<Completer<List<FinancialAccount>>> pending = <Completer<List<FinancialAccount>>>[];
 
   /// Every read this repository was asked to perform.
   final List<String> reads = <String>[];
@@ -172,8 +171,7 @@ final class HeldAccountsRepository
     String accountId, {
     int? limit,
     String? cursor,
-  }) async =>
-      Success<Page<BalanceSnapshot>>(_page<BalanceSnapshot>(const <BalanceSnapshot>[]));
+  }) async => Success<Page<BalanceSnapshot>>(_page<BalanceSnapshot>(const <BalanceSnapshot>[]));
 
   @override
   Future<Result<Page<AccountSourceLink>>> listSourceLinks(
@@ -240,8 +238,7 @@ final class TenantIsolationHarness {
         ...featureSurfaceOverrides(),
         loggerProvider.overrideWithValue(AppLogger.silent),
         keyValueStoreProvider.overrideWithValue(InMemoryKeyValueStore()),
-        localSecurityStateStoreProvider
-            .overrideWithValue(InMemoryLocalSecurityStateStore()),
+        localSecurityStateStoreProvider.overrideWithValue(InMemoryLocalSecurityStateStore()),
         tokenStoreProvider.overrideWithValue(tokens),
         bootstrapGatewayProvider.overrideWithValue(bootstrap),
         // The tenant-binding call is the only request that reaches the

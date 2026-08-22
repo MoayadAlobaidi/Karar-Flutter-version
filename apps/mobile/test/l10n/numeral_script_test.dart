@@ -69,12 +69,12 @@ void main() {
     });
 
     test('no Arabic message writes a number in Arabic-Indic digits', () {
-      final List<String> offenders =
-          _offenders(arabic, _arabicIndicDigits).toList();
+      final List<String> offenders = _offenders(arabic, _arabicIndicDigits).toList();
       expect(
         offenders,
         isEmpty,
-        reason: 'these messages spell a number in Arabic-Indic while every '
+        reason:
+            'these messages spell a number in Arabic-Indic while every '
             'number this application formats renders in Western digits under '
             '`ar` and `ar_QA`. A user sees both scripts for the same quantity:\n'
             '${offenders.join('\n')}\n'
@@ -85,14 +85,12 @@ void main() {
     });
 
     test('no message uses extended Arabic-Indic digits', () {
-      for (final Map<String, String> catalogue in <Map<String, String>>[
-        arabic,
-        english,
-      ]) {
+      for (final Map<String, String> catalogue in <Map<String, String>>[arabic, english]) {
         expect(
           _offenders(catalogue, _extendedArabicIndicDigits).toList(),
           isEmpty,
-          reason: 'extended Arabic-Indic digits belong to Persian and Urdu; '
+          reason:
+              'extended Arabic-Indic digits belong to Persian and Urdu; '
               'no locale here uses them',
         );
       }
@@ -100,8 +98,7 @@ void main() {
 
     test('no English message writes a number in a non-Western script', () {
       expect(
-        _offenders(english, '$_arabicIndicDigits$_extendedArabicIndicDigits')
-            .toList(),
+        _offenders(english, '$_arabicIndicDigits$_extendedArabicIndicDigits').toList(),
         isEmpty,
       );
     });

@@ -25,34 +25,28 @@ ConsentOverview overviewFor({
   bool noticeRequired = false,
   String? grantId,
   String? documentId = testDocumentId,
-}) =>
-    resolve(
-      purposeRef: testPurposeRef,
-      status: consentStatus(
-        state: state,
-        noticeRequired: noticeRequired,
-        grantId: grantId,
-        documentId: documentId,
-      ),
-      documents: documents ?? <LegalDocument>[legalDocument()],
-      prerequisites: prerequisites,
-    );
+}) => resolve(
+  purposeRef: testPurposeRef,
+  status: consentStatus(
+    state: state,
+    noticeRequired: noticeRequired,
+    grantId: grantId,
+    documentId: documentId,
+  ),
+  documents: documents ?? <LegalDocument>[legalDocument()],
+  prerequisites: prerequisites,
+);
 
 ApiConsentRepository repositoryReturning(Object? body) => ApiConsentRepository(
-      KararApiClient(
-        FakeApiTransport(
-          (ApiRequest request) async => ApiResponse(statusCode: 200, body: body),
-        ),
-      ),
-    );
+  KararApiClient(
+    FakeApiTransport((ApiRequest request) async => ApiResponse(statusCode: 200, body: body)),
+  ),
+);
 
 void main() {
   group('the decision table', () {
     test('an in-force grant is ACTIVE and offers withdrawal', () {
-      final overview = overviewFor(
-        state: ConsentStatusState.active,
-        grantId: 'grant-1',
-      );
+      final overview = overviewFor(state: ConsentStatusState.active, grantId: 'grant-1');
 
       expect(overview.state, ConsentState.active);
       expect(overview.canAccept, isFalse);
@@ -61,10 +55,7 @@ void main() {
     });
 
     test('a withdrawal keeps the grant on the overview as history', () {
-      final overview = overviewFor(
-        state: ConsentStatusState.withdrawn,
-        grantId: 'grant-1',
-      );
+      final overview = overviewFor(state: ConsentStatusState.withdrawn, grantId: 'grant-1');
 
       expect(overview.state, ConsentState.withdrawn);
       expect(overview.canAccept, isFalse);
@@ -93,10 +84,7 @@ void main() {
     });
 
     test('no applicable document at all is NOT_REQUIRED, not a gap', () {
-      final overview = overviewFor(
-        documents: const <LegalDocument>[],
-        documentId: null,
-      );
+      final overview = overviewFor(documents: const <LegalDocument>[], documentId: null);
 
       expect(overview.state, ConsentState.notRequired);
       expect(overview.canAccept, isFalse);
@@ -104,9 +92,7 @@ void main() {
     });
 
     test('a document with nothing published is LEGAL_DOCUMENT_UNAVAILABLE', () {
-      final overview = overviewFor(
-        documents: <LegalDocument>[legalDocument(published: false)],
-      );
+      final overview = overviewFor(documents: <LegalDocument>[legalDocument(published: false)]);
 
       expect(overview.state, ConsentState.legalDocumentUnavailable);
       expect(overview.canAccept, isFalse);
@@ -216,10 +202,7 @@ void main() {
       expect(ConsentState.active.wireName, 'ACTIVE');
       expect(ConsentState.withdrawn.wireName, 'WITHDRAWN');
       expect(ConsentState.unavailable.wireName, 'UNAVAILABLE');
-      expect(
-        ConsentState.legalDocumentUnavailable.wireName,
-        'LEGAL_DOCUMENT_UNAVAILABLE',
-      );
+      expect(ConsentState.legalDocumentUnavailable.wireName, 'LEGAL_DOCUMENT_UNAVAILABLE');
       expect(ConsentState.policyNotApproved.wireName, 'POLICY_NOT_APPROVED');
     });
 
@@ -304,10 +287,7 @@ void main() {
         ],
       }).listApplicableDocuments();
 
-      expect(
-        result.valueOrNull!.single.effectiveVersion?.action,
-        LegalDocumentAction.unstated,
-      );
+      expect(result.valueOrNull!.single.effectiveVersion?.action, LegalDocumentAction.unstated);
     });
 
     test('a document with no published version has nothing to accept', () async {
@@ -384,8 +364,7 @@ void main() {
       expect(result.failureOrNull, isA<ContractViolationFailure>());
     });
 
-    test('the acceptance request carries the version and the purpose, and no evidence',
-        () async {
+    test('the acceptance request carries the version and the purpose, and no evidence', () async {
       final transport = FakeApiTransport(
         (ApiRequest request) async => ApiResponse(
           statusCode: 200,
@@ -402,20 +381,17 @@ void main() {
         ),
       );
 
-      await ApiConsentRepository(KararApiClient(transport)).accept(
-        legalDocumentVersionId: testVersionId,
-        purposeRef: testPurposeRef,
-      );
+      await ApiConsentRepository(KararApiClient(transport))
+          .accept(legalDocumentVersionId: testVersionId, purposeRef: testPurposeRef);
 
       final request = transport.requests.single;
       expect(request.path, '/consent/acceptances');
       expect(request.method.wireName, 'POST');
       final body = request.body! as Map<String, Object?>;
-      expect(
-        body.keys.toSet(),
-        <String>{'legalDocumentVersionId', 'purposeRef'},
-        reason: 'the evidence reference is derived server-side, never supplied',
-      );
+      expect(body.keys.toSet(), <String>{
+        'legalDocumentVersionId',
+        'purposeRef',
+      }, reason: 'the evidence reference is derived server-side, never supplied');
     });
   });
 }

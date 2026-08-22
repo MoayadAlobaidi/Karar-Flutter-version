@@ -61,22 +61,22 @@ Issuer issuerOne({IssuerKind kind = IssuerKind.bank, IssuerStatus status = Issue
     );
 
 Issuer issuerTwo({IssuerKind kind = IssuerKind.exchangeHouse}) => Issuer(
-      issuerId: issuerTwoId,
-      code: 'ISSUER_TWO',
-      kind: kind,
-      displayNameEn: issuerTwoNameEn,
-      displayNameAr: issuerTwoNameAr,
-      status: IssuerStatus.active,
-    );
+  issuerId: issuerTwoId,
+  code: 'ISSUER_TWO',
+  kind: kind,
+  displayNameEn: issuerTwoNameEn,
+  displayNameAr: issuerTwoNameAr,
+  status: IssuerStatus.active,
+);
 
 Issuer walletIssuer() => Issuer(
-      issuerId: issuerWalletId,
-      code: 'ISSUER_WALLET',
-      kind: IssuerKind.fintechWallet,
-      displayNameEn: issuerWalletNameEn,
-      displayNameAr: issuerWalletNameAr,
-      status: IssuerStatus.active,
-    );
+  issuerId: issuerWalletId,
+  code: 'ISSUER_WALLET',
+  kind: IssuerKind.fintechWallet,
+  displayNameEn: issuerWalletNameEn,
+  displayNameAr: issuerWalletNameAr,
+  status: IssuerStatus.active,
+);
 
 const InstitutionLinkClaim noLiveLink = InstitutionLinkClaim(
   impliesLiveInstitutionLink: false,
@@ -96,23 +96,22 @@ FinancialAccount account({
   AccountLifecycle lifecycle = AccountLifecycle.active,
   AccountOrigin origin = AccountOrigin.manual,
   int version = 1,
-}) =>
-    FinancialAccount(
-      accountId: accountId,
-      displayName: displayName,
-      accountType: accountType,
-      walletKind: walletKind,
-      nature: nature,
-      currency: CurrencyRef(code: currency, exponent: exponent),
-      mask: SafeMask.from(mask),
-      issuer: issuer ?? IssuerFromCatalogue(issuerOne()),
-      lifecycle: lifecycle,
-      origin: origin,
-      link: noLiveLink,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026, 2),
-      version: version,
-    );
+}) => FinancialAccount(
+  accountId: accountId,
+  displayName: displayName,
+  accountType: accountType,
+  walletKind: walletKind,
+  nature: nature,
+  currency: CurrencyRef(code: currency, exponent: exponent),
+  mask: SafeMask.from(mask),
+  issuer: issuer ?? IssuerFromCatalogue(issuerOne()),
+  lifecycle: lifecycle,
+  origin: origin,
+  link: noLiveLink,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026, 2),
+  version: version,
+);
 
 /// A portfolio that exercises every multiplicity the brief names.
 ///
@@ -123,61 +122,53 @@ FinancialAccount account({
 ///   * two wallets from one issuer, with different wallet kinds;
 ///   * cash, and an account imported from a statement.
 List<FinancialAccount> wholePortfolio() => <FinancialAccount>[
-      account(
-        accountId: 'account-0001',
-        displayName: 'Everyday account',
-        currency: 'QAR',
-      ),
-      // Same issuer, same type, same currency as the row above. Two accounts,
-      // not one.
-      account(
-        accountId: 'account-0002',
-        displayName: 'Second everyday account',
-        currency: 'QAR',
-      ),
-      account(
-        accountId: 'account-0003',
-        displayName: 'Savings in another currency',
-        accountType: AccountType.savings,
-        currency: 'USD',
-      ),
-      account(
-        accountId: 'account-0004',
-        displayName: 'Card account',
-        accountType: AccountType.creditCard,
-        nature: AccountNature.liability,
-        issuer: IssuerFromCatalogue(issuerTwo()),
-        origin: AccountOrigin.csv,
-      ),
-      account(
-        accountId: 'account-0005',
-        displayName: 'First wallet',
-        accountType: AccountType.wallet,
-        walletKind: WalletKind.mobileMoney,
-        issuer: IssuerFromCatalogue(walletIssuer()),
-      ),
-      // A second wallet at the SAME issuer, of a different kind.
-      account(
-        accountId: 'account-0006',
-        displayName: 'Second wallet',
-        accountType: AccountType.wallet,
-        walletKind: WalletKind.prepaid,
-        issuer: IssuerFromCatalogue(walletIssuer()),
-      ),
-      account(
-        accountId: 'account-0007',
-        displayName: 'Cash at home',
-        accountType: AccountType.cash,
-        issuer: const IssuerNotStated(),
-        mask: null,
-      ),
-      account(
-        accountId: 'account-0008',
-        displayName: 'Account at an unlisted issuer',
-        issuer: const IssuerUnlisted(unlistedIssuerLabel),
-        lifecycle: AccountLifecycle.archived,
-      ),
-    ];
+  account(accountId: 'account-0001', displayName: 'Everyday account', currency: 'QAR'),
+  // Same issuer, same type, same currency as the row above. Two accounts,
+  // not one.
+  account(accountId: 'account-0002', displayName: 'Second everyday account', currency: 'QAR'),
+  account(
+    accountId: 'account-0003',
+    displayName: 'Savings in another currency',
+    accountType: AccountType.savings,
+    currency: 'USD',
+  ),
+  account(
+    accountId: 'account-0004',
+    displayName: 'Card account',
+    accountType: AccountType.creditCard,
+    nature: AccountNature.liability,
+    issuer: IssuerFromCatalogue(issuerTwo()),
+    origin: AccountOrigin.csv,
+  ),
+  account(
+    accountId: 'account-0005',
+    displayName: 'First wallet',
+    accountType: AccountType.wallet,
+    walletKind: WalletKind.mobileMoney,
+    issuer: IssuerFromCatalogue(walletIssuer()),
+  ),
+  // A second wallet at the SAME issuer, of a different kind.
+  account(
+    accountId: 'account-0006',
+    displayName: 'Second wallet',
+    accountType: AccountType.wallet,
+    walletKind: WalletKind.prepaid,
+    issuer: IssuerFromCatalogue(walletIssuer()),
+  ),
+  account(
+    accountId: 'account-0007',
+    displayName: 'Cash at home',
+    accountType: AccountType.cash,
+    issuer: const IssuerNotStated(),
+    mask: null,
+  ),
+  account(
+    accountId: 'account-0008',
+    displayName: 'Account at an unlisted issuer',
+    issuer: const IssuerUnlisted(unlistedIssuerLabel),
+    lifecycle: AccountLifecycle.archived,
+  ),
+];
 
 Money money(String minorUnits, {String currency = 'QAR', int exponent = 2}) =>
     Money(minorUnits: minorUnits, currency: currency, exponent: exponent);
@@ -190,17 +181,16 @@ BalanceSnapshot balance({
   SourceKind sourceKind = SourceKind.manual,
   RailAvailability availability = RailAvailability.executable,
   DateTime? asOf,
-}) =>
-    BalanceSnapshot(
-      snapshotId: snapshotId,
-      accountId: accountId,
-      amount: amount ?? money('125000'),
-      balanceKind: balanceKind,
-      sourceKind: sourceKind,
-      availability: availability,
-      asOf: asOf ?? DateTime.utc(2026, 3, 1, 12),
-      capturedAt: DateTime.utc(2026, 3, 1, 13),
-    );
+}) => BalanceSnapshot(
+  snapshotId: snapshotId,
+  accountId: accountId,
+  amount: amount ?? money('125000'),
+  balanceKind: balanceKind,
+  sourceKind: sourceKind,
+  availability: availability,
+  asOf: asOf ?? DateTime.utc(2026, 3, 1, 12),
+  capturedAt: DateTime.utc(2026, 3, 1, 13),
+);
 
 AccountSourceLink sourceLink({
   String sourceLinkId = 'source-link-0001',
@@ -210,32 +200,31 @@ AccountSourceLink sourceLink({
   SourceLinkStatus status = SourceLinkStatus.linked,
   DateTime? lastSuccessfulImportAt,
   CalendarDayRange? coverage,
-}) =>
-    AccountSourceLink(
-      sourceLinkId: sourceLinkId,
-      accountId: accountId,
-      connectionId: 'connection-0001',
-      rail: rail,
-      availability: availability,
-      sourceAuthority: SourceAuthority.authoritative,
-      matchBasis: MatchBasis.exactExternalReference,
-      status: status,
-      impliesLiveInstitutionLink: false,
-      providerAccessImplemented: false,
-      subjectConfirmedAt: DateTime.utc(2026, 2, 2),
-      sourcePriority: 1,
-      observation: SourceObservation(
-        firstObservedAt: DateTime.utc(2026),
-        lastObservedAt: DateTime.utc(2026, 3),
-        lastSuccessfulImportAt: lastSuccessfulImportAt,
-      ),
-      historyCoverage: coverage,
-      capabilities: const SourceCapabilities(
-        balance: SourceDataObservationState.observed,
-        pendingTransactions: SourceDataObservationState.notProvided,
-      ),
-      version: 1,
-    );
+}) => AccountSourceLink(
+  sourceLinkId: sourceLinkId,
+  accountId: accountId,
+  connectionId: 'connection-0001',
+  rail: rail,
+  availability: availability,
+  sourceAuthority: SourceAuthority.authoritative,
+  matchBasis: MatchBasis.exactExternalReference,
+  status: status,
+  impliesLiveInstitutionLink: false,
+  providerAccessImplemented: false,
+  subjectConfirmedAt: DateTime.utc(2026, 2, 2),
+  sourcePriority: 1,
+  observation: SourceObservation(
+    firstObservedAt: DateTime.utc(2026),
+    lastObservedAt: DateTime.utc(2026, 3),
+    lastSuccessfulImportAt: lastSuccessfulImportAt,
+  ),
+  historyCoverage: coverage,
+  capabilities: const SourceCapabilities(
+    balance: SourceDataObservationState.observed,
+    pendingTransactions: SourceDataObservationState.notProvided,
+  ),
+  version: 1,
+);
 
 PaymentInstrument instrument({
   required String instrumentId,
@@ -245,20 +234,19 @@ PaymentInstrument instrument({
   InstrumentStatus status = InstrumentStatus.active,
   bool spendable = true,
   String mask = '**4321',
-}) =>
-    PaymentInstrument(
-      instrumentId: instrumentId,
-      accountId: accountId,
-      instrumentType: instrumentType,
-      status: status,
-      spendable: spendable,
-      mask: SafeMask.from(mask),
-      displayLabel: displayLabel,
-      impliesLiveIssuerLink: false,
-      version: 1,
-      createdAt: DateTime.utc(2026),
-      updatedAt: DateTime.utc(2026),
-    );
+}) => PaymentInstrument(
+  instrumentId: instrumentId,
+  accountId: accountId,
+  instrumentType: instrumentType,
+  status: status,
+  spendable: spendable,
+  mask: SafeMask.from(mask),
+  displayLabel: displayLabel,
+  impliesLiveIssuerLink: false,
+  version: 1,
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
 
 Transaction transaction({
   String transactionId = 'transaction-0001',
@@ -275,26 +263,25 @@ Transaction transaction({
   RailAvailability availability = RailAvailability.executable,
   TransactionStatus status = TransactionStatus.posted,
   int version = 1,
-}) =>
-    Transaction(
-      transactionId: transactionId,
-      accountId: accountId,
-      amount: amount ?? money('-4500'),
-      direction: direction,
-      bookingDate: bookingDate ?? const CalendarDay(year: 2026, month: 3, day: 1),
-      valueDate: valueDate,
-      eventOccurredAt: null,
-      sourceTimezone: null,
-      merchant: merchant,
-      description: description,
-      note: note,
-      originalAmount: originalAmount,
-      sourceKind: sourceKind,
-      availability: availability,
-      status: status,
-      createdAt: DateTime.utc(2026, 3, 2),
-      version: version,
-    );
+}) => Transaction(
+  transactionId: transactionId,
+  accountId: accountId,
+  amount: amount ?? money('-4500'),
+  direction: direction,
+  bookingDate: bookingDate ?? const CalendarDay(year: 2026, month: 3, day: 1),
+  valueDate: valueDate,
+  eventOccurredAt: null,
+  sourceTimezone: null,
+  merchant: merchant,
+  description: description,
+  note: note,
+  originalAmount: originalAmount,
+  sourceKind: sourceKind,
+  availability: availability,
+  status: status,
+  createdAt: DateTime.utc(2026, 3, 2),
+  version: version,
+);
 
 TransactionDetail transactionDetail({
   Transaction? held,
@@ -305,7 +292,8 @@ TransactionDetail transactionDetail({
   final subject = held ?? transaction();
   return TransactionDetail(
     transaction: subject,
-    revisions: revisions ??
+    revisions:
+        revisions ??
         <TransactionRevision>[
           TransactionRevision(
             revisionNumber: 1,
@@ -335,70 +323,68 @@ CategoryAssignment categoryAssignment({
   String categoryCode = 'HOUSEHOLD',
   AssignmentSource assignmentSource = AssignmentSource.user,
   String? ruleVersion,
-}) =>
-    CategoryAssignment(
-      assignmentId: 'assignment-0001',
-      categoryCode: categoryCode,
-      assignmentSource: assignmentSource,
-      ruleVersion: ruleVersion,
-      status: AssignmentStatus.active,
-      assignedAt: DateTime.utc(2026, 3, 3),
-    );
+}) => CategoryAssignment(
+  assignmentId: 'assignment-0001',
+  categoryCode: categoryCode,
+  assignmentSource: assignmentSource,
+  ruleVersion: ruleVersion,
+  status: AssignmentStatus.active,
+  assignedAt: DateTime.utc(2026, 3, 3),
+);
 
 TransactionProvenance provenance({
   int revisionNumber = 1,
   SourceKind sourceKind = SourceKind.csv,
   RailAvailability availability = RailAvailability.executable,
   bool importedFromStatement = true,
-}) =>
-    TransactionProvenance(
-      revisionNumber: revisionNumber,
-      sourceKind: sourceKind,
-      availability: availability,
-      accountId: 'account-0001',
-      importedFromStatement: importedFromStatement,
-      versions: const ProcessingVersions(
-        parserVersion: 'parser-1',
-        mappingVersion: 'mapping-1',
-        normalizationVersion: 'normalization-1',
-        // An ALGORITHM version. Never a fingerprint.
-        fingerprintVersion: 'fingerprint-algorithm-1',
-      ),
-      sourceDirection: SourceDirection.debit,
-      directionMapping: DirectionMapping.sourceDirectionWord,
-      categoryAssignmentSource: CategoryAssignmentOrigin.user,
-      createdAt: DateTime.utc(2026, 3, 2),
-    );
+}) => TransactionProvenance(
+  revisionNumber: revisionNumber,
+  sourceKind: sourceKind,
+  availability: availability,
+  accountId: 'account-0001',
+  importedFromStatement: importedFromStatement,
+  versions: const ProcessingVersions(
+    parserVersion: 'parser-1',
+    mappingVersion: 'mapping-1',
+    normalizationVersion: 'normalization-1',
+    // An ALGORITHM version. Never a fingerprint.
+    fingerprintVersion: 'fingerprint-algorithm-1',
+  ),
+  sourceDirection: SourceDirection.debit,
+  directionMapping: DirectionMapping.sourceDirectionWord,
+  categoryAssignmentSource: CategoryAssignmentOrigin.user,
+  createdAt: DateTime.utc(2026, 3, 2),
+);
 
 CategoryCatalogue catalogue() => const CategoryCatalogue(<TransactionCategory>[
-      TransactionCategory(
-        code: 'HOUSEHOLD',
-        parentCode: null,
-        labelEn: 'Household',
-        labelAr: 'المنزل',
-        catalogueVersion: 'catalogue-1',
-        assignable: true,
-        retiredAt: null,
-      ),
-      TransactionCategory(
-        code: 'HOUSEHOLD.UTILITIES',
-        parentCode: 'HOUSEHOLD',
-        labelEn: 'Utilities',
-        labelAr: 'المرافق',
-        catalogueVersion: 'catalogue-1',
-        assignable: true,
-        retiredAt: null,
-      ),
-      TransactionCategory(
-        code: 'RETIRED_ENTRY',
-        parentCode: null,
-        labelEn: 'Retired entry',
-        labelAr: 'مدخل متقاعد',
-        catalogueVersion: 'catalogue-1',
-        assignable: false,
-        retiredAt: null,
-      ),
-    ]);
+  TransactionCategory(
+    code: 'HOUSEHOLD',
+    parentCode: null,
+    labelEn: 'Household',
+    labelAr: 'المنزل',
+    catalogueVersion: 'catalogue-1',
+    assignable: true,
+    retiredAt: null,
+  ),
+  TransactionCategory(
+    code: 'HOUSEHOLD.UTILITIES',
+    parentCode: 'HOUSEHOLD',
+    labelEn: 'Utilities',
+    labelAr: 'المرافق',
+    catalogueVersion: 'catalogue-1',
+    assignable: true,
+    retiredAt: null,
+  ),
+  TransactionCategory(
+    code: 'RETIRED_ENTRY',
+    parentCode: null,
+    labelEn: 'Retired entry',
+    labelAr: 'مدخل متقاعد',
+    catalogueVersion: 'catalogue-1',
+    assignable: false,
+    retiredAt: null,
+  ),
+]);
 
 // ---------------------------------------------------------------------------
 // The capability answer
@@ -413,36 +399,31 @@ BootstrapSnapshot syntheticBootstrap({
   bool withTransactions = true,
   CapabilityResolutionState resolution = CapabilityResolutionState.resolved,
   String status = 'AVAILABLE',
-}) =>
-    BootstrapSnapshot(
-      userId: 'local-test-user',
-      emailVerified: true,
-      sessionId: 'local-test-session',
-      binding: const TenantBound(
-        TenantOption(
-          tenantId: 'local-test-tenant',
-          name: 'Local Test Organisation',
-          roleHint: 'MEMBER',
-        ),
-      ),
-      jurisdictionState: JurisdictionState.verified,
-      jurisdictionId: 'local-test-jurisdiction',
-      operatingEntityState: OperatingEntityState.assigned,
-      operatingEntity: const OperatingEntitySummary(
-        id: 'local-test-entity',
-        name: 'Local Test Operating Entity',
-        jurisdictionRef: 'local-test-jurisdiction',
-        contactReference: 'privacy@example.invalid',
-      ),
-      policyPackVersion: '1.0.0',
-      policyPackStatus: 'ACTIVE',
-      capabilityState: resolution,
-      capabilities: <CapabilityView>[
-        if (withTransactions)
-          CapabilityView(
-            id: transactionsCapabilityId,
-            status: status,
-            requirements: const <String>[],
-          ),
-      ],
-    );
+}) => BootstrapSnapshot(
+  userId: 'local-test-user',
+  emailVerified: true,
+  sessionId: 'local-test-session',
+  binding: const TenantBound(
+    TenantOption(
+      tenantId: 'local-test-tenant',
+      name: 'Local Test Organisation',
+      roleHint: 'MEMBER',
+    ),
+  ),
+  jurisdictionState: JurisdictionState.verified,
+  jurisdictionId: 'local-test-jurisdiction',
+  operatingEntityState: OperatingEntityState.assigned,
+  operatingEntity: const OperatingEntitySummary(
+    id: 'local-test-entity',
+    name: 'Local Test Operating Entity',
+    jurisdictionRef: 'local-test-jurisdiction',
+    contactReference: 'privacy@example.invalid',
+  ),
+  policyPackVersion: '1.0.0',
+  policyPackStatus: 'ACTIVE',
+  capabilityState: resolution,
+  capabilities: <CapabilityView>[
+    if (withTransactions)
+      CapabilityView(id: transactionsCapabilityId, status: status, requirements: const <String>[]),
+  ],
+);

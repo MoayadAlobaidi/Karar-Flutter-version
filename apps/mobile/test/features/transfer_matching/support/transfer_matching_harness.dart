@@ -60,30 +60,29 @@ TransferMatch matchFixture({
   SuggestionBasis basis = SuggestionBasis.equalAndOppositeSameCurrencyWithinWindow,
   String suggestionWindow = shippedWindowLabel,
   int version = 1,
-}) =>
-    TransferMatch(
-      matchId: matchId,
-      outflow: MatchSide(
-        transactionId: outflowTransactionId,
-        accountId: outflowAccountId,
-        currencyCode: outflowCurrency,
-      ),
-      inflow: MatchSide(
-        transactionId: inflowTransactionId,
-        accountId: inflowAccountId,
-        currencyCode: inflowCurrency,
-      ),
-      state: state,
-      authoritative: authoritative ?? (state == MatchState.confirmed),
-      suggestionBasis: basis,
-      suggestionWindow: suggestionWindow,
-      subjectDecidedAt: subjectDecidedAt ??
-          (state == MatchState.suggested ? null : DateTime.utc(2026, 4, 5, 9)),
-      firstSuggestedAt: DateTime.utc(2026, 4, 4, 8),
-      createdAt: DateTime.utc(2026, 4, 4, 8),
-      updatedAt: DateTime.utc(2026, 4, 4, 8),
-      version: version,
-    );
+}) => TransferMatch(
+  matchId: matchId,
+  outflow: MatchSide(
+    transactionId: outflowTransactionId,
+    accountId: outflowAccountId,
+    currencyCode: outflowCurrency,
+  ),
+  inflow: MatchSide(
+    transactionId: inflowTransactionId,
+    accountId: inflowAccountId,
+    currencyCode: inflowCurrency,
+  ),
+  state: state,
+  authoritative: authoritative ?? (state == MatchState.confirmed),
+  suggestionBasis: basis,
+  suggestionWindow: suggestionWindow,
+  subjectDecidedAt:
+      subjectDecidedAt ?? (state == MatchState.suggested ? null : DateTime.utc(2026, 4, 5, 9)),
+  firstSuggestedAt: DateTime.utc(2026, 4, 4, 8),
+  createdAt: DateTime.utc(2026, 4, 4, 8),
+  updatedAt: DateTime.utc(2026, 4, 4, 8),
+  version: version,
+);
 
 /// One write this repository was asked to perform.
 final class RecordedDecision {
@@ -212,8 +211,7 @@ final class ScriptedMovementsRepository implements TransactionsRepository {
     TransactionFilter filter = const TransactionFilter(),
     int? limit,
     String? cursor,
-  }) async =>
-      Success<Page<Transaction>>(onePage<Transaction>(const <Transaction>[]));
+  }) async => Success<Page<Transaction>>(onePage<Transaction>(const <Transaction>[]));
 
   @override
   Future<Result<Transaction>> createManual(ManualTransactionDraft draft) async =>
@@ -223,20 +221,16 @@ final class ScriptedMovementsRepository implements TransactionsRepository {
   Future<Result<Transaction>> correct(
     String transactionId,
     TransactionCorrection correction,
-  ) async =>
-      const Failed<Transaction>(DependencyUnavailableFailure());
+  ) async => const Failed<Transaction>(DependencyUnavailableFailure());
 
   @override
   Future<Result<CategoryAssignment>> assignCategory(
     String transactionId,
     String categoryCode,
-  ) async =>
-      const Failed<CategoryAssignment>(DependencyUnavailableFailure());
+  ) async => const Failed<CategoryAssignment>(DependencyUnavailableFailure());
 
   @override
-  Future<Result<List<TransactionProvenance>>> listProvenance(
-    String transactionId,
-  ) async =>
+  Future<Result<List<TransactionProvenance>>> listProvenance(String transactionId) async =>
       const Success<List<TransactionProvenance>>(<TransactionProvenance>[]);
 
   @override
@@ -255,50 +249,48 @@ ScriptedMovementsRepository movementsFixture({
   String outflowCurrency = 'QAR',
   String inflowCurrency = 'QAR',
   Set<String> unreadable = const <String>{},
-}) =>
-    ScriptedMovementsRepository(
-      details: <String, TransactionDetail>{
-        outflowTransactionId: transactionDetail(
-          held: transaction(
-            transactionId: outflowTransactionId,
-            accountId: outflowAccountId,
-            amount: money(outflowMinorUnits, currency: outflowCurrency),
-            direction: MoneyDirection.moneyOut,
-            description: 'Top-up sent',
-          ),
-        ),
-        inflowTransactionId: transactionDetail(
-          held: transaction(
-            transactionId: inflowTransactionId,
-            accountId: inflowAccountId,
-            amount: money(inflowMinorUnits, currency: inflowCurrency),
-            direction: MoneyDirection.moneyIn,
-            description: 'Top-up received',
-          ),
-        ),
-      },
-      unreadable: unreadable,
-    );
+}) => ScriptedMovementsRepository(
+  details: <String, TransactionDetail>{
+    outflowTransactionId: transactionDetail(
+      held: transaction(
+        transactionId: outflowTransactionId,
+        accountId: outflowAccountId,
+        amount: money(outflowMinorUnits, currency: outflowCurrency),
+        direction: MoneyDirection.moneyOut,
+        description: 'Top-up sent',
+      ),
+    ),
+    inflowTransactionId: transactionDetail(
+      held: transaction(
+        transactionId: inflowTransactionId,
+        accountId: inflowAccountId,
+        amount: money(inflowMinorUnits, currency: inflowCurrency),
+        direction: MoneyDirection.moneyIn,
+        description: 'Top-up received',
+      ),
+    ),
+  },
+  unreadable: unreadable,
+);
 
 /// The portfolio the two sides sit on, so the accounts are NAMED rather than
 /// rendered as identifiers.
 ScriptedAccountsRepository accountsFixture() => ScriptedAccountsRepository(
-      accounts: <FinancialAccount>[
-        account(accountId: outflowAccountId, displayName: 'Everyday account'),
-        account(accountId: inflowAccountId, displayName: 'Travel wallet'),
-      ],
-    );
+  accounts: <FinancialAccount>[
+    account(accountId: outflowAccountId, displayName: 'Everyday account'),
+    account(accountId: inflowAccountId, displayName: 'Travel wallet'),
+  ],
+);
 
 /// The overrides a transfer-matching test installs.
 List<Override> transferMatchingOverrides({
   ScriptedTransferMatchesRepository? matches,
   ScriptedMovementsRepository? movements,
   ScriptedAccountsRepository? accounts,
-}) =>
-    <Override>[
-      ...financialOverrides(accounts: accounts ?? accountsFixture()),
-      transferMatchesRepositoryProvider
-          .overrideWithValue(matches ?? ScriptedTransferMatchesRepository()),
-      if (movements != null)
-        transactionsRepositoryProvider.overrideWithValue(movements),
-    ];
+}) => <Override>[
+  ...financialOverrides(accounts: accounts ?? accountsFixture()),
+  transferMatchesRepositoryProvider.overrideWithValue(
+    matches ?? ScriptedTransferMatchesRepository(),
+  ),
+  if (movements != null) transactionsRepositoryProvider.overrideWithValue(movements),
+];

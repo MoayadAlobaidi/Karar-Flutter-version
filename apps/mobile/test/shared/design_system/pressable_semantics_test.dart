@@ -40,13 +40,16 @@ Future<void> pumpButton(
   required String label,
   VoidCallback? onPressed,
   Locale locale = KararLocalization.english,
-}) =>
-    pumpFeatureScreen(
-      tester,
-      Scaffold(body: Center(child: KararButton(label: label, onPressed: onPressed))),
-      locale: locale,
-      surfaceSize: phone,
-    );
+}) => pumpFeatureScreen(
+  tester,
+  Scaffold(
+    body: Center(
+      child: KararButton(label: label, onPressed: onPressed),
+    ),
+  ),
+  locale: locale,
+  surfaceSize: phone,
+);
 
 void main() {
   group('the pressable primitive announces itself correctly', () {

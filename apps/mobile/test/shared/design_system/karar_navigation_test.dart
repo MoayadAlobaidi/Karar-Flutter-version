@@ -25,19 +25,13 @@ void main() {
       Locale locale,
       double scale,
     ) async {
-      await pumpKarar(
-        tester,
-        const Icon(KararIcons.navigateNext),
-        locale: locale,
-      );
+      await pumpKarar(tester, const Icon(KararIcons.navigateNext), locale: locale);
       final RichText rendered = tester.widget(
         find.descendant(of: find.byType(Icon), matching: find.byType(RichText)),
       );
       expect(
         rendered.textDirection,
-        locale == KararLocalization.arabic
-            ? TextDirection.rtl
-            : TextDirection.ltr,
+        locale == KararLocalization.arabic ? TextDirection.rtl : TextDirection.ltr,
       );
     });
   });
@@ -55,9 +49,7 @@ void main() {
         locale: locale,
         textScale: scale,
       );
-      final AppLocalizations l10n = AppLocalizations.of(
-        tester.element(find.byType(KararAppBar)),
-      );
+      final AppLocalizations l10n = AppLocalizations.of(tester.element(find.byType(KararAppBar)));
       expect(find.text('Settings'), findsOneWidget);
 
       await tester.tap(find.bySemanticsLabel(l10n.actionBack));
@@ -93,28 +85,17 @@ void main() {
       double scale,
     ) async {
       final SemanticsHandle handle = tester.ensureSemantics();
-      await pumpKarar(
-        tester,
-        const KararAppBar(title: 'Settings'),
-        locale: locale,
-      );
-      expect(
-        tester.getSemantics(find.text('Settings')),
-        isSemantics(isHeader: true),
-      );
+      await pumpKarar(tester, const KararAppBar(title: 'Settings'), locale: locale);
+      expect(tester.getSemantics(find.text('Settings')), isSemantics(isHeader: true));
       handle.dispose();
     });
   });
 
   group('navigation bar', () {
-    const List<KararNavigationDestination> destinations =
-        <KararNavigationDestination>[
-          KararNavigationDestination(icon: Icons.home_outlined, label: 'Home'),
-          KararNavigationDestination(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-          ),
-        ];
+    const List<KararNavigationDestination> destinations = <KararNavigationDestination>[
+      KararNavigationDestination(icon: Icons.home_outlined, label: 'Home'),
+      KararNavigationDestination(icon: Icons.settings_outlined, label: 'Settings'),
+    ];
 
     testInBothDirections('renders a label for every destination', (
       WidgetTester tester,
@@ -166,34 +147,35 @@ void main() {
       }
     });
 
-    testInBothDirections(
-      'the selected destination is announced and positioned',
-      (WidgetTester tester, Locale locale, double scale) async {
-        final SemanticsHandle handle = tester.ensureSemantics();
-        await pumpKarar(
-          tester,
-          KararNavigationBar(
-            destinations: destinations,
-            selectedIndex: 1,
-            onDestinationSelected: (_) {},
-          ),
-          locale: locale,
-        );
-        final AppLocalizations l10n = AppLocalizations.of(
-          tester.element(find.byType(KararNavigationBar)),
-        );
-        expect(
-          tester.getSemantics(find.bySemanticsLabel('Settings')),
-          isSemantics(
-            isSelected: true,
-            isButton: true,
-            hasTapAction: true,
-            hint: l10n.a11yTabPosition(2, 2),
-          ),
-        );
-        handle.dispose();
-      },
-    );
+    testInBothDirections('the selected destination is announced and positioned', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      final SemanticsHandle handle = tester.ensureSemantics();
+      await pumpKarar(
+        tester,
+        KararNavigationBar(
+          destinations: destinations,
+          selectedIndex: 1,
+          onDestinationSelected: (_) {},
+        ),
+        locale: locale,
+      );
+      final AppLocalizations l10n = AppLocalizations.of(
+        tester.element(find.byType(KararNavigationBar)),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Settings')),
+        isSemantics(
+          isSelected: true,
+          isButton: true,
+          hasTapAction: true,
+          hint: l10n.a11yTabPosition(2, 2),
+        ),
+      );
+      handle.dispose();
+    });
 
     testInBothDirections('selecting a destination reports its index', (
       WidgetTester tester,
@@ -217,40 +199,36 @@ void main() {
   });
 
   group('list row', () {
-    testInBothDirections(
-      'renders title and subtitle and keeps the chevron at the end',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpKarar(
-          tester,
-          SizedBox(
-            width: 400,
-            child: KararListRow(
-              title: 'Language',
-              subtitle: 'English',
-              leadingIcon: KararIcons.language,
-              onPressed: () {},
-            ),
+    testInBothDirections('renders title and subtitle and keeps the chevron at the end', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpKarar(
+        tester,
+        SizedBox(
+          width: 400,
+          child: KararListRow(
+            title: 'Language',
+            subtitle: 'English',
+            leadingIcon: KararIcons.language,
+            onPressed: () {},
           ),
-          locale: locale,
-          textScale: scale,
-        );
-        expect(find.text('Language'), findsOneWidget);
-        expect(find.text('English'), findsOneWidget);
+        ),
+        locale: locale,
+        textScale: scale,
+      );
+      expect(find.text('Language'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
 
-        final double leading = tester
-            .getCenter(find.byIcon(KararIcons.language))
-            .dx;
-        final double chevron = tester
-            .getCenter(find.byIcon(KararIcons.navigateNext))
-            .dx;
-        if (locale == KararLocalization.arabic) {
-          expect(leading, greaterThan(chevron));
-        } else {
-          expect(leading, lessThan(chevron));
-        }
-      },
-      textScales: testTextScales,
-    );
+      final double leading = tester.getCenter(find.byIcon(KararIcons.language)).dx;
+      final double chevron = tester.getCenter(find.byIcon(KararIcons.navigateNext)).dx;
+      if (locale == KararLocalization.arabic) {
+        expect(leading, greaterThan(chevron));
+      } else {
+        expect(leading, lessThan(chevron));
+      }
+    }, textScales: testTextScales);
 
     testInBothDirections('a pressable row is announced with both lines', (
       WidgetTester tester,
@@ -263,9 +241,7 @@ void main() {
         KararListRow(title: 'Language', subtitle: 'English', onPressed: () {}),
         locale: locale,
       );
-      final AppLocalizations l10n = AppLocalizations.of(
-        tester.element(find.byType(KararListRow)),
-      );
+      final AppLocalizations l10n = AppLocalizations.of(tester.element(find.byType(KararListRow)));
       expect(
         tester.getSemantics(find.byType(KararPressable)),
         isSemantics(
@@ -282,11 +258,7 @@ void main() {
       Locale locale,
       double scale,
     ) async {
-      await pumpKarar(
-        tester,
-        const KararListRow(title: 'Version'),
-        locale: locale,
-      );
+      await pumpKarar(tester, const KararListRow(title: 'Version'), locale: locale);
       expect(find.byIcon(KararIcons.navigateNext), findsNothing);
     });
   });

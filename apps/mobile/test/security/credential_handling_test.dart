@@ -24,12 +24,12 @@ import 'support/source_tree.dart';
 const Redactor _redactor = Redactor();
 
 SessionTokens _tokens() => SessionTokens(
-      accessToken: 'access-token-value-must-not-leak',
-      accessTokenExpiresAt: DateTime.utc(2026, 9, 1, 12),
-      refreshToken: 'refresh-token-value-must-not-leak',
-      refreshTokenExpiresAt: DateTime.utc(2026, 10, 1, 12),
-      sessionId: 'session-1',
-    );
+  accessToken: 'access-token-value-must-not-leak',
+  accessTokenExpiresAt: DateTime.utc(2026, 9, 1, 12),
+  refreshToken: 'refresh-token-value-must-not-leak',
+  refreshTokenExpiresAt: DateTime.utc(2026, 10, 1, 12),
+  sessionId: 'session-1',
+);
 
 void main() {
   group('session credentials live in platform secure storage only', () {
@@ -47,15 +47,15 @@ void main() {
     });
 
     test('a secure-store failure is a failure, never an empty session', () async {
-      final secureStore = InMemorySecureStore()
-        ..failWith = SecureStorageOperation.read;
+      final secureStore = InMemorySecureStore()..failWith = SecureStorageOperation.read;
       final tokenStore = SecureTokenStore(secureStore);
 
       final read = await tokenStore.read();
       expect(
         read,
         isA<Failed<SessionTokens?>>(),
-        reason: 'a store that cannot be consulted must not be reported as an absent '
+        reason:
+            'a store that cannot be consulted must not be reported as an absent '
             'session; the caller has to fail closed rather than treat the user as '
             'signed out and continue',
       );
@@ -84,7 +84,8 @@ void main() {
         expect(
           () => PreferenceKey(name),
           throwsA(isA<ArgumentError>()),
-          reason: 'shared preferences are unencrypted and readable on a rooted '
+          reason:
+              'shared preferences are unencrypted and readable on a rooted '
               'device; "$name" must fail at the call site',
         );
       }
@@ -121,11 +122,7 @@ void main() {
           expect(entry.value, 'application/json');
           continue;
         }
-        expect(
-          entry.value,
-          redactedPlaceholder,
-          reason: '${entry.key} must not reach a log sink',
-        );
+        expect(entry.value, redactedPlaceholder, reason: '${entry.key} must not reach a log sink');
       }
     });
 
@@ -152,11 +149,7 @@ void main() {
           expect(entry.value, 'ok', reason: 'non-sensitive diagnostics must survive');
           continue;
         }
-        expect(
-          entry.value,
-          redactedPlaceholder,
-          reason: '${entry.key} must be redacted',
-        );
+        expect(entry.value, redactedPlaceholder, reason: '${entry.key} must be redacted');
       }
     });
 
@@ -221,7 +214,8 @@ void main() {
           expect(
             _redactor.isSensitiveField(key),
             isFalse,
-            reason: 'the transport logs a field named "$key", which the redactor '
+            reason:
+                'the transport logs a field named "$key", which the redactor '
                 'classifies as sensitive',
           );
 
@@ -264,10 +258,7 @@ void main() {
         isNot(RegExp(r'badCertificateCallback\s*=\s*\([^)]*\)\s*=>\s*true')),
         reason: 'accepting an invalid certificate would defeat platform TLS validation',
       );
-      expect(
-        RegExp(r'badCertificateCallback[^;]*=>\s*false').hasMatch(transport),
-        isTrue,
-      );
+      expect(RegExp(r'badCertificateCallback[^;]*=>\s*false').hasMatch(transport), isTrue);
     });
 
     test('no certificate is pinned in the transport', () {
@@ -281,7 +272,8 @@ void main() {
         expect(
           stripCodeComments(transport),
           isNot(contains(marker)),
-          reason: 'pinning is not a Phase 4 control and adding it needs an ADR, not a '
+          reason:
+              'pinning is not a Phase 4 control and adding it needs an ADR, not a '
               'code change',
         );
       }

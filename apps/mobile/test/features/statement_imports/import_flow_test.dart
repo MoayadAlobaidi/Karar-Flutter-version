@@ -47,21 +47,19 @@ final class _DeferredPicker implements StatementSourcePicker {
 const String csvFixture = 'Date,Description,Amount\n2026-04-03,Coffee,-12.50\n';
 
 StatementColumnMapping mappingFixture() => const StatementColumnMapping(
-      bookingDateColumn: 0,
-      descriptionColumn: 1,
-      amount: SignedAmountMapping(
-        amountColumn: 2,
-        signFrame: AmountSignFrame.accountHolder,
-      ),
-      hasHeaderRow: true,
-      statedCurrencyCode: 'QAR',
-    );
+  bookingDateColumn: 0,
+  descriptionColumn: 1,
+  amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
+  hasHeaderRow: true,
+  statedCurrencyCode: 'QAR',
+);
 
 ({
   ProviderContainer container,
   ScriptedStatementImportsRepository repository,
   FakeStatementSourcePicker picker,
-}) flowFor({
+})
+flowFor({
   List<int>? bytes,
   PickerOutcome? outcome,
   ScriptedStatementImportsRepository? repository,
@@ -85,8 +83,7 @@ StatementImportFlowState stateOf(ProviderContainer container) =>
 
 void main() {
   group('choosing a source', () {
-    test('a host with no document picker reports itself unavailable, not a throw',
-        () async {
+    test('a host with no document picker reports itself unavailable, not a throw', () async {
       // This suite runs on a desktop host, where no native half is registered,
       // so the provider selects the picker that says so. The seam is honest
       // there: a person is told the device cannot offer a file, and is not
@@ -95,8 +92,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      final outcome =
-          await container.read(statementSourcePickerProvider).pickStatementSource();
+      final outcome = await container.read(statementSourcePickerProvider).pickStatementSource();
 
       expect(outcome, isA<PickerOutcomeUnavailable>());
     });
@@ -173,7 +169,8 @@ void main() {
       expect(
         flow.repository.uploadedBytes!.toList(),
         Uint8List.fromList(bytes).toList(),
-        reason: 'nothing between the picker and the repository may re-encode, '
+        reason:
+            'nothing between the picker and the repository may re-encode, '
             'trim or normalise the file',
       );
     });
@@ -205,10 +202,7 @@ void main() {
 
       final state = stateOf(flow.container);
       expect(state, isA<ImportFlowRefused>());
-      expect(
-        (state as ImportFlowRefused).snapshot.refusal,
-        ImportRefusal.sourceAlreadyImported,
-      );
+      expect((state as ImportFlowRefused).snapshot.refusal, ImportRefusal.sourceAlreadyImported);
     });
 
     test('a failed start does not go on to upload the file', () async {
@@ -227,7 +221,7 @@ void main() {
 
   group('parsing', () {
     Future<({ProviderContainer container, ScriptedStatementImportsRepository repository})>
-        uploaded({ScriptedStatementImportsRepository? repository}) async {
+    uploaded({ScriptedStatementImportsRepository? repository}) async {
       final flow = flowFor(repository: repository);
       await controllerOf(flow.container).chooseSource();
       await controllerOf(flow.container).upload(accountId: accountFixtureId);
@@ -241,8 +235,7 @@ void main() {
       final sent = flow.repository.parsedMapping;
       expect(sent, isNotNull);
       expect(sent!.bookingDateColumn, 0);
-      expect((sent.amount as SignedAmountMapping).signFrame,
-          AmountSignFrame.accountHolder);
+      expect((sent.amount as SignedAmountMapping).signFrame, AmountSignFrame.accountHolder);
       expect(sent.dateOrder, isNull, reason: 'an unstated order stays unstated');
     });
 
@@ -278,10 +271,7 @@ void main() {
 
       final state = stateOf(flow.container);
       expect(state, isA<ImportFlowRefused>());
-      expect(
-        (state as ImportFlowRefused).snapshot.refusal,
-        ImportRefusal.multipleAccountsInSource,
-      );
+      expect((state as ImportFlowRefused).snapshot.refusal, ImportRefusal.multipleAccountsInSource);
     });
 
     test('a successful parse waits for a decision rather than committing', () async {
@@ -299,7 +289,7 @@ void main() {
 
   group('deciding', () {
     Future<({ProviderContainer container, ScriptedStatementImportsRepository repository})>
-        reviewable() async {
+    reviewable() async {
       final repository = ScriptedStatementImportsRepository(
         uploadResult: Success<StatementImportSnapshot>(
           snapshotFixture(state: ImportLifecycleState.sourceStored, version: 6),
@@ -420,8 +410,11 @@ void main() {
       // tested and would pass whether or not `build()` forgets anything. A
       // screen watching the flow is what keeps the element alive, and that is
       // when Riverpod reuses the notifier and re-runs only `build()`.
-      final subscription =
-          flow.container.listen(statementImportFlowProvider, (_, _) {}, fireImmediately: true);
+      final subscription = flow.container.listen(
+        statementImportFlowProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
       addTearDown(subscription.close);
 
       final controller = controllerOf(flow.container);
@@ -438,10 +431,10 @@ void main() {
       expect(
         rebuilt.holdsSource,
         isFalse,
-        reason: 'the bytes of the previous session\'s bank statement must not '
+        reason:
+            'the bytes of the previous session\'s bank statement must not '
             'still be held by a controller the next session will use',
       );
     });
   });
-
 }

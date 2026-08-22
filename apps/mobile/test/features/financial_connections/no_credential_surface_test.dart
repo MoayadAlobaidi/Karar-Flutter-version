@@ -115,13 +115,13 @@ List<({String path, String body})> sourcesUnder(String root) {
       continue;
     }
     final body = <String>[
-      for (final line in file.readAsLinesSync())
-        line.trimLeft().startsWith('//') ? '' : line,
+      for (final line in file.readAsLinesSync()) line.trimLeft().startsWith('//') ? '' : line,
     ].join('\n');
     found.add((path: path, body: body));
   }
-  found.sort((({String path, String body}) a, ({String path, String body}) b) =>
-      a.path.compareTo(b.path));
+  found.sort(
+    (({String path, String body}) a, ({String path, String body}) b) => a.path.compareTo(b.path),
+  );
   return found;
 }
 
@@ -167,7 +167,8 @@ void main() {
     expect(
       findings,
       isEmpty,
-      reason: 'this surface is read-only and holds no credential of any kind; '
+      reason:
+          'this surface is read-only and holds no credential of any kind; '
           'no field belongs in it:\n${findings.join('\n')}',
     );
   });
@@ -215,7 +216,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'an unimplemented rail may be NAMED and REFUSED. It may not be '
+        reason:
+            'an unimplemented rail may be NAMED and REFUSED. It may not be '
             'offered, scheduled or apologised for with a date:\n'
             '${offenders.join('\n')}',
       );
@@ -237,7 +239,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'the only sentence on this surface that may name a credential '
+        reason:
+            'the only sentence on this surface that may name a credential '
             'is the one saying none is ever asked for:\n${offenders.join('\n')}',
       );
       // And that sentence has to actually be there, or the exemption above

@@ -104,8 +104,7 @@ List<SourceFile> readSourceFiles(List<String> relativeRoots) {
       if (entity is! File) {
         continue;
       }
-      final relativePath =
-          entity.path.substring(root.path.length + 1).replaceAll(r'\', '/');
+      final relativePath = entity.path.substring(root.path.length + 1).replaceAll(r'\', '/');
       if (_isExcluded(relativePath)) {
         continue;
       }
@@ -120,11 +119,7 @@ List<SourceFile> readSourceFiles(List<String> relativeRoots) {
       files.add(SourceFile(relativePath, contents));
     }
   }
-  expect(
-    files,
-    isNotEmpty,
-    reason: 'expected to scan at least one file under $relativeRoots',
-  );
+  expect(files, isNotEmpty, reason: 'expected to scan at least one file under $relativeRoots');
   return files;
 }
 
@@ -132,13 +127,7 @@ List<SourceFile> readSourceFiles(List<String> relativeRoots) {
 ///
 /// `test/` is included deliberately: a credential pasted into a fixture is
 /// committed just as permanently as one pasted into `lib/`.
-const List<String> mobileSourceRoots = <String>[
-  'lib',
-  'android',
-  'ios',
-  'tool',
-  'test',
-];
+const List<String> mobileSourceRoots = <String>['lib', 'android', 'ios', 'tool', 'test'];
 
 /// Reads one file relative to apps/mobile, failing the test if it is absent.
 String readRequiredFile(String relativePath) {
@@ -156,19 +145,16 @@ String readRequiredFile(String relativePath) {
 ///
 /// Named for XML rather than the obvious `collapseWhitespace`, which collides
 /// with a matcher of that name exported by `package:matcher`.
-String collapseXmlWhitespace(String value) =>
-    value.replaceAll(RegExp(r'\s+'), ' ').trim();
+String collapseXmlWhitespace(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
 
 /// Whether a path is source code whose `//` and `/* */` comments should be
 /// stripped before a content assertion runs.
 bool isCodeLikePath(String relativePath) =>
-    RegExp(r'\.(dart|kt|kts|gradle|swift|java|properties|yaml|yml)$')
-        .hasMatch(relativePath);
+    RegExp(r'\.(dart|kt|kts|gradle|swift|java|properties|yaml|yml)$').hasMatch(relativePath);
 
 /// Removes XML comments, so an assertion about what a manifest DECLARES is not
 /// satisfied (or broken) by prose that merely mentions it.
-String stripXmlComments(String value) =>
-    value.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
+String stripXmlComments(String value) => value.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
 
 /// What an XML or plist file at [relativePath] DECLARES: its contents with
 /// comments removed and whitespace collapsed.

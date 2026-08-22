@@ -9,14 +9,8 @@ import '../harness.dart';
 /// component.
 void main() {
   test('the localization facade resolves deterministically', () {
-    const List<Locale> supported = <Locale>[
-      KararLocalization.english,
-      KararLocalization.arabic,
-    ];
-    expect(
-      KararLocalization.resolve(const Locale('ar'), supported),
-      KararLocalization.arabic,
-    );
+    const List<Locale> supported = <Locale>[KararLocalization.english, KararLocalization.arabic];
+    expect(KararLocalization.resolve(const Locale('ar'), supported), KararLocalization.arabic);
     expect(
       KararLocalization.resolve(const Locale('ar', 'QA'), supported),
       KararLocalization.arabic,
@@ -33,40 +27,32 @@ void main() {
           'An unsupported language must land somewhere stated, not wherever '
           'the framework happens to order the list.',
     );
-    expect(
-      KararLocalization.resolve(null, supported),
-      KararLocalization.fallbackLocale,
-    );
+    expect(KararLocalization.resolve(null, supported), KararLocalization.fallbackLocale);
   });
 
   test('direction is derived from the locale, not configured per screen', () {
-    expect(
-      KararLocalization.directionOf(KararLocalization.arabic),
-      TextDirection.rtl,
-    );
-    expect(
-      KararLocalization.directionOf(KararLocalization.english),
-      TextDirection.ltr,
-    );
+    expect(KararLocalization.directionOf(KararLocalization.arabic), TextDirection.rtl);
+    expect(KararLocalization.directionOf(KararLocalization.english), TextDirection.ltr);
   });
 
-  testInBothDirections(
-    'the framework applies the direction the locale implies',
-    (WidgetTester tester, Locale locale, double scale) async {
-      late TextDirection observed;
-      await pumpKarar(
-        tester,
-        Builder(
-          builder: (BuildContext context) {
-            observed = context.direction;
-            return const SizedBox.shrink();
-          },
-        ),
-        locale: locale,
-      );
-      expect(observed, KararLocalization.directionOf(locale));
-    },
-  );
+  testInBothDirections('the framework applies the direction the locale implies', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    late TextDirection observed;
+    await pumpKarar(
+      tester,
+      Builder(
+        builder: (BuildContext context) {
+          observed = context.direction;
+          return const SizedBox.shrink();
+        },
+      ),
+      locale: locale,
+    );
+    expect(observed, KararLocalization.directionOf(locale));
+  });
 
   testWidgets('directional padding actually flips between the two locales', (
     WidgetTester tester,
@@ -102,14 +88,8 @@ void main() {
 
   group('mixed-direction text', () {
     test('paragraph direction follows the first strong character', () {
-      expect(
-        KararBidiText.directionOf('Karar', TextDirection.rtl),
-        TextDirection.ltr,
-      );
-      expect(
-        KararBidiText.directionOf('قرار', TextDirection.ltr),
-        TextDirection.rtl,
-      );
+      expect(KararBidiText.directionOf('Karar', TextDirection.rtl), TextDirection.ltr);
+      expect(KararBidiText.directionOf('قرار', TextDirection.ltr), TextDirection.rtl);
       expect(
         KararBidiText.directionOf('قرار Karar', TextDirection.ltr),
         TextDirection.rtl,
@@ -117,19 +97,10 @@ void main() {
       );
     });
 
-    test(
-      'a string with no strong character inherits the ambient direction',
-      () {
-        expect(
-          KararBidiText.directionOf('2026-08-16', TextDirection.rtl),
-          TextDirection.rtl,
-        );
-        expect(
-          KararBidiText.directionOf('2026-08-16', TextDirection.ltr),
-          TextDirection.ltr,
-        );
-      },
-    );
+    test('a string with no strong character inherits the ambient direction', () {
+      expect(KararBidiText.directionOf('2026-08-16', TextDirection.rtl), TextDirection.rtl);
+      expect(KararBidiText.directionOf('2026-08-16', TextDirection.ltr), TextDirection.ltr);
+    });
 
     testInBothDirections(
       'server-supplied text renders in its own direction, not the interface one',
@@ -143,10 +114,7 @@ void main() {
           locale: locale,
           textScale: scale,
         );
-        expect(
-          directionOf(tester, find.text('شروط الاستخدام')),
-          TextDirection.rtl,
-        );
+        expect(directionOf(tester, find.text('شروط الاستخدام')), TextDirection.rtl);
       },
       textScales: testTextScales,
     );

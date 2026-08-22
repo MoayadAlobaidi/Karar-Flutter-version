@@ -58,8 +58,7 @@ final class ScriptedInvitationRepository implements TenantInvitationRepository {
 /// A coordinator wired to in-memory doubles, holding a live credential, so
 /// `onTenantSelected` really reaches the bootstrap step instead of stopping at
 /// "no session".
-Future<({FakeBootstrapGateway gateway, List<Override> overrides})>
-    coordinatorHarness() async {
+Future<({FakeBootstrapGateway gateway, List<Override> overrides})> coordinatorHarness() async {
   final store = InMemoryTokenStore();
   final sessions = SessionManager(store: store, logger: AppLogger.silent);
   await sessions.adopt(liveTokens());
@@ -83,63 +82,64 @@ AppLocalizations organisationStrings(WidgetTester tester) =>
 
 void main() {
   group('the selection gate', () {
-    testInBothDirections(
-      'lists only the memberships the platform returned',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const TenantSelectionScreen(choices: twoTenantChoices),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingRepositoryProvider.overrideWithValue(
-              ScriptedBindingRepository(
-                Success<TenantBindingOutcome>(TenantBound(twoTenantChoices.first)),
-              ),
+    testInBothDirections('lists only the memberships the platform returned', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const TenantSelectionScreen(choices: twoTenantChoices),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingRepositoryProvider.overrideWithValue(
+            ScriptedBindingRepository(
+              Success<TenantBindingOutcome>(TenantBound(twoTenantChoices.first)),
             ),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
+          ),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
 
-        expect(find.text('First Organisation'), findsOneWidget);
-        expect(find.text('Second Organisation'), findsOneWidget);
-        expect(
-          find.byType(TextField),
-          findsNothing,
-          reason: 'no field may originate a tenant identifier',
-        );
-        expect(
-          directionUnder(tester, find.byType(TenantSelectionScreen)),
-          locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-        );
-      },
-      textScales: featureTextScales,
-    );
+      expect(find.text('First Organisation'), findsOneWidget);
+      expect(find.text('Second Organisation'), findsOneWidget);
+      expect(
+        find.byType(TextField),
+        findsNothing,
+        reason: 'no field may originate a tenant identifier',
+      );
+      expect(
+        directionUnder(tester, find.byType(TenantSelectionScreen)),
+        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+      );
+    }, textScales: featureTextScales);
 
-    testInBothDirections(
-      'binds only an identifier the platform listed',
-      (WidgetTester tester, Locale locale, double scale) async {
-        final repository = ScriptedBindingRepository(
-          Success<TenantBindingOutcome>(TenantBound(twoTenantChoices.last)),
-        );
+    testInBothDirections('binds only an identifier the platform listed', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      final repository = ScriptedBindingRepository(
+        Success<TenantBindingOutcome>(TenantBound(twoTenantChoices.last)),
+      );
 
-        await pumpFeatureScreen(
-          tester,
-          const TenantSelectionScreen(choices: twoTenantChoices),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingRepositoryProvider.overrideWithValue(repository),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
+      await pumpFeatureScreen(
+        tester,
+        const TenantSelectionScreen(choices: twoTenantChoices),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingRepositoryProvider.overrideWithValue(repository),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
 
-        await tester.tap(find.text('Second Organisation'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Second Organisation'));
+      await tester.pumpAndSettle();
 
-        expect(repository.boundTenantIds, <String>['tenant-0002']);
-      },
-    );
+      expect(repository.boundTenantIds, <String>['tenant-0002']);
+    });
 
     testWidgets('binds a single membership without asking', (WidgetTester tester) async {
       final repository = ScriptedBindingRepository(
@@ -199,8 +199,9 @@ void main() {
       textScales: featureTextScales,
     );
 
-    testWidgets('redeems the code the invitee entered, and nothing else',
-        (WidgetTester tester) async {
+    testWidgets('redeems the code the invitee entered, and nothing else', (
+      WidgetTester tester,
+    ) async {
       final repository = ScriptedInvitationRepository(
         const Success<RedeemedMembership>(
           RedeemedMembership(tenantId: 'tenant-0003', membershipId: 'm-1'),
@@ -250,114 +251,118 @@ void main() {
       expect(repository.tokens, isEmpty);
     });
 
-    testInBothDirections(
-      'a refused selection says nothing changed',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const TenantSelectionScreen(choices: twoTenantChoices),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingRepositoryProvider.overrideWithValue(
-              ScriptedBindingRepository(
-                const Failed<TenantBindingOutcome>(
-                  NotAuthorizedFailure(code: ApiErrorCode.membershipRequired),
-                ),
+    testInBothDirections('a refused selection says nothing changed', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const TenantSelectionScreen(choices: twoTenantChoices),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingRepositoryProvider.overrideWithValue(
+            ScriptedBindingRepository(
+              const Failed<TenantBindingOutcome>(
+                NotAuthorizedFailure(code: ApiErrorCode.membershipRequired),
               ),
             ),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
-        final l10n = selectionStrings(tester);
+          ),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
+      final l10n = selectionStrings(tester);
 
-        await tester.tap(find.text('Second Organisation'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Second Organisation'));
+      await tester.pumpAndSettle();
 
-        expect(find.text(l10n.tenantMembershipRefusedTitle), findsOneWidget);
-      },
-    );
+      expect(find.text(l10n.tenantMembershipRefusedTitle), findsOneWidget);
+    });
 
-    testInBothDirections(
-      'a concurrent membership change explains that the session ended',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const TenantSelectionScreen(choices: twoTenantChoices),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingRepositoryProvider.overrideWithValue(
-              ScriptedBindingRepository(
-                const Failed<TenantBindingOutcome>(
-                  ConflictFailure(code: ApiErrorCode.membershipRevokedConcurrently),
-                ),
+    testInBothDirections('a concurrent membership change explains that the session ended', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const TenantSelectionScreen(choices: twoTenantChoices),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingRepositoryProvider.overrideWithValue(
+            ScriptedBindingRepository(
+              const Failed<TenantBindingOutcome>(
+                ConflictFailure(code: ApiErrorCode.membershipRevokedConcurrently),
               ),
             ),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
-        final l10n = selectionStrings(tester);
+          ),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
+      final l10n = selectionStrings(tester);
 
-        await tester.tap(find.text('Second Organisation'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Second Organisation'));
+      await tester.pumpAndSettle();
 
-        expect(find.text(l10n.tenantMembershipChangedTitle), findsOneWidget);
-      },
-    );
+      expect(find.text(l10n.tenantMembershipChangedTitle), findsOneWidget);
+    });
   });
 
   group('the organisation surface', () {
-    testInBothDirections(
-      'shows the bound organisation and no way to type another',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const OrganisationScreen(),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingViewProvider.overrideWithValue(
-              TenantBindingView(current: twoTenantChoices.first),
-            ),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
-        final l10n = organisationStrings(tester);
+    testInBothDirections('shows the bound organisation and no way to type another', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const OrganisationScreen(),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingViewProvider.overrideWithValue(
+            TenantBindingView(current: twoTenantChoices.first),
+          ),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
+      final l10n = organisationStrings(tester);
 
-        expect(find.text('First Organisation'), findsOneWidget);
-        expect(find.text(l10n.tenantCurrentOrganisationLabel), findsOneWidget);
-        expect(find.text(l10n.tenantNoAlternativesTitle), findsOneWidget);
-        expect(find.byType(TextField), findsNothing);
-        expect(
-          directionUnder(tester, find.byType(OrganisationScreen)),
-          locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-        );
-      },
-      textScales: featureTextScales,
-    );
+      expect(find.text('First Organisation'), findsOneWidget);
+      expect(find.text(l10n.tenantCurrentOrganisationLabel), findsOneWidget);
+      expect(find.text(l10n.tenantNoAlternativesTitle), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      expect(
+        directionUnder(tester, find.byType(OrganisationScreen)),
+        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+      );
+    }, textScales: featureTextScales);
 
-    testInBothDirections(
-      'names the unbound state rather than showing an empty organisation',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const OrganisationScreen(),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingViewProvider.overrideWithValue(const TenantBindingView()),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
-        final l10n = organisationStrings(tester);
+    testInBothDirections('names the unbound state rather than showing an empty organisation', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const OrganisationScreen(),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingViewProvider.overrideWithValue(const TenantBindingView()),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
+      final l10n = organisationStrings(tester);
 
-        expect(find.text(l10n.tenantUnboundTitle), findsOneWidget);
-      },
-    );
+      expect(find.text(l10n.tenantUnboundTitle), findsOneWidget);
+    });
 
-    testWidgets('a switch discards tenant-scoped state and re-reads bootstrap',
-        (WidgetTester tester) async {
+    testWidgets('a switch discards tenant-scoped state and re-reads bootstrap', (
+      WidgetTester tester,
+    ) async {
       final repository = ScriptedBindingRepository(
         Success<TenantBindingOutcome>(
           TenantSwitched(tenant: twoTenantChoices.last, sessionId: 'session-0002'),
@@ -392,32 +397,34 @@ void main() {
       expect(find.text(l10n.tenantSwitchedConfirmation), findsOneWidget);
     });
 
-    testInBothDirections(
-      'renders no monetary value',
-      (WidgetTester tester, Locale locale, double scale) async {
-        await pumpFeatureScreen(
-          tester,
-          const OrganisationScreen(),
-          locale: locale,
-          textScale: scale,
-          overrides: <Override>[
-            tenantBindingViewProvider.overrideWithValue(
-              TenantBindingView(current: twoTenantChoices.first),
-            ),
-            ...(await coordinatorHarness()).overrides,
-          ],
-        );
+    testInBothDirections('renders no monetary value', (
+      WidgetTester tester,
+      Locale locale,
+      double scale,
+    ) async {
+      await pumpFeatureScreen(
+        tester,
+        const OrganisationScreen(),
+        locale: locale,
+        textScale: scale,
+        overrides: <Override>[
+          tenantBindingViewProvider.overrideWithValue(
+            TenantBindingView(current: twoTenantChoices.first),
+          ),
+          ...(await coordinatorHarness()).overrides,
+        ],
+      );
 
-        expectNothingMatching(
-          tester,
-          RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
-          because: 'no financial value belongs on the organisation surface',
-        );
-      },
-    );
+      expectNothingMatching(
+        tester,
+        RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
+        because: 'no financial value belongs on the organisation surface',
+      );
+    });
 
-    testWidgets('shows progress rather than an error before the binding arrives',
-        (WidgetTester tester) async {
+    testWidgets('shows progress rather than an error before the binding arrives', (
+      WidgetTester tester,
+    ) async {
       await pumpFeatureScreen(
         tester,
         const OrganisationScreen(),

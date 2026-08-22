@@ -154,7 +154,8 @@ void main() {
           if (!import.contains('networking/generated/')) {
             continue;
           }
-          final isDataLayer = path.contains('/data/') ||
+          final isDataLayer =
+              path.contains('/data/') ||
               // The bootstrap gateway is the app-level data boundary and is
               // the worked example the README points at.
               path.endsWith('lib/app/lifecycle/api_bootstrap_gateway.dart') ||

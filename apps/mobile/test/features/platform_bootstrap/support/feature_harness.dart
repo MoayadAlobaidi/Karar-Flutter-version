@@ -37,10 +37,7 @@ import 'package:karar_mobile/shared/shared.dart';
 export 'package:flutter_riverpod/misc.dart' show Override;
 
 /// The locales every screen in this workstream is proven in.
-const List<Locale> featureLocales = <Locale>[
-  KararLocalization.english,
-  KararLocalization.arabic,
-];
+const List<Locale> featureLocales = <Locale>[KararLocalization.english, KararLocalization.arabic];
 
 /// Normal, and the largest scale the platform accessibility settings offer.
 const List<double> featureTextScales = <double>[1.0, 2.0];
@@ -94,9 +91,7 @@ Future<void> pumpFeatureScreen(
         localeResolutionCallback: KararLocalization.resolve,
         theme: KararTheme.light(locale: locale),
         builder: (BuildContext context, Widget? child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(textScale),
-          ),
+          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
           child: KararThemeScope(child: child ?? const SizedBox.shrink()),
         ),
       ),
@@ -195,17 +190,15 @@ final class InMemoryTokenStore implements TokenStore {
 StartupCoordinator buildTestCoordinator({
   required SessionManager sessionManager,
   required BootstrapGateway gateway,
-}) =>
-    StartupCoordinator(
-      loadConfiguration: () => const Failed<AppConfiguration>(
-        ConfigurationInvalidFailure(violations: <String>[]),
-      ),
-      appLock: _loadedGate(),
-      sessionManager: sessionManager,
-      bootstrapGateway: gateway,
-      logger: AppLogger.silent,
-      clock: const SystemClock(),
-    );
+}) => StartupCoordinator(
+  loadConfiguration: () =>
+      const Failed<AppConfiguration>(ConfigurationInvalidFailure(violations: <String>[])),
+  appLock: _loadedGate(),
+  sessionManager: sessionManager,
+  bootstrapGateway: gateway,
+  logger: AppLogger.silent,
+  clock: const SystemClock(),
+);
 
 /// An application-lock gate over a working, empty security-state store, with
 /// the choice already LOADED.
@@ -215,21 +208,19 @@ StartupCoordinator buildTestCoordinator({
 /// are about what happens after the lock, so they start from the answer a real
 /// launch would have got from an empty store — the lock is off.
 AppLockGate _loadedGate() {
-  final AppLockGate gate = AppLockGate(
-    securityState: InMemoryLocalSecurityStateStore(),
-  );
+  final AppLockGate gate = AppLockGate(securityState: InMemoryLocalSecurityStateStore());
   unawaited(gate.load());
   return gate;
 }
 
 /// A session credential that is valid for the whole of a test.
 SessionTokens liveTokens({String sessionId = 'session-1'}) => SessionTokens(
-      accessToken: 'access',
-      accessTokenExpiresAt: DateTime.utc(2999),
-      refreshToken: 'refresh',
-      refreshTokenExpiresAt: DateTime.utc(2999),
-      sessionId: sessionId,
-    );
+  accessToken: 'access',
+  accessTokenExpiresAt: DateTime.utc(2999),
+  refreshToken: 'refresh',
+  refreshTokenExpiresAt: DateTime.utc(2999),
+  sessionId: sessionId,
+);
 
 /// Yields to the event loop so scheduled futures complete.
 Future<void> settleMicrotasks() => Future<void>.delayed(Duration.zero);
@@ -274,7 +265,8 @@ void expectEveryTapTargetLargeEnough(
   expect(
     count,
     greaterThanOrEqualTo(expectAtLeast),
-    reason: 'the surface was expected to carry at least $expectAtLeast pressable '
+    reason:
+        'the surface was expected to carry at least $expectAtLeast pressable '
         'control(s) and carries $count; either the screen changed or this '
         'measurement is not reaching it',
   );
@@ -290,7 +282,8 @@ void expectEveryTapTargetLargeEnough(
   expect(
     tooSmall,
     isEmpty,
-    reason: 'every control a person taps must be at least '
+    reason:
+        'every control a person taps must be at least '
         '${minimum}x$minimum; these are not: $tooSmall',
   );
 }

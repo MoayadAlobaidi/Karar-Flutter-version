@@ -17,8 +17,7 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../authentication/support/identity_harness.dart';
 
-EmailAddress _email() =>
-    (EmailAddress.parse('person@example.test') as EmailAccepted).email;
+EmailAddress _email() => (EmailAddress.parse('person@example.test') as EmailAccepted).email;
 
 Password _password([String value = 'brand-new-password']) =>
     (const PasswordPolicy().parse(value) as PasswordAccepted).password;
@@ -36,11 +35,7 @@ void main() {
       for (final Map<String, Object?> body in <Map<String, Object?>>[
         <String, Object?>{'status': 'accepted', 'detail': 'Instructions sent.'},
         <String, Object?>{'status': 'accepted', 'detail': 'No such account.'},
-        <String, Object?>{
-          'status': 'accepted',
-          'detail': 'Cooling down.',
-          'cooldownSeconds': 60,
-        },
+        <String, Object?>{'status': 'accepted', 'detail': 'Cooling down.', 'cooldownSeconds': 60},
       ]) {
         final IdentityHarness harness = IdentityHarness();
         harness.transport.onPost('/auth/forgot-password', body, statusCode: 202);
@@ -75,8 +70,7 @@ void main() {
     test('a completed reset wipes the local credential', () async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      harness.transport
-          .onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
+      harness.transport.onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
 
       final Result<void> outcome = await harness.container
           .read(passwordRecoveryRepositoryProvider)
@@ -105,10 +99,7 @@ void main() {
 
       final Result<void> outcome = await harness.container
           .read(passwordRecoveryRepositoryProvider)
-          .resetPassword(
-            token: const OpaqueSecret('stale-token'),
-            newPassword: _password(),
-          );
+          .resetPassword(token: const OpaqueSecret('stale-token'), newPassword: _password());
 
       expect(outcome.failureOrNull, isA<AuthenticationRequiredFailure>());
       expect(
@@ -118,13 +109,13 @@ void main() {
       );
     });
 
-    test('the reset token and the new password never reach a log or preferences',
-        () async {
+    test('the reset token and the new password never reach a log or preferences', () async {
       final IdentityHarness harness = IdentityHarness();
-      harness.transport
-          .onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
+      harness.transport.onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
 
-      await harness.container.read(passwordRecoveryRepositoryProvider).resetPassword(
+      await harness.container
+          .read(passwordRecoveryRepositoryProvider)
+          .resetPassword(
             token: const OpaqueSecret('reset-token-fixture'),
             newPassword: _password('brand-new-password'),
           );
@@ -137,11 +128,7 @@ void main() {
 
     test('an unclassifiable payload degrades to a contract violation', () async {
       final IdentityHarness harness = IdentityHarness();
-      harness.transport.on(
-        HttpMethod.post,
-        '/auth/reset-password',
-        (_) async => throw TypeError(),
-      );
+      harness.transport.on(HttpMethod.post, '/auth/reset-password', (_) async => throw TypeError());
 
       final Result<void> outcome = await harness.container
           .read(passwordRecoveryRepositoryProvider)
@@ -155,13 +142,21 @@ void main() {
   });
 
   group('forgot-password screen', () {
-    testEveryDirectionAndScale('renders in the locale direction',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('renders in the locale direction', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(tester, const ForgotPasswordScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const ForgotPasswordScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
 
       expect(find.text(l10n.forgotPasswordSubtitle), findsOneWidget);
       expect(
@@ -171,52 +166,63 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testEveryDirectionAndScale(
-      'a known and an unknown address render identically',
-      (WidgetTester tester, Locale locale, double textScale) async {
-        final AppLocalizations l10n = lookupAppLocalizations(locale);
-        final List<List<String>> renderings = <List<String>>[];
+    testEveryDirectionAndScale('a known and an unknown address render identically', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
+      final List<List<String>> renderings = <List<String>>[];
 
-        for (final Map<String, Object?> body in <Map<String, Object?>>[
-          <String, Object?>{'status': 'accepted', 'detail': 'Reset link sent.'},
-          <String, Object?>{
-            'status': 'accepted',
-            'detail': 'No account for that address.',
-            'accountExists': false,
-          },
-        ]) {
-          final IdentityHarness harness = IdentityHarness();
-          harness.transport.onPost('/auth/forgot-password', body, statusCode: 202);
+      for (final Map<String, Object?> body in <Map<String, Object?>>[
+        <String, Object?>{'status': 'accepted', 'detail': 'Reset link sent.'},
+        <String, Object?>{
+          'status': 'accepted',
+          'detail': 'No account for that address.',
+          'accountExists': false,
+        },
+      ]) {
+        final IdentityHarness harness = IdentityHarness();
+        harness.transport.onPost('/auth/forgot-password', body, statusCode: 202);
 
-          await pumpIdentity(tester, const ForgotPasswordScreen(),
-              harness: harness, locale: locale, textScale: textScale);
-          await enterIdentityField(tester, 0, 'person@example.test');
-          await tapIdentityButton(tester, l10n.forgotPasswordAction);
-          await tester.pumpAndSettle();
-
-          renderings.add(_renderedText(tester));
-          await tester.pumpWidget(const SizedBox.shrink());
-          await tester.pumpAndSettle();
-        }
-
-        expect(renderings[1], equals(renderings[0]));
-        expect(renderings[0], contains(l10n.forgotPasswordAcknowledgementMessage));
-        expect(
-          renderings[0].where((String value) => value.contains('No account')),
-          isEmpty,
+        await pumpIdentity(
+          tester,
+          const ForgotPasswordScreen(),
+          harness: harness,
+          locale: locale,
+          textScale: textScale,
         );
-      },
-    );
+        await enterIdentityField(tester, 0, 'person@example.test');
+        await tapIdentityButton(tester, l10n.forgotPasswordAction);
+        await tester.pumpAndSettle();
+
+        renderings.add(_renderedText(tester));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
+
+      expect(renderings[1], equals(renderings[0]));
+      expect(renderings[0], contains(l10n.forgotPasswordAcknowledgementMessage));
+      expect(renderings[0].where((String value) => value.contains('No account')), isEmpty);
+    });
   });
 
   group('reset-password screen', () {
-    testEveryDirectionAndScale('renders in the locale direction',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('renders in the locale direction', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(tester, const ResetPasswordScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const ResetPasswordScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
 
       expect(find.text(l10n.resetPasswordTokenLabel), findsOneWidget);
       expect(find.text(l10n.resetPasswordNewLabel), findsOneWidget);
@@ -227,8 +233,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('is wrapped in the sensitive-content cover',
-        (WidgetTester tester) async {
+    testWidgets('is wrapped in the sensitive-content cover', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
 
       await pumpIdentity(tester, const ResetPasswordScreen(), harness: harness);
@@ -236,8 +241,9 @@ void main() {
       expect(find.byType(SensitiveScreen), findsOneWidget);
     });
 
-    testWidgets('a token from the link is prefilled but never rendered as text',
-        (WidgetTester tester) async {
+    testWidgets('a token from the link is prefilled but never rendered as text', (
+      WidgetTester tester,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
 
       await pumpIdentity(
@@ -257,15 +263,22 @@ void main() {
       }
     });
 
-    testEveryDirectionAndScale('states that every session ended, on success',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('states that every session ended, on success', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
-      harness.transport
-          .onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
+      harness.transport.onPost('/auth/reset-password', <String, Object?>{'status': 'reset'});
 
-      await pumpIdentity(tester, const ResetPasswordScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const ResetPasswordScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await enterIdentityField(tester, 0, 'reset-token-fixture');
       await enterIdentityField(tester, 1, 'brand-new-password');
       await enterIdentityField(tester, 2, 'brand-new-password');
@@ -275,8 +288,7 @@ void main() {
       expect(find.text(l10n.resetPasswordSuccessMessage), findsOneWidget);
     });
 
-    testWidgets('every interactive control carries a name',
-        (WidgetTester tester) async {
+    testWidgets('every interactive control carries a name', (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       final SemanticsHandle handle = tester.ensureSemantics();
 

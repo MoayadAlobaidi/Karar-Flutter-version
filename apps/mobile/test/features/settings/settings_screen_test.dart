@@ -38,84 +38,78 @@ Future<InMemoryKeyValueStore> pumpSettings(
     textScale: textScale,
     overrides: <Override>[
       keyValueStoreProvider.overrideWithValue(store),
-      profileRepositoryProvider.overrideWithValue(
-        profiles ?? ScriptedProfileRepository(),
-      ),
+      profileRepositoryProvider.overrideWithValue(profiles ?? ScriptedProfileRepository()),
     ],
   );
   return store;
 }
 
 void main() {
-  testInBothDirections(
-    'renders every group and derives its direction from the locale',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpSettings(tester, locale: locale, textScale: scale);
-      final l10n = mountedL10n(tester);
+  testInBothDirections('renders every group and derives its direction from the locale', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpSettings(tester, locale: locale, textScale: scale);
+    final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.settingsAppearanceTitle), findsOneWidget);
-      expect(find.text(l10n.settingsYourAccountTitle), findsOneWidget);
-      expect(find.text(l10n.settingsDangerTitle), findsOneWidget);
-      expect(
-        directionUnder(tester, find.byType(SettingsScreen)),
-        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      );
-    },
-    textScales: featureTextScales,
-  );
+    expect(find.text(l10n.settingsAppearanceTitle), findsOneWidget);
+    expect(find.text(l10n.settingsYourAccountTitle), findsOneWidget);
+    expect(find.text(l10n.settingsDangerTitle), findsOneWidget);
+    expect(
+      directionUnder(tester, find.byType(SettingsScreen)),
+      locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+    );
+  }, textScales: featureTextScales);
 
-  testInBothDirections(
-    'a language choice writes a device preference, not an account field',
-    (WidgetTester tester, Locale locale, double scale) async {
-      final profiles = ScriptedProfileRepository();
-      final store = await pumpSettings(
-        tester,
-        locale: locale,
-        textScale: scale,
-        profiles: profiles,
-      );
+  testInBothDirections('a language choice writes a device preference, not an account field', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    final profiles = ScriptedProfileRepository();
+    final store = await pumpSettings(tester, locale: locale, textScale: scale, profiles: profiles);
 
-      // The second option is Arabic; the first is "follow the device".
-      await tester.tap(find.byType(KararCheckboxTile).at(2));
-      await tester.pumpAndSettle();
+    // The second option is Arabic; the first is "follow the device".
+    await tester.tap(find.byType(KararCheckboxTile).at(2));
+    await tester.pumpAndSettle();
 
-      expect(store.readString(localePreferenceKey), 'ar');
-      expect(
-        profiles.updates,
-        isEmpty,
-        reason: 'a device preference is not a statement about the account',
-      );
-    },
-  );
+    expect(store.readString(localePreferenceKey), 'ar');
+    expect(
+      profiles.updates,
+      isEmpty,
+      reason: 'a device preference is not a statement about the account',
+    );
+  });
 
-  testInBothDirections(
-    'an appearance choice is stored as a device preference',
-    (WidgetTester tester, Locale locale, double scale) async {
-      final store = await pumpSettings(tester, locale: locale, textScale: scale);
+  testInBothDirections('an appearance choice is stored as a device preference', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    final store = await pumpSettings(tester, locale: locale, textScale: scale);
 
-      // The three interface locales come first, then the three themes.
-      await tester.tap(find.byType(KararCheckboxTile).at(4));
-      await tester.pumpAndSettle();
+    // The three interface locales come first, then the three themes.
+    await tester.tap(find.byType(KararCheckboxTile).at(4));
+    await tester.pumpAndSettle();
 
-      expect(store.readString(themePreferenceKey), ThemePreference.light.name);
-    },
-  );
+    expect(store.readString(themePreferenceKey), ThemePreference.light.name);
+  });
 
-  testInBothDirections(
-    'the disable request is described as recording an intention',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpSettings(tester, locale: locale, textScale: scale);
-      final l10n = mountedL10n(tester);
+  testInBothDirections('the disable request is described as recording an intention', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpSettings(tester, locale: locale, textScale: scale);
+    final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.settingsDisableTitle), findsOneWidget);
-      expect(find.text(l10n.settingsDisableDescription), findsOneWidget);
-      expect(find.text(l10n.settingsDisableRecordedTitle), findsNothing);
-    },
-    textScales: featureTextScales,
-  );
+    expect(find.text(l10n.settingsDisableTitle), findsOneWidget);
+    expect(find.text(l10n.settingsDisableDescription), findsOneWidget);
+    expect(find.text(l10n.settingsDisableRecordedTitle), findsNothing);
+  }, textScales: featureTextScales);
 
-  testWidgets('the disable request is confirmed before it is sent',
-      (WidgetTester tester) async {
+  testWidgets('the disable request is confirmed before it is sent', (WidgetTester tester) async {
     final profiles = ScriptedProfileRepository();
     await pumpSettings(tester, profiles: profiles);
     final l10n = mountedL10n(tester);
@@ -135,8 +129,9 @@ void main() {
     expect(find.text(l10n.settingsDisableConfirmTitle), findsNothing);
   });
 
-  testWidgets('a confirmed disable request records an intention and says so',
-      (WidgetTester tester) async {
+  testWidgets('a confirmed disable request records an intention and says so', (
+    WidgetTester tester,
+  ) async {
     final profiles = ScriptedProfileRepository();
     await pumpSettings(tester, profiles: profiles);
     final l10n = mountedL10n(tester);
@@ -151,8 +146,9 @@ void main() {
     expect(find.text(l10n.settingsDisableRecordedMessage), findsOneWidget);
   });
 
-  testWidgets('an unrecorded audit entry is surfaced rather than hidden',
-      (WidgetTester tester) async {
+  testWidgets('an unrecorded audit entry is surfaced rather than hidden', (
+    WidgetTester tester,
+  ) async {
     final profiles = ScriptedProfileRepository(
       disableResult: Success<AccountDisableRequest>(
         AccountDisableRequest(requestedAt: DateTime.utc(2026, 4), auditRecorded: false),
@@ -169,19 +165,19 @@ void main() {
     expect(find.textContaining(l10n.settingsDisableAuditWarning), findsOneWidget);
   });
 
-  testInBothDirections(
-    'renders no monetary value',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpSettings(tester, locale: locale, textScale: scale);
+  testInBothDirections('renders no monetary value', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpSettings(tester, locale: locale, textScale: scale);
 
-      expectNothingMatching(
-        tester,
-        RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
-        because: 'no financial value belongs in settings',
-      );
-    },
-    textScales: featureTextScales,
-  );
+    expectNothingMatching(
+      tester,
+      RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
+      because: 'no financial value belongs in settings',
+    );
+  }, textScales: featureTextScales);
 
   test('the interface locales are the ones this build ships', () {
     expect(interfaceLocaleOptions.length, 3);

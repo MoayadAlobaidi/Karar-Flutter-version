@@ -20,55 +20,54 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 import '../../core/support/fakes.dart';
 import 'support/feature_harness.dart';
 
-BootstrapUnavailable unavailable({bool? retryable, String? reference}) =>
-    BootstrapUnavailable(
-      BootstrapUnavailableFailure(
-        code: ApiErrorCode.bootstrapUnavailable,
-        correlationId: reference,
-        retryable: retryable,
-      ),
-    );
+BootstrapUnavailable unavailable({bool? retryable, String? reference}) => BootstrapUnavailable(
+  BootstrapUnavailableFailure(
+    code: ApiErrorCode.bootstrapUnavailable,
+    correlationId: reference,
+    retryable: retryable,
+  ),
+);
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(ServiceUnavailableScreen)));
 
 void main() {
-  testInBothDirections(
-    'renders the outage state with a retry and the platform reference',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpFeatureScreen(
-        tester,
-        ServiceUnavailableScreen(state: unavailable(retryable: true, reference: 'req-9')),
-        locale: locale,
-        textScale: scale,
-      );
-      final l10n = mountedL10n(tester);
+  testInBothDirections('renders the outage state with a retry and the platform reference', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpFeatureScreen(
+      tester,
+      ServiceUnavailableScreen(state: unavailable(retryable: true, reference: 'req-9')),
+      locale: locale,
+      textScale: scale,
+    );
+    final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.platformServiceUnavailableTitle), findsOneWidget);
-      expect(find.text(l10n.platformServiceUnavailableDescription), findsOneWidget);
-      expect(find.textContaining('req-9'), findsOneWidget);
-      expect(find.text(l10n.platformNoServicesTitle), findsNothing);
-    },
-    textScales: featureTextScales,
-  );
+    expect(find.text(l10n.platformServiceUnavailableTitle), findsOneWidget);
+    expect(find.text(l10n.platformServiceUnavailableDescription), findsOneWidget);
+    expect(find.textContaining('req-9'), findsOneWidget);
+    expect(find.text(l10n.platformNoServicesTitle), findsNothing);
+  }, textScales: featureTextScales);
 
-  testInBothDirections(
-    'derives its direction from the locale',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpFeatureScreen(
-        tester,
-        ServiceUnavailableScreen(state: unavailable(retryable: true)),
-        locale: locale,
-        textScale: scale,
-      );
+  testInBothDirections('derives its direction from the locale', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpFeatureScreen(
+      tester,
+      ServiceUnavailableScreen(state: unavailable(retryable: true)),
+      locale: locale,
+      textScale: scale,
+    );
 
-      expect(
-        directionUnder(tester, find.byType(ServiceUnavailableScreen)),
-        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      );
-    },
-    textScales: featureTextScales,
-  );
+    expect(
+      directionUnder(tester, find.byType(ServiceUnavailableScreen)),
+      locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+    );
+  }, textScales: featureTextScales);
 
   testInBothDirections(
     'offers starting over, not a retry, when the platform said a retry cannot help',
@@ -86,69 +85,70 @@ void main() {
     },
   );
 
-  testInBothDirections(
-    'offers a retry when the platform did not say whether one would help',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpFeatureScreen(
+  testInBothDirections('offers a retry when the platform did not say whether one would help', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpFeatureScreen(
+      tester,
+      ServiceUnavailableScreen(state: unavailable()),
+      locale: locale,
+      textScale: scale,
+    );
+    final l10n = mountedL10n(tester);
+
+    expect(find.text(l10n.platformActionStartOver), findsNothing);
+    expect(find.text(l10n.platformServiceUnavailableDescription), findsOneWidget);
+  });
+
+  testInBothDirections('omits the reference when the platform supplied none', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpFeatureScreen(
+      tester,
+      ServiceUnavailableScreen(state: unavailable(retryable: true)),
+      locale: locale,
+      textScale: scale,
+    );
+
+    expect(find.textContaining('Reference'), findsNothing);
+  });
+
+  testInBothDirections('names no service, entitlement or dependency', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpFeatureScreen(
+      tester,
+      ServiceUnavailableScreen(state: unavailable(retryable: true, reference: 'req-10')),
+      locale: locale,
+      textScale: scale,
+    );
+
+    for (final leak in <String>[
+      'transactions',
+      'budgets',
+      'goals',
+      'insights',
+      'zakat',
+      'capability',
+      'BOOTSTRAP_UNAVAILABLE',
+    ]) {
+      expectNothingMatching(
         tester,
-        ServiceUnavailableScreen(state: unavailable()),
-        locale: locale,
-        textScale: scale,
+        RegExp(leak, caseSensitive: false),
+        because: 'a failure surface must not disclose what a success would have withheld',
       );
-      final l10n = mountedL10n(tester);
+    }
+  }, textScales: featureTextScales);
 
-      expect(find.text(l10n.platformActionStartOver), findsNothing);
-      expect(find.text(l10n.platformServiceUnavailableDescription), findsOneWidget);
-    },
-  );
-
-  testInBothDirections(
-    'omits the reference when the platform supplied none',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpFeatureScreen(
-        tester,
-        ServiceUnavailableScreen(state: unavailable(retryable: true)),
-        locale: locale,
-        textScale: scale,
-      );
-
-      expect(find.textContaining('Reference'), findsNothing);
-    },
-  );
-
-  testInBothDirections(
-    'names no service, entitlement or dependency',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpFeatureScreen(
-        tester,
-        ServiceUnavailableScreen(
-          state: unavailable(retryable: true, reference: 'req-10'),
-        ),
-        locale: locale,
-        textScale: scale,
-      );
-
-      for (final leak in <String>[
-        'transactions',
-        'budgets',
-        'goals',
-        'insights',
-        'zakat',
-        'capability',
-        'BOOTSTRAP_UNAVAILABLE',
-      ]) {
-        expectNothingMatching(
-          tester,
-          RegExp(leak, caseSensitive: false),
-          because: 'a failure surface must not disclose what a success would have withheld',
-        );
-      }
-    },
-    textScales: featureTextScales,
-  );
-
-  testWidgets('the retry action re-reads bootstrap rather than navigating onward',
-      (WidgetTester tester) async {
+  testWidgets('the retry action re-reads bootstrap rather than navigating onward', (
+    WidgetTester tester,
+  ) async {
     final tokens = InMemoryTokenStore();
     await tokens.write(liveTokens());
     final sessions = SessionManager(store: tokens, logger: AppLogger.silent);
@@ -177,8 +177,9 @@ void main() {
     expect(find.byType(ServiceUnavailableScreen), findsOneWidget);
   });
 
-  testWidgets('the gate builder renders progress for a state that is not an outage',
-      (WidgetTester tester) async {
+  testWidgets('the gate builder renders progress for a state that is not an outage', (
+    WidgetTester tester,
+  ) async {
     await pumpFeatureScreen(
       tester,
       Builder(

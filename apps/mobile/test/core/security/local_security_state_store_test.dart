@@ -28,7 +28,8 @@ void main() {
       expect(
         read.isAnswered,
         isTrue,
-        reason: 'the store was consulted successfully and held nothing. That '
+        reason:
+            'the store was consulted successfully and held nothing. That '
             'is the ONE case a caller may default, and it is safe precisely '
             'because the store answered',
       );
@@ -88,7 +89,8 @@ void main() {
       expect(
         read,
         isNot(isA<SecurityStateAbsent>()),
-        reason: 'ABSENT reads as "the user never turned the lock on". A store '
+        reason:
+            'ABSENT reads as "the user never turned the lock on". A store '
             'that could not be consulted has not earned that answer',
       );
       expect(read.isAnswered, isFalse);
@@ -106,15 +108,15 @@ void main() {
       expect(
         read.isAnswered,
         isFalse,
-        reason: 'absent is a user who never chose; corrupt is a value that was '
+        reason:
+            'absent is a user who never chose; corrupt is a value that was '
             'written and has since been damaged or tampered with. Only the '
             'first may be defaulted',
       );
       expect(read.failureOrNull, isA<LocalSecurityStateCorruptFailure>());
     });
 
-    test('a refused write is WRITE_FAILED and leaves the stored value alone',
-        () async {
+    test('a refused write is WRITE_FAILED and leaves the stored value alone', () async {
       final store = InMemoryLocalSecurityStateStore();
       await store.write(LocalSecurityFlag.appLockEnabled, value: true);
       store.unwritableFlags.add(LocalSecurityFlag.appLockEnabled);
@@ -126,7 +128,8 @@ void main() {
       expect(
         await store.read(LocalSecurityFlag.appLockEnabled),
         isA<SecurityStateValue>().having((v) => v.value, 'value', isTrue),
-        reason: 'the previous durable value must survive a refusal, or the '
+        reason:
+            'the previous durable value must survive a refusal, or the '
             'caller cannot retain it',
       );
     });
@@ -176,7 +179,8 @@ void main() {
             'operation',
             LocalSecurityStateOperation.open,
           ),
-          reason: 'an unopened store refuses every write for the life of the '
+          reason:
+              'an unopened store refuses every write for the life of the '
               'process; a refused write may succeed on retry. The remedies '
               'differ and so do the reports',
         );
@@ -192,10 +196,7 @@ void main() {
       // one: it does not quietly become a store that forgets at exit.
       await store.write(LocalSecurityFlag.appLockEnabled, value: true);
 
-      expect(
-        await store.read(LocalSecurityFlag.appLockEnabled),
-        isA<SecurityStateUnavailable>(),
-      );
+      expect(await store.read(LocalSecurityFlag.appLockEnabled), isA<SecurityStateUnavailable>());
     });
   });
 
@@ -205,10 +206,10 @@ void main() {
       // author cannot write `security.refresh_token` because there is no such
       // constant to write.
       expect(LocalSecurityFlag.values, hasLength(2));
-      expect(
-        LocalSecurityFlag.values.map((LocalSecurityFlag flag) => flag.storageName),
-        <String>['app_lock_enabled', 'persisted_session_abandoned'],
-      );
+      expect(LocalSecurityFlag.values.map((LocalSecurityFlag flag) => flag.storageName), <String>[
+        'app_lock_enabled',
+        'persisted_session_abandoned',
+      ]);
       for (final flag in LocalSecurityFlag.values) {
         for (final marker in <String>[
           'token',
@@ -223,7 +224,8 @@ void main() {
           expect(
             flag.storageName,
             isNot(contains(marker)),
-            reason: '${flag.storageName} names something that could satisfy a '
+            reason:
+                '${flag.storageName} names something that could satisfy a '
                 'gate rather than merely describe one',
           );
         }
@@ -239,10 +241,7 @@ void main() {
       await store.write(LocalSecurityFlag.appLockEnabled, value: true);
       await store.write(LocalSecurityFlag.persistedSessionAbandoned, value: false);
 
-      expect(store.writes, <String>[
-        'app_lock_enabled=true',
-        'persisted_session_abandoned=false',
-      ]);
+      expect(store.writes, <String>['app_lock_enabled=true', 'persisted_session_abandoned=false']);
     });
 
     test('no diagnostic label carries a stored value', () {
@@ -264,10 +263,7 @@ void main() {
       ];
 
       for (final outcome in outcomes) {
-        for (final rendered in <String>[
-          outcome.diagnosticLabel,
-          outcome.toString(),
-        ]) {
+        for (final rendered in <String>[outcome.diagnosticLabel, outcome.toString()]) {
           expect(rendered, isNot(contains('true')), reason: rendered);
           expect(rendered, isNot(contains('false')), reason: rendered);
         }
@@ -275,7 +271,8 @@ void main() {
       expect(
         outcomes.map((LocalSecurityStateOutcome o) => o.diagnosticLabel).toSet(),
         hasLength(10),
-        reason: 'SecurityStateValue(true) and SecurityStateValue(false) share a '
+        reason:
+            'SecurityStateValue(true) and SecurityStateValue(false) share a '
             'label on purpose — that is the point — and every OTHER outcome '
             'must still be distinguishable in a log',
       );

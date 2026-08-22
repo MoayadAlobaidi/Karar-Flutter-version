@@ -54,11 +54,7 @@ const String contractDirectory = '../../packages/api-contracts/openapi';
 /// one.
 void copyContract(Directory destination) {
   final source = Directory(contractDirectory);
-  expect(
-    source.existsSync(),
-    isTrue,
-    reason: 'these tests must run from apps/mobile',
-  );
+  expect(source.existsSync(), isTrue, reason: 'these tests must run from apps/mobile');
   for (final file in source.listSync(recursive: true).whereType<File>()) {
     final relative = file.path.substring(source.path.length + 1);
     final target = File('${destination.path}/$relative');
@@ -91,7 +87,8 @@ void mutate(Directory directory, String fragment, String original, String replac
   expect(
     text.contains(original),
     isTrue,
-    reason: 'the contract no longer contains "$original"; this mutation needs '
+    reason:
+        'the contract no longer contains "$original"; this mutation needs '
         'updating before it proves anything',
   );
   file.writeAsStringSync(text.replaceFirst(original, replacement));
@@ -117,8 +114,7 @@ void main() {
     test('the unmutated copy reproduces the committed models exactly', () {
       // The control. Without it, a mutation test could pass because the
       // generator is non-deterministic rather than because the contract moved.
-      final committed =
-          File('lib/core/networking/generated/models.dart').readAsStringSync();
+      final committed = File('lib/core/networking/generated/models.dart').readAsStringSync();
       expect(baseline, committed);
     });
 
@@ -165,8 +161,7 @@ void main() {
       // The committed DTO still carries `minorUnits`, which is what the money
       // mapper reads. Regenerating over the mutated contract would leave that
       // read with no field to read, and the analyzer would say so.
-      expect(classBody(baseline, 'MinorUnitAmountDto'),
-          contains('final String minorUnits;'));
+      expect(classBody(baseline, 'MinorUnitAmountDto'), contains('final String minorUnits;'));
     });
 
     test('a field that becomes nullable reaches the generated DTO', () {
@@ -181,14 +176,8 @@ void main() {
       expect(mutated, isNot(baseline));
       // A day that may be absent is a different type, and the mapper that
       // treats it as always present stops compiling.
-      expect(
-        classBody(mutated, 'TransactionViewDto'),
-        contains('final String? bookingDate;'),
-      );
-      expect(
-        classBody(baseline, 'TransactionViewDto'),
-        contains('final String bookingDate;'),
-      );
+      expect(classBody(mutated, 'TransactionViewDto'), contains('final String? bookingDate;'));
+      expect(classBody(baseline, 'TransactionViewDto'), contains('final String bookingDate;'));
     });
   });
 
@@ -212,14 +201,16 @@ void main() {
           expect(
             mapped,
             unrecognised,
-            reason: '$vocabulary: the generated fallback must map to the '
+            reason:
+                '$vocabulary: the generated fallback must map to the '
                 "domain's unrecognised member and to nothing else",
           );
         } else {
           expect(
             mapped,
             isNot(unrecognised),
-            reason: '$vocabulary: "$member" is a value the platform states; '
+            reason:
+                '$vocabulary: "$member" is a value the platform states; '
                 'reporting it as unrecognised would hide a real answer',
           );
         }
@@ -284,10 +275,7 @@ void main() {
         accountNatureFromDto,
       );
       expect(accountNatureFromDto(AccountNatureDto.unknown), AccountNature.notStated);
-      expect(
-        accountNatureFromDto(AccountNatureDto.unrecognised),
-        AccountNature.unrecognised,
-      );
+      expect(accountNatureFromDto(AccountNatureDto.unrecognised), AccountNature.unrecognised);
     });
 
     test('rails, balances and links', () {

@@ -56,6 +56,7 @@ import 'package:karar_mobile/features/transactions/domain/transaction.dart';
 import 'package:karar_mobile/features/transactions/domain/transaction_detail.dart';
 import 'package:karar_mobile/features/transactions/presentation/transactions_providers.dart';
 
+import '../support/digit_run.dart';
 import 'support/contract.dart';
 import 'support/journey_harness.dart';
 import 'support/synthetic_platform.dart';
@@ -75,27 +76,27 @@ Future<List<FinancialAccount>> _portfolio(JourneyHarness harness) async {
 
 void main() {
   group('signing in, through the real startup sequence', () {
-    test('bootstrap is fetched with the credential and opens the surface',
-        () async {
+    test('bootstrap is fetched with the credential and opens the surface', () async {
       final harness = await JourneyHarness.begin();
 
       final bootstrap = harness.platform.requestFor('GET', '/platform/bootstrap');
       expect(
         bootstrap.headers['authorization'],
         'Bearer SYNTHETIC-ACCESS-TOKEN-DO-NOT-LOG',
-        reason: 'the generated client reaches the platform through the '
+        reason:
+            'the generated client reaches the platform through the '
             'authenticated transport, which is what attaches the credential',
       );
       expect(
         harness.container.read(financialSurfaceEnabledProvider),
         isTrue,
-        reason: 'the capability gate is derived from the bootstrap answer that '
+        reason:
+            'the capability gate is derived from the bootstrap answer that '
             'actually arrived, not from a fixture',
       );
     });
 
-    test('a bootstrap that withholds the capability closes the surface',
-        () async {
+    test('a bootstrap that withholds the capability closes the surface', () async {
       final harness = await JourneyHarness.begin(
         world: (SyntheticPlatform platform) {
           installSyntheticWorld(platform);
@@ -113,15 +114,15 @@ void main() {
       expect(
         harness.container.read(financialSurfaceEnabledProvider),
         isFalse,
-        reason: 'the gate reads the answer that arrived. Fail closed is the '
+        reason:
+            'the gate reads the answer that arrived. Fail closed is the '
             'whole point of deriving it rather than assuming it.',
       );
     });
   });
 
   group('the portfolio, across several institutions at once', () {
-    test('every account at every issuer arrives, mapped from the wire',
-        () async {
+    test('every account at every issuer arrives, mapped from the wire', () async {
       final harness = await JourneyHarness.begin();
       final accounts = await _portfolio(harness);
 
@@ -135,41 +136,26 @@ void main() {
       expect(current.currency.code, 'QAR');
       expect(current.currency.exponent, 2);
       expect(current.mask.value, '**4417');
-      expect(
-        (current.issuer as IssuerFromCatalogue).issuer.displayNameEn,
-        harbourBankNameEn,
-      );
-      expect(
-        (current.issuer as IssuerFromCatalogue).issuer.kind,
-        IssuerKind.bank,
-      );
+      expect((current.issuer as IssuerFromCatalogue).issuer.displayNameEn, harbourBankNameEn);
+      expect((current.issuer as IssuerFromCatalogue).issuer.kind, IssuerKind.bank);
 
       // A second currency at the SAME issuer. Two accounts, never merged.
       final savings = _account(accounts, savingsUsdAccountId);
       expect(savings.currency.code, 'USD');
-      expect(
-        (savings.issuer as IssuerFromCatalogue).issuer.issuerId,
-        harbourBankId,
-      );
+      expect((savings.issuer as IssuerFromCatalogue).issuer.issuerId, harbourBankId);
 
       // A liability at a second issuer, imported from a statement.
       final card = _account(accounts, cardAccountId);
       expect(card.nature, AccountNature.liability);
       expect(card.accountType, AccountType.creditCard);
       expect(card.origin, AccountOrigin.csv);
-      expect(
-        (card.issuer as IssuerFromCatalogue).issuer.kind,
-        IssuerKind.exchangeHouse,
-      );
+      expect((card.issuer as IssuerFromCatalogue).issuer.kind, IssuerKind.exchangeHouse);
 
       // A wallet at a third issuer, with its subtype.
       final wallet = _account(accounts, walletAccountId);
       expect(wallet.accountType, AccountType.wallet);
       expect(wallet.walletKind, WalletKind.mobileMoney);
-      expect(
-        (wallet.issuer as IssuerFromCatalogue).issuer.kind,
-        IssuerKind.fintechWallet,
-      );
+      expect((wallet.issuer as IssuerFromCatalogue).issuer.kind, IssuerKind.fintechWallet);
 
       // An issuer the catalogue does not hold, named by the person.
       final unlisted = _account(accounts, unlistedIssuerAccountId);
@@ -185,8 +171,7 @@ void main() {
       }
     });
 
-    test('two currencies are held side by side, and the client never adds them',
-        () async {
+    test('two currencies are held side by side, and the client never adds them', () async {
       final harness = await JourneyHarness.begin();
       final accounts = await _portfolio(harness);
       final portfolio = AccountPortfolio.from(
@@ -205,40 +190,40 @@ void main() {
       }
     });
 
-    test('the figures sources reported arrive as exact characters, per account',
-        () async {
+    test('the figures sources reported arrive as exact characters, per account', () async {
       final harness = await JourneyHarness.begin();
 
-      final onCurrent =
-          await harness.container.read(accountBalancesProvider(currentAccountId).future);
-      final booked = onCurrent.entries
-          .firstWhere((BalanceKindGroup group) => group.kind == BalanceKind.booked);
-      final available = onCurrent.entries
-          .firstWhere((BalanceKindGroup group) => group.kind == BalanceKind.available);
+      final onCurrent = await harness.container.read(
+        accountBalancesProvider(currentAccountId).future,
+      );
+      final booked = onCurrent.entries.firstWhere(
+        (BalanceKindGroup group) => group.kind == BalanceKind.booked,
+      );
+      final available = onCurrent.entries.firstWhere(
+        (BalanceKindGroup group) => group.kind == BalanceKind.available,
+      );
       expect(booked.mostRecent.amount.minorUnits, '1250075');
       expect(booked.mostRecent.amount.currency, 'QAR');
       expect(booked.mostRecent.amount.exponent, 2);
       expect(available.mostRecent.amount.minorUnits, '1180075');
 
-      final onSavings = await harness.container
-          .read(accountBalancesProvider(savingsUsdAccountId).future);
+      final onSavings = await harness.container.read(
+        accountBalancesProvider(savingsUsdAccountId).future,
+      );
       expect(onSavings.entries.single.mostRecent.amount.currency, 'USD');
       expect(onSavings.entries.single.mostRecent.amount.minorUnits, '900000');
 
       // A liability's reported figure is negative on the wire and stays the
       // characters it arrived as.
-      final onCard =
-          await harness.container.read(accountBalancesProvider(cardAccountId).future);
+      final onCard = await harness.container.read(accountBalancesProvider(cardAccountId).future);
       expect(onCard.entries.single.mostRecent.amount.minorUnits, '-48250');
       expect(onCard.entries.single.mostRecent.amount.isNegative, isTrue);
       expect(onCard.entries.single.kind, BalanceKind.outstanding);
     });
 
-    test('the card account names the file that feeds it, on the one rail that runs',
-        () async {
+    test('the card account names the file that feeds it, on the one rail that runs', () async {
       final harness = await JourneyHarness.begin();
-      final links = await harness.container
-          .read(accountSourceLinksProvider(cardAccountId).future);
+      final links = await harness.container.read(accountSourceLinksProvider(cardAccountId).future);
 
       expect(links, hasLength(1));
       final link = links.single;
@@ -249,27 +234,22 @@ void main() {
       expect(link.impliesLiveInstitutionLink, isFalse);
       expect(link.providerAccessImplemented, isFalse);
       expect(link.capabilities.balance, SourceDataObservationState.observed);
-      expect(
-        link.capabilities.pendingTransactions,
-        SourceDataObservationState.notProvided,
-      );
+      expect(link.capabilities.pendingTransactions, SourceDataObservationState.notProvided);
       // A calendar range, never an instant.
       expect(link.historyCoverage!.start.iso8601, '2026-06-01');
       expect(link.historyCoverage!.end.iso8601, '2026-07-31');
     });
 
-    test('two cards spend from one wallet, and neither carries a figure',
-        () async {
+    test('two cards spend from one wallet, and neither carries a figure', () async {
       final harness = await JourneyHarness.begin();
-      final instruments = await harness.container
-          .read(accountInstrumentsProvider(walletAccountId).future);
+      final instruments = await harness.container.read(
+        accountInstrumentsProvider(walletAccountId).future,
+      );
 
       expect(instruments, hasLength(2));
-      expect(
-        instruments.map((PaymentInstrument card) => card.accountId).toSet(),
-        <String>{walletAccountId},
-        reason: 'both cards point at the ONE balance-bearing account',
-      );
+      expect(instruments.map((PaymentInstrument card) => card.accountId).toSet(), <String>{
+        walletAccountId,
+      }, reason: 'both cards point at the ONE balance-bearing account');
       expect(instruments.first.instrumentType, InstrumentType.virtualCard);
       expect(instruments.first.status, InstrumentStatus.active);
       expect(instruments.first.spendable, isTrue);
@@ -281,28 +261,25 @@ void main() {
       }
 
       // The account that holds the balance is the wallet, not either card.
-      final walletBalances = await harness.container
-          .read(accountBalancesProvider(walletAccountId).future);
+      final walletBalances = await harness.container.read(
+        accountBalancesProvider(walletAccountId).future,
+      );
       expect(walletBalances.entries.single.mostRecent.amount.minorUnits, '32500');
     });
 
-    test('an account with no instruments answers an empty list, not a failure',
-        () async {
+    test('an account with no instruments answers an empty list, not a failure', () async {
       final harness = await JourneyHarness.begin();
       expect(
-        await harness.container
-            .read(accountInstrumentsProvider(currentAccountId).future),
+        await harness.container.read(accountInstrumentsProvider(currentAccountId).future),
         isEmpty,
       );
     });
   });
 
   group('transactions, listed, paged and read', () {
-    test('the first page arrives with the amounts and directions as stated',
-        () async {
+    test('the first page arrives with the amounts and directions as stated', () async {
       final harness = await JourneyHarness.begin();
-      final listing =
-          await harness.container.read(transactionListingProvider.future);
+      final listing = await harness.container.read(transactionListingProvider.future);
       final loaded = listing as TransactionsLoaded;
 
       expect(loaded.transactions, hasLength(2));
@@ -327,8 +304,7 @@ void main() {
       expect(tram.amount.minorUnits, '-350');
     });
 
-    test('the second page is asked for with the platform\'s own cursor, unaltered',
-        () async {
+    test('the second page is asked for with the platform\'s own cursor, unaltered', () async {
       final harness = await JourneyHarness.begin();
       await harness.container.read(transactionListingProvider.future);
       await harness.container.read(transactionListingProvider.notifier).loadMore();
@@ -343,7 +319,8 @@ void main() {
       expect(
         issued.last.query['cursor'],
         transactionsNextCursor,
-        reason: 'the cursor is opaque. Re-encoding, trimming or decoding it '
+        reason:
+            'the cursor is opaque. Re-encoding, trimming or decoding it '
             'asks the platform for a position it did not name.',
       );
       // And it survives the trip onto the wire, percent-encoding included.
@@ -359,11 +336,11 @@ void main() {
 
       final listing =
           harness.container.read(transactionListingProvider).value! as TransactionsLoaded;
-      expect(
-        listing.transactions.map((Transaction row) => row.transactionId),
-        <String>[groceryTransactionId, tramTransactionId, salaryTransactionId],
-        reason: 'pages accumulate in order; the second does not replace the first',
-      );
+      expect(listing.transactions.map((Transaction row) => row.transactionId), <String>[
+        groceryTransactionId,
+        tramTransactionId,
+        salaryTransactionId,
+      ], reason: 'pages accumulate in order; the second does not replace the first');
       expect(listing.hasMore, isFalse);
     });
 
@@ -375,8 +352,9 @@ void main() {
 
       final listing =
           harness.container.read(transactionListingProvider).value! as TransactionsLoaded;
-      final received = listing.transactions
-          .firstWhere((Transaction row) => row.transactionId == salaryTransactionId);
+      final received = listing.transactions.firstWhere(
+        (Transaction row) => row.transactionId == salaryTransactionId,
+      );
 
       expect(received.direction, MoneyDirection.moneyIn);
       expect(received.amount.minorUnits, '150000');
@@ -388,11 +366,11 @@ void main() {
       // relationship between them.
     });
 
-    test('one transaction opens with its history and the person\'s own category',
-        () async {
+    test('one transaction opens with its history and the person\'s own category', () async {
       final harness = await JourneyHarness.begin();
-      final detail = (await harness.container
-          .read(transactionDetailProvider(groceryTransactionId).future))!;
+      final detail = (await harness.container.read(
+        transactionDetailProvider(groceryTransactionId).future,
+      ))!;
 
       expect(detail.transaction.version, 2);
       expect(detail.divergesFromSource, isTrue);
@@ -403,7 +381,8 @@ void main() {
       expect(
         detail.revisions.last.changedFields,
         <RevisableField>[RevisableField.merchant],
-        reason: 'the revisable-field vocabulary is lower-camel on the wire and '
+        reason:
+            'the revisable-field vocabulary is lower-camel on the wire and '
             'a mapper that upper-cased it would decode to unrecognised',
       );
       expect(detail.revisions.first.values.merchant, isNull);
@@ -421,16 +400,13 @@ void main() {
 
     test('the account detail read narrows by account through the store', () async {
       final harness = await JourneyHarness.begin();
-      final rows = await harness.container
-          .read(accountRecentTransactionsProvider(walletAccountId).future);
+      final rows = await harness.container.read(
+        accountRecentTransactionsProvider(walletAccountId).future,
+      );
 
-      expect(rows.map((Transaction row) => row.transactionId),
-          <String>[tramTransactionId]);
+      expect(rows.map((Transaction row) => row.transactionId), <String>[tramTransactionId]);
       expect(
-        harness.platform
-            .requestsFor('GET', '/financial/transactions')
-            .single
-            .query['accountId'],
+        harness.platform.requestsFor('GET', '/financial/transactions').single.query['accountId'],
         walletAccountId,
       );
     });
@@ -442,12 +418,10 @@ void main() {
       final flow = harness.container.read(statementImportFlowProvider.notifier);
 
       await flow.chooseSource();
-      expect(harness.container.read(statementImportFlowProvider),
-          isA<ImportFlowSourceReady>());
+      expect(harness.container.read(statementImportFlowProvider), isA<ImportFlowSourceReady>());
 
       await flow.upload(accountId: cardAccountId);
-      final mapping = harness.container.read(statementImportFlowProvider)
-          as ImportFlowMapping;
+      final mapping = harness.container.read(statementImportFlowProvider) as ImportFlowMapping;
       expect(mapping.snapshot.state, ImportLifecycleState.sourceStored);
       expect(mapping.snapshot.hasStoredSource, isTrue);
       expect(mapping.snapshot.version, 2);
@@ -456,10 +430,7 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(
-            amountColumn: 2,
-            signFrame: AmountSignFrame.accountHolder,
-          ),
+          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
           hasHeaderRow: true,
           currencyColumn: 3,
         ),
@@ -469,8 +440,8 @@ void main() {
           currencyCode: 'QAR',
         ),
       );
-      final review = harness.container.read(statementImportFlowProvider)
-          as ImportFlowAwaitingReview;
+      final review =
+          harness.container.read(statementImportFlowProvider) as ImportFlowAwaitingReview;
       expect(review.snapshot.state, ImportLifecycleState.reviewRequired);
       expect(review.snapshot.reconciliation, ReconciliationOutcome.matched);
       expect(review.snapshot.counts.rowCount, 3);
@@ -480,21 +451,17 @@ void main() {
       expect(review.snapshot.version, 3);
       expect(review.snapshot.canCommit, isTrue);
 
-      final preview = (await harness.container
-              .read(statementImportPreviewProvider(statementImportId).future))
-          as ImportPreviewLoaded;
+      final preview = (await harness.container.read(
+        statementImportPreviewProvider(statementImportId).future,
+      )) as ImportPreviewLoaded;
       expect(preview.preview.rowIssues, hasLength(1));
       expect(preview.preview.rowIssues.single.rowNumber, 3);
       expect(preview.preview.rowIssues.single.field, StatementField.amount);
-      expect(
-        preview.preview.rowIssues.single.reason,
-        RowIssueReason.unreadableAmount,
-      );
+      expect(preview.preview.rowIssues.single.reason, RowIssueReason.unreadableAmount);
       expect(preview.preview.isTruncated, isFalse);
 
       await flow.commit();
-      final committed = harness.container.read(statementImportFlowProvider)
-          as ImportFlowCommitted;
+      final committed = harness.container.read(statementImportFlowProvider) as ImportFlowCommitted;
       expect(committed.receipt.committedTransactionCount, 2);
       expect(committed.receipt.alreadyCommitted, isFalse);
       expect(committed.receipt.transactionIds, hasLength(2));
@@ -502,11 +469,11 @@ void main() {
       // The sequence the contract states, in order, and nothing else.
       expect(
         harness.platform.requests
-            .where((RecordedRequest request) =>
-                request.template?.startsWith('/financial/statement-imports') ??
-                false)
-            .map((RecordedRequest request) =>
-                '${request.method} ${request.template}'),
+            .where(
+              (RecordedRequest request) =>
+                  request.template?.startsWith('/financial/statement-imports') ?? false,
+            )
+            .map((RecordedRequest request) => '${request.method} ${request.template}'),
         <String>[
           'POST /financial/statement-imports',
           'POST /financial/statement-imports/{importId}/source',
@@ -517,28 +484,26 @@ void main() {
       );
     });
 
-    test('the chosen file reaches the socket byte-identical, under text/csv',
-        () async {
+    test('the chosen file reaches the socket byte-identical, under text/csv', () async {
       final harness = await JourneyHarness.begin();
       final flow = harness.container.read(statementImportFlowProvider.notifier);
       await flow.chooseSource();
       await flow.upload(accountId: cardAccountId);
 
-      final upload = harness.platform
-          .requestFor('POST', '/financial/statement-imports/{importId}/source');
+      final upload = harness.platform.requestFor(
+        'POST',
+        '/financial/statement-imports/{importId}/source',
+      );
       expect(
         upload.rawBody,
         same(syntheticStatementBytes),
-        reason: 'the bytes are carried by IDENTITY from the picker to the '
+        reason:
+            'the bytes are carried by IDENTITY from the picker to the '
             'socket. A copy would still compare equal today and would hide a '
             'normalisation somebody adds tomorrow.',
       );
       expect(upload.contentType, 'text/csv');
-      expect(
-        upload.jsonBody,
-        isNull,
-        reason: 'the file is a raw body, not a JSON string',
-      );
+      expect(upload.jsonBody, isNull, reason: 'the file is a raw body, not a JSON string');
       // A retry of an upload must be the same upload.
       expect(upload.headers['idempotency-key'], statementImportId);
     });
@@ -553,10 +518,7 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(
-            amountColumn: 2,
-            signFrame: AmountSignFrame.bankLedger,
-          ),
+          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.bankLedger),
           hasHeaderRow: true,
           currencyColumn: 3,
           dateOrder: StatementDateOrder.iso,
@@ -574,12 +536,9 @@ void main() {
       expect(mapping['dateOrder'], 'ISO');
       expect(
         mapping['amount'],
-        <String, Object?>{
-          'kind': 'SIGNED',
-          'amountColumn': 2,
-          'signFrame': 'BANK_LEDGER',
-        },
-        reason: 'the sign frame decides whether every payment in the file is a '
+        <String, Object?>{'kind': 'SIGNED', 'amountColumn': 2, 'signFrame': 'BANK_LEDGER'},
+        reason:
+            'the sign frame decides whether every payment in the file is a '
             'payment or income. It travels in the contract\'s upper-snake '
             'vocabulary, and a client that sent its own spelling would be '
             'refused — or worse, defaulted.',
@@ -588,8 +547,7 @@ void main() {
       expect(mapping.containsKey('headerNames'), isFalse);
     });
 
-    test('the commit carries the version from the last WRITE, not from a read',
-        () async {
+    test('the commit carries the version from the last WRITE, not from a read', () async {
       final harness = await JourneyHarness.begin();
       final flow = harness.container.read(statementImportFlowProvider.notifier);
       await flow.chooseSource();
@@ -598,24 +556,23 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(
-            amountColumn: 2,
-            signFrame: AmountSignFrame.accountHolder,
-          ),
+          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
           hasHeaderRow: true,
           currencyColumn: 3,
         ),
       );
-      await harness.container
-          .read(statementImportPreviewProvider(statementImportId).future);
+      await harness.container.read(statementImportPreviewProvider(statementImportId).future);
       await flow.commit();
 
-      final commit = harness.platform
-          .requestFor('POST', '/financial/statement-imports/{importId}/commit');
+      final commit = harness.platform.requestFor(
+        'POST',
+        '/financial/statement-imports/{importId}/commit',
+      );
       expect(
         commit.jsonObject,
         <String, Object?>{'expectedVersion': 3},
-        reason: 'the parse response carried version 3; the preview read carries '
+        reason:
+            'the parse response carried version 3; the preview read carries '
             'no version at all, and a commit that used the upload\'s 2 would '
             'apply a decision taken against a different parse',
       );
@@ -624,8 +581,9 @@ void main() {
   });
 
   group('the portfolio on screen, over the same real stack', () {
-    testWidgets('every institution and both currencies are shown, separately',
-        (WidgetTester tester) async {
+    testWidgets('every institution and both currencies are shown, separately', (
+      WidgetTester tester,
+    ) async {
       final harness = await JourneyHarness.beginFor(tester);
       await harness.pump(tester, const AccountsAndWalletsScreen());
 
@@ -651,8 +609,9 @@ void main() {
       expect(find.text('USD'), findsWidgets);
     });
 
-    testWidgets('THE MONEY ON SCREEN IS EXACTLY WHAT THE SOURCES REPORTED',
-        (WidgetTester tester) async {
+    testWidgets('THE MONEY ON SCREEN IS EXACTLY WHAT THE SOURCES REPORTED', (
+      WidgetTester tester,
+    ) async {
       final harness = await JourneyHarness.beginFor(tester);
       await harness.pump(tester, const AccountsAndWalletsScreen());
 
@@ -670,33 +629,30 @@ void main() {
       expect(
         amounts,
         hasLength(5),
-        reason: 'five figures were reported over the wire — booked and '
+        reason:
+            'five figures were reported over the wire — booked and '
             'available on the current account, one on the dollar savings, one '
             'outstanding on the card and one on the wallet. Anything else here '
             'is a figure this client computed:\n$amounts',
       );
-      expect(
-        amounts.where((String amount) => amount.contains('USD')),
-        hasLength(1),
-      );
-      expect(
-        amounts.where((String amount) => amount.contains('QAR')),
-        hasLength(4),
-      );
+      expect(amounts.where((String amount) => amount.contains('USD')), hasLength(1));
+      expect(amounts.where((String amount) => amount.contains('QAR')), hasLength(4));
     });
 
-    testWidgets('nothing longer than a mask reaches the screen',
-        (WidgetTester tester) async {
+    testWidgets('nothing longer than a mask reaches the screen', (WidgetTester tester) async {
       final harness = await JourneyHarness.beginFor(tester);
       await harness.pump(tester, const AccountsAndWalletsScreen());
 
       expect(find.text('**4417'), findsWidgets);
       for (final rendered in renderedStrings(tester)) {
-        final digits = rendered.replaceAll(RegExp('[^0-9]'), '');
+        // CONTIGUOUS, not "every digit in the string". Stripping separators
+        // made a formatted date read as a card number — see
+        // test/support/digit_run.dart, and the CI run that found it.
         expect(
-          digits.length,
+          longestDigitRun(rendered),
           lessThan(9),
-          reason: '"$rendered" renders a run of digits that could be an '
+          reason:
+              '"$rendered" renders a run of digits that could be an '
               'account number, a card number or an identifier',
         );
       }
@@ -704,8 +660,9 @@ void main() {
   });
 
   group('the import on screen, and the cells somebody else wrote', () {
-    testWidgets('the account chooser offers the accounts the platform returned',
-        (WidgetTester tester) async {
+    testWidgets('the account chooser offers the accounts the platform returned', (
+      WidgetTester tester,
+    ) async {
       final harness = await JourneyHarness.beginFor(tester);
       await harness.offFrame(
         tester,
@@ -716,9 +673,7 @@ void main() {
       // A closed dropdown builds no menu, so the chooser's contents are read
       // off the widget rather than off the screen. What matters is that they
       // came from the portfolio the platform returned, not from a fixture.
-      final chooser = tester.widget<DropdownButton<String>>(
-        find.byType(DropdownButton<String>),
-      );
+      final chooser = tester.widget<DropdownButton<String>>(find.byType(DropdownButton<String>));
       expect(
         chooser.items!.map((DropdownMenuItem<String> item) => item.value),
         containsAll(<String>[
@@ -730,18 +685,14 @@ void main() {
         ]),
       );
       expect(
-        chooser.items!
-            .map((DropdownMenuItem<String> item) => (item.child as Text).data),
-        containsAll(<String>[
-          currentAccountName,
-          cardAccountName,
-          walletAccountName,
-        ]),
+        chooser.items!.map((DropdownMenuItem<String> item) => (item.child as Text).data),
+        containsAll(<String>[currentAccountName, cardAccountName, walletAccountName]),
       );
     });
 
-    testWidgets('an adversarial cell renders as its own characters, and inertly',
-        (WidgetTester tester) async {
+    testWidgets('an adversarial cell renders as its own characters, and inertly', (
+      WidgetTester tester,
+    ) async {
       final harness = await JourneyHarness.beginFor(tester);
       final flow = harness.container.read(statementImportFlowProvider.notifier);
       await harness.offFrame(tester, () async {
@@ -762,7 +713,8 @@ void main() {
         expect(
           find.text(hostile),
           findsWidgets,
-          reason: 'the cell must render exactly as the file wrote it. '
+          reason:
+              'the cell must render exactly as the file wrote it. '
               'Escaping it, prefixing it, trimming it or linkifying it would '
               'show a person something their bank did not write.',
         );
@@ -771,31 +723,23 @@ void main() {
       // Nothing this feature built can act on a tap, and no span carries a
       // recognizer that could follow the link in a merchant name.
       expect(
-        find.descendant(
-          of: find.byType(UntrustedCellText),
-          matching: find.byType(GestureDetector),
-        ),
+        find.descendant(of: find.byType(UntrustedCellText), matching: find.byType(GestureDetector)),
         findsNothing,
       );
       expect(
-        find.descendant(
-          of: find.byType(UntrustedCellText),
-          matching: find.byType(InkWell),
-        ),
+        find.descendant(of: find.byType(UntrustedCellText), matching: find.byType(InkWell)),
         findsNothing,
       );
       for (final richText in tester.widgetList<RichText>(
-        find.descendant(
-          of: find.byType(UntrustedCellText),
-          matching: find.byType(RichText),
-        ),
+        find.descendant(of: find.byType(UntrustedCellText), matching: find.byType(RichText)),
       )) {
         expect(_recognizersIn(richText.text), isEmpty);
       }
     });
 
-    testWidgets('the review surface reports counts and reasons, never a cell',
-        (WidgetTester tester) async {
+    testWidgets('the review surface reports counts and reasons, never a cell', (
+      WidgetTester tester,
+    ) async {
       final harness = await JourneyHarness.beginFor(tester);
       final flow = harness.container.read(statementImportFlowProvider.notifier);
       await harness.offFrame(tester, () async {
@@ -805,10 +749,7 @@ void main() {
           mapping: const StatementColumnMapping(
             bookingDateColumn: 0,
             descriptionColumn: 1,
-            amount: SignedAmountMapping(
-              amountColumn: 2,
-              signFrame: AmountSignFrame.accountHolder,
-            ),
+            amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
             hasHeaderRow: true,
             currencyColumn: 3,
           ),
@@ -828,7 +769,8 @@ void main() {
         expect(
           rendered,
           isNot(contains(hostile)),
-          reason: 'the review surface carries counts and reason codes. A cell '
+          reason:
+              'the review surface carries counts and reason codes. A cell '
               'here would mean the platform echoed staged content back.',
         );
       }
@@ -864,8 +806,7 @@ void main() {
       }
     });
 
-    test('no credential and nothing from the statement reaches a log record',
-        () async {
+    test('no credential and nothing from the statement reaches a log record', () async {
       final harness = await JourneyHarness.begin();
       await _walkTheWholeSurface(harness);
 
@@ -881,11 +822,7 @@ void main() {
         groceryMerchant,
         '1250075',
       ]) {
-        expect(
-          logged,
-          isNot(contains(secret)),
-          reason: '"$secret" reached a log record',
-        );
+        expect(logged, isNot(contains(secret)), reason: '"$secret" reached a log record');
       }
       for (final record in harness.logSink.records) {
         expect(record.fields.containsKey('headers'), isFalse);
@@ -893,8 +830,7 @@ void main() {
       }
     });
 
-    test('every request the journey issued is one the contract declares',
-        () async {
+    test('every request the journey issued is one the contract declares', () async {
       final harness = await JourneyHarness.begin();
       await _walkTheWholeSurface(harness);
 
@@ -925,25 +861,15 @@ void main() {
       accountsPage = contract.responseSchema('/financial/accounts', 'GET', 200)!;
     });
 
-    Map<String, Object?> pageOf(Map<String, Object?> account) =>
-        <String, Object?>{
-          'items': <Map<String, Object?>>[account],
-          'page': <String, Object?>{
-            'limit': 50,
-            'returned': 1,
-            'hasMore': false,
-            'nextCursor': null,
-          },
-        };
+    Map<String, Object?> pageOf(Map<String, Object?> account) => <String, Object?>{
+      'items': <Map<String, Object?>>[account],
+      'page': <String, Object?>{'limit': 50, 'returned': 1, 'hasMore': false, 'nextCursor': null},
+    };
 
-    Map<String, Object?> anAccount() =>
-        Map<String, Object?>.from(syntheticPortfolio.first);
+    Map<String, Object?> anAccount() => Map<String, Object?>.from(syntheticPortfolio.first);
 
     test('the body the journey actually serves satisfies the contract', () {
-      expect(
-        contract.violations(accountsPage, pageOf(anAccount())),
-        isEmpty,
-      );
+      expect(contract.violations(accountsPage, pageOf(anAccount())), isEmpty);
     });
 
     test('a required field left out is reported', () {
@@ -959,7 +885,8 @@ void main() {
       expect(
         contract.violations(accountsPage, pageOf(broken)),
         contains(contains('is not a member of the contract vocabulary')),
-        reason: 'a value in the wrong case is the defect this suite exists to '
+        reason:
+            'a value in the wrong case is the defect this suite exists to '
             'catch, and it has to be caught in the fixture too',
       );
     });
@@ -972,8 +899,7 @@ void main() {
         contains(contains('is not an instant with an explicit offset')),
       );
 
-      final transactions =
-          contract.responseSchema('/financial/transactions', 'GET', 200)!;
+      final transactions = contract.responseSchema('/financial/transactions', 'GET', 200)!;
       final asInstant = Map<String, Object?>.from(transactionsPageOne.first)
         ..['bookingDate'] = '2026-07-18T00:00:00Z';
       expect(
@@ -1053,10 +979,7 @@ Future<void> _walkTheWholeSurface(JourneyHarness harness) async {
     mapping: const StatementColumnMapping(
       bookingDateColumn: 0,
       descriptionColumn: 1,
-      amount: SignedAmountMapping(
-        amountColumn: 2,
-        signFrame: AmountSignFrame.accountHolder,
-      ),
+      amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
       hasHeaderRow: true,
       currencyColumn: 3,
     ),

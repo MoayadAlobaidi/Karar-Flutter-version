@@ -50,18 +50,15 @@ const String totalledFragment = '469.12';
 const String sideFragment = '234.56';
 
 List<String> renderedStrings(WidgetTester tester) => <String>[
-      for (final widget in tester.allWidgets)
-        if (widget is Text && widget.data != null) widget.data!,
-    ];
+  for (final widget in tester.allWidgets)
+    if (widget is Text && widget.data != null) widget.data!,
+];
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(TransferMatchesScreen)));
 
-Future<
-    ({
-      ScriptedTransferMatchesRepository matches,
-      ScriptedMovementsRepository movements,
-    })> pumpSurface(
+Future<({ScriptedTransferMatchesRepository matches, ScriptedMovementsRepository movements})>
+pumpSurface(
   WidgetTester tester, {
   List<TransferMatch>? held,
   ScriptedTransferMatchesRepository? repository,
@@ -69,22 +66,16 @@ Future<
   Locale locale = KararLocalization.english,
   double textScale = 1.0,
 }) async {
-  final scriptedMatches = repository ??
-      ScriptedTransferMatchesRepository(
-        matches: held ?? <TransferMatch>[matchFixture()],
-      );
-  final scriptedMovements = movements ??
-      movementsFixture(
-        outflowMinorUnits: outflowMinorUnits,
-        inflowMinorUnits: inflowMinorUnits,
-      );
+  final scriptedMatches =
+      repository ??
+      ScriptedTransferMatchesRepository(matches: held ?? <TransferMatch>[matchFixture()]);
+  final scriptedMovements =
+      movements ??
+      movementsFixture(outflowMinorUnits: outflowMinorUnits, inflowMinorUnits: inflowMinorUnits);
   await pumpFeatureScreen(
     tester,
     const TransferMatchesScreen(),
-    overrides: transferMatchingOverrides(
-      matches: scriptedMatches,
-      movements: scriptedMovements,
-    ),
+    overrides: transferMatchingOverrides(matches: scriptedMatches, movements: scriptedMovements),
     locale: locale,
     textScale: textScale,
     surfaceSize: tallSurface,
@@ -99,8 +90,9 @@ Future<void> openMovements(WidgetTester tester) async {
 
 void main() {
   group('a proposal is a question, not a decision', () {
-    testWidgets('the card says nothing has changed and reads as proposed',
-        (WidgetTester tester) async {
+    testWidgets('the card says nothing has changed and reads as proposed', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
 
@@ -109,8 +101,7 @@ void main() {
       expect(find.text(l10n.transferMatchStateConfirmed), findsNothing);
     });
 
-    testWidgets('the basis is shown and no score is offered',
-        (WidgetTester tester) async {
+    testWidgets('the basis is shown and no score is offered', (WidgetTester tester) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
 
@@ -121,8 +112,9 @@ void main() {
       expect(find.text(shippedWindowLabel), findsOneWidget);
     });
 
-    testWidgets('the two accounts are NAMED, never rendered as identifiers',
-        (WidgetTester tester) async {
+    testWidgets('the two accounts are NAMED, never rendered as identifiers', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
 
       expect(find.text('Everyday account'), findsOneWidget);
@@ -137,8 +129,7 @@ void main() {
   });
 
   group('the answer controls live inside the evidence', () {
-    testWidgets('a collapsed card offers no confirmation at all',
-        (WidgetTester tester) async {
+    testWidgets('a collapsed card offers no confirmation at all', (WidgetTester tester) async {
       await pumpSurface(tester);
       final l10n = mountedL10n(tester);
 
@@ -147,29 +138,29 @@ void main() {
       expect(find.text(l10n.transferMatchOpenToAnswerNote), findsOneWidget);
     });
 
-    testWidgets('a collapsed card reads no transaction, so a page costs one call',
-        (WidgetTester tester) async {
+    testWidgets('a collapsed card reads no transaction, so a page costs one call', (
+      WidgetTester tester,
+    ) async {
       final harness = await pumpSurface(tester);
 
       expect(harness.movements.reads, isEmpty);
     });
 
-    testWidgets('opening the movements reads both and offers the confirmation',
-        (WidgetTester tester) async {
+    testWidgets('opening the movements reads both and offers the confirmation', (
+      WidgetTester tester,
+    ) async {
       final harness = await pumpSurface(tester);
       await openMovements(tester);
       final l10n = mountedL10n(tester);
 
-      expect(
-        harness.movements.reads,
-        <String>[outflowTransactionId, inflowTransactionId],
-      );
+      expect(harness.movements.reads, <String>[outflowTransactionId, inflowTransactionId]);
       expect(find.text(l10n.transferMatchActionConfirm), findsOneWidget);
       expect(find.text(l10n.transferMatchActionReject), findsOneWidget);
     });
 
-    testWidgets('an unreadable movement withholds the confirmation and says why',
-        (WidgetTester tester) async {
+    testWidgets('an unreadable movement withholds the confirmation and says why', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(
         tester,
         movements: movementsFixture(
@@ -185,21 +176,24 @@ void main() {
       expect(
         find.text(l10n.transferMatchActionConfirm),
         findsNothing,
-        reason: 'answering "these are one movement" about something nobody can '
+        reason:
+            'answering "these are one movement" about something nobody can '
             'see is exactly the trust this surface exists not to ask for',
       );
       expect(
         find.text(l10n.transferMatchActionReject),
         findsOneWidget,
-        reason: 'keeping two records separate asserts nothing and leaves both '
+        reason:
+            'keeping two records separate asserts nothing and leaves both '
             'exactly as they are',
       );
     });
   });
 
   group('nothing is summed, netted or converted', () {
-    testWidgets('the two sides render as two amounts and no third figure',
-        (WidgetTester tester) async {
+    testWidgets('the two sides render as two amounts and no third figure', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester);
       await openMovements(tester);
 
@@ -223,13 +217,12 @@ void main() {
       }
     });
 
-    testWidgets('a cross-currency pair shows two currencies and refuses to pair',
-        (WidgetTester tester) async {
+    testWidgets('a cross-currency pair shows two currencies and refuses to pair', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(
         tester,
-        held: <TransferMatch>[
-          matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD'),
-        ],
+        held: <TransferMatch>[matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD')],
         movements: movementsFixture(
           outflowMinorUnits: outflowMinorUnits,
           inflowMinorUnits: inflowMinorUnits,
@@ -254,16 +247,16 @@ void main() {
   });
 
   group('the decision is the person\'s', () {
-    testWidgets('rendering the surface records no answer',
-        (WidgetTester tester) async {
+    testWidgets('rendering the surface records no answer', (WidgetTester tester) async {
       final harness = await pumpSurface(tester);
       await openMovements(tester);
 
       expect(harness.matches.calls, <String>['list']);
     });
 
-    testWidgets('confirming sends exactly one confirmation, once pressed',
-        (WidgetTester tester) async {
+    testWidgets('confirming sends exactly one confirmation, once pressed', (
+      WidgetTester tester,
+    ) async {
       final harness = await pumpSurface(tester);
       await openMovements(tester);
 
@@ -272,14 +265,12 @@ void main() {
 
       expect(harness.matches.confirmations, hasLength(1));
       expect(harness.matches.confirmations.single.expectedVersion, 1);
-      expect(
-        find.text(mountedL10n(tester).transferMatchStateConfirmed),
-        findsOneWidget,
-      );
+      expect(find.text(mountedL10n(tester).transferMatchStateConfirmed), findsOneWidget);
     });
 
-    testWidgets('a refused confirmation leaves the pair reading as proposed',
-        (WidgetTester tester) async {
+    testWidgets('a refused confirmation leaves the pair reading as proposed', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(
         tester,
         repository: ScriptedTransferMatchesRepository(
@@ -305,8 +296,9 @@ void main() {
       );
     });
 
-    testWidgets('keeping a pair separate is asked for once, and can be cancelled',
-        (WidgetTester tester) async {
+    testWidgets('keeping a pair separate is asked for once, and can be cancelled', (
+      WidgetTester tester,
+    ) async {
       final harness = await pumpSurface(tester);
       await openMovements(tester);
       final l10n = mountedL10n(tester);
@@ -322,8 +314,9 @@ void main() {
       expect(find.text(l10n.transferMatchStateSuggested), findsOneWidget);
     });
 
-    testWidgets('a confirmed pair offers a withdrawal and no second confirmation',
-        (WidgetTester tester) async {
+    testWidgets('a confirmed pair offers a withdrawal and no second confirmation', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(
         tester,
         held: <TransferMatch>[matchFixture(state: MatchState.confirmed, version: 2)],
@@ -344,8 +337,7 @@ void main() {
       );
     });
 
-    testWidgets('a pair kept separate offers no answer at all',
-        (WidgetTester tester) async {
+    testWidgets('a pair kept separate offers no answer at all', (WidgetTester tester) async {
       await pumpSurface(
         tester,
         held: <TransferMatch>[matchFixture(state: MatchState.rejected, version: 2)],
@@ -361,8 +353,9 @@ void main() {
   });
 
   group('Arabic is first-class', () {
-    testWidgets('the tree is right to left because the LOCALE is Arabic',
-        (WidgetTester tester) async {
+    testWidgets('the tree is right to left because the LOCALE is Arabic', (
+      WidgetTester tester,
+    ) async {
       await pumpSurface(tester, locale: KararLocalization.arabic);
 
       expect(
@@ -371,8 +364,7 @@ void main() {
       );
     });
 
-    testWidgets('the Arabic catalogue is what is rendered',
-        (WidgetTester tester) async {
+    testWidgets('the Arabic catalogue is what is rendered', (WidgetTester tester) async {
       await pumpSurface(tester, locale: KararLocalization.arabic);
       final l10n = mountedL10n(tester);
 
@@ -381,12 +373,10 @@ void main() {
       expect(find.text(l10n.transferMatchNothingChangedNote), findsOneWidget);
       expect(find.text(l10n.transferMatchStateSuggested), findsOneWidget);
       // The English sentence must not survive into the Arabic tree.
-      expect(find.text('Nothing has changed. This is a question, not a decision.'),
-          findsNothing);
+      expect(find.text('Nothing has changed. This is a question, not a decision.'), findsNothing);
     });
 
-    testWidgets('the whole answer flow works in Arabic',
-        (WidgetTester tester) async {
+    testWidgets('the whole answer flow works in Arabic', (WidgetTester tester) async {
       final harness = await pumpSurface(tester, locale: KararLocalization.arabic);
       await openMovements(tester);
       final l10n = mountedL10n(tester);
@@ -411,31 +401,23 @@ void main() {
   });
 
   group('the surface is usable without sight and at twice the text size', () {
-    testWidgets('every answer control carries its own semantic label',
-        (WidgetTester tester) async {
+    testWidgets('every answer control carries its own semantic label', (WidgetTester tester) async {
       await pumpSurface(tester);
       await openMovements(tester);
       final l10n = mountedL10n(tester);
       final handle = tester.ensureSemantics();
 
-      expect(
-        find.bySemanticsLabel(l10n.transferMatchActionConfirm),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel(l10n.transferMatchActionConfirm), findsOneWidget);
       expect(find.bySemanticsLabel(l10n.transferMatchActionReject), findsOneWidget);
       // The state is carried by the WORD, not by the colour of the badge.
       // The badge's own node merges into the card's, so the assertion is that
       // the WORD reaches the semantics tree — not that it stands alone.
-      expect(
-        find.bySemanticsLabel(RegExp(l10n.transferMatchStateSuggested)),
-        findsWidgets,
-      );
+      expect(find.bySemanticsLabel(RegExp(l10n.transferMatchStateSuggested)), findsWidgets);
 
       handle.dispose();
     });
 
-    testWidgets('the flow still works at twice the text scale',
-        (WidgetTester tester) async {
+    testWidgets('the flow still works at twice the text scale', (WidgetTester tester) async {
       final harness = await pumpSurface(tester, textScale: 2.0);
       await openMovements(tester);
       final l10n = mountedL10n(tester);
@@ -447,8 +429,7 @@ void main() {
       expect(harness.matches.confirmations, hasLength(1));
     });
 
-    testWidgets('an empty listing says WHICH kind of empty it is',
-        (WidgetTester tester) async {
+    testWidgets('an empty listing says WHICH kind of empty it is', (WidgetTester tester) async {
       await pumpSurface(tester, held: <TransferMatch>[]);
       final l10n = mountedL10n(tester);
 
@@ -477,5 +458,4 @@ void main() {
       handle.dispose();
     });
   });
-
 }

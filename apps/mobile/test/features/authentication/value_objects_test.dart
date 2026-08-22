@@ -13,20 +13,13 @@ void main() {
     test('accepts a plus-addressed and a subdomain address', () {
       // A client pattern stricter than the server rejects addresses the
       // platform would have accepted, which the user cannot work around.
-      expect(EmailAddress.parse('person+karar@mail.example.test'),
-          isA<EmailAccepted>());
+      expect(EmailAddress.parse('person+karar@mail.example.test'), isA<EmailAccepted>());
       expect(EmailAddress.parse("o'brien@example.test"), isA<EmailAccepted>());
     });
 
     test('reports an empty value distinctly from a malformed one', () {
-      expect(
-        (EmailAddress.parse('   ') as EmailRejected).violation,
-        EmailViolation.empty,
-      );
-      expect(
-        (EmailAddress.parse('person') as EmailRejected).violation,
-        EmailViolation.malformed,
-      );
+      expect((EmailAddress.parse('   ') as EmailRejected).violation, EmailViolation.empty);
+      expect((EmailAddress.parse('person') as EmailRejected).violation, EmailViolation.malformed);
     });
 
     test('rejects values that cannot be an address', () {
@@ -47,8 +40,7 @@ void main() {
     });
 
     test('toString never contains the address', () {
-      final EmailAccepted accepted =
-          EmailAddress.parse('person@example.test') as EmailAccepted;
+      final EmailAccepted accepted = EmailAddress.parse('person@example.test') as EmailAccepted;
       expect(accepted.email.toString(), isNot(contains('person')));
       expect(accepted.email.toString(), isNot(contains('example.test')));
     });
@@ -72,15 +64,11 @@ void main() {
 
     test('parse yields an accepted password or a violation', () {
       expect(policy.parse('correct-horse'), isA<PasswordAccepted>());
-      expect(
-        (policy.parse('nope') as PasswordRejected).violation,
-        PasswordViolation.tooShort,
-      );
+      expect((policy.parse('nope') as PasswordRejected).violation, PasswordViolation.tooShort);
     });
 
     test('a password never prints its material', () {
-      final PasswordAccepted accepted =
-          policy.parse('correct-horse-battery') as PasswordAccepted;
+      final PasswordAccepted accepted = policy.parse('correct-horse-battery') as PasswordAccepted;
       expect(accepted.password.value, 'correct-horse-battery');
       expect(accepted.password.toString(), isNot(contains('correct-horse')));
       expect(accepted.password.toString(), contains('redacted'));

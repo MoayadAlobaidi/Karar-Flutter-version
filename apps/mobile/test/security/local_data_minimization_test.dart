@@ -25,10 +25,7 @@ import 'package:karar_mobile/features/tenant_selection/data/api_tenant_binding_r
 /// by opening the app. ADDING TO THIS SET IS A REVIEW DECISION: a preference
 /// is unencrypted, survives sign-out, and is not scoped to an organisation
 /// unless someone remembers to register it.
-const Set<String> reviewedPreferenceKeys = <String>{
-  'localization.locale',
-  'localization.theme',
-};
+const Set<String> reviewedPreferenceKeys = <String>{'localization.locale', 'localization.theme'};
 
 /// Packages that would give the application a place to keep records.
 ///
@@ -69,12 +66,13 @@ final RegExp fileWrite = RegExp(
 
 Directory get libRoot => Directory('lib');
 
-List<File> dartSources() => libRoot
-    .listSync(recursive: true)
-    .whereType<File>()
-    .where((File file) => file.path.endsWith('.dart'))
-    .toList()
-  ..sort((File a, File b) => a.path.compareTo(b.path));
+List<File> dartSources() =>
+    libRoot
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((File file) => file.path.endsWith('.dart'))
+        .toList()
+      ..sort((File a, File b) => a.path.compareTo(b.path));
 
 void main() {
   group('nothing financial is written to this device', () {
@@ -95,7 +93,8 @@ void main() {
       expect(
         constructed.keys.toSet(),
         reviewedPreferenceKeys,
-        reason: 'a preference key outside the reviewed set is unencrypted storage '
+        reason:
+            'a preference key outside the reviewed set is unencrypted storage '
             'nobody decided on. Found: $constructed',
       );
     });
@@ -105,28 +104,29 @@ void main() {
       // must join or "it will survive a switch and be read under the wrong
       // tenant". That was a comment; this makes it a rule. Every key that is
       // NOT one of the two organisation-independent ones must appear in it.
-      final unscoped =
-          reviewedPreferenceKeys.difference(tenantScopedPreferenceKeyNames.toSet());
+      final unscoped = reviewedPreferenceKeys.difference(tenantScopedPreferenceKeyNames.toSet());
 
       expect(
         unscoped,
         <String>{'localization.locale', 'localization.theme'},
-        reason: 'a preference that is neither organisation-independent nor '
+        reason:
+            'a preference that is neither organisation-independent nor '
             'registered as tenant-scoped outlives a tenant switch',
       );
     });
 
     test('the application declares no durable store', () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
-      final declared = RegExp(r'^\s{2}([a-z_0-9]+):', multiLine: true)
-          .allMatches(pubspec)
-          .map((RegExpMatch match) => match.group(1)!)
-          .toSet();
+      final declared = RegExp(
+        r'^\s{2}([a-z_0-9]+):',
+        multiLine: true,
+      ).allMatches(pubspec).map((RegExpMatch match) => match.group(1)!).toSet();
 
       expect(
         declared.intersection(persistencePackages),
         isEmpty,
-        reason: 'a database or a writable-directory package means this client '
+        reason:
+            'a database or a writable-directory package means this client '
             'can keep financial records between launches',
       );
     });

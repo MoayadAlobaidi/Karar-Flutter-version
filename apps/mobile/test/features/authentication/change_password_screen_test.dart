@@ -10,19 +10,25 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'support/identity_harness.dart';
 
 /// The English catalogue, for assertions that do not depend on the locale.
-final AppLocalizations _english = lookupAppLocalizations(
-  KararLocalization.english,
-);
+final AppLocalizations _english = lookupAppLocalizations(KararLocalization.english);
 
 void main() {
-  testEveryDirectionAndScale('renders the form in the locale direction',
-      (WidgetTester tester, Locale locale, double textScale) async {
+  testEveryDirectionAndScale('renders the form in the locale direction', (
+    WidgetTester tester,
+    Locale locale,
+    double textScale,
+  ) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    await pumpIdentity(tester, const ChangePasswordScreen(),
-        harness: harness, locale: locale, textScale: textScale);
+    await pumpIdentity(
+      tester,
+      const ChangePasswordScreen(),
+      harness: harness,
+      locale: locale,
+      textScale: textScale,
+    );
 
     expect(find.text(l10n.changePasswordSubtitle), findsOneWidget);
     expect(find.text(l10n.changePasswordCurrentLabel), findsOneWidget);
@@ -34,18 +40,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testEveryDirectionAndScale('confirms the change and states what it did',
-      (WidgetTester tester, Locale locale, double textScale) async {
+  testEveryDirectionAndScale('confirms the change and states what it did', (
+    WidgetTester tester,
+    Locale locale,
+    double textScale,
+  ) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
-    harness.transport
-        .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
-    harness.refreshTransport
-        .onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
+    harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+    harness.refreshTransport.onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
 
-    await pumpIdentity(tester, const ChangePasswordScreen(),
-        harness: harness, locale: locale, textScale: textScale);
+    await pumpIdentity(
+      tester,
+      const ChangePasswordScreen(),
+      harness: harness,
+      locale: locale,
+      textScale: textScale,
+    );
     await enterIdentityField(tester, 0, 'old-password');
     await enterIdentityField(tester, 1, 'brand-new-password');
     await enterIdentityField(tester, 2, 'brand-new-password');
@@ -58,8 +70,11 @@ void main() {
     expect(harness.refreshTransport.callsTo('/auth/refresh'), 1);
   });
 
-  testEveryDirectionAndScale('reports an incorrect current password generically',
-      (WidgetTester tester, Locale locale, double textScale) async {
+  testEveryDirectionAndScale('reports an incorrect current password generically', (
+    WidgetTester tester,
+    Locale locale,
+    double textScale,
+  ) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
@@ -70,8 +85,13 @@ void main() {
       statusCode: 401,
     );
 
-    await pumpIdentity(tester, const ChangePasswordScreen(),
-        harness: harness, locale: locale, textScale: textScale);
+    await pumpIdentity(
+      tester,
+      const ChangePasswordScreen(),
+      harness: harness,
+      locale: locale,
+      textScale: textScale,
+    );
     await enterIdentityField(tester, 0, 'wrong-password');
     await enterIdentityField(tester, 1, 'brand-new-password');
     await enterIdentityField(tester, 2, 'brand-new-password');
@@ -81,14 +101,13 @@ void main() {
     expect(find.text(l10n.changePasswordIncorrectCurrent), findsOneWidget);
   });
 
-  testWidgets('neither password appears anywhere in the rendered tree',
-      (WidgetTester tester) async {
+  testWidgets('neither password appears anywhere in the rendered tree', (
+    WidgetTester tester,
+  ) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
-    harness.transport
-        .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
-    harness.refreshTransport
-        .onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
+    harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+    harness.refreshTransport.onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
 
     await pumpIdentity(tester, const ChangePasswordScreen(), harness: harness);
     await enterIdentityField(tester, 0, 'old-password');

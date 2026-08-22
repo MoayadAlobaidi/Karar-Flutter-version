@@ -28,10 +28,8 @@ List<Override> refusingFinancialRepositories(Failure failure) {
   return <Override>[
     financialAccountsRepositoryProvider.overrideWithValue(accounts),
     issuerCatalogueRepositoryProvider.overrideWithValue(accounts),
-    transactionsRepositoryProvider
-        .overrideWithValue(_RefusingTransactionsRepository(failure)),
-    paymentInstrumentsRepositoryProvider
-        .overrideWithValue(_RefusingInstrumentsRepository(failure)),
+    transactionsRepositoryProvider.overrideWithValue(_RefusingTransactionsRepository(failure)),
+    paymentInstrumentsRepositoryProvider.overrideWithValue(_RefusingInstrumentsRepository(failure)),
   ];
 }
 
@@ -62,16 +60,14 @@ final class _RefusingAccountsRepository
     String accountId, {
     int? limit,
     String? cursor,
-  }) async =>
-      Failed<Page<BalanceSnapshot>>(_failure);
+  }) async => Failed<Page<BalanceSnapshot>>(_failure);
 
   @override
   Future<Result<Page<AccountSourceLink>>> listSourceLinks(
     String accountId, {
     int? limit,
     String? cursor,
-  }) async =>
-      Failed<Page<AccountSourceLink>>(_failure);
+  }) async => Failed<Page<AccountSourceLink>>(_failure);
 
   @override
   Future<Result<Page<Issuer>>> listSelectableIssuers({int? limit, String? cursor}) async =>
@@ -88,8 +84,7 @@ final class _RefusingTransactionsRepository implements TransactionsRepository {
     TransactionFilter filter = const TransactionFilter(),
     int? limit,
     String? cursor,
-  }) async =>
-      Failed<Page<Transaction>>(_failure);
+  }) async => Failed<Page<Transaction>>(_failure);
 
   @override
   Future<Result<TransactionDetail>> read(String transactionId) async =>
@@ -126,6 +121,5 @@ final class _RefusingInstrumentsRepository implements PaymentInstrumentsReposito
     String accountId, {
     int? limit,
     String? cursor,
-  }) async =>
-      Failed<Page<PaymentInstrument>>(_failure);
+  }) async => Failed<Page<PaymentInstrument>>(_failure);
 }

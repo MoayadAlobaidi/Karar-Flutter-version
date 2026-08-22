@@ -15,9 +15,7 @@ void main() {
     expect(find.text(_label(locale)), findsOneWidget);
     expect(
       directionOf(tester, find.byType(KararButton)),
-      locale == KararLocalization.arabic
-          ? TextDirection.rtl
-          : TextDirection.ltr,
+      locale == KararLocalization.arabic ? TextDirection.rtl : TextDirection.ltr,
     );
   }, textScales: testTextScales);
 
@@ -76,11 +74,7 @@ void main() {
     double scale,
   ) async {
     final SemanticsHandle handle = tester.ensureSemantics();
-    await pumpKarar(
-      tester,
-      KararButton(label: _label(locale), onPressed: null),
-      locale: locale,
-    );
+    await pumpKarar(tester, KararButton(label: _label(locale), onPressed: null), locale: locale);
     expect(
       tester.getSemantics(find.byType(KararButton)),
       isSemantics(isEnabled: false, hasEnabledState: true),
@@ -97,11 +91,7 @@ void main() {
     int presses = 0;
     await pumpKarar(
       tester,
-      KararButton(
-        label: _label(locale),
-        onPressed: () => presses++,
-        isLoading: true,
-      ),
+      KararButton(label: _label(locale), onPressed: () => presses++, isLoading: true),
       locale: locale,
       settle: false,
     );
@@ -146,11 +136,7 @@ void main() {
           for (final KararButtonVariant variant in KararButtonVariant.values)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              child: KararButton(
-                label: _label(locale),
-                onPressed: () {},
-                variant: variant,
-              ),
+              child: KararButton(label: _label(locale), onPressed: () {}, variant: variant),
             ),
         ],
       ),
@@ -161,40 +147,35 @@ void main() {
     expect(tester.takeException(), isNull);
   }, textScales: testTextScales);
 
-  testInBothDirections(
-    'the leading icon sits at the start of the reading order',
-    (WidgetTester tester, Locale locale, double scale) async {
-      await pumpKarar(
-        tester,
-        KararButton(
-          label: _label(locale),
-          onPressed: () {},
-          icon: KararIcons.check,
-        ),
-        locale: locale,
+  testInBothDirections('the leading icon sits at the start of the reading order', (
+    WidgetTester tester,
+    Locale locale,
+    double scale,
+  ) async {
+    await pumpKarar(
+      tester,
+      KararButton(label: _label(locale), onPressed: () {}, icon: KararIcons.check),
+      locale: locale,
+    );
+    final double iconCentre = tester.getCenter(find.byType(Icon)).dx;
+    final double labelCentre = tester.getCenter(find.text(_label(locale))).dx;
+    if (locale == KararLocalization.arabic) {
+      expect(
+        iconCentre,
+        greaterThan(labelCentre),
+        reason: 'Under RTL the leading slot is on the right.',
       );
-      final double iconCentre = tester.getCenter(find.byType(Icon)).dx;
-      final double labelCentre = tester.getCenter(find.text(_label(locale))).dx;
-      if (locale == KararLocalization.arabic) {
-        expect(
-          iconCentre,
-          greaterThan(labelCentre),
-          reason: 'Under RTL the leading slot is on the right.',
-        );
-      } else {
-        expect(iconCentre, lessThan(labelCentre));
-      }
-    },
-  );
+    } else {
+      expect(iconCentre, lessThan(labelCentre));
+    }
+  });
 }
 
-KararButton _button(Locale locale) =>
-    KararButton(label: _label(locale), onPressed: () {});
+KararButton _button(Locale locale) => KararButton(label: _label(locale), onPressed: () {});
 
 /// Localized copy, so the test proves the delegate resolved rather than
 /// asserting on a string the widget was handed.
-String _label(Locale locale) =>
-    locale == KararLocalization.arabic ? 'متابعة' : 'Continue';
+String _label(Locale locale) => locale == KararLocalization.arabic ? 'متابعة' : 'Continue';
 
 AppLocalizations _localizations(WidgetTester tester) {
   return AppLocalizations.of(tester.element(find.byType(KararButton)));

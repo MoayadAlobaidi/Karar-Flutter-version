@@ -226,17 +226,15 @@ List<_Finding> _scan(List<SourceFile> files) {
       final quoted = _usesQuotedLiterals(file.relativePath);
       final assignments = quoted
           ? _quotedAssignmentPattern
-              .allMatches(line)
-              .map((RegExpMatch m) => <String>[m.group(1)!, m.group(3)!])
+                .allMatches(line)
+                .map((RegExpMatch m) => <String>[m.group(1)!, m.group(3)!])
           : _bareAssignmentPattern
-              .allMatches(line)
-              .map((RegExpMatch m) => <String>[m.group(1)!, m.group(2)!]);
+                .allMatches(line)
+                .map((RegExpMatch m) => <String>[m.group(1)!, m.group(2)!]);
 
       for (final assignment in assignments) {
         if (_isSecretShapedName(assignment[0]) && _looksLikeMaterial(assignment[1])) {
-          findings.add(
-            _Finding(file.relativePath, index + 1, 'secret-shaped-assignment', line),
-          );
+          findings.add(_Finding(file.relativePath, index + 1, 'secret-shaped-assignment', line));
         }
       }
     }
@@ -257,7 +255,8 @@ void main() {
       expect(
         findings,
         isEmpty,
-        reason: 'credential material must never be committed. Findings:\n'
+        reason:
+            'credential material must never be committed. Findings:\n'
             '${findings.join('\n')}',
       );
     });
@@ -311,7 +310,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'signing and provider credential files must be supplied externally at '
+        reason:
+            'signing and provider credential files must be supplied externally at '
             'release time, never committed. Found: $offenders',
       );
     });
@@ -337,7 +337,8 @@ void main() {
         expect(
           _isSecretShapedName(key),
           isFalse,
-          reason: '$key is credential-shaped and must not be a build-time input to a '
+          reason:
+              '$key is credential-shaped and must not be a build-time input to a '
               'mobile binary',
         );
       }

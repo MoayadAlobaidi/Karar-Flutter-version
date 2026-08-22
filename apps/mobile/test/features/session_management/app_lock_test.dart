@@ -20,17 +20,12 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../authentication/support/identity_harness.dart';
 
-IdentityHarness _harnessWith(ScriptedLocalAuthenticator authenticator) =>
-    IdentityHarness(
-      overrides: <Override>[
-        localAuthenticatorProvider.overrideWithValue(authenticator),
-      ],
-    );
+IdentityHarness _harnessWith(ScriptedLocalAuthenticator authenticator) => IdentityHarness(
+  overrides: <Override>[localAuthenticatorProvider.overrideWithValue(authenticator)],
+);
 
 /// The English catalogue, for assertions that do not depend on the locale.
-final AppLocalizations _english = lookupAppLocalizations(
-  KararLocalization.english,
-);
+final AppLocalizations _english = lookupAppLocalizations(KararLocalization.english);
 
 void main() {
   group('AppLockPolicy', () {
@@ -39,18 +34,12 @@ void main() {
       final DateTime away = DateTime.utc(2026, 1, 1, 12);
 
       expect(
-        policy.shouldRelock(
-          backgroundedAt: away,
-          now: away.add(const Duration(seconds: 29)),
-        ),
+        policy.shouldRelock(backgroundedAt: away, now: away.add(const Duration(seconds: 29))),
         isFalse,
         reason: 'a share sheet or a password-manager hand-off must not re-lock',
       );
       expect(
-        policy.shouldRelock(
-          backgroundedAt: away,
-          now: away.add(const Duration(seconds: 30)),
-        ),
+        policy.shouldRelock(backgroundedAt: away, now: away.add(const Duration(seconds: 30))),
         isTrue,
       );
     });
@@ -62,10 +51,7 @@ void main() {
       final DateTime away = DateTime.utc(2026, 1, 1, 12);
 
       expect(
-        policy.shouldRelock(
-          backgroundedAt: away,
-          now: away.subtract(const Duration(hours: 1)),
-        ),
+        policy.shouldRelock(backgroundedAt: away, now: away.subtract(const Duration(hours: 1))),
         isTrue,
       );
     });
@@ -88,9 +74,7 @@ void main() {
   group('AppLockController', () {
     test('reports an unsupported device and does not offer the switch', () async {
       final IdentityHarness harness = _harnessWith(
-        ScriptedLocalAuthenticator(
-          availabilityAnswer: LocalAuthAvailability.unsupported,
-        ),
+        ScriptedLocalAuthenticator(availabilityAnswer: LocalAuthAvailability.unsupported),
       );
 
       await harness.container.read(appLockControllerProvider.notifier).refresh();
@@ -105,10 +89,9 @@ void main() {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.container.read(appLockControllerProvider.notifier).refresh();
 
-      await harness.container.read(appLockControllerProvider.notifier).setEnabled(
-            enabled: true,
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .setEnabled(enabled: true, reason: _english.appLockPromptReason);
 
       final AppLockViewState state = harness.container.read(appLockControllerProvider);
       expect(state.requiresSession, isTrue);
@@ -119,17 +102,14 @@ void main() {
     test('FAILS CLOSED: a refused prompt does not enable the lock', () async {
       // Otherwise the next launch would present a lock nobody can open.
       final IdentityHarness harness = _harnessWith(
-        ScriptedLocalAuthenticator(
-          outcomes: const <LocalAuthOutcome>[LocalAuthCancelled()],
-        ),
+        ScriptedLocalAuthenticator(outcomes: const <LocalAuthOutcome>[LocalAuthCancelled()]),
       );
       await harness.signInFixture();
       await harness.container.read(appLockControllerProvider.notifier).refresh();
 
-      await harness.container.read(appLockControllerProvider.notifier).setEnabled(
-            enabled: true,
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .setEnabled(enabled: true, reason: _english.appLockPromptReason);
 
       expect(harness.container.read(appLockGateProvider).isEnabled, isFalse);
       expect(
@@ -138,17 +118,15 @@ void main() {
       );
     });
 
-    test('enables the lock only after the device has just authenticated',
-        () async {
+    test('enables the lock only after the device has just authenticated', () async {
       final ScriptedLocalAuthenticator authenticator = ScriptedLocalAuthenticator();
       final IdentityHarness harness = _harnessWith(authenticator);
       await harness.signInFixture();
       await harness.container.read(appLockControllerProvider.notifier).refresh();
 
-      await harness.container.read(appLockControllerProvider.notifier).setEnabled(
-            enabled: true,
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .setEnabled(enabled: true, reason: _english.appLockPromptReason);
 
       expect(authenticator.promptCount, 1);
       expect(harness.container.read(appLockGateProvider).isEnabled, isTrue);
@@ -156,8 +134,7 @@ void main() {
       expect(authenticator.reasons.single, _english.appLockPromptReason);
     });
 
-    test('stands the choice down when the device can no longer satisfy it',
-        () async {
+    test('stands the choice down when the device can no longer satisfy it', () async {
       final ScriptedLocalAuthenticator authenticator = ScriptedLocalAuthenticator();
       final IdentityHarness harness = _harnessWith(authenticator);
       await harness.signInFixture();
@@ -177,9 +154,9 @@ void main() {
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
       expect(harness.container.read(appLockGateProvider).isLocked, isTrue);
 
-      await harness.container.read(appLockControllerProvider.notifier).unlock(
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .unlock(reason: _english.appLockPromptReason);
 
       expect(harness.container.read(appLockGateProvider).isLocked, isFalse);
       // Proving presence to the DEVICE grants nothing server-side.
@@ -190,16 +167,14 @@ void main() {
     test('a failed unlock leaves the gate engaged', () async {
       final IdentityHarness harness = _harnessWith(
         ScriptedLocalAuthenticator(
-          outcomes: const <LocalAuthOutcome>[
-            LocalAuthFailed(LocalAuthFailureReason.notRecognised),
-          ],
+          outcomes: const <LocalAuthOutcome>[LocalAuthFailed(LocalAuthFailureReason.notRecognised)],
         ),
       );
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
 
-      await harness.container.read(appLockControllerProvider.notifier).unlock(
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .unlock(reason: _english.appLockPromptReason);
 
       expect(harness.container.read(appLockGateProvider).isLocked, isTrue);
     });
@@ -210,10 +185,9 @@ void main() {
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
       await harness.container.read(appLockControllerProvider.notifier).refresh();
 
-      await harness.container.read(appLockControllerProvider.notifier).setEnabled(
-            enabled: false,
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .setEnabled(enabled: false, reason: _english.appLockPromptReason);
 
       expect(harness.container.read(appLockGateProvider).isEnabled, isFalse);
       expect(harness.container.read(appLockGateProvider).isLocked, isFalse);
@@ -241,8 +215,7 @@ void main() {
       expect(gate.isDurablyDisabled, isFalse);
       expect(gate.isLocked, isTrue);
 
-      await harness.securityState
-          .write(LocalSecurityFlag.appLockEnabled, value: false);
+      await harness.securityState.write(LocalSecurityFlag.appLockEnabled, value: false);
       expect(
         await gate.load(),
         isA<AppLockChoiceKnown>().having((c) => c.enabled, 'enabled', isFalse),
@@ -251,8 +224,7 @@ void main() {
       expect(gate.isLocked, isFalse);
     });
 
-    test('an ABSENT choice is a real answer: the lock is opt-in and off',
-        () async {
+    test('an ABSENT choice is a real answer: the lock is opt-in and off', () async {
       final IdentityHarness harness = IdentityHarness();
       final AppLockGate gate = harness.container.read(appLockGateProvider);
 
@@ -261,7 +233,8 @@ void main() {
       expect(
         choice,
         isA<AppLockChoiceKnown>().having((c) => c.enabled, 'enabled', isFalse),
-        reason: 'the store was consulted and held nothing. Defaulting to off is '
+        reason:
+            'the store was consulted and held nothing. Defaulting to off is '
             'safe HERE and only here, because there was an answer',
       );
       expect(gate.isDurablyDisabled, isTrue);
@@ -283,7 +256,8 @@ void main() {
       expect(
         gate.isDurablyDisabled,
         isFalse,
-        reason: 'THE ASSERTION THAT FAILS WITHOUT THE FIX. A store that would '
+        reason:
+            'THE ASSERTION THAT FAILS WITHOUT THE FIX. A store that would '
             'not answer used to read as a user who never turned the lock on',
       );
       expect(gate.isLocked, isTrue);
@@ -298,10 +272,7 @@ void main() {
       final AppLockChoice choice = await gate.load();
 
       expect(choice, isA<AppLockChoiceUnavailable>());
-      expect(
-        (choice as AppLockChoiceUnavailable).failure,
-        isA<LocalSecurityStateCorruptFailure>(),
-      );
+      expect((choice as AppLockChoiceUnavailable).failure, isA<LocalSecurityStateCorruptFailure>());
       expect(gate.isLocked, isTrue);
     });
 
@@ -321,9 +292,7 @@ void main() {
     test('an UNLOADED gate reports locked', () {
       // A gate nobody has evaluated has certainly not been passed. This is what
       // stops a future change that forgets the load step from failing open.
-      final AppLockGate gate = AppLockGate(
-        securityState: InMemoryLocalSecurityStateStore(),
-      );
+      final AppLockGate gate = AppLockGate(securityState: InMemoryLocalSecurityStateStore());
 
       expect(gate.choice, isA<AppLockChoiceNotLoaded>());
       expect(gate.isChoiceKnown, isFalse);
@@ -331,8 +300,7 @@ void main() {
       expect(gate.isLocked, isTrue);
     });
 
-    test('the ordinary preference store cannot answer for the lock at all',
-        () async {
+    test('the ordinary preference store cannot answer for the lock at all', () async {
       // The preference store is where the choice used to live, and its
       // in-memory fallback is why it may not live there again. Nothing the
       // preference store does — including being replaced wholesale by the
@@ -342,13 +310,13 @@ void main() {
       await harness.container.read(appLockGateProvider).load();
 
       await harness.preferences.clear();
-      await harness.preferences
-          .writeBool(PreferenceKey('security.app_lock_enabled'), value: false);
+      await harness.preferences.writeBool(PreferenceKey('security.app_lock_enabled'), value: false);
 
       expect(
         harness.container.read(appLockGateProvider).isEnabled,
         isTrue,
-        reason: 'a value in unencrypted preferences must not be able to switch '
+        reason:
+            'a value in unencrypted preferences must not be able to switch '
             'a security control off',
       );
       expect(
@@ -373,10 +341,7 @@ void main() {
 
       final AppLockChange change = await gate.setEnabled(enabled: true);
 
-      expect(
-        change,
-        isA<AppLockChangeApplied>().having((c) => c.enabled, 'enabled', isTrue),
-      );
+      expect(change, isA<AppLockChangeApplied>().having((c) => c.enabled, 'enabled', isTrue));
       expect(gate.isEnabled, isTrue);
       expect(gate.isLocked, isTrue, reason: 'turning the lock on locks');
       expect(
@@ -385,8 +350,7 @@ void main() {
       );
     });
 
-    test('a REFUSED enable leaves the lock off, in memory as well as on disk',
-        () async {
+    test('a REFUSED enable leaves the lock off, in memory as well as on disk', () async {
       final IdentityHarness harness = IdentityHarness();
       harness.securityState.unwritableFlags.add(LocalSecurityFlag.appLockEnabled);
       final AppLockGate gate = harness.container.read(appLockGateProvider);
@@ -402,7 +366,8 @@ void main() {
       expect(
         gate.isEnabled,
         isFalse,
-        reason: 'THE IN-MEMORY-ONLY LOCK. Reporting this as enabled shows a '
+        reason:
+            'THE IN-MEMORY-ONLY LOCK. Reporting this as enabled shows a '
             'protection that does not exist and vanishes at the next launch',
       );
       expect(harness.securityState.writes, isEmpty);
@@ -417,13 +382,13 @@ void main() {
 
       // A brand-new gate over the same storage: the process restarted and
       // nothing in memory carried over.
-      final AppLockGate restarted =
-          AppLockGate(securityState: harness.securityState);
+      final AppLockGate restarted = AppLockGate(securityState: harness.securityState);
 
       expect(
         await restarted.load(),
         isA<AppLockChoiceKnown>().having((c) => c.enabled, 'enabled', isFalse),
-        reason: 'nothing was ever written, so there is nothing to load. The '
+        reason:
+            'nothing was ever written, so there is nothing to load. The '
             'test above and this one are the same defect seen from two sides',
       );
     });
@@ -443,7 +408,8 @@ void main() {
       expect(
         rejected.retainedEnabled,
         isTrue,
-        reason: 'of the two states this could settle into, ON is the safer, and '
+        reason:
+            'of the two states this could settle into, ON is the safer, and '
             'it is recoverable — the setting can be retried and the lock screen '
             'still offers the password fallback',
       );
@@ -451,8 +417,7 @@ void main() {
       expect(gate.isDurablyDisabled, isFalse);
     });
 
-    test('a refused disable still reads as ENABLED after a cold restart',
-        () async {
+    test('a refused disable still reads as ENABLED after a cold restart', () async {
       final IdentityHarness harness = IdentityHarness();
       await harness.enableAppLock();
       final AppLockGate gate = harness.container.read(appLockGateProvider);
@@ -460,8 +425,7 @@ void main() {
       harness.securityState.unwritableFlags.add(LocalSecurityFlag.appLockEnabled);
       await gate.setEnabled(enabled: false);
 
-      final AppLockGate restarted =
-          AppLockGate(securityState: harness.securityState);
+      final AppLockGate restarted = AppLockGate(securityState: harness.securityState);
 
       expect(
         await restarted.load(),
@@ -481,8 +445,7 @@ void main() {
 
       expect(retried, isA<AppLockChangeApplied>());
       expect(gate.isEnabled, isTrue);
-      final AppLockGate restarted =
-          AppLockGate(securityState: harness.securityState);
+      final AppLockGate restarted = AppLockGate(securityState: harness.securityState);
       expect(
         await restarted.load(),
         isA<AppLockChoiceKnown>().having((c) => c.enabled, 'enabled', isTrue),
@@ -499,16 +462,16 @@ void main() {
       await harness.container.read(appLockControllerProvider.notifier).refresh();
       harness.securityState.unwritableFlags.add(LocalSecurityFlag.appLockEnabled);
 
-      await harness.container.read(appLockControllerProvider.notifier).setEnabled(
-            enabled: true,
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .setEnabled(enabled: true, reason: _english.appLockPromptReason);
 
       final AppLockViewState state = harness.container.read(appLockControllerProvider);
       expect(
         state.isEnabled,
         isFalse,
-        reason: 'the controller used to set this true straight after awaiting '
+        reason:
+            'the controller used to set this true straight after awaiting '
             'a Future<void> that could not fail',
       );
       expect(state.lastChange, isA<AppLockChangeRejected>());
@@ -526,10 +489,9 @@ void main() {
       await harness.container.read(appLockControllerProvider.notifier).refresh();
       harness.securityState.unwritableFlags.add(LocalSecurityFlag.appLockEnabled);
 
-      await harness.container.read(appLockControllerProvider.notifier).setEnabled(
-            enabled: false,
-            reason: _english.appLockPromptReason,
-          );
+      await harness.container
+          .read(appLockControllerProvider.notifier)
+          .setEnabled(enabled: false, reason: _english.appLockPromptReason);
 
       final AppLockViewState state = harness.container.read(appLockControllerProvider);
       expect(state.isEnabled, isTrue);
@@ -563,8 +525,9 @@ void main() {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
       harness.container.read(appLockGateProvider).markUnlocked();
-      final AppLockBackgroundWatcher watcher =
-          harness.container.read(appLockBackgroundWatcherProvider);
+      final AppLockBackgroundWatcher watcher = harness.container.read(
+        appLockBackgroundWatcherProvider,
+      );
 
       watcher.didChangeAppLifecycleState(AppLifecycleState.inactive);
       harness.clock.advance(const Duration(minutes: 5));
@@ -578,8 +541,9 @@ void main() {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
       harness.container.read(appLockGateProvider).markUnlocked();
-      final AppLockBackgroundWatcher watcher =
-          harness.container.read(appLockBackgroundWatcherProvider);
+      final AppLockBackgroundWatcher watcher = harness.container.read(
+        appLockBackgroundWatcherProvider,
+      );
 
       watcher.didChangeAppLifecycleState(AppLifecycleState.inactive);
       harness.clock.advance(const Duration(seconds: 5));
@@ -595,8 +559,9 @@ void main() {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.container.read(appLockGateProvider).setEnabled(enabled: true);
       harness.container.read(appLockGateProvider).markUnlocked();
-      final AppLockBackgroundWatcher watcher =
-          harness.container.read(appLockBackgroundWatcherProvider);
+      final AppLockBackgroundWatcher watcher = harness.container.read(
+        appLockBackgroundWatcherProvider,
+      );
 
       watcher.didChangeAppLifecycleState(AppLifecycleState.inactive);
       harness.clock.advance(const Duration(seconds: 20));
@@ -614,8 +579,9 @@ void main() {
       // and is exactly why the watcher asks whether the lock is durably OFF
       // rather than whether it is on.
       await harness.container.read(appLockGateProvider).load();
-      final AppLockBackgroundWatcher watcher =
-          harness.container.read(appLockBackgroundWatcherProvider);
+      final AppLockBackgroundWatcher watcher = harness.container.read(
+        appLockBackgroundWatcherProvider,
+      );
 
       watcher.didChangeAppLifecycleState(AppLifecycleState.paused);
       harness.clock.advance(const Duration(hours: 1));
@@ -635,8 +601,9 @@ void main() {
       harness.container.read(appLockGateProvider).markUnlocked();
       harness.securityState.unreadableFlags.add(LocalSecurityFlag.appLockEnabled);
       await harness.container.read(appLockGateProvider).load();
-      final AppLockBackgroundWatcher watcher =
-          harness.container.read(appLockBackgroundWatcherProvider);
+      final AppLockBackgroundWatcher watcher = harness.container.read(
+        appLockBackgroundWatcherProvider,
+      );
 
       watcher.didChangeAppLifecycleState(AppLifecycleState.paused);
       harness.clock.advance(const Duration(hours: 1));
@@ -657,21 +624,26 @@ void main() {
       const UnsupportedLocalAuthenticator authenticator = UnsupportedLocalAuthenticator();
 
       expect(await authenticator.availability(), LocalAuthAvailability.unsupported);
-      expect(
-        await authenticator.authenticate(reason: 'x'),
-        isA<LocalAuthFailed>(),
-      );
+      expect(await authenticator.authenticate(reason: 'x'), isA<LocalAuthFailed>());
     });
   });
 
   group('lock screen', () {
-    testEveryDirectionAndScale('renders the locked state in the locale direction',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('renders the locked state in the locale direction', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(tester, const AppLockScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const AppLockScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text(l10n.appLockLockedMessage), findsOneWidget);
@@ -686,13 +658,12 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a locked-out device tells the user to use their password',
-        (WidgetTester tester) async {
+    testWidgets('a locked-out device tells the user to use their password', (
+      WidgetTester tester,
+    ) async {
       final IdentityHarness harness = _harnessWith(
         ScriptedLocalAuthenticator(
-          outcomes: const <LocalAuthOutcome>[
-            LocalAuthFailed(LocalAuthFailureReason.lockedOut),
-          ],
+          outcomes: const <LocalAuthOutcome>[LocalAuthFailed(LocalAuthFailureReason.lockedOut)],
         ),
       );
       final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
@@ -705,9 +676,7 @@ void main() {
       expect(find.text(l10n.appLockLockedOut), findsOneWidget);
     });
 
-    testWidgets('the password fallback actually ends the session', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the password fallback actually ends the session', (WidgetTester tester) async {
       // THE TEST ABOVE ASSERTS THE BUTTON EXISTS. THAT WAS NOT ENOUGH.
       //
       // It rendered, it was enabled, it responded to a tap — and it did
@@ -729,7 +698,8 @@ void main() {
       expect(
         harness.secureEntries,
         isNotEmpty,
-        reason: 'the fixture must establish a session, or this test proves '
+        reason:
+            'the fixture must establish a session, or this test proves '
             'nothing by finding none afterwards',
       );
 
@@ -741,7 +711,8 @@ void main() {
       expect(
         harness.secureEntries,
         isEmpty,
-        reason: 'pressing the password fallback must end the session, so the '
+        reason:
+            'pressing the password fallback must end the session, so the '
             'startup state leaves AppLocked and routing reaches sign-in on its '
             'own. Tokens still in the store mean the button did nothing again.',
       );
@@ -750,14 +721,22 @@ void main() {
   });
 
   group('lock setting', () {
-    testEveryDirectionAndScale('explains that the lock is device-only',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('explains that the lock is device-only', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(tester, const AppLockSettingsScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const AppLockSettingsScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await tester.pumpAndSettle();
 
       // The copy states plainly that this is not authentication and that no
@@ -771,44 +750,43 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testEveryDirectionAndScale('hides the switch on a device that cannot lock',
-        (WidgetTester tester, Locale locale, double textScale) async {
+    testEveryDirectionAndScale('hides the switch on a device that cannot lock', (
+      WidgetTester tester,
+      Locale locale,
+      double textScale,
+    ) async {
       final IdentityHarness harness = _harnessWith(
-        ScriptedLocalAuthenticator(
-          availabilityAnswer: LocalAuthAvailability.unsupported,
-        ),
+        ScriptedLocalAuthenticator(availabilityAnswer: LocalAuthAvailability.unsupported),
       );
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(tester, const AppLockSettingsScreen(),
-          harness: harness, locale: locale, textScale: textScale);
+      await pumpIdentity(
+        tester,
+        const AppLockSettingsScreen(),
+        harness: harness,
+        locale: locale,
+        textScale: textScale,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text(l10n.appLockUnavailableMessage), findsOneWidget);
       expect(find.text(l10n.appLockToggleLabel), findsNothing);
     });
 
-    testWidgets('an unenrolled device says what to do about it',
-        (WidgetTester tester) async {
+    testWidgets('an unenrolled device says what to do about it', (WidgetTester tester) async {
       final IdentityHarness harness = _harnessWith(
-        ScriptedLocalAuthenticator(
-          availabilityAnswer: LocalAuthAvailability.notEnrolled,
-        ),
+        ScriptedLocalAuthenticator(availabilityAnswer: LocalAuthAvailability.notEnrolled),
       );
       await harness.signInFixture();
 
       await pumpIdentity(tester, const AppLockSettingsScreen(), harness: harness);
       await tester.pumpAndSettle();
 
-      expect(
-        find.text(_english.appLockNotEnrolledMessage),
-        findsOneWidget,
-      );
+      expect(find.text(_english.appLockNotEnrolledMessage), findsOneWidget);
     });
 
-    testWidgets('every interactive control carries a name',
-        (WidgetTester tester) async {
+    testWidgets('every interactive control carries a name', (WidgetTester tester) async {
       final IdentityHarness harness = _harnessWith(ScriptedLocalAuthenticator());
       await harness.signInFixture();
       final SemanticsHandle handle = tester.ensureSemantics();
