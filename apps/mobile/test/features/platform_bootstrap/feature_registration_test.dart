@@ -22,22 +22,25 @@ import 'package:karar_mobile/features/tenant_selection/presentation/tenant_provi
 import 'package:karar_mobile/features/tenant_selection/presentation/tenant_routes.dart';
 
 List<String> pathsOf(List<RouteBase> routes) => <String>[
-  for (final route in routes)
-    if (route is GoRoute) route.path,
-];
+      for (final route in routes)
+        if (route is GoRoute) route.path,
+    ];
 
 void main() {
   test('every protected surface is registered exactly once', () {
     final paths = pathsOf(platformFeatureRoutes());
 
-    expect(paths.toSet(), <String>{
-      ProfileRoutes.profile,
-      SettingsRoutes.settings,
-      TenantRoutes.organisation,
-      PlatformRoutes.jurisdiction,
-      PlatformRoutes.legal,
-      ConsentRoutes.consent,
-    });
+    expect(
+      paths.toSet(),
+      <String>{
+        ProfileRoutes.profile,
+        SettingsRoutes.settings,
+        TenantRoutes.organisation,
+        PlatformRoutes.jurisdiction,
+        PlatformRoutes.legal,
+        ConsentRoutes.consent,
+      },
+    );
     expect(paths.length, paths.toSet().length, reason: 'no route is registered twice');
   });
 
@@ -63,10 +66,13 @@ void main() {
   });
 
   test('the two startup gates this workstream owns are replaced', () {
-    expect(platformStartupScreens().keys.toSet(), <StartupStage>{
-      StartupStage.tenantSelectionRequired,
-      StartupStage.bootstrapUnavailable,
-    });
+    expect(
+      platformStartupScreens().keys.toSet(),
+      <StartupStage>{
+        StartupStage.tenantSelectionRequired,
+        StartupStage.bootstrapUnavailable,
+      },
+    );
   });
 
   test('every tenant-scoped provider is registered for invalidation', () {
@@ -101,7 +107,10 @@ void main() {
     addTearDown(container.dispose);
 
     expect(pathsOf(container.read(featureRoutesProvider)), contains('/elsewhere'));
-    expect(container.read(startupScreenOverridesProvider).keys, contains(StartupStage.appLocked));
+    expect(
+      container.read(startupScreenOverridesProvider).keys,
+      contains(StartupStage.appLocked),
+    );
     expect(
       container.read(startupScreenOverridesProvider).keys,
       contains(StartupStage.tenantSelectionRequired),

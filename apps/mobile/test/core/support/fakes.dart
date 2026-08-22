@@ -78,14 +78,15 @@ ResponseBody jsonResponse(
   Object? body, {
   String contentType = 'application/json',
   Map<String, List<String>> headers = const <String, List<String>>{},
-}) => ResponseBody.fromString(
-  body == null ? '' : jsonEncode(body),
-  statusCode,
-  headers: <String, List<String>>{
-    Headers.contentTypeHeader: <String>[contentType],
-    ...headers,
-  },
-);
+}) =>
+    ResponseBody.fromString(
+      body == null ? '' : jsonEncode(body),
+      statusCode,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>[contentType],
+        ...headers,
+      },
+    );
 
 /// A bootstrap snapshot in the fully resolved state.
 BootstrapSnapshot readySnapshot({
@@ -93,35 +94,35 @@ BootstrapSnapshot readySnapshot({
   TenantBinding? binding,
   OperatingEntityState operatingEntityState = OperatingEntityState.assigned,
   CapabilityResolutionState capabilityState = CapabilityResolutionState.resolved,
-}) => BootstrapSnapshot(
-  userId: '11111111-1111-4111-8111-111111111111',
-  emailVerified: emailVerified,
-  sessionId: '22222222-2222-4222-8222-222222222222',
-  binding:
-      binding ??
-      const TenantBound(
-        TenantOption(
-          tenantId: '33333333-3333-4333-8333-333333333333',
-          name: 'Test Tenant',
-          roleHint: 'MEMBER',
-        ),
-      ),
-  jurisdictionState: JurisdictionState.verified,
-  jurisdictionId: 'jurisdiction-a',
-  operatingEntityState: operatingEntityState,
-  operatingEntity: operatingEntityState == OperatingEntityState.assigned
-      ? const OperatingEntitySummary(
-          id: '44444444-4444-4444-8444-444444444444',
-          name: 'Test Operating Entity',
-          jurisdictionRef: 'jurisdiction-a',
-          contactReference: 'privacy@example.invalid',
-        )
-      : null,
-  policyPackVersion: '1.0.0',
-  policyPackStatus: 'ACTIVE',
-  capabilityState: capabilityState,
-  capabilities: const <CapabilityView>[],
-);
+}) =>
+    BootstrapSnapshot(
+      userId: '11111111-1111-4111-8111-111111111111',
+      emailVerified: emailVerified,
+      sessionId: '22222222-2222-4222-8222-222222222222',
+      binding: binding ??
+          const TenantBound(
+            TenantOption(
+              tenantId: '33333333-3333-4333-8333-333333333333',
+              name: 'Test Tenant',
+              roleHint: 'MEMBER',
+            ),
+          ),
+      jurisdictionState: JurisdictionState.verified,
+      jurisdictionId: 'jurisdiction-a',
+      operatingEntityState: operatingEntityState,
+      operatingEntity: operatingEntityState == OperatingEntityState.assigned
+          ? const OperatingEntitySummary(
+              id: '44444444-4444-4444-8444-444444444444',
+              name: 'Test Operating Entity',
+              jurisdictionRef: 'jurisdiction-a',
+              contactReference: 'privacy@example.invalid',
+            )
+          : null,
+      policyPackVersion: '1.0.0',
+      policyPackStatus: 'ACTIVE',
+      capabilityState: capabilityState,
+      capabilities: const <CapabilityView>[],
+    );
 
 /// A failure that is neither authentication nor session expiry, for the
 /// bootstrap-unavailable paths.

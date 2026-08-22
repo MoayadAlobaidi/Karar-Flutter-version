@@ -18,9 +18,9 @@ import 'package:karar_mobile/features/authentication/presentation/routes/identit
 import 'package:karar_mobile/features/platform_bootstrap/presentation/platform_feature_registration.dart';
 
 Set<String> _pathsOf(List<RouteBase> routes) => <String>{
-  for (final route in routes)
-    if (route is GoRoute) route.path,
-};
+      for (final route in routes)
+        if (route is GoRoute) route.path,
+    };
 
 void main() {
   group('the merged feature surface keeps every contribution', () {
@@ -35,14 +35,22 @@ void main() {
     test('every identity route survives the merge', () {
       final merged = _pathsOf(container.read(featureRoutesProvider));
       for (final path in _pathsOf(identityRoutes())) {
-        expect(merged, contains(path), reason: 'identity route $path was dropped by the merge');
+        expect(
+          merged,
+          contains(path),
+          reason: 'identity route $path was dropped by the merge',
+        );
       }
     });
 
     test('every platform route survives the merge', () {
       final merged = _pathsOf(container.read(featureRoutesProvider));
       for (final path in _pathsOf(platformFeatureRoutes())) {
-        expect(merged, contains(path), reason: 'platform route $path was dropped by the merge');
+        expect(
+          merged,
+          contains(path),
+          reason: 'platform route $path was dropped by the merge',
+        );
       }
     });
 
@@ -68,8 +76,7 @@ void main() {
       expect(
         identity.intersection(platform),
         isEmpty,
-        reason:
-            'both workstreams claim the same startup stage; decide the '
+        reason: 'both workstreams claim the same startup stage; decide the '
             'precedence explicitly in feature_surface.dart rather than '
             'depending on merge order',
       );
@@ -89,27 +96,24 @@ void main() {
       final light = container.read(lightThemeProvider);
       final dark = container.read(darkThemeProvider);
 
-      expect(
-        light,
-        isNotNull,
-        reason:
-            'MaterialApp would fall back to the '
-            'framework default theme',
-      );
+      expect(light, isNotNull, reason: 'MaterialApp would fall back to the '
+          'framework default theme');
       expect(dark, isNotNull);
       expect(light!.brightness, Brightness.light);
       expect(dark!.brightness, Brightness.dark);
       expect(
         light.colorScheme.primary,
         isNot(dark.colorScheme.primary),
-        reason:
-            'both providers resolving to the same palette would mean one '
+        reason: 'both providers resolving to the same palette would mean one '
             'of them is not the theme it claims to be',
       );
     });
 
     test('no route path is contributed twice', () {
-      final all = <String>[..._pathsOf(identityRoutes()), ..._pathsOf(platformFeatureRoutes())];
+      final all = <String>[
+        ..._pathsOf(identityRoutes()),
+        ..._pathsOf(platformFeatureRoutes()),
+      ];
       expect(all.toSet().length, all.length, reason: 'duplicate route path');
     });
   });

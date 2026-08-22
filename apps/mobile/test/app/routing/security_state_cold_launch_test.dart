@@ -81,7 +81,11 @@ SessionTokens _tokens({String access = _accessToken, String refresh = _refreshTo
 
 /// One process, over storage that outlives it.
 final class _Process {
-  _Process({required this.secureStore, required this.preferences, required this.securityState}) {
+  _Process({
+    required this.secureStore,
+    required this.preferences,
+    required this.securityState,
+  }) {
     container = ProviderContainer(
       overrides: <Override>[
         ...featureSurfaceOverrides(),
@@ -101,7 +105,9 @@ final class _Process {
         keyValueStoreProvider.overrideWithValue(preferences),
         localSecurityStateStoreProvider.overrideWithValue(securityState),
         secureStoreProvider.overrideWithValue(secureStore),
-        loggerProvider.overrideWithValue(AppLogger(sink: logSink, minimumLevel: LogLevel.trace)),
+        loggerProvider.overrideWithValue(
+          AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
+        ),
         clockProvider.overrideWithValue(FixedClock(_now)),
         apiTransportProvider.overrideWithValue(ScriptedIdentityTransport()),
         rawApiTransportProvider.overrideWithValue(ScriptedIdentityTransport()),
@@ -116,7 +122,9 @@ final class _Process {
           // authenticator makes the lock screen stand the lock down, which
           // would dismantle the gate these tests are about.
           ScriptedLocalAuthenticator(
-            outcomes: const <LocalAuthOutcome>[LocalAuthFailed(LocalAuthFailureReason.lockedOut)],
+            outcomes: const <LocalAuthOutcome>[
+              LocalAuthFailed(LocalAuthFailureReason.lockedOut),
+            ],
           ),
         ),
       ],
@@ -141,7 +149,8 @@ final class _Process {
 
   Map<String, String> get secureEntries => secureStore.entries;
 
-  String get loggedText => logSink.records.map((LogRecord record) => record.toString()).join('\n');
+  String get loggedText =>
+      logSink.records.map((LogRecord record) => record.toString()).join('\n');
 
   /// The location the router is actually showing.
   String get location => router.routerDelegate.currentConfiguration.uri.path;
@@ -196,8 +205,7 @@ void _expectNoCredentialLeak(_Process process) {
     expect(
       process.loggedText,
       isNot(contains(secret)),
-      reason:
-          'a failure path logs more than the happy one, and is where a '
+      reason: 'a failure path logs more than the happy one, and is where a '
           'credential is most likely to be swept into a diagnostic',
     );
     final KeyValueStore preferences = process.preferences;
@@ -205,8 +213,7 @@ void _expectNoCredentialLeak(_Process process) {
       expect(
         preferences.writtenText,
         isNot(contains(secret)),
-        reason:
-            'preferences are unencrypted; nothing that can authenticate may '
+        reason: 'preferences are unencrypted; nothing that can authenticate may '
             'be written there',
       );
     }
@@ -215,8 +222,7 @@ void _expectNoCredentialLeak(_Process process) {
       expect(
         securityState.writes.join('\n'),
         isNot(contains(secret)),
-        reason:
-            'local security state records decisions ABOUT credentials, '
+        reason: 'local security state records decisions ABOUT credentials, '
             'never credentials',
       );
     }
@@ -237,11 +243,12 @@ void main() {
   _Process newProcess({
     KeyValueStore? withPreferences,
     LocalSecurityStateStore? withSecurityState,
-  }) => _Process(
-    secureStore: secureStore,
-    preferences: withPreferences ?? preferences,
-    securityState: withSecurityState ?? securityState,
-  );
+  }) =>
+      _Process(
+        secureStore: secureStore,
+        preferences: withPreferences ?? preferences,
+        securityState: withSecurityState ?? securityState,
+      );
 
   group('a security-state store that cannot be OPENED blocks startup', () {
     /// The composition root installs `UnavailableLocalSecurityStateStore` when
@@ -268,8 +275,7 @@ void main() {
       expect(
         process.coordinator.state,
         isA<LocalSecurityStateUnavailable>(),
-        reason:
-            'THE ASSERTION THAT FAILS WITHOUT THE FIX. The old gate read a '
+        reason: 'THE ASSERTION THAT FAILS WITHOUT THE FIX. The old gate read a '
             'store that could not answer as "the lock is off" and carried on',
       );
       expect(
@@ -284,8 +290,7 @@ void main() {
       expect(
         process.sessions.state,
         isA<NoSession>(),
-        reason:
-            'the security-state step runs BEFORE the restore, so the '
+        reason: 'the security-state step runs BEFORE the restore, so the '
             'keystore is not opened at all',
       );
       expect(process.sessions.tokens, isNull);
@@ -296,7 +301,9 @@ void main() {
       );
     });
 
-    testWidgets('it has its own route and cannot reach protected content', (tester) async {
+    testWidgets('it has its own route and cannot reach protected content', (
+      tester,
+    ) async {
       final _Process process = await launch(tester);
       expect(process.location, RoutePaths.securityUnavailable);
 
@@ -314,15 +321,16 @@ void main() {
         expect(
           process.location,
           RoutePaths.securityUnavailable,
-          reason:
-              'asking for $route must land back here in ONE hop, not '
+          reason: 'asking for $route must land back here in ONE hop, not '
               'oscillate against the single redirect',
         );
       }
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the screen offers a retry, and it is safe to press repeatedly', (tester) async {
+    testWidgets('the screen offers a retry, and it is safe to press repeatedly', (
+      tester,
+    ) async {
       final _Process process = await launch(tester);
 
       await _pressRetry(tester);
@@ -345,15 +353,16 @@ void main() {
       expect(
         recovered.coordinator.state,
         isA<Ready>(),
-        reason:
-            'an empty security-state store is a real answer — the lock is '
+        reason: 'an empty security-state store is a real answer — the lock is '
             'off — so the credential restores and startup completes',
       );
       expect(recovered.location, RoutePaths.home);
       _expectNoCredentialLeak(process);
     });
 
-    testWidgets('a COLD RESTART with the store still broken stays blocked', (tester) async {
+    testWidgets('a COLD RESTART with the store still broken stays blocked', (
+      tester,
+    ) async {
       await launch(tester);
 
       final _Process restarted = newProcess(
@@ -386,8 +395,7 @@ void main() {
       expect(
         process.lock.isDurablyDisabled,
         isFalse,
-        reason:
-            'no answer is not the same as "off", and only "off" may skip '
+        reason: 'no answer is not the same as "off", and only "off" may skip '
             'the gate',
       );
       expect(process.sessions.tokens, isNull);
@@ -404,14 +412,15 @@ void main() {
       expect(
         (state as LocalSecurityStateUnavailable).failure,
         isA<LocalSecurityStateCorruptFailure>(),
-        reason:
-            'a damaged value is not an absent one; only absent means the '
+        reason: 'a damaged value is not an absent one; only absent means the '
             'user never chose',
       );
       expect(process.sessions.tokens, isNull);
     });
 
-    testWidgets('the retry reaches the lock once the read works again', (tester) async {
+    testWidgets('the retry reaches the lock once the read works again', (
+      tester,
+    ) async {
       final _Process process = await launch(tester);
 
       securityState.unreadableFlags.remove(LocalSecurityFlag.appLockEnabled);
@@ -426,13 +435,14 @@ void main() {
       expect(
         process.sessions.tokens,
         isNull,
-        reason:
-            'the lock is evaluated before the restore, so a locked launch '
+        reason: 'the lock is evaluated before the restore, so a locked launch '
             'still holds a credential it has never read',
       );
     });
 
-    testWidgets('a COLD RESTART after the read failure is still locked', (tester) async {
+    testWidgets('a COLD RESTART after the read failure is still locked', (
+      tester,
+    ) async {
       await launch(tester);
       securityState.unreadableFlags.remove(LocalSecurityFlag.appLockEnabled);
 
@@ -445,7 +455,9 @@ void main() {
   });
 
   group('an ABSENT app-lock choice is a real answer', () {
-    testWidgets('startup completes normally and nothing is blocked', (tester) async {
+    testWidgets('startup completes normally and nothing is blocked', (
+      tester,
+    ) async {
       final _Process process = newProcess();
       await process.persistSessionMaterial();
       await process.boot(tester);
@@ -453,8 +465,7 @@ void main() {
       expect(
         process.coordinator.state,
         isA<Ready>(),
-        reason:
-            'the store answered and held nothing, which is a user who never '
+        reason: 'the store answered and held nothing, which is a user who never '
             'turned the lock on. Blocking here would make an opt-in control '
             'mandatory for everybody',
       );
@@ -464,7 +475,9 @@ void main() {
   });
 
   group('the plain preference store cannot move a security gate', () {
-    testWidgets('its in-memory fallback does not disable the lock', (tester) async {
+    testWidgets('its in-memory fallback does not disable the lock', (
+      tester,
+    ) async {
       // EXACTLY THE FAILURE THE OLD DESIGN HAD. `PreferencesKeyValueStore.open`
       // returns this store when the platform refuses; it holds nothing, and the
       // lock choice used to be read out of it.
@@ -476,16 +489,20 @@ void main() {
       expect(
         process.coordinator.state,
         isA<AppLocked>(),
-        reason:
-            'a preference store that lost everything must not be able to '
+        reason: 'a preference store that lost everything must not be able to '
             'switch the application lock off',
       );
       expect(process.location, RoutePaths.lock);
     });
 
-    testWidgets('a contradicting preference value is ignored entirely', (tester) async {
+    testWidgets('a contradicting preference value is ignored entirely', (
+      tester,
+    ) async {
       await securityState.write(LocalSecurityFlag.appLockEnabled, value: true);
-      await preferences.writeBool(PreferenceKey('security.app_lock_enabled'), value: false);
+      await preferences.writeBool(
+        PreferenceKey('security.app_lock_enabled'),
+        value: false,
+      );
       final _Process process = newProcess();
       await process.persistSessionMaterial();
       await process.boot(tester);
@@ -493,8 +510,7 @@ void main() {
       expect(
         process.coordinator.state,
         isA<AppLocked>(),
-        reason:
-            'unencrypted preferences are writable on a rooted device; a '
+        reason: 'unencrypted preferences are writable on a rooted device; a '
             'value there must not be able to open a gate',
       );
     });
@@ -511,7 +527,9 @@ void main() {
       return process;
     }
 
-    testWidgets('the user reaches sign-in, flagged rather than reassured', (tester) async {
+    testWidgets('the user reaches sign-in, flagged rather than reassured', (
+      tester,
+    ) async {
       final _Process process = await abandonWithFailingErase(tester);
 
       expect(process.secureEntries, isNotEmpty, reason: 'the erase must fail');
@@ -520,14 +538,15 @@ void main() {
       expect(
         (state as Unauthenticated).secureStorageUnavailable,
         isTrue,
-        reason:
-            'NO CLEAN-SUCCESS MESSAGE WHERE PERSISTENCE WAS NOT CONFIRMED. '
+        reason: 'NO CLEAN-SUCCESS MESSAGE WHERE PERSISTENCE WAS NOT CONFIRMED. '
             'The credential is still on disk',
       );
       expect(process.location, RoutePaths.signIn);
     });
 
-    testWidgets('a COLD RESTART refuses to restore what could not be erased', (tester) async {
+    testWidgets('a COLD RESTART refuses to restore what could not be erased', (
+      tester,
+    ) async {
       await abandonWithFailingErase(tester);
 
       final _Process restarted = newProcess();
@@ -565,17 +584,21 @@ void main() {
       expect(
         state,
         isA<SecurityRecoveryBlocked>(),
-        reason:
-            'THE DEFECT. Both failures together used to reach the same '
+        reason: 'THE DEFECT. Both failures together used to reach the same '
             'Unauthenticated state a clean sign-out reaches, so the client told '
             'the user the session was abandoned when nothing recorded that it '
             'was',
       );
-      expect((state as SecurityRecoveryBlocked).outcome, isA<AbandonmentNotDurable>());
+      expect(
+        (state as SecurityRecoveryBlocked).outcome,
+        isA<AbandonmentNotDurable>(),
+      );
       expect(state, isNot(isA<Unauthenticated>()));
     });
 
-    testWidgets('no protected content, no credential restore, its own route', (tester) async {
+    testWidgets('no protected content, no credential restore, its own route', (
+      tester,
+    ) async {
       final _Process process = await abandonWithCompoundFailure(tester);
       expect(process.location, RoutePaths.securityRecovery);
 
@@ -596,7 +619,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the surviving credential is withheld for the rest of the process', (tester) async {
+    testWidgets('the surviving credential is withheld for the rest of the process', (
+      tester,
+    ) async {
       final _Process process = await abandonWithCompoundFailure(tester);
 
       // The in-process latch, exercised through the real store. Nothing durable
@@ -607,13 +632,14 @@ void main() {
       expect(
         restored.valueOrNull,
         isNull,
-        reason:
-            'the object that failed to destroy the credential handed it '
+        reason: 'the object that failed to destroy the credential handed it '
             'straight back',
       );
     });
 
-    testWidgets('retrying repeatedly is safe and stays blocked while it fails', (tester) async {
+    testWidgets('retrying repeatedly is safe and stays blocked while it fails', (
+      tester,
+    ) async {
       final _Process process = await abandonWithCompoundFailure(tester);
 
       await _pressRetry(tester);
@@ -624,7 +650,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the retry resolves it once the keystore recovers', (tester) async {
+    testWidgets('the retry resolves it once the keystore recovers', (
+      tester,
+    ) async {
       final _Process process = await abandonWithCompoundFailure(tester);
 
       secureStore.failingOperations.remove(SecureStorageOperation.delete);
@@ -633,16 +661,20 @@ void main() {
       expect(
         process.coordinator.state,
         isA<Unauthenticated>(),
-        reason:
-            'the credential is provably gone, so the ordinary signed-out '
+        reason: 'the credential is provably gone, so the ordinary signed-out '
             'state is now an honest claim',
       );
-      expect((process.coordinator.state as Unauthenticated).secureStorageUnavailable, isFalse);
+      expect(
+        (process.coordinator.state as Unauthenticated).secureStorageUnavailable,
+        isFalse,
+      );
       expect(process.secureEntries, isEmpty);
       expect(process.location, RoutePaths.signIn);
     });
 
-    testWidgets('the retry resolves it once the marker can be written', (tester) async {
+    testWidgets('the retry resolves it once the marker can be written', (
+      tester,
+    ) async {
       final _Process process = await abandonWithCompoundFailure(tester);
 
       securityState.unwritableFlags.remove(LocalSecurityFlag.persistedSessionAbandoned);
@@ -652,8 +684,7 @@ void main() {
       expect(
         state,
         isA<Unauthenticated>(),
-        reason:
-            'the erase still fails, but the abandonment is now durable, '
+        reason: 'the erase still fails, but the abandonment is now durable, '
             'which is the survivable case',
       );
       expect((state as Unauthenticated).secureStorageUnavailable, isTrue);
@@ -681,8 +712,7 @@ void main() {
       expect(
         restarted.secureEntries,
         isNotEmpty,
-        reason:
-            'the credential is still there — withheld, not destroyed, which '
+        reason: 'the credential is still there — withheld, not destroyed, which '
             'is the honest state and the reason the screen says so',
       );
     });
@@ -720,7 +750,9 @@ void main() {
       _expectNoCredentialLeak(restarted);
     });
 
-    testWidgets('no credential reaches a log, a preference or security state', (tester) async {
+    testWidgets('no credential reaches a log, a preference or security state', (
+      tester,
+    ) async {
       final _Process process = await abandonWithCompoundFailure(tester);
 
       _expectNoCredentialLeak(process);
@@ -741,7 +773,9 @@ void main() {
       return process;
     }
 
-    testWidgets('the credential is gone and the user is not blocked', (tester) async {
+    testWidgets('the credential is gone and the user is not blocked', (
+      tester,
+    ) async {
       final _Process process = await abandonWithStuckMarker(tester);
 
       expect(process.secureEntries, isEmpty);
@@ -749,15 +783,16 @@ void main() {
       expect(
         state,
         isA<Unauthenticated>(),
-        reason:
-            'a stale marker guards nothing. Blocking here would trap a user '
+        reason: 'a stale marker guards nothing. Blocking here would trap a user '
             'over the failure of a cleanup step that has nothing left to clean',
       );
       expect((state as Unauthenticated).secureStorageUnavailable, isFalse);
       expect(process.location, RoutePaths.signIn);
     });
 
-    testWidgets('it is DISTINGUISHABLE from a failed token deletion', (tester) async {
+    testWidgets('it is DISTINGUISHABLE from a failed token deletion', (
+      tester,
+    ) async {
       // Same user-visible destination, different outcome — and the outcome is
       // what the log and any later decision read.
       final store = SecureTokenStore(
@@ -772,7 +807,9 @@ void main() {
       expect(await store.clear(), isA<CredentialErasedMarkerRetained>());
     });
 
-    testWidgets('a COLD RESTART does not reopen the old credential path', (tester) async {
+    testWidgets('a COLD RESTART does not reopen the old credential path', (
+      tester,
+    ) async {
       await abandonWithStuckMarker(tester);
 
       final _Process restarted = newProcess();
@@ -785,7 +822,9 @@ void main() {
       expect(restarted.location, RoutePaths.signIn);
     });
 
-    testWidgets('a new session is NOT permanently trapped once storage recovers', (tester) async {
+    testWidgets('a new session is NOT permanently trapped once storage recovers', (
+      tester,
+    ) async {
       final _Process process = await abandonWithStuckMarker(tester);
 
       // The store starts accepting writes again and the user signs in.
@@ -799,8 +838,7 @@ void main() {
       expect(
         process.coordinator.state,
         isA<Ready>(),
-        reason:
-            'a marker that survives a confirmed replacement is an endless '
+        reason: 'a marker that survives a confirmed replacement is an endless '
             'sign-in loop for a user who has done nothing wrong',
       );
 
@@ -812,15 +850,16 @@ void main() {
       expect(
         restarted.coordinator.state,
         isA<Ready>(),
-        reason:
-            'the replacement must survive a relaunch, or the trap is merely '
+        reason: 'the replacement must survive a relaunch, or the trap is merely '
             'deferred by one launch',
       );
     });
   });
 
   group('enabling the lock cannot succeed only in memory', () {
-    testWidgets('a refused write leaves the next cold launch unlocked', (tester) async {
+    testWidgets('a refused write leaves the next cold launch unlocked', (
+      tester,
+    ) async {
       final _Process process = newProcess();
       await process.persistSessionMaterial();
       await process.boot(tester);
@@ -835,20 +874,24 @@ void main() {
       expect(
         restarted.coordinator.state,
         isA<Ready>(),
-        reason:
-            'a lock the user was told was on would present itself here. It '
+        reason: 'a lock the user was told was on would present itself here. It '
             'never reached storage, so it does not — and the point of the typed '
             'rejection is that the user was never told otherwise',
       );
     });
 
-    testWidgets('a confirmed write DOES lock the next cold launch', (tester) async {
+    testWidgets('a confirmed write DOES lock the next cold launch', (
+      tester,
+    ) async {
       // Without this, the assertion above could pass because nothing works.
       final _Process process = newProcess();
       await process.persistSessionMaterial();
       await process.boot(tester);
 
-      expect(await process.lock.setEnabled(enabled: true), isA<AppLockChangeApplied>());
+      expect(
+        await process.lock.setEnabled(enabled: true),
+        isA<AppLockChangeApplied>(),
+      );
 
       final _Process restarted = newProcess();
       await restarted.boot(tester);

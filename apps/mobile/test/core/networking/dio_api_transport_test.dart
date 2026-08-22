@@ -32,12 +32,12 @@ import '../support/fakes.dart';
 final DateTime _now = DateTime.utc(2026, 8, 16, 12);
 
 SessionTokens _tokens(String access, {String sessionId = 'session-1'}) => SessionTokens(
-  accessToken: access,
-  accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
-  refreshToken: 'refresh-$access',
-  refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
-  sessionId: sessionId,
-);
+      accessToken: access,
+      accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
+      refreshToken: 'refresh-$access',
+      refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
+      sessionId: sessionId,
+    );
 
 final class _Harness {
   _Harness({
@@ -49,9 +49,9 @@ final class _Harness {
       jitterFraction: 0,
     ),
     bool authenticated = true,
-  }) : adapter = ScriptedHttpAdapter(handler),
-       secureStore = InMemorySecureStore(),
-       logSink = RecordingLogSink() {
+  })  : adapter = ScriptedHttpAdapter(handler),
+        secureStore = InMemorySecureStore(),
+        logSink = RecordingLogSink() {
     final dio = buildDio(
       baseUrl: Uri.parse('https://api.example.invalid'),
       defaultTimeouts: TimeoutProfile.standard,
@@ -63,7 +63,8 @@ final class _Harness {
       sessionManager: sessions,
       clock: FixedClock(_now),
       logger: logger,
-      refresh: refresh ?? (String _) async => Success<SessionTokens>(_tokens('renewed')),
+      refresh: refresh ??
+          (String _) async => Success<SessionTokens>(_tokens('renewed')),
     );
     transport = DioApiTransport(
       dio: dio,
@@ -102,7 +103,9 @@ void main() {
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
 
-      await harness.transport.send(const ApiRequest(method: HttpMethod.get, path: '/users/me'));
+      await harness.transport.send(
+        const ApiRequest(method: HttpMethod.get, path: '/users/me'),
+      );
 
       final sent = harness.adapter.requests.single;
       expect(sent.headers[correlationIdHeader], 'corr-1');
@@ -156,7 +159,9 @@ void main() {
       );
       expect(harness.adapter.requests.single.contentType, Headers.jsonContentType);
 
-      await harness.transport.send(const ApiRequest(method: HttpMethod.get, path: '/users/me'));
+      await harness.transport.send(
+        const ApiRequest(method: HttpMethod.get, path: '/users/me'),
+      );
       expect(harness.adapter.requests.last.contentType, isNull);
     });
 
@@ -180,7 +185,8 @@ void main() {
       );
 
       expect(harness.logSink.records, isNotEmpty);
-      final logged = harness.logSink.records.map((record) => record.toString()).join('\n');
+      final logged =
+          harness.logSink.records.map((record) => record.toString()).join('\n');
       expect(logged, isNot(contains('SALARY')));
       expect(logged, isNot(contains('ACME')));
       expect(logged, isNot(contains('120000')));
@@ -198,9 +204,7 @@ void main() {
         handler: (RequestOptions options, int _) async {
           // The switch happens while this request is in flight.
           await harness.sessions.adopt(_tokens('b', sessionId: 'session-2'));
-          return jsonResponse(200, <String, Object?>{
-            'accounts': <String>['organisation-a'],
-          });
+          return jsonResponse(200, <String, Object?>{'accounts': <String>['organisation-a']});
         },
       );
       addTearDown(harness.dispose);
@@ -225,9 +229,7 @@ void main() {
       harness = _Harness(
         handler: (RequestOptions options, int _) async {
           await harness.sessions.end(SessionEndReason.signedOut);
-          return jsonResponse(200, <String, Object?>{
-            'accounts': <String>['organisation-a'],
-          });
+          return jsonResponse(200, <String, Object?>{'accounts': <String>['organisation-a']});
         },
       );
       addTearDown(harness.dispose);
@@ -346,14 +348,18 @@ void main() {
   group('failure mapping', () {
     test('decodes a problem document into a typed failure', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(503, <String, Object?>{
-          'type': 'about:blank',
-          'title': 'Unavailable',
-          'status': 503,
-          'code': 'BOOTSTRAP_UNAVAILABLE',
-          'retryable': true,
-          'requestId': 'corr-1',
-        }, contentType: 'application/problem+json'),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          503,
+          <String, Object?>{
+            'type': 'about:blank',
+            'title': 'Unavailable',
+            'status': 503,
+            'code': 'BOOTSTRAP_UNAVAILABLE',
+            'retryable': true,
+            'requestId': 'corr-1',
+          },
+          contentType: 'application/problem+json',
+        ),
         retryPolicy: RetryPolicy.none,
       );
       addTearDown(harness.dispose);
@@ -367,11 +373,8 @@ void main() {
           isA<ApiException>().having(
             (ApiException exception) => exception.failure,
             'failure',
-            isA<BootstrapUnavailableFailure>().having(
-              (BootstrapUnavailableFailure f) => f.retryable,
-              'retryable',
-              isTrue,
-            ),
+            isA<BootstrapUnavailableFailure>()
+                .having((BootstrapUnavailableFailure f) => f.retryable, 'retryable', isTrue),
           ),
         ),
       );
@@ -399,8 +402,10 @@ void main() {
 
     test('a connection error is offline, and reachability follows', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) =>
-            throw DioException(requestOptions: options, type: DioExceptionType.connectionError),
+        handler: (RequestOptions options, int _) => throw DioException(
+          requestOptions: options,
+          type: DioExceptionType.connectionError,
+        ),
         retryPolicy: RetryPolicy.none,
       );
       addTearDown(harness.dispose);
@@ -421,8 +426,10 @@ void main() {
 
     test('an invalid certificate is never downgraded', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) =>
-            throw DioException(requestOptions: options, type: DioExceptionType.badCertificate),
+        handler: (RequestOptions options, int _) => throw DioException(
+          requestOptions: options,
+          type: DioExceptionType.badCertificate,
+        ),
         retryPolicy: RetryPolicy.none,
       );
       addTearDown(harness.dispose);
@@ -450,7 +457,11 @@ void main() {
 
       await expectLater(
         harness.transport.send(
-          ApiRequest(method: HttpMethod.get, path: '/users/me', cancellation: cancellation),
+          ApiRequest(
+            method: HttpMethod.get,
+            path: '/users/me',
+            cancellation: cancellation,
+          ),
         ),
         throwsA(
           isA<ApiException>().having(
@@ -468,10 +479,11 @@ void main() {
     test('a rejected GET is refreshed and replayed exactly once', () async {
       final harness = _Harness(
         handler: (RequestOptions options, int attempt) => attempt == 1
-            ? jsonResponse(401, <String, Object?>{
-                'status': 401,
-                'code': 'AUTHENTICATION_REQUIRED',
-              }, contentType: 'application/problem+json')
+            ? jsonResponse(
+                401,
+                <String, Object?>{'status': 401, 'code': 'AUTHENTICATION_REQUIRED'},
+                contentType: 'application/problem+json',
+              )
             : jsonResponse(200, <String, Object?>{'ok': true}),
       );
       addTearDown(harness.dispose);
@@ -489,10 +501,11 @@ void main() {
 
     test('a rejected POST is NOT replayed; the caller reissues it', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(401, <String, Object?>{
-          'status': 401,
-          'code': 'AUTHENTICATION_REQUIRED',
-        }, contentType: 'application/problem+json'),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          401,
+          <String, Object?>{'status': 401, 'code': 'AUTHENTICATION_REQUIRED'},
+          contentType: 'application/problem+json',
+        ),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
@@ -515,10 +528,11 @@ void main() {
     test('a rejected POST carrying an idempotency key IS replayed', () async {
       final harness = _Harness(
         handler: (RequestOptions options, int attempt) => attempt == 1
-            ? jsonResponse(401, <String, Object?>{
-                'status': 401,
-                'code': 'AUTHENTICATION_REQUIRED',
-              }, contentType: 'application/problem+json')
+            ? jsonResponse(
+                401,
+                <String, Object?>{'status': 401, 'code': 'AUTHENTICATION_REQUIRED'},
+                contentType: 'application/problem+json',
+              )
             : jsonResponse(201, <String, Object?>{'ok': true}),
       );
       addTearDown(harness.dispose);
@@ -538,10 +552,11 @@ void main() {
 
     test('a second 401 after a refresh is authoritative', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(401, <String, Object?>{
-          'status': 401,
-          'code': 'AUTHENTICATION_REQUIRED',
-        }, contentType: 'application/problem+json'),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          401,
+          <String, Object?>{'status': 401, 'code': 'AUTHENTICATION_REQUIRED'},
+          contentType: 'application/problem+json',
+        ),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
@@ -550,17 +565,23 @@ void main() {
         harness.transport.send(const ApiRequest(method: HttpMethod.get, path: '/users/me')),
         throwsA(isA<ApiException>()),
       );
-      expect(harness.adapter.requests.length, 2, reason: 'one replay only — no retry storm on 401');
+      expect(
+        harness.adapter.requests.length,
+        2,
+        reason: 'one replay only — no retry storm on 401',
+      );
       expect(harness.coordinator.refreshCallCount, 1);
     });
 
     test('a failed refresh ends the session and clears the credential', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(401, <String, Object?>{
-          'status': 401,
-          'code': 'AUTHENTICATION_REQUIRED',
-        }, contentType: 'application/problem+json'),
-        refresh: (String _) async => const Failed<SessionTokens>(AuthenticationRequiredFailure()),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          401,
+          <String, Object?>{'status': 401, 'code': 'AUTHENTICATION_REQUIRED'},
+          contentType: 'application/problem+json',
+        ),
+        refresh: (String _) async =>
+            const Failed<SessionTokens>(AuthenticationRequiredFailure()),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
@@ -583,10 +604,11 @@ void main() {
   group('retry', () {
     test('retries an idempotent request on a transient failure, bounded', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(503, <String, Object?>{
-          'status': 503,
-          'code': 'DEPENDENCY_UNAVAILABLE',
-        }, contentType: 'application/problem+json'),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          503,
+          <String, Object?>{'status': 503, 'code': 'DEPENDENCY_UNAVAILABLE'},
+          contentType: 'application/problem+json',
+        ),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
@@ -601,10 +623,11 @@ void main() {
 
     test('never retries an unsafe request without an idempotency key', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(503, <String, Object?>{
-          'status': 503,
-          'code': 'DEPENDENCY_UNAVAILABLE',
-        }, contentType: 'application/problem+json'),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          503,
+          <String, Object?>{'status': 503, 'code': 'DEPENDENCY_UNAVAILABLE'},
+          contentType: 'application/problem+json',
+        ),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
@@ -621,10 +644,11 @@ void main() {
 
     test('does not retry a rejected request', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(403, <String, Object?>{
-          'status': 403,
-          'code': 'NOT_AUTHORIZED',
-        }, contentType: 'application/problem+json'),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          403,
+          <String, Object?>{'status': 403, 'code': 'NOT_AUTHORIZED'},
+          contentType: 'application/problem+json',
+        ),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('live'));
@@ -640,10 +664,11 @@ void main() {
     test('recovers when a retry succeeds', () async {
       final harness = _Harness(
         handler: (RequestOptions options, int attempt) => attempt == 1
-            ? jsonResponse(503, <String, Object?>{
-                'status': 503,
-                'code': 'DEPENDENCY_UNAVAILABLE',
-              }, contentType: 'application/problem+json')
+            ? jsonResponse(
+                503,
+                <String, Object?>{'status': 503, 'code': 'DEPENDENCY_UNAVAILABLE'},
+                contentType: 'application/problem+json',
+              )
             : jsonResponse(200, <String, Object?>{'ok': true}),
       );
       addTearDown(harness.dispose);
@@ -661,10 +686,10 @@ void main() {
   group('logging', () {
     test('no log record ever contains a credential, a header or a body', () async {
       final harness = _Harness(
-        handler: (RequestOptions options, int _) => jsonResponse(200, <String, Object?>{
-          'displayName': 'Person Name',
-          'email': 'person@example.invalid',
-        }),
+        handler: (RequestOptions options, int _) => jsonResponse(
+          200,
+          <String, Object?>{'displayName': 'Person Name', 'email': 'person@example.invalid'},
+        ),
       );
       addTearDown(harness.dispose);
       await harness.sessions.adopt(_tokens('super-secret-access-token'));

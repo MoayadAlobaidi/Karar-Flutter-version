@@ -47,7 +47,8 @@ final List<RegExp> connectionClaims = <RegExp>[
 /// claim. Listed individually so that adding one is a decision a human takes:
 /// a substring scan cannot tell a denial from an assertion.
 const Map<String, String> denialExceptions = <String, String>{
-  'sourceNoLiveLinkNotice': 'the notice whose whole purpose is to state that no live link exists',
+  'sourceNoLiveLinkNotice':
+      'the notice whose whole purpose is to state that no live link exists',
 };
 
 /// Messages whose Arabic contains the letters of a scanned phrase as part of
@@ -56,7 +57,7 @@ const Map<String, String> denialExceptions = <String, String>{
 const Map<String, String> commonNounExceptions = <String, String>{
   'issuerKindTelcoFinancialServices':
       'اتصالات — the ordinary Arabic word for telecommunications, in the name '
-      'of an issuer KIND rather than a claim about reachability',
+          'of an issuer KIND rather than a claim about reachability',
 };
 
 void main() {
@@ -66,7 +67,10 @@ void main() {
       expect(dataOriginOfAccount(AccountOrigin.csv), DataOrigin.importedFromStatement);
       // The vocabulary member that reads like a provider connection. No path in
       // the platform can produce it, and it is not softened into one here.
-      expect(dataOriginOfAccount(AccountOrigin.externalProvider), DataOrigin.notStated);
+      expect(
+        dataOriginOfAccount(AccountOrigin.externalProvider),
+        DataOrigin.notStated,
+      );
       expect(dataOriginOfAccount(AccountOrigin.unrecognised), DataOrigin.notStated);
     });
 
@@ -93,8 +97,7 @@ void main() {
       for (final rail in ConnectionRail.values) {
         for (final availability in RailAvailability.values) {
           final origin = dataOriginOfRail(rail, availability);
-          final isExecutablePair =
-              availability == RailAvailability.executable &&
+          final isExecutablePair = availability == RailAvailability.executable &&
               (rail == ConnectionRail.manual || rail == ConnectionRail.userFileUpload);
           if (isExecutablePair) {
             continue;
@@ -117,7 +120,10 @@ void main() {
         ConnectionRail.directBankOrWalletApi,
         ConnectionRail.licensedAggregatorApi,
       ]) {
-        expect(dataOriginOfRail(rail, RailAvailability.executable), DataOrigin.notStated);
+        expect(
+          dataOriginOfRail(rail, RailAvailability.executable),
+          DataOrigin.notStated,
+        );
       }
     });
   });
@@ -142,8 +148,14 @@ void main() {
 
     test('a rail that cannot run reports nothing, whatever its name', () {
       for (final kind in SourceKind.values) {
-        expect(dataOriginOfSourceKind(kind, RailAvailability.notImplemented), DataOrigin.notStated);
-        expect(dataOriginOfSourceKind(kind, RailAvailability.unrecognised), DataOrigin.notStated);
+        expect(
+          dataOriginOfSourceKind(kind, RailAvailability.notImplemented),
+          DataOrigin.notStated,
+        );
+        expect(
+          dataOriginOfSourceKind(kind, RailAvailability.unrecognised),
+          DataOrigin.notStated,
+        );
       }
     });
   });
@@ -162,7 +174,11 @@ void main() {
     test('no member is named for a connection', () {
       for (final origin in DataOrigin.values) {
         for (final claim in connectionClaims) {
-          expect(claim.hasMatch(origin.name), isFalse, reason: '${origin.name} names a connection');
+          expect(
+            claim.hasMatch(origin.name),
+            isFalse,
+            reason: '${origin.name} names a connection',
+          );
         }
       }
     });
@@ -171,7 +187,10 @@ void main() {
   group('freshness is an observation, not a health claim', () {
     test('no source at all is distinct from a source that never delivered', () {
       expect(freshnessOf(const <AccountSourceLink>[]), isA<NoSourceObserved>());
-      expect(freshnessOf(<AccountSourceLink>[sourceLink()]), isA<NeverImported>());
+      expect(
+        freshnessOf(<AccountSourceLink>[sourceLink()]),
+        isA<NeverImported>(),
+      );
     });
 
     test('the last synchronised moment is the last SUCCESSFUL import', () {
@@ -189,14 +208,21 @@ void main() {
     test('a source that was observed but never imported is never called fresh', () {
       // `lastObservedAt` is in the fixture and is deliberately not read: "we
       // saw the source" and "an import finished" are different facts.
-      expect(freshnessOf(<AccountSourceLink>[sourceLink()]), isNot(isA<LastSynchronisedAt>()));
+      expect(
+        freshnessOf(<AccountSourceLink>[sourceLink()]),
+        isNot(isA<LastSynchronisedAt>()),
+      );
     });
   });
 
   group('the copy catalogue offers no way to claim a connection', () {
     test('no financial message in either language reads as a live link', () {
-      for (final path in <String>['lib/l10n/arb/app_en.arb', 'lib/l10n/arb/app_ar.arb']) {
-        final catalogue = jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
+      for (final path in <String>[
+        'lib/l10n/arb/app_en.arb',
+        'lib/l10n/arb/app_ar.arb',
+      ]) {
+        final catalogue =
+            jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
         final offenders = <String>[];
         for (final entry in catalogue.entries) {
           if (entry.key.startsWith('@') || entry.value is! String) {
@@ -217,8 +243,7 @@ void main() {
         expect(
           offenders,
           isEmpty,
-          reason:
-              '$path offers a string that reads as a live institution link. '
+          reason: '$path offers a string that reads as a live institution link. '
               'No issuer exposes an interface to this platform, so no such '
               'string may exist for a screen to reach for:\n${offenders.join('\n')}',
         );
@@ -228,15 +253,15 @@ void main() {
     test('every documented exception still denies rather than asserts', () {
       // An exception that stopped denying would be an assertion nobody
       // noticed. Both languages are checked, and both must still say "no".
-      final english =
-          jsonDecode(File('lib/l10n/arb/app_en.arb').readAsStringSync()) as Map<String, Object?>;
+      final english = jsonDecode(
+        File('lib/l10n/arb/app_en.arb').readAsStringSync(),
+      ) as Map<String, Object?>;
       for (final key in denialExceptions.keys) {
         final message = english[key]! as String;
         expect(
           message.toLowerCase(),
           anyOf(contains('no live link'), contains('does not connect')),
-          reason:
-              '$key is exempted as a denial (${denialExceptions[key]}) and '
+          reason: '$key is exempted as a denial (${denialExceptions[key]}) and '
               'no longer reads as one',
         );
       }
@@ -244,8 +269,9 @@ void main() {
 
     test('the documented common-noun exceptions are still real', () {
       // An exception that no longer applies is a hole nobody closed.
-      final arabic =
-          jsonDecode(File('lib/l10n/arb/app_ar.arb').readAsStringSync()) as Map<String, Object?>;
+      final arabic = jsonDecode(
+        File('lib/l10n/arb/app_ar.arb').readAsStringSync(),
+      ) as Map<String, Object?>;
       for (final key in commonNounExceptions.keys) {
         expect(
           arabic.containsKey(key),
@@ -256,8 +282,12 @@ void main() {
     });
 
     test('the notice that denies a live link is present in both languages', () {
-      for (final path in <String>['lib/l10n/arb/app_en.arb', 'lib/l10n/arb/app_ar.arb']) {
-        final catalogue = jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
+      for (final path in <String>[
+        'lib/l10n/arb/app_en.arb',
+        'lib/l10n/arb/app_ar.arb',
+      ]) {
+        final catalogue =
+            jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;
         expect(
           catalogue['sourceNoLiveLinkNotice'],
           isA<String>(),
@@ -267,8 +297,9 @@ void main() {
     });
 
     test('the derivation file declares no connected arm', () {
-      final source = File('lib/features/financial_accounts/domain/data_origin.dart')
-          .readAsStringSync();
+      final source = File(
+        'lib/features/financial_accounts/domain/data_origin.dart',
+      ).readAsStringSync();
       final body = source
           .split('\n')
           .map((String line) => line.trimLeft().startsWith('//') ? '' : line)

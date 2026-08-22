@@ -108,7 +108,9 @@ void main() {
         continue;
       }
       for (final RegExpMatch match in construction.allMatches(source.content)) {
-        offenders.add('${source.path}:${source.lineOf(match.start)}  ${match.group(1)}');
+        offenders.add(
+          '${source.path}:${source.lineOf(match.start)}  ${match.group(1)}',
+        );
       }
     }
 
@@ -179,7 +181,8 @@ bool _isReceiverCharacter(int unit) {
       unit == 0x21; // !
 }
 
-bool _isWhitespace(int unit) => unit == 0x20 || unit == 0x09 || unit == 0x0A || unit == 0x0D;
+bool _isWhitespace(int unit) =>
+    unit == 0x20 || unit == 0x09 || unit == 0x0A || unit == 0x0D;
 
 /// Message keys whose ICU placeholders are rendered by a number formatter.
 ///
@@ -193,14 +196,16 @@ Set<String> _numericMessageKeys() {
     return const <String>{};
   }
 
-  final Map<String, dynamic> catalogue = jsonDecode(arb.readAsStringSync()) as Map<String, dynamic>;
+  final Map<String, dynamic> catalogue =
+      jsonDecode(arb.readAsStringSync()) as Map<String, dynamic>;
   final Set<String> keys = <String>{};
 
   for (final MapEntry<String, dynamic> entry in catalogue.entries) {
     if (!entry.key.startsWith('@') || entry.value is! Map<String, dynamic>) {
       continue;
     }
-    final Object? placeholders = (entry.value as Map<String, dynamic>)['placeholders'];
+    final Object? placeholders =
+        (entry.value as Map<String, dynamic>)['placeholders'];
     if (placeholders is! Map<String, dynamic>) {
       continue;
     }
@@ -225,7 +230,8 @@ class _Source {
   /// cannot trip it, while line numbers stay accurate.
   final String content;
 
-  int lineOf(int offset) => '\n'.allMatches(content.substring(0, offset)).length + 1;
+  int lineOf(int offset) =>
+      '\n'.allMatches(content.substring(0, offset)).length + 1;
 }
 
 /// Every Dart file under `lib`, except generated output. Generated code is

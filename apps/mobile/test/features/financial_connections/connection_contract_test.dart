@@ -31,10 +31,8 @@ import 'package:karar_mobile/features/financial_connections/domain/financial_con
 
 import '../../core/support/fakes.dart';
 
-({ApiFinancialConnectionsRepository repository, FakeApiTransport transport}) repositoryFor(
-  Object? body, {
-  int statusCode = 200,
-}) {
+({ApiFinancialConnectionsRepository repository, FakeApiTransport transport})
+    repositoryFor(Object? body, {int statusCode = 200}) {
   final transport = FakeApiTransport(
     (ApiRequest request) async => ApiResponse(statusCode: statusCode, body: body),
   );
@@ -51,36 +49,40 @@ Map<String, Object?> connectionBody({
   bool impliesLiveInstitutionLink = false,
   String providerAccessStatus = 'NOT_IMPLEMENTED',
   String? institutionId = 'institution-0001',
-}) => <String, Object?>{
-  'connectionId': 'connection-0001',
-  'rail': rail,
-  'availability': availability,
-  'status': status,
-  'displayLabel': 'Statements I upload',
-  'institutionId': institutionId,
-  'link': <String, Object?>{
-    'impliesLiveInstitutionLink': impliesLiveInstitutionLink,
-    'providerAccessStatus': providerAccessStatus,
-  },
-  'createdAt': '2026-01-04T08:00:00Z',
-  'updatedAt': '2026-02-09T10:00:00Z',
-  'version': 1,
-};
+}) =>
+    <String, Object?>{
+      'connectionId': 'connection-0001',
+      'rail': rail,
+      'availability': availability,
+      'status': status,
+      'displayLabel': 'Statements I upload',
+      'institutionId': institutionId,
+      'link': <String, Object?>{
+        'impliesLiveInstitutionLink': impliesLiveInstitutionLink,
+        'providerAccessStatus': providerAccessStatus,
+      },
+      'createdAt': '2026-01-04T08:00:00Z',
+      'updatedAt': '2026-02-09T10:00:00Z',
+      'version': 1,
+    };
 
 Map<String, Object?> listBody(List<Map<String, Object?>> items) => <String, Object?>{
-  'items': items,
-  'page': <String, Object?>{
-    'limit': 50,
-    'returned': items.length,
-    'hasMore': false,
-    'nextCursor': null,
-  },
-};
+      'items': items,
+      'page': <String, Object?>{
+        'limit': 50,
+        'returned': items.length,
+        'hasMore': false,
+        'nextCursor': null,
+      },
+    };
 
 Future<Result<FinancialConnectionPage>> readOne(
   Map<String, Object?> body, {
   ConnectionStatusFilter? status,
-}) => repositoryFor(listBody(<Map<String, Object?>>[body])).repository.listOwn(status: status);
+}) =>
+    repositoryFor(listBody(<Map<String, Object?>>[body]))
+        .repository
+        .listOwn(status: status);
 
 void main() {
   group('the generated client issues the request', () {
@@ -104,7 +106,8 @@ void main() {
       expect(held.transport.requests.single.query['status'], isNull);
     });
 
-    test('a status this build cannot name is refused before anything is sent', () {
+    test('a status this build cannot name is refused before anything is sent',
+        () {
       expect(
         () => connectionStatusToDto(ConnectionStatus.unrecognised),
         throwsA(isA<ApiException>()),
@@ -114,7 +117,9 @@ void main() {
 
   group('a response that claims a live institution link is refused', () {
     test('impliesLiveInstitutionLink true is a contract violation', () async {
-      final result = await readOne(connectionBody(impliesLiveInstitutionLink: true));
+      final result = await readOne(
+        connectionBody(impliesLiveInstitutionLink: true),
+      );
       expect(result, isA<Failed<FinancialConnectionPage>>());
       final failure = (result as Failed<FinancialConnectionPage>).failure;
       expect(failure, isA<ContractViolationFailure>());
@@ -124,11 +129,14 @@ void main() {
       );
     });
 
-    test('a provider-access status this build cannot read is not implemented', () async {
+    test('a provider-access status this build cannot read is not implemented',
+        () async {
       // The generated enum answers `unknown` for a value added later. That is
       // not evidence that anything was implemented, so it reads as false and
       // the row is accepted rather than refused.
-      final result = await readOne(connectionBody(providerAccessStatus: 'SOMETHING_ADDED_LATER'));
+      final result = await readOne(
+        connectionBody(providerAccessStatus: 'SOMETHING_ADDED_LATER'),
+      );
       final page = (result as Success<FinancialConnectionPage>).value;
       expect(page.items.single.providerAccessImplemented, isFalse);
     });
@@ -137,21 +145,31 @@ void main() {
   group('a rail and its availability must agree', () {
     test('a bank interface reported as EXECUTABLE is refused', () async {
       final result = await readOne(
-        connectionBody(rail: 'DIRECT_BANK_OR_WALLET_API', availability: 'EXECUTABLE'),
+        connectionBody(
+          rail: 'DIRECT_BANK_OR_WALLET_API',
+          availability: 'EXECUTABLE',
+        ),
       );
       final failure = (result as Failed<FinancialConnectionPage>).failure;
       expect(failure, isA<ContractViolationFailure>());
-      expect((failure as ContractViolationFailure).location, 'ConnectionSummaryView.availability');
+      expect(
+        (failure as ContractViolationFailure).location,
+        'ConnectionSummaryView.availability',
+      );
     });
 
     test('a file upload reported as NOT_IMPLEMENTED is refused', () async {
       final result = await readOne(
-        connectionBody(rail: 'USER_FILE_UPLOAD', availability: 'NOT_IMPLEMENTED'),
+        connectionBody(
+          rail: 'USER_FILE_UPLOAD',
+          availability: 'NOT_IMPLEMENTED',
+        ),
       );
       expect(result, isA<Failed<FinancialConnectionPage>>());
     });
 
-    test('a bank interface reported as NOT_IMPLEMENTED is accepted and named', () async {
+    test('a bank interface reported as NOT_IMPLEMENTED is accepted and named',
+        () async {
       final result = await readOne(
         connectionBody(
           rail: 'DIRECT_BANK_OR_WALLET_API',
@@ -159,24 +177,26 @@ void main() {
           status: 'NOT_IMPLEMENTED',
         ),
       );
-      final connection = (result as Success<FinancialConnectionPage>).value.items.single;
+      final connection =
+          (result as Success<FinancialConnectionPage>).value.items.single;
       expect(connection.rail, ConnectionRail.directBankOrWalletApi);
       expect(connection.availability, RailAvailability.notImplemented);
       expect(connection.status, ConnectionStatus.notImplemented);
       expect(connection.isSuppliedBySubject, isFalse);
     });
 
-    test('a rail added after this build shipped is accepted, whatever it claims', () async {
+    test('a rail added after this build shipped is accepted, whatever it claims',
+        () async {
       final result = await readOne(
         connectionBody(rail: 'SOMETHING_ADDED_LATER', availability: 'EXECUTABLE'),
       );
-      final connection = (result as Success<FinancialConnectionPage>).value.items.single;
+      final connection =
+          (result as Success<FinancialConnectionPage>).value.items.single;
       expect(connection.rail, ConnectionRail.unrecognised);
       expect(
         connection.isSuppliedBySubject,
         isFalse,
-        reason:
-            'a rail this build cannot describe is not one the person '
+        reason: 'a rail this build cannot describe is not one the person '
             'supplied anything through',
       );
     });
@@ -193,23 +213,34 @@ void main() {
       };
       for (final entry in expected.entries) {
         final result = await readOne(
-          connectionBody(rail: 'MANUAL', availability: 'EXECUTABLE', status: entry.key),
+          connectionBody(
+            rail: 'MANUAL',
+            availability: 'EXECUTABLE',
+            status: entry.key,
+          ),
         );
-        final connection = (result as Success<FinancialConnectionPage>).value.items.single;
+        final connection =
+            (result as Success<FinancialConnectionPage>).value.items.single;
         expect(connection.status, entry.value, reason: entry.key);
       }
       // The three that a careless reading would merge are three distinct
       // members, so no label can collapse them without somebody choosing to.
-      expect(<ConnectionStatus>{
-        ConnectionStatus.notConfigured,
-        ConnectionStatus.unavailable,
-        ConnectionStatus.notImplemented,
-      }, hasLength(3));
+      expect(
+        <ConnectionStatus>{
+          ConnectionStatus.notConfigured,
+          ConnectionStatus.unavailable,
+          ConnectionStatus.notImplemented,
+        },
+        hasLength(3),
+      );
     });
 
     test('a status added after this build shipped is unrecognised', () async {
-      final result = await readOne(connectionBody(status: 'SOMETHING_ADDED_LATER'));
-      final connection = (result as Success<FinancialConnectionPage>).value.items.single;
+      final result = await readOne(
+        connectionBody(status: 'SOMETHING_ADDED_LATER'),
+      );
+      final connection =
+          (result as Success<FinancialConnectionPage>).value.items.single;
       expect(connection.status, ConnectionStatus.unrecognised);
     });
   });

@@ -20,7 +20,11 @@ import 'support/source_tree.dart';
 /// Only hidden capabilities belong here. A capability the client is allowed to
 /// render (transactions, budgets, goals) must NOT be listed: this is a test
 /// about non-disclosure, not a vocabulary ban.
-const List<String> _hiddenCapabilityNames = <String>['amanat', 'sealed_vault', 'sealedvault'];
+const List<String> _hiddenCapabilityNames = <String>[
+  'amanat',
+  'sealed_vault',
+  'sealedvault',
+];
 
 /// COMMENTS ARE NOT SCANNED, STRING LITERALS ARE.
 ///
@@ -86,8 +90,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'a withheld capability identifier must not be compiled into this '
+        reason: 'a withheld capability identifier must not be compiled into this '
             'client — not in a string table, a localisation catalogue, a route name '
             'or a test fixture. Naming it is enough to disclose that it exists. '
             'Found: $offenders',
@@ -116,8 +119,11 @@ void main() {
           final name = match.group(1)!;
           // Generated contract types carry a Dto suffix; judge the name under
           // it, so CapabilitiesSectionStateDto reads as a State enum.
-          final bare = name.endsWith('Dto') ? name.substring(0, name.length - 'Dto'.length) : name;
-          final describesState = stateSuffixes.any((String suffix) => bare.endsWith(suffix));
+          final bare = name.endsWith('Dto')
+              ? name.substring(0, name.length - 'Dto'.length)
+              : name;
+          final describesState =
+              stateSuffixes.any((String suffix) => bare.endsWith(suffix));
           // Judge the MEMBERS, not just the name. An inventory lists capability
           // identifiers; SourceCapabilityObservation lists OBSERVED,
           // NOT_OBSERVED and NOT_PROVIDED — an observation about one source,
@@ -126,9 +132,9 @@ void main() {
           // allow-list would have to grow with every new noun. What actually
           // matters is whether a capability identifier is written down here.
           final memberBlock = RegExp('enum\\s+$name\\b[^{]*\\{([^}]*)\\}').firstMatch(body);
-          final listsCapabilityIdentifiers =
-              memberBlock != null &&
-              _knownCapabilityIdentifiers.any((String id) => memberBlock.group(1)!.contains(id));
+          final listsCapabilityIdentifiers = memberBlock != null &&
+              _knownCapabilityIdentifiers
+                  .any((String id) => memberBlock.group(1)!.contains(id));
           if (!describesState && listsCapabilityIdentifiers) {
             offenders.add('${file.relativePath}: $name');
           }
@@ -137,8 +143,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'capabilities are resolved by the server and passed through as opaque '
+        reason: 'capabilities are resolved by the server and passed through as opaque '
             'identifiers. Found a client-side inventory in: $offenders',
       );
     });
@@ -168,7 +173,11 @@ void main() {
           .map((RegExpMatch match) => match.group(1)!)
           .toList(growable: false);
 
-      expect(renderings, isNotEmpty, reason: 'the generated models must define toString');
+      expect(
+        renderings,
+        isNotEmpty,
+        reason: 'the generated models must define toString',
+      );
       for (final rendering in renderings) {
         expect(
           RegExp(r'^\w+\(\)$').hasMatch(rendering),
@@ -180,8 +189,14 @@ void main() {
 
     test('no DTO toString interpolates a field', () {
       final models = readRequiredFile('lib/core/networking/generated/models.dart');
-      final interpolating = RegExp(r"String toString\(\) => '[^']*\$").allMatches(models).length;
-      expect(interpolating, 0, reason: 'a generated toString must not interpolate contract data');
+      final interpolating = RegExp(r"String toString\(\) => '[^']*\$")
+          .allMatches(models)
+          .length;
+      expect(
+        interpolating,
+        0,
+        reason: 'a generated toString must not interpolate contract data',
+      );
     });
   });
 }

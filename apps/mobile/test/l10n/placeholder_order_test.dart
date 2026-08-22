@@ -44,9 +44,8 @@ void main() {
     late Map<String, Object?> template;
 
     setUpAll(() {
-      template = jsonDecode(
-        File('${arbDirectory.path}/app_en.arb').readAsStringSync(),
-      ) as Map<String, Object?>;
+      template = jsonDecode(File('${arbDirectory.path}/app_en.arb').readAsStringSync())
+          as Map<String, Object?>;
     });
 
     test('every message declares its placeholders in reading order', () {
@@ -63,11 +62,13 @@ void main() {
         final List<String> used = appearanceOrder(entry.value! as String);
         // A placeholder declared but never used is a separate problem and not
         // this one; compare only what the message actually mentions, in order.
-        final List<String> declaredAndUsed = declared.keys.where(used.contains).toList();
+        final List<String> declaredAndUsed =
+            declared.keys.where(used.contains).toList();
         if (declaredAndUsed.isEmpty) continue;
 
         checked += 1;
-        final List<String> expected = used.where(declared.keys.contains).toList();
+        final List<String> expected =
+            used.where(declared.keys.contains).toList();
         if (!const ListEquality().equals(declaredAndUsed, expected)) {
           wrong[entry.key] = 'declared $declaredAndUsed, used $expected';
         }
@@ -76,18 +77,13 @@ void main() {
       expect(
         wrong,
         isEmpty,
-        reason:
-            'gen-l10n orders the generated parameters by the declaration, so '
+        reason: 'gen-l10n orders the generated parameters by the declaration, so '
             'these messages render their arguments in the wrong places: $wrong',
       );
       // A scan that reaches nothing passes for the wrong reason.
-      expect(
-        checked,
-        greaterThan(20),
-        reason:
-            'the scan found almost no messages with placeholders, which '
-            'means it is not reading the catalogue it thinks it is',
-      );
+      expect(checked, greaterThan(20),
+          reason: 'the scan found almost no messages with placeholders, which '
+              'means it is not reading the catalogue it thinks it is');
     });
 
     test('the check would catch the bug that prompted it', () {

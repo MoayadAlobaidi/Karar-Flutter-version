@@ -8,7 +8,9 @@ import '../harness.dart';
 void main() {
   group('typography', () {
     final KararTypography latin = KararTypography.forScript(KararScript.latin);
-    final KararTypography arabic = KararTypography.forScript(KararScript.arabic);
+    final KararTypography arabic = KararTypography.forScript(
+      KararScript.arabic,
+    );
 
     test('Arabic carries no letter spacing on any style', () {
       for (final TextStyle style in _allStyles(arabic)) {
@@ -39,7 +41,10 @@ void main() {
     });
 
     test('the numeric style uses tabular figures', () {
-      expect(latin.numeric.fontFeatures, contains(const FontFeature.tabularFigures()));
+      expect(
+        latin.numeric.fontFeatures,
+        contains(const FontFeature.tabularFigures()),
+      );
     });
 
     test('the shipped typeface is the platform default', () {
@@ -54,14 +59,23 @@ void main() {
     });
 
     test('the Arabic fallback chain names Naskh faces, not display faces', () {
-      expect(arabic.bodyMedium.fontFamilyFallback, contains('Noto Naskh Arabic'));
+      expect(
+        arabic.bodyMedium.fontFamilyFallback,
+        contains('Noto Naskh Arabic'),
+      );
     });
 
     test('script is chosen by language, not by country', () {
-      expect(KararTypography.scriptOf(const Locale('ar', 'QA')), KararScript.arabic);
+      expect(
+        KararTypography.scriptOf(const Locale('ar', 'QA')),
+        KararScript.arabic,
+      );
       expect(KararTypography.scriptOf(const Locale('fa')), KararScript.arabic);
       expect(KararTypography.scriptOf(const Locale('ur')), KararScript.arabic);
-      expect(KararTypography.scriptOf(const Locale('en', 'GB')), KararScript.latin);
+      expect(
+        KararTypography.scriptOf(const Locale('en', 'GB')),
+        KararScript.latin,
+      );
     });
   });
 
@@ -110,7 +124,9 @@ void main() {
         KararScript.arabic,
       );
       expect(
-        KararTokens.resolve(locale: KararLocalization.english).typography.script,
+        KararTokens.resolve(locale: KararLocalization.english)
+            .typography
+            .script,
         KararScript.latin,
       );
     });
@@ -127,7 +143,9 @@ void main() {
   });
 
   group('theme', () {
-    testWidgets('the theme carries the token extension', (WidgetTester tester) async {
+    testWidgets('the theme carries the token extension', (
+      WidgetTester tester,
+    ) async {
       late KararTokens seen;
       await pumpKarar(
         tester,
@@ -165,18 +183,25 @@ void main() {
       );
     });
 
-    testWidgets('applyTokens keeps other theme extensions', (WidgetTester tester) async {
+    testWidgets('applyTokens keeps other theme extensions', (
+      WidgetTester tester,
+    ) async {
       final ThemeData base = KararTheme.light().copyWith(
         extensions: <ThemeExtension<dynamic>>[const _OtherExtension()],
       );
-      final ThemeData result = KararTheme.applyTokens(base, KararTokens.resolve());
+      final ThemeData result = KararTheme.applyTokens(
+        base,
+        KararTokens.resolve(),
+      );
       expect(result.extension<_OtherExtension>(), isNotNull);
       expect(result.extension<KararTokens>(), isNotNull);
     });
   });
 
   group('motion', () {
-    testWidgets('durations collapse when the platform reduces motion', (WidgetTester tester) async {
+    testWidgets('durations collapse when the platform reduces motion', (
+      WidgetTester tester,
+    ) async {
       late Duration reduced;
       late Duration normal;
       await pumpKarar(
@@ -285,5 +310,8 @@ class _OtherExtension extends ThemeExtension<_OtherExtension> {
   _OtherExtension copyWith() => this;
 
   @override
-  _OtherExtension lerp(covariant ThemeExtension<_OtherExtension>? other, double t) => this;
+  _OtherExtension lerp(
+    covariant ThemeExtension<_OtherExtension>? other,
+    double t,
+  ) => this;
 }

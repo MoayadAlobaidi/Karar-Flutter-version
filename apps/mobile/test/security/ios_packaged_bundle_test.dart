@@ -86,7 +86,8 @@ const String _environmentKey = iosBuildEnvironmentKey;
 const String _undeterminedEnvironment = 'UNSET';
 
 bool get _buildIsExpected {
-  final String value = (Platform.environment[_gateVariable] ?? '').trim().toLowerCase();
+  final String value =
+      (Platform.environment[_gateVariable] ?? '').trim().toLowerCase();
   return value == '1' || value == 'true' || value == 'yes';
 }
 
@@ -166,8 +167,7 @@ void main() {
       expect(
         bundle.environment,
         isNotEmpty,
-        reason:
-            '${bundle.label} carries no $_environmentKey, which means the '
+        reason: '${bundle.label} carries no $_environmentKey, which means the '
             '`Verify Packaged Bundle` build phase did not run. Nothing below '
             'this line can be trusted about that artifact, and the phase is '
             'also what confines the local HTTP exception.',
@@ -175,8 +175,7 @@ void main() {
       expect(
         <String>[...declaredEnvironments(), _undeterminedEnvironment],
         contains(bundle.environment),
-        reason:
-            '${bundle.label} was built for an unrecognised environment '
+        reason: '${bundle.label} was built for an unrecognised environment '
             "'${bundle.environment}'",
       );
     });
@@ -190,58 +189,60 @@ void main() {
     // all four. Nothing below reads a build setting or an xcconfig; it reads
     // what the artifact calls itself and compares it with what the Android
     // build calls the same environment.
-    forEachBundle('is named for the environment it was compiled for, and named the same '
-        'thing the Android build names it', (PackagedIosBundle bundle) {
-      if (bundle.environment == _undeterminedEnvironment) {
-        // A build that never learned its environment is refused outright by
-        // the packaging phase now, so this cannot be produced. If one is
-        // present it is stale, and the assertion below would compare an
-        // identifier against a rule that has no entry for it.
-        fail(
-          '${bundle.label} records $_environmentKey=$_undeterminedEnvironment, '
-          'so it was packaged with no compiled environment. Such a build is '
-          'refused now — its identifier belongs to no environment — so this '
-          'artifact predates the rule and must be rebuilt rather than read.',
+    forEachBundle(
+      'is named for the environment it was compiled for, and named the same '
+      'thing the Android build names it',
+      (PackagedIosBundle bundle) {
+        if (bundle.environment == _undeterminedEnvironment) {
+          // A build that never learned its environment is refused outright by
+          // the packaging phase now, so this cannot be produced. If one is
+          // present it is stale, and the assertion below would compare an
+          // identifier against a rule that has no entry for it.
+          fail(
+            '${bundle.label} records $_environmentKey=$_undeterminedEnvironment, '
+            'so it was packaged with no compiled environment. Such a build is '
+            'refused now — its identifier belongs to no environment — so this '
+            'artifact predates the rule and must be rebuilt rather than read.',
+          );
+        }
+        expect(
+          bundle.bundleIdentifier,
+          counterpartBundleIdentifier(bundle.environment),
+          reason: '${bundle.label} was compiled for ${bundle.environment} and '
+              "the artifact calls itself '${bundle.bundleIdentifier}'. The "
+              'expected value is derived from the same rule the Android build '
+              'applies through applicationIdSuffix, which is the identifier the '
+              "Android artifact's data-extraction rules name as this "
+              'application. A mismatch means one platform is installing over — '
+              'or claiming to be the counterpart of — a different application.',
         );
-      }
-      expect(
-        bundle.bundleIdentifier,
-        counterpartBundleIdentifier(bundle.environment),
-        reason:
-            '${bundle.label} was compiled for ${bundle.environment} and '
-            "the artifact calls itself '${bundle.bundleIdentifier}'. The "
-            'expected value is derived from the same rule the Android build '
-            'applies through applicationIdSuffix, which is the identifier the '
-            "Android artifact's data-extraction rules name as this "
-            'application. A mismatch means one platform is installing over — '
-            'or claiming to be the counterpart of — a different application.',
-      );
-    });
+      },
+    );
 
-    forEachBundle('never carries the production identifier unless it is a PRODUCTION build', (
-      PackagedIosBundle bundle,
-    ) {
-      // Stated separately from the equality above because it is the property
-      // that matters on its own, and because it holds for a reason the
-      // equality does not carry: only PRODUCTION maps to the empty suffix, so
-      // only PRODUCTION may be unsuffixed. A LOCAL artifact wearing the
-      // production identifier installs OVER the production application on a
-      // device that has both.
-      final String production = counterpartBundleIdentifier('PRODUCTION');
-      if (bundle.environment == 'PRODUCTION') {
-        expect(bundle.bundleIdentifier, production);
-        return;
-      }
-      expect(
-        bundle.bundleIdentifier,
-        isNot(production),
-        reason:
-            '${bundle.label} was compiled for ${bundle.environment} and '
-            "carries the production identifier '$production'. It would "
-            'install over the production application, and any App Store '
-            'record for that identifier would accept it.',
-      );
-    });
+    forEachBundle(
+      'never carries the production identifier unless it is a PRODUCTION build',
+      (PackagedIosBundle bundle) {
+        // Stated separately from the equality above because it is the property
+        // that matters on its own, and because it holds for a reason the
+        // equality does not carry: only PRODUCTION maps to the empty suffix, so
+        // only PRODUCTION may be unsuffixed. A LOCAL artifact wearing the
+        // production identifier installs OVER the production application on a
+        // device that has both.
+        final String production = counterpartBundleIdentifier('PRODUCTION');
+        if (bundle.environment == 'PRODUCTION') {
+          expect(bundle.bundleIdentifier, production);
+          return;
+        }
+        expect(
+          bundle.bundleIdentifier,
+          isNot(production),
+          reason: '${bundle.label} was compiled for ${bundle.environment} and '
+              "carries the production identifier '$production'. It would "
+              'install over the production application, and any App Store '
+              'record for that identifier would accept it.',
+        );
+      },
+    );
 
     // The two artifacts, compared to each other rather than each to the rule.
     //
@@ -250,76 +251,79 @@ void main() {
     // but this one. When both have been built the stronger statement is
     // available and costs nothing: the identifier in the packaged plist and the
     // applicationId in the merged manifest are the same string.
-    forEachBundle('matches the identifier the built Android artifact carries for the same '
-        'environment', (PackagedIosBundle bundle) {
-      final Map<String, String> android = builtAndroidApplicationIds();
-      final Map<String, String> environments = environmentByBundleIdentifier();
-      final Iterable<MapEntry<String, String>> sameEnvironment = android.entries.where(
-        (MapEntry<String, String> entry) => environments[entry.value] == bundle.environment,
-      );
-      if (sameEnvironment.isEmpty) {
-        // Nothing to compare with. Not a failure here: this suite's gate
-        // promises an iOS artifact, and the Android gate in
-        // platform_hardening_test.dart is what promises the other half.
-        return;
-      }
-      for (final MapEntry<String, String> entry in sameEnvironment) {
+    forEachBundle(
+      'matches the identifier the built Android artifact carries for the same '
+      'environment',
+      (PackagedIosBundle bundle) {
+        final Map<String, String> android = builtAndroidApplicationIds();
+        final Map<String, String> environments = environmentByBundleIdentifier();
+        final Iterable<MapEntry<String, String>> sameEnvironment = android
+            .entries
+            .where((MapEntry<String, String> entry) =>
+                environments[entry.value] == bundle.environment);
+        if (sameEnvironment.isEmpty) {
+          // Nothing to compare with. Not a failure here: this suite's gate
+          // promises an iOS artifact, and the Android gate in
+          // platform_hardening_test.dart is what promises the other half.
+          return;
+        }
+        for (final MapEntry<String, String> entry in sameEnvironment) {
+          expect(
+            bundle.bundleIdentifier,
+            entry.value,
+            reason: '${bundle.label} carries '
+                "'${bundle.bundleIdentifier}' and ${entry.key} carries "
+                "'${entry.value}' for the same environment "
+                '${bundle.environment}',
+          );
+        }
+      },
+    );
+
+    forEachBundle(
+      'carries no localhost exception unless it is a LOCAL build',
+      (PackagedIosBundle bundle) {
+        if (bundle.environment == _localEnvironment) {
+          return;
+        }
         expect(
-          bundle.bundleIdentifier,
-          entry.value,
-          reason:
-              '${bundle.label} carries '
-              "'${bundle.bundleIdentifier}' and ${entry.key} carries "
-              "'${entry.value}' for the same environment "
-              '${bundle.environment}',
+          bundle.appTransportSecurity,
+          isNull,
+          reason: '${bundle.label} was built for ${bundle.environment} and '
+              'carries an App Transport Security dictionary: '
+              '${bundle.appTransportSecurity}. A deployed artifact must rely on '
+              'the platform transport policy, with no exception domain of any '
+              'kind. Only a Debug build compiled for LOCAL may have one.',
         );
-      }
-    });
+      },
+    );
 
-    forEachBundle('carries no localhost exception unless it is a LOCAL build', (
-      PackagedIosBundle bundle,
-    ) {
-      if (bundle.environment == _localEnvironment) {
-        return;
-      }
-      expect(
-        bundle.appTransportSecurity,
-        isNull,
-        reason:
-            '${bundle.label} was built for ${bundle.environment} and '
-            'carries an App Transport Security dictionary: '
-            '${bundle.appTransportSecurity}. A deployed artifact must rely on '
-            'the platform transport policy, with no exception domain of any '
-            'kind. Only a Debug build compiled for LOCAL may have one.',
-      );
-    });
-
-    forEachBundle('grants a LOCAL build the narrow loopback exception and nothing wider', (
-      PackagedIosBundle bundle,
-    ) {
-      if (bundle.environment != _localEnvironment) {
-        return;
-      }
-      final Map<String, Object?>? ats = bundle.appTransportSecurity;
-      if (ats == null) {
-        // Permitted, not required: a LOCAL build that never talks to the
-        // loopback API does not need the exception.
-        return;
-      }
-      expect(
-        ats['NSExceptionDomains'],
-        <String, Object?>{
-          'localhost': <String, Object?>{
-            'NSExceptionAllowsInsecureHTTPLoads': true,
-            'NSIncludesSubdomains': false,
+    forEachBundle(
+      'grants a LOCAL build the narrow loopback exception and nothing wider',
+      (PackagedIosBundle bundle) {
+        if (bundle.environment != _localEnvironment) {
+          return;
+        }
+        final Map<String, Object?>? ats = bundle.appTransportSecurity;
+        if (ats == null) {
+          // Permitted, not required: a LOCAL build that never talks to the
+          // loopback API does not need the exception.
+          return;
+        }
+        expect(
+          ats['NSExceptionDomains'],
+          <String, Object?>{
+            'localhost': <String, Object?>{
+              'NSExceptionAllowsInsecureHTTPLoads': true,
+              'NSIncludesSubdomains': false,
+            },
           },
-        },
-        reason:
-            'the LOCAL exception is for the loopback host of the machine '
-            'of the developer and for nothing else. No routable host, and no '
-            'subdomain, may be added to it.',
-      );
-    });
+          reason: 'the LOCAL exception is for the loopback host of the machine '
+              'of the developer and for nothing else. No routable host, and no '
+              'subdomain, may be added to it.',
+        );
+      },
+    );
 
     forEachBundle('carries no key that permits arbitrary loads', (PackagedIosBundle bundle) {
       final Map<String, Object?>? ats = bundle.appTransportSecurity;
@@ -329,16 +333,14 @@ void main() {
       expect(
         ats['NSAllowsArbitraryLoads'],
         anyOf(isNull, isFalse),
-        reason:
-            '${bundle.label} permits arbitrary loads, which switches off '
+        reason: '${bundle.label} permits arbitrary loads, which switches off '
             'transport security for every host at once',
       );
       for (final String key in _blanketAtsKeys) {
         expect(
           ats.containsKey(key),
           isFalse,
-          reason:
-              '$key is present in ${bundle.label}. It relaxes transport '
+          reason: '$key is present in ${bundle.label}. It relaxes transport '
               'security for a whole class of traffic rather than for one host.',
         );
       }
@@ -349,54 +351,53 @@ void main() {
       expect(
         purpose,
         isA<String>(),
-        reason:
-            '${bundle.label} has no Face ID purpose string. iOS terminates '
+        reason: '${bundle.label} has no Face ID purpose string. iOS terminates '
             'the process on the first Face ID evaluation without one, so this '
             'is a crash rather than a missing disclosure.',
       );
       expect((purpose! as String).trim(), isNotEmpty);
     });
 
-    forEachBundle('carries the Face ID purpose string in English and in Arabic', (
-      PackagedIosBundle bundle,
-    ) {
-      final localized = <String, String>{};
-      for (final String language in <String>['en', 'ar']) {
-        final File strings = File('${bundle.directory.path}/$language.lproj/InfoPlist.strings');
-        expect(
-          strings.existsSync(),
-          isTrue,
-          reason:
-              '${bundle.label} has no $language.lproj/InfoPlist.strings. '
-              'The purpose string would fall back to the development '
-              'language for every user reading that language, and a system '
-              'prompt nobody reads is a disclosure that was not made.',
-        );
-        final Object? value = decodePlist(strings)['NSFaceIDUsageDescription'];
-        expect(
-          value,
-          isA<String>(),
-          reason:
-              '$language.lproj/InfoPlist.strings in ${bundle.label} '
-              'carries no NSFaceIDUsageDescription',
-        );
-        localized[language] = (value! as String).trim();
-        expect(localized[language], isNotEmpty);
-      }
+    forEachBundle(
+      'carries the Face ID purpose string in English and in Arabic',
+      (PackagedIosBundle bundle) {
+        final localized = <String, String>{};
+        for (final String language in <String>['en', 'ar']) {
+          final File strings =
+              File('${bundle.directory.path}/$language.lproj/InfoPlist.strings');
+          expect(
+            strings.existsSync(),
+            isTrue,
+            reason: '${bundle.label} has no $language.lproj/InfoPlist.strings. '
+                'The purpose string would fall back to the development '
+                'language for every user reading that language, and a system '
+                'prompt nobody reads is a disclosure that was not made.',
+          );
+          final Object? value =
+              decodePlist(strings)['NSFaceIDUsageDescription'];
+          expect(
+            value,
+            isA<String>(),
+            reason: '$language.lproj/InfoPlist.strings in ${bundle.label} '
+                'carries no NSFaceIDUsageDescription',
+          );
+          localized[language] = (value! as String).trim();
+          expect(localized[language], isNotEmpty);
+        }
 
-      expect(
-        localized['ar'],
-        matches(RegExp(r'[؀-ۿ]')),
-        reason:
-            'the Arabic purpose string in ${bundle.label} contains no '
-            'Arabic script, so it is an untranslated copy of the English',
-      );
-      expect(
-        localized['ar'],
-        isNot(equals(localized['en'])),
-        reason: 'the two localizations are identical in ${bundle.label}',
-      );
-    });
+        expect(
+          localized['ar'],
+          matches(RegExp(r'[؀-ۿ]')),
+          reason: 'the Arabic purpose string in ${bundle.label} contains no '
+              'Arabic script, so it is an untranslated copy of the English',
+        );
+        expect(
+          localized['ar'],
+          isNot(equals(localized['en'])),
+          reason: 'the two localizations are identical in ${bundle.label}',
+        );
+      },
+    );
   });
 
   // The assertions above prove what the artifact on this machine contains. The
@@ -413,8 +414,7 @@ void main() {
       expect(
         plist,
         isNot(contains('NSAppTransportSecurity')),
-        reason:
-            'the shared plist is the one file whose contents reach every '
+        reason: 'the shared plist is the one file whose contents reach every '
             'configuration, so no transport exception may be declared in it',
       );
       expect(plist, isNot(contains('NSExceptionDomains')));
@@ -429,8 +429,7 @@ void main() {
         expect(
           fragment,
           isNot(contains(key)),
-          reason:
-              '$key relaxes transport security for a whole class of '
+          reason: '$key relaxes transport security for a whole class of '
               'traffic rather than for one host',
         );
       }
@@ -439,8 +438,7 @@ void main() {
       expect(
         project,
         isNot(contains('ATSLocalDevelopment.plist in Resources')),
-        reason:
-            'the fragment is merged into the packaged plist by a build '
+        reason: 'the fragment is merged into the packaged plist by a build '
             'phase. Copying it into the bundle as a resource would put the '
             'exception in every artifact again, by a different route.',
       );
@@ -451,8 +449,7 @@ void main() {
       expect(
         project,
         contains('Verify Packaged Bundle'),
-        reason:
-            'without this phase no artifact gets the exception — which is '
+        reason: 'without this phase no artifact gets the exception — which is '
             'the safe direction — but nothing checks the packaged plist for an '
             'arbitrary-load key either',
       );
@@ -471,24 +468,21 @@ void main() {
           'if [ "\${CONFIGURATION:-}" = "Debug" ] && '
           r'[ "$compiled_environment" = "LOCAL" ]; then',
         ),
-        reason:
-            'the exception must be granted on proof, never on the absence '
+        reason: 'the exception must be granted on proof, never on the absence '
             'of a reason to withhold it. An undetermined environment gets no '
             'exception, and no configuration other than Debug gets one at all.',
       );
       expect(
         script,
         contains('KARAR_ENV=*'),
-        reason:
-            'the environment is read from the compiled dart-defines, '
+        reason: 'the environment is read from the compiled dart-defines, '
             'because the Xcode configuration does not know it: a Debug build '
             'can be compiled for DEV',
       );
       expect(
         script,
         contains('plutil -remove NSAppTransportSecurity'),
-        reason:
-            'anything an earlier phase or an incremental build left behind '
+        reason: 'anything an earlier phase or an incremental build left behind '
             'must be removed, not just not-added',
       );
       expect(
@@ -514,8 +508,7 @@ void main() {
       expect(
         project,
         contains('InfoPlist.strings in Resources'),
-        reason:
-            'a .strings file that is not in the resources build phase is '
+        reason: 'a .strings file that is not in the resources build phase is '
             'not in the built application, and the localization silently does '
             'nothing',
       );
@@ -565,16 +558,14 @@ void main() {
       expect(
         script,
         contains('. "\$identity_rules"'),
-        reason:
-            'the build phase must source $iosBundleIdentityRules rather than '
+        reason: 'the build phase must source $iosBundleIdentityRules rather than '
             'carry its own copy of the suffix table. A second copy is a second '
             'rule the moment either is edited.',
       );
       expect(
         script,
         contains(r'karar_bundle_identifier "$compiled_environment"'),
-        reason:
-            'the expected identifier must come from the compiled '
+        reason: 'the expected identifier must come from the compiled '
             'environment. Deriving it from CONFIGURATION would make a Debug '
             'build of DEV a LOCAL artifact.',
       );
@@ -583,8 +574,7 @@ void main() {
       expect(
         project,
         contains('Scripts/bundle_identity.sh'),
-        reason:
-            'the rule file must be an input of the build phase, so an edit '
+        reason: 'the rule file must be an input of the build phase, so an edit '
             'to the suffix table is an edit the build notices',
       );
     });
@@ -598,16 +588,14 @@ void main() {
       expect(
         script,
         contains(r'[ -n "$compiled_environment" ] || fail "Missing environment:'),
-        reason:
-            'a build compiled with no KARAR_ENV must fail rather than be '
+        reason: 'a build compiled with no KARAR_ENV must fail rather than be '
             'given an identifier that belongs to an environment nobody asked '
             'for',
       );
       expect(
         script,
         contains('|| fail "Unknown environment:'),
-        reason:
-            'an environment outside the rule must fail rather than fall '
+        reason: 'an environment outside the rule must fail rather than fall '
             'through to the empty suffix, which is production\'s',
       );
     });
@@ -616,8 +604,7 @@ void main() {
       expect(
         script,
         contains(r'[ "$final_identifier" = "$expected_identifier" ] || fail'),
-        reason:
-            'a rewrite that reported success and did not take would '
+        reason: 'a rewrite that reported success and did not take would '
             'otherwise ship the wrong identity. This also covers the path where '
             'nothing was rewritten, so the final value is asserted on every '
             'branch rather than only the corrected one.',
@@ -628,8 +615,7 @@ void main() {
       expect(
         script,
         contains(r'[ "$seed_is_an_identity" -eq 1 ] || fail'),
-        reason:
-            'a typo in an xcconfig produces an identifier that still starts '
+        reason: 'a typo in an xcconfig produces an identifier that still starts '
             'with the owned prefix. Unchecked, it would be silently overwritten '
             'here and never seen.',
       );
@@ -640,37 +626,36 @@ void main() {
       // that crosses the two axes.
       final Set<String> issued = environmentByBundleIdentifier().keys.toSet();
       final Map<String, String> rule = environmentSuffixRule();
-      for (final String xcconfig in <String>[iosDebugXcconfig, iosReleaseXcconfig]) {
+      for (final String xcconfig in <String>[
+        iosDebugXcconfig,
+        iosReleaseXcconfig,
+      ]) {
         final String? suffix = xcconfigBundleIdSuffix(xcconfig);
         expect(
           suffix,
           isNotNull,
-          reason:
-              '$xcconfig sets no KARAR_BUNDLE_ID_SUFFIX, so '
+          reason: '$xcconfig sets no KARAR_BUNDLE_ID_SUFFIX, so '
               'PRODUCT_BUNDLE_IDENTIFIER resolves with an empty expansion and '
               'the seed is production\'s by accident rather than by decision',
         );
         expect(
           issued,
           contains('${baseApplicationId()}$suffix'),
-          reason:
-              "$xcconfig seeds the suffix '$suffix', which no environment "
+          reason: "$xcconfig seeds the suffix '$suffix', which no environment "
               'in $rule maps to',
         );
       }
       expect(
         xcconfigBundleIdSuffix(iosDebugXcconfig),
         rule['LOCAL'],
-        reason:
-            'the Debug default is the developer environment, on the same '
+        reason: 'the Debug default is the developer environment, on the same '
             'rule as `-Pkarar.env` defaulting to LOCAL on Android: a build with '
             'no arguments can never be production',
       );
       expect(
         xcconfigBundleIdSuffix(iosReleaseXcconfig),
         rule['PRODUCTION'],
-        reason:
-            'Release and Profile are the configurations a production '
+        reason: 'Release and Profile are the configurations a production '
             'artifact is cut from, and PRODUCT_BUNDLE_IDENTIFIER is what a '
             'provisioning profile is ever selected by',
       );
@@ -689,8 +674,7 @@ void main() {
           r'if [ -n "${DEVELOPMENT_TEAM:-}" ] || '
           r'[ -n "${PROVISIONING_PROFILE_SPECIFIER:-}" ]; then',
         ),
-        reason:
-            'a signed build needs per-environment Xcode configurations and '
+        reason: 'a signed build needs per-environment Xcode configurations and '
             'per-environment App Store records, and both need a real Apple Team '
             'ID. Until one exists out of band, that path is refused rather than '
             'approximated.',
@@ -698,8 +682,7 @@ void main() {
       expect(
         script,
         contains('Cross-platform identity is not configured for signed builds'),
-        reason:
-            'the refusal must say what is missing, or an operator reads it '
+        reason: 'the refusal must say what is missing, or an operator reads it '
             'as a bug in the build',
       );
 
@@ -711,8 +694,7 @@ void main() {
             .map((RegExpMatch match) => match.group(1)!.trim())
             .where((String value) => value.isNotEmpty && value != '""'),
         isEmpty,
-        reason:
-            'no Apple Team ID exists for this project, and a syntactically '
+        reason: 'no Apple Team ID exists for this project, and a syntactically '
             'valid one committed here would be an identity that is not ours',
       );
     });

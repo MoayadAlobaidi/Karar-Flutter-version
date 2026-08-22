@@ -19,12 +19,12 @@ import 'package:karar_mobile/core/utilities/clock.dart';
 final DateTime _now = DateTime.utc(2026, 8, 16, 12);
 
 SessionTokens _tokens() => SessionTokens(
-  accessToken: 'access-token-value',
-  accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
-  refreshToken: 'refresh-token-value',
-  refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
-  sessionId: 'session-1',
-);
+      accessToken: 'access-token-value',
+      accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
+      refreshToken: 'refresh-token-value',
+      refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
+      sessionId: 'session-1',
+    );
 
 void main() {
   group('SecureTokenStore', () {
@@ -62,7 +62,10 @@ void main() {
       expect(read.isFailure, isTrue);
       final failure = read.failureOrNull;
       expect(failure, isA<SecureStorageUnavailableFailure>());
-      expect((failure! as SecureStorageUnavailableFailure).operation, SecureStorageOperation.read);
+      expect(
+        (failure! as SecureStorageUnavailableFailure).operation,
+        SecureStorageOperation.read,
+      );
     });
 
     test('a write failure is reported rather than swallowed', () async {
@@ -114,7 +117,10 @@ void main() {
   group('SessionManager', () {
     test('restore reports a storage failure and holds no session', () async {
       final backing = InMemorySecureStore()..failWith = SecureStorageOperation.read;
-      final manager = SessionManager(store: SecureTokenStore(backing), logger: AppLogger.silent);
+      final manager = SessionManager(
+        store: SecureTokenStore(backing),
+        logger: AppLogger.silent,
+      );
       addTearDown(manager.dispose);
 
       final restored = await manager.restore();
@@ -127,7 +133,10 @@ void main() {
 
     test('ending a session wipes storage and notifies once', () async {
       final backing = InMemorySecureStore();
-      final manager = SessionManager(store: SecureTokenStore(backing), logger: AppLogger.silent);
+      final manager = SessionManager(
+        store: SecureTokenStore(backing),
+        logger: AppLogger.silent,
+      );
       addTearDown(manager.dispose);
       final reasons = <SessionEndReason>[];
       manager.onSessionEnded.listen((SessionEnded ended) => reasons.add(ended.reason));
@@ -144,7 +153,10 @@ void main() {
 
     test('the in-memory credential is dropped even when the wipe fails', () async {
       final backing = InMemorySecureStore();
-      final manager = SessionManager(store: SecureTokenStore(backing), logger: AppLogger.silent);
+      final manager = SessionManager(
+        store: SecureTokenStore(backing),
+        logger: AppLogger.silent,
+      );
       addTearDown(manager.dispose);
       await manager.adopt(_tokens());
       backing.failWith = SecureStorageOperation.delete;
@@ -156,7 +168,10 @@ void main() {
 
     test('adoption survives a persistence failure for this launch only', () async {
       final backing = InMemorySecureStore()..failWith = SecureStorageOperation.write;
-      final manager = SessionManager(store: SecureTokenStore(backing), logger: AppLogger.silent);
+      final manager = SessionManager(
+        store: SecureTokenStore(backing),
+        logger: AppLogger.silent,
+      );
       addTearDown(manager.dispose);
 
       final adopted = await manager.adopt(_tokens());
@@ -238,7 +253,10 @@ void main() {
   group('abandonPersistedSession never materialises a session', () {
     test('it does not read the credential it is erasing', () async {
       final counting = _ReadCountingStore(InMemorySecureStore());
-      final manager = SessionManager(store: SecureTokenStore(counting), logger: AppLogger.silent);
+      final manager = SessionManager(
+        store: SecureTokenStore(counting),
+        logger: AppLogger.silent,
+      );
       addTearDown(manager.dispose);
 
       await manager.adopt(_tokens());
@@ -249,8 +267,7 @@ void main() {
       expect(
         counting.reads,
         0,
-        reason:
-            'the store was read ${counting.reads} time(s) while abandoning. '
+        reason: 'the store was read ${counting.reads} time(s) while abandoning. '
             'A restore-then-end implementation reaches the same final state '
             'while briefly holding the session the lock exists to prevent.',
       );
@@ -271,8 +288,7 @@ void main() {
       expect(
         counting.reads,
         greaterThan(0),
-        reason:
-            'a genuine read must register, or the zero asserted above is '
+        reason: 'a genuine read must register, or the zero asserted above is '
             'measuring nothing',
       );
     });
@@ -303,7 +319,8 @@ void main() {
       expect(cleared.isDurablyResolved, isTrue);
     });
 
-    test('erase confirmed, marker unremovable: CREDENTIAL_ERASED_MARKER_RETAINED', () async {
+    test('erase confirmed, marker unremovable: CREDENTIAL_ERASED_MARKER_RETAINED',
+        () async {
       final securityState = InMemoryLocalSecurityStateStore()
         ..unremovableFlags.add(LocalSecurityFlag.persistedSessionAbandoned)
         ..unwritableFlags.add(LocalSecurityFlag.persistedSessionAbandoned);
@@ -317,18 +334,20 @@ void main() {
       expect(
         cleared,
         isA<CredentialErasedMarkerRetained>(),
-        reason:
-            'the credential is gone, so this is safe — but it is not the '
+        reason: 'the credential is gone, so this is safe — but it is not the '
             'same event as a clean erase and must not be reported as one',
       );
       expect(cleared.credentialIsGone, isTrue);
     });
 
-    test('erase failed, marker durable: CREDENTIAL_PERSISTED_BUT_DURABLY_INVALIDATED', () async {
-      final backing = InMemorySecureStore()..failingOperations.add(SecureStorageOperation.delete);
+    test('erase failed, marker durable: CREDENTIAL_PERSISTED_BUT_DURABLY_INVALIDATED',
+        () async {
+      final backing = InMemorySecureStore()
+        ..failingOperations.add(SecureStorageOperation.delete);
       final store = SecureTokenStore(
         backing,
-        invalidation: PersistedSessionInvalidation(InMemoryLocalSecurityStateStore()),
+        invalidation:
+            PersistedSessionInvalidation(InMemoryLocalSecurityStateStore()),
       );
 
       final cleared = await store.clear();
@@ -337,8 +356,7 @@ void main() {
       expect(
         cleared.credentialIsGone,
         isFalse,
-        reason:
-            'the credential is still in the keystore and the caller must '
+        reason: 'the credential is still in the keystore and the caller must '
             'not tell the user it was removed',
       );
       expect(
@@ -349,7 +367,8 @@ void main() {
     });
 
     test('erase failed, marker write refused: ABANDONMENT_NOT_DURABLE', () async {
-      final backing = InMemorySecureStore()..failingOperations.add(SecureStorageOperation.delete);
+      final backing = InMemorySecureStore()
+        ..failingOperations.add(SecureStorageOperation.delete);
       final securityState = InMemoryLocalSecurityStateStore()
         ..unwritableFlags.add(LocalSecurityFlag.persistedSessionAbandoned);
       final store = SecureTokenStore(
@@ -362,19 +381,21 @@ void main() {
       expect(
         cleared,
         isA<AbandonmentNotDurable>(),
-        reason:
-            'the erase failed AND the marker did not reach the platform. '
+        reason: 'the erase failed AND the marker did not reach the platform. '
             'Reporting that as recorded is the exact overstatement that made '
             'this mechanism look stronger than it was.',
       );
       expect(cleared.isDurablyResolved, isFalse);
     });
 
-    test('erase failed, whole store unavailable: SECURITY_STATE_UNAVAILABLE', () async {
-      final backing = InMemorySecureStore()..failingOperations.add(SecureStorageOperation.delete);
+    test('erase failed, whole store unavailable: SECURITY_STATE_UNAVAILABLE',
+        () async {
+      final backing = InMemorySecureStore()
+        ..failingOperations.add(SecureStorageOperation.delete);
       final store = SecureTokenStore(
         backing,
-        invalidation: const PersistedSessionInvalidation(UnavailableLocalSecurityStateStore()),
+        invalidation:
+            const PersistedSessionInvalidation(UnavailableLocalSecurityStateStore()),
       );
 
       final cleared = await store.clear();
@@ -382,8 +403,7 @@ void main() {
       expect(
         cleared,
         isA<AbandonmentSecurityStateUnavailable>(),
-        reason:
-            'no marker was even attempted; the remedy differs from a '
+        reason: 'no marker was even attempted; the remedy differs from a '
             'refused write and the two are reported apart',
       );
       expect(cleared.isDurablyResolved, isFalse);
@@ -402,8 +422,7 @@ void main() {
       expect(
         cleared,
         isA<CredentialErased>(),
-        reason:
-            'nothing survived the erase, so there is nothing for a marker '
+        reason: 'nothing survived the erase, so there is nothing for a marker '
             'to guard and a failed marker write is irrelevant',
       );
     });
@@ -426,13 +445,13 @@ void main() {
       expect(
         order.indexOf('write:persistedSessionAbandoned'),
         lessThan(order.indexOf('delete')),
-        reason:
-            'the intent must reach storage before the operation it '
+        reason: 'the intent must reach storage before the operation it '
             'describes is attempted',
       );
     });
 
-    test('the erase is attempted even when the marker could not be written', () async {
+    test('the erase is attempted even when the marker could not be written',
+        () async {
       // A marker that would not persist is a reason to report honestly, never
       // a reason to leave the credential where it is.
       final securityState = InMemoryLocalSecurityStateStore()
@@ -452,7 +471,8 @@ void main() {
 
   // THE MARKER IS THE ONLY THING BETWEEN A FAILED ERASE AND A RESTORED SESSION.
   group('a raised marker refuses to hand back a credential', () {
-    test('a surviving credential is never returned while the marker stands', () async {
+    test('a surviving credential is never returned while the marker stands',
+        () async {
       final backing = InMemorySecureStore();
       final securityState = InMemoryLocalSecurityStateStore();
       final store = SecureTokenStore(
@@ -475,14 +495,14 @@ void main() {
       expect(
         read.isFailure,
         isTrue,
-        reason:
-            'the delete still fails, so the store reports the storage '
+        reason: 'the delete still fails, so the store reports the storage '
             'failure. It must never hand the survivor back "just this once"',
       );
       expect(read.valueOrNull, isNull);
     });
 
-    test('the erase completes and the marker clears as soon as storage recovers', () async {
+    test('the erase completes and the marker clears as soon as storage recovers',
+        () async {
       final backing = InMemorySecureStore();
       final securityState = InMemoryLocalSecurityStateStore();
       final store = SecureTokenStore(
@@ -506,13 +526,13 @@ void main() {
       expect(
         await securityState.read(LocalSecurityFlag.persistedSessionAbandoned),
         isNot(isA<SecurityStateValue>().having((v) => v.value, 'value', isTrue)),
-        reason:
-            'a marker left standing over nothing would destroy the next '
+        reason: 'a marker left standing over nothing would destroy the next '
             'credential written',
       );
     });
 
-    test('the IN-PROCESS latch holds even when nothing durable could be written', () async {
+    test('the IN-PROCESS latch holds even when nothing durable could be written',
+        () async {
       // The marker write is refused and the delete is refused, so nothing on
       // disk records the abandonment. Within this process the latch still must.
       final backing = InMemorySecureStore();
@@ -532,8 +552,7 @@ void main() {
       expect(
         read.valueOrNull,
         isNull,
-        reason:
-            'the credential the user gave up was handed back by the very '
+        reason: 'the credential the user gave up was handed back by the very '
             'object that failed to destroy it',
       );
       expect(read.isFailure, isTrue);
@@ -554,8 +573,7 @@ void main() {
       expect(
         read.isFailure,
         isTrue,
-        reason:
-            'the one record that could forbid this credential cannot be '
+        reason: 'the one record that could forbid this credential cannot be '
             'read, so the credential is not read either',
       );
       expect(read.failureOrNull, isA<LocalSecurityStateUnavailableFailure>());
@@ -581,7 +599,8 @@ void main() {
 
   // A FAIL-CLOSED MARKER MUST NOT BECOME A PERMANENT LOCKOUT.
   group('a confirmed replacement supersedes the marker', () {
-    test('signing in again clears the marker and the credential survives a restart', () async {
+    test('signing in again clears the marker and the credential survives a restart',
+        () async {
       final backing = InMemorySecureStore();
       final securityState = InMemoryLocalSecurityStateStore();
       final store = SecureTokenStore(
@@ -606,13 +625,13 @@ void main() {
       expect(
         read.valueOrNull,
         isNotNull,
-        reason:
-            'a marker that survives a successful sign-in is an endless '
+        reason: 'a marker that survives a successful sign-in is an endless '
             'sign-in loop for a user who has done nothing wrong',
       );
     });
 
-    test('a marker that could not be stood down makes the WRITE report failure', () async {
+    test('a marker that could not be stood down makes the WRITE report failure',
+        () async {
       // The credential is on disk and a marker forbidding it is on disk too, so
       // the next launch will destroy what was just written. That is correct and
       // the caller has to be told, rather than left to discover it.
@@ -649,7 +668,8 @@ void main() {
       );
     });
 
-    test('a removal that is refused with no fallback is reported as failed', () async {
+    test('a removal that is refused with no fallback is reported as failed',
+        () async {
       final securityState = InMemoryLocalSecurityStateStore()
         ..unremovableFlags.add(LocalSecurityFlag.persistedSessionAbandoned)
         ..unwritableFlags.add(LocalSecurityFlag.persistedSessionAbandoned);
@@ -662,7 +682,8 @@ void main() {
     });
   });
 
-  group('no credential material reaches local security state or a rendering', () {
+  group('no credential material reaches local security state or a rendering',
+      () {
     test('every value written is a boolean flag, never anything else', () async {
       final securityState = InMemoryLocalSecurityStateStore();
       final store = SecureTokenStore(
@@ -678,8 +699,7 @@ void main() {
         expect(
           written,
           anyOf(endsWith('=true'), endsWith('=false')),
-          reason:
-              'local security state carries decisions, never material: '
+          reason: 'local security state carries decisions, never material: '
               'found "$written"',
         );
         expect(written, isNot(contains('access-token-value')));
@@ -707,6 +727,7 @@ void main() {
   });
 }
 
+
 /// Counts reads of the underlying store, so a test can assert that an
 /// operation did NOT consult it.
 final class _ReadCountingStore implements SecureStore {
@@ -730,6 +751,7 @@ final class _ReadCountingStore implements SecureStore {
   @override
   Future<Result<void>> deleteAll() => _inner.deleteAll();
 }
+
 
 /// A security-state store that records the order of its operations.
 final class _OrderingSecurityState implements LocalSecurityStateStore {

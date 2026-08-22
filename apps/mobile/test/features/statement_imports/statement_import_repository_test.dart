@@ -46,69 +46,72 @@ Map<String, Object?> countsBody({
   int validRowCount = 8,
   int invalidRowCount = 2,
   int exactDuplicateCount = 0,
-}) => <String, Object?>{
-  'rowCount': rowCount,
-  'validRowCount': validRowCount,
-  'invalidRowCount': invalidRowCount,
-  'exactDuplicateCount': exactDuplicateCount,
-  'probableDuplicateCount': 0,
-  'committedTransactionCount': 0,
-};
+}) =>
+    <String, Object?>{
+      'rowCount': rowCount,
+      'validRowCount': validRowCount,
+      'invalidRowCount': invalidRowCount,
+      'exactDuplicateCount': exactDuplicateCount,
+      'probableDuplicateCount': 0,
+      'committedTransactionCount': 0,
+    };
 
 Map<String, Object?> importBody({
   String state = 'SOURCE_STORED',
   String? refusalCode,
   String reconciliation = 'NOT_AVAILABLE',
   int version = 4,
-}) => <String, Object?>{
-  'importId': '11111111-1111-4111-8111-111111111111',
-  'accountId': '22222222-2222-4222-8222-222222222222',
-  'connectionId': null,
-  'state': state,
-  'stateChangedAt': '2026-04-03T10:00:00Z',
-  'mediaType': 'text/csv',
-  'rail': 'USER_FILE_UPLOAD',
-  'availability': 'EXECUTABLE',
-  'hasStoredSource': true,
-  'retentionState': 'DECIDED',
-  'versions': null,
-  'counts': countsBody(),
-  'reconciliationStatus': reconciliation,
-  'statedBalance': null,
-  'refusalCode': refusalCode,
-  'awaitsDecision': true,
-  'committedAt': null,
-  'erasedAt': null,
-  'createdAt': '2026-04-03T09:00:00Z',
-  'version': version,
-};
+}) =>
+    <String, Object?>{
+      'importId': '11111111-1111-4111-8111-111111111111',
+      'accountId': '22222222-2222-4222-8222-222222222222',
+      'connectionId': null,
+      'state': state,
+      'stateChangedAt': '2026-04-03T10:00:00Z',
+      'mediaType': 'text/csv',
+      'rail': 'USER_FILE_UPLOAD',
+      'availability': 'EXECUTABLE',
+      'hasStoredSource': true,
+      'retentionState': 'DECIDED',
+      'versions': null,
+      'counts': countsBody(),
+      'reconciliationStatus': reconciliation,
+      'statedBalance': null,
+      'refusalCode': refusalCode,
+      'awaitsDecision': true,
+      'committedAt': null,
+      'erasedAt': null,
+      'createdAt': '2026-04-03T09:00:00Z',
+      'version': version,
+    };
 
 Map<String, Object?> previewBody({
   List<Map<String, Object?>> rowErrors = const <Map<String, Object?>>[],
   int? reportedErrorCount,
   int totalErrorCount = 0,
   String? refusalCode,
-}) => <String, Object?>{
-  'importId': '11111111-1111-4111-8111-111111111111',
-  'accountId': '22222222-2222-4222-8222-222222222222',
-  'connectionId': null,
-  'state': 'REVIEW_REQUIRED',
-  'hasStoredSource': true,
-  'counts': countsBody(),
-  'reconciliationStatus': 'MATCHED',
-  'versions': null,
-  'refusalCode': refusalCode,
-  'awaitsDecision': true,
-  'reportedErrorCount': reportedErrorCount ?? rowErrors.length,
-  'totalErrorCount': totalErrorCount,
-  'rowErrors': rowErrors,
-  'page': <String, Object?>{
-    'limit': 50,
-    'returned': rowErrors.length,
-    'hasMore': false,
-    'nextCursor': null,
-  },
-};
+}) =>
+    <String, Object?>{
+      'importId': '11111111-1111-4111-8111-111111111111',
+      'accountId': '22222222-2222-4222-8222-222222222222',
+      'connectionId': null,
+      'state': 'REVIEW_REQUIRED',
+      'hasStoredSource': true,
+      'counts': countsBody(),
+      'reconciliationStatus': 'MATCHED',
+      'versions': null,
+      'refusalCode': refusalCode,
+      'awaitsDecision': true,
+      'reportedErrorCount': reportedErrorCount ?? rowErrors.length,
+      'totalErrorCount': totalErrorCount,
+      'rowErrors': rowErrors,
+      'page': <String, Object?>{
+        'limit': 50,
+        'returned': rowErrors.length,
+        'hasMore': false,
+        'nextCursor': null,
+      },
+    };
 
 void main() {
   group('the upload hands the platform exactly the bytes it was given', () {
@@ -129,8 +132,7 @@ void main() {
       expect(
         identical(raw!.bytes, bytes),
         isTrue,
-        reason:
-            'the bytes must reach the transport as the same object. A copy '
+        reason: 'the bytes must reach the transport as the same object. A copy '
             'is a place for a transformation to be added later.',
       );
     });
@@ -142,13 +144,14 @@ void main() {
       return harness.repository
           .uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]))
           .then((_) {
-            expect(harness.transport.requests.single.rawBody!.mediaType, 'text/csv');
-          });
+        expect(harness.transport.requests.single.rawBody!.mediaType, 'text/csv');
+      });
     });
 
     test('the upload is replayable, so a mid-flight failure is not a guess', () async {
       final harness = repositoryFor(importBody());
-      await harness.repository.uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]));
+      await harness.repository
+          .uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]));
       expect(harness.transport.requests.single.idempotencyKey, isNotNull);
       expect(harness.transport.requests.single.isReplayable, isTrue);
     });
@@ -163,10 +166,8 @@ void main() {
         importBody(state: 'DUPLICATE', refusalCode: 'SOURCE_ALREADY_IMPORTED'),
       );
 
-      final result = await harness.repository.uploadSource(
-        importId: 'abc',
-        bytes: Uint8List.fromList(<int>[1]),
-      );
+      final result = await harness.repository
+          .uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]));
 
       final snapshot = (result as Success<StatementImportSnapshot>).value;
       expect(snapshot.state, ImportLifecycleState.duplicate);
@@ -177,10 +178,8 @@ void main() {
       final harness = repositoryFor(
         importBody(state: 'FAILED', refusalCode: 'SPREADSHEET_CONTENT'),
       );
-      final result = await harness.repository.uploadSource(
-        importId: 'abc',
-        bytes: Uint8List.fromList(<int>[1]),
-      );
+      final result = await harness.repository
+          .uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]));
       expect(
         (result as Success<StatementImportSnapshot>).value.refusal,
         ImportRefusal.spreadsheetContent,
@@ -193,10 +192,8 @@ void main() {
       final harness = repositoryFor(
         importBody(state: 'FAILED', refusalCode: 'SOME_CODE_FROM_THE_FUTURE'),
       );
-      final result = await harness.repository.uploadSource(
-        importId: 'abc',
-        bytes: Uint8List.fromList(<int>[1]),
-      );
+      final result = await harness.repository
+          .uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]));
       expect(
         (result as Success<StatementImportSnapshot>).value.refusal,
         ImportRefusal.unrecognised,
@@ -205,10 +202,8 @@ void main() {
 
     test('no refusal code stays null rather than becoming a reason', () async {
       final harness = repositoryFor(importBody());
-      final result = await harness.repository.uploadSource(
-        importId: 'abc',
-        bytes: Uint8List.fromList(<int>[1]),
-      );
+      final result = await harness.repository
+          .uploadSource(importId: 'abc', bytes: Uint8List.fromList(<int>[1]));
       expect((result as Success<StatementImportSnapshot>).value.refusal, isNull);
     });
   });
@@ -233,7 +228,10 @@ void main() {
 
       expect(preview.rowIssues.single.rowNumber, 14);
       expect(preview.rowIssues.single.field, StatementField.amount);
-      expect(preview.rowIssues.single.reason, RowIssueReason.ambiguousDecimalSeparator);
+      expect(
+        preview.rowIssues.single.reason,
+        RowIssueReason.ambiguousDecimalSeparator,
+      );
     });
 
     test('an over-long field surfaces as its own typed reason', () async {
@@ -250,7 +248,8 @@ void main() {
         ),
       );
       final result = await harness.repository.readPreview(importId: 'abc');
-      final issue = (result as Success<StatementImportPreview>).value.rowIssues.single;
+      final issue =
+          (result as Success<StatementImportPreview>).value.rowIssues.single;
       expect(issue.reason, RowIssueReason.fieldTooLarge);
       expect(issue.field, StatementField.description);
       expect(issue.reason.remedy, RowIssueRemedy.respectABound);
@@ -315,7 +314,10 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.bankLedger),
+          amount: SignedAmountMapping(
+            amountColumn: 2,
+            signFrame: AmountSignFrame.bankLedger,
+          ),
           hasHeaderRow: true,
           statedCurrencyCode: 'QAR',
           dateOrder: StatementDateOrder.dayFirst,
@@ -343,7 +345,10 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
+          amount: SignedAmountMapping(
+            amountColumn: 2,
+            signFrame: AmountSignFrame.accountHolder,
+          ),
           hasHeaderRow: true,
           statedCurrencyCode: 'QAR',
         ),
@@ -369,7 +374,8 @@ void main() {
       );
 
       final body = harness.transport.requests.single.body! as Map<String, Object?>;
-      final amount = (body['mapping']! as Map<String, Object?>)['amount']! as Map<String, Object?>;
+      final amount =
+          (body['mapping']! as Map<String, Object?>)['amount']! as Map<String, Object?>;
       expect(amount['kind'], 'DEBIT_CREDIT');
       expect(amount['debitColumn'], 2);
       expect(amount['creditColumn'], 3);
@@ -386,7 +392,10 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
+          amount: SignedAmountMapping(
+            amountColumn: 2,
+            signFrame: AmountSignFrame.accountHolder,
+          ),
           hasHeaderRow: true,
           statedCurrencyCode: 'QAR',
         ),
@@ -411,7 +420,10 @@ void main() {
         mapping: const StatementColumnMapping(
           bookingDateColumn: 0,
           descriptionColumn: 1,
-          amount: SignedAmountMapping(amountColumn: 2, signFrame: AmountSignFrame.accountHolder),
+          amount: SignedAmountMapping(
+            amountColumn: 2,
+            signFrame: AmountSignFrame.accountHolder,
+          ),
           hasHeaderRow: true,
           statedCurrencyCode: 'QAR',
         ),
@@ -430,7 +442,8 @@ void main() {
         'transactionIds': <String>[],
       });
 
-      final result = await harness.repository.commit(importId: 'abc', expectedVersion: 9);
+      final result =
+          await harness.repository.commit(importId: 'abc', expectedVersion: 9);
 
       final body = harness.transport.requests.single.body! as Map<String, Object?>;
       expect(body['expectedVersion'], 9);
@@ -441,12 +454,16 @@ void main() {
     });
 
     test('a platform refusal becomes a typed failure, not a throw', () async {
-      final harness = repositoryFor(<String, Object?>{
-        'code': 'RECONCILIATION_BLOCKED',
-        'title': 'Blocked',
-        'status': 409,
-      }, statusCode: 409);
-      final result = await harness.repository.commit(importId: 'abc', expectedVersion: 1);
+      final harness = repositoryFor(
+        <String, Object?>{
+          'code': 'RECONCILIATION_BLOCKED',
+          'title': 'Blocked',
+          'status': 409,
+        },
+        statusCode: 409,
+      );
+      final result =
+          await harness.repository.commit(importId: 'abc', expectedVersion: 1);
       expect(result, isA<Failed<ImportCommitReceipt>>());
     });
   });

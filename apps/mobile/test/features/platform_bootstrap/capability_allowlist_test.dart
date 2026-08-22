@@ -42,12 +42,12 @@ const List<String> unrecognisedCapabilityIds = <String>[
 
 /// A hypothetical answer containing everything a server might return.
 List<PlatformCapability> hypotheticalCapabilities() => <PlatformCapability>[
-  for (final id in unimplementedProductCapabilities)
-    PlatformCapability(id: id, status: capabilityStatusAvailable),
-  for (final id in unrecognisedCapabilityIds)
-    PlatformCapability(id: id, status: capabilityStatusAvailable),
-  const PlatformCapability(id: 'capability-restricted', status: 'RESTRICTED'),
-];
+      for (final id in unimplementedProductCapabilities)
+        PlatformCapability(id: id, status: capabilityStatusAvailable),
+      for (final id in unrecognisedCapabilityIds)
+        PlatformCapability(id: id, status: capabilityStatusAvailable),
+      const PlatformCapability(id: 'capability-restricted', status: 'RESTRICTED'),
+    ];
 
 void main() {
   group('the resolver', () {
@@ -77,9 +77,9 @@ void main() {
       // The resolved value exposes destinations and nothing else, so an
       // unregistered identifier cannot travel upwards inside a diagnostic.
       final navigation = resolver.resolve(
-        resolutionCompleted: true,
-        capabilities: hypotheticalCapabilities(),
-      ) as CapabilityNavigationResolved;
+            resolutionCompleted: true,
+            capabilities: hypotheticalCapabilities(),
+          ) as CapabilityNavigationResolved;
 
       expect(navigation.hasDestinations, isFalse);
       expect(navigation.toString(), 'CapabilityNavigationResolved(0)');
@@ -100,7 +100,8 @@ void main() {
     test('a registered identifier with no route fails loudly', () {
       // Registering an identifier without shipping a screen is a programming
       // error, and it must not degrade into a row that leads nowhere.
-      const misconfigured = CapabilityNavigationResolver(navigable: <String>{'capability-alpha'});
+      const misconfigured =
+          CapabilityNavigationResolver(navigable: <String>{'capability-alpha'});
 
       expect(
         () => misconfigured.resolve(
@@ -114,7 +115,8 @@ void main() {
     });
 
     test('a registered identifier that is not available is still not rendered', () {
-      const registered = CapabilityNavigationResolver(navigable: <String>{'capability-alpha'});
+      const registered =
+          CapabilityNavigationResolver(navigable: <String>{'capability-alpha'});
 
       final navigation = registered.resolve(
         resolutionCompleted: true,
@@ -128,35 +130,36 @@ void main() {
   });
 
   group('the home screen', () {
-    testInBothDirections('renders none of the identifiers a hypothetical answer contained', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      final resolved = const CapabilityNavigationResolver().resolve(
-        resolutionCompleted: true,
-        capabilities: hypotheticalCapabilities(),
-      );
-
-      await pumpFeatureScreen(
-        tester,
-        const PlatformHomeScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[
-          platformContextProvider.overrideWithValue(platformContext(navigation: resolved)),
-        ],
-      );
-
-      for (final capability in hypotheticalCapabilities()) {
-        expectNothingMatching(
-          tester,
-          RegExp(RegExp.escape(capability.id), caseSensitive: false),
-          because:
-              '${capability.id} is not registered by this build and must not '
-              'appear, as available, as unavailable, or as forthcoming',
+    testInBothDirections(
+      'renders none of the identifiers a hypothetical answer contained',
+      (WidgetTester tester, Locale locale, double scale) async {
+        final resolved = const CapabilityNavigationResolver().resolve(
+          resolutionCompleted: true,
+          capabilities: hypotheticalCapabilities(),
         );
-      }
-    }, textScales: featureTextScales);
+
+        await pumpFeatureScreen(
+          tester,
+          const PlatformHomeScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(
+              platformContext(navigation: resolved),
+            ),
+          ],
+        );
+
+        for (final capability in hypotheticalCapabilities()) {
+          expectNothingMatching(
+            tester,
+            RegExp(RegExp.escape(capability.id), caseSensitive: false),
+            because: '${capability.id} is not registered by this build and must not '
+                'appear, as available, as unavailable, or as forthcoming',
+          );
+        }
+      },
+      textScales: featureTextScales,
+    );
   });
 }

@@ -46,11 +46,12 @@ Map<String, Object?> sideBody({
   String transactionId = 'transaction-out-0001',
   String accountId = 'account-0001',
   String currency = 'QAR',
-}) => <String, Object?>{
-  'transactionId': transactionId,
-  'accountId': accountId,
-  'currency': currency,
-};
+}) =>
+    <String, Object?>{
+      'transactionId': transactionId,
+      'accountId': accountId,
+      'currency': currency,
+    };
 
 Map<String, Object?> matchBody({
   String state = 'SUGGESTED',
@@ -60,34 +61,36 @@ Map<String, Object?> matchBody({
   String outflowCurrency = 'QAR',
   String inflowCurrency = 'QAR',
   int version = 1,
-}) => <String, Object?>{
-  'matchId': 'match-0001',
-  'outflow': sideBody(currency: outflowCurrency),
-  'inflow': sideBody(
-    transactionId: 'transaction-in-0001',
-    accountId: 'account-0003',
-    currency: inflowCurrency,
-  ),
-  'state': state,
-  'authoritative': authoritative ?? state == 'CONFIRMED',
-  'suggestionBasis': suggestionBasis,
-  'suggestionWindow': 'equal-and-opposite/same-currency/P3D/v1',
-  'subjectDecidedAt': subjectDecidedAt ?? (state == 'SUGGESTED' ? null : '2026-04-05T09:00:00Z'),
-  'firstSuggestedAt': '2026-04-04T08:00:00Z',
-  'createdAt': '2026-04-04T08:00:00Z',
-  'updatedAt': '2026-04-04T08:00:00Z',
-  'version': version,
-};
+}) =>
+    <String, Object?>{
+      'matchId': 'match-0001',
+      'outflow': sideBody(currency: outflowCurrency),
+      'inflow': sideBody(
+        transactionId: 'transaction-in-0001',
+        accountId: 'account-0003',
+        currency: inflowCurrency,
+      ),
+      'state': state,
+      'authoritative': authoritative ?? state == 'CONFIRMED',
+      'suggestionBasis': suggestionBasis,
+      'suggestionWindow': 'equal-and-opposite/same-currency/P3D/v1',
+      'subjectDecidedAt':
+          subjectDecidedAt ?? (state == 'SUGGESTED' ? null : '2026-04-05T09:00:00Z'),
+      'firstSuggestedAt': '2026-04-04T08:00:00Z',
+      'createdAt': '2026-04-04T08:00:00Z',
+      'updatedAt': '2026-04-04T08:00:00Z',
+      'version': version,
+    };
 
 Map<String, Object?> listBody(List<Map<String, Object?>> items) => <String, Object?>{
-  'items': items,
-  'page': <String, Object?>{
-    'limit': 50,
-    'returned': items.length,
-    'hasMore': false,
-    'nextCursor': null,
-  },
-};
+      'items': items,
+      'page': <String, Object?>{
+        'limit': 50,
+        'returned': items.length,
+        'hasMore': false,
+        'nextCursor': null,
+      },
+    };
 
 void main() {
   group('the listing reads the contract once', () {
@@ -134,7 +137,8 @@ void main() {
         },
       });
 
-      final page = (await harness.repository.listOwn() as Success<TransferMatchPage>).value;
+      final page = (await harness.repository.listOwn()
+          as Success<TransferMatchPage>).value;
 
       expect(page.hasMore, isTrue);
       expect(page.nextCursor, 'cursor-two');
@@ -160,7 +164,8 @@ void main() {
       expect(body['expectedVersion'], 3);
     });
 
-    test('a confirmation is replayable, so a mid-flight failure is not a guess', () async {
+    test('a confirmation is replayable, so a mid-flight failure is not a guess',
+        () async {
       // Without a key a POST is not replayable at all — see
       // `ApiRequest.isReplayable` — so a request that failed mid-flight leaves
       // a person not knowing whether their answer took effect.
@@ -172,7 +177,8 @@ void main() {
       expect(harness.transport.requests.single.isReplayable, isTrue);
     });
 
-    test('confirming and rejecting one pair are replayed under DIFFERENT keys', () async {
+    test('confirming and rejecting one pair are replayed under DIFFERENT keys',
+        () async {
       // A shared key would let the platform answer a rejection with the
       // result of the confirmation it had already seen — which is a decision
       // the person did not make, arriving as a success.
@@ -187,7 +193,8 @@ void main() {
       );
     });
 
-    test('one answer about two versions of a pair are two different keys', () async {
+    test('one answer about two versions of a pair are two different keys',
+        () async {
       // Answering a pair that has since changed is a DIFFERENT decision, and
       // must not be served the earlier answer's replay.
       final harness = repositoryFor(matchBody(state: 'CONFIRMED', version: 3));
@@ -201,7 +208,8 @@ void main() {
       );
     });
 
-    test('the same answer about the same pair replays under the same key', () async {
+    test('the same answer about the same pair replays under the same key',
+        () async {
       // Derived rather than random, so a retry from a fresh app launch is
       // recognisable as the same request.
       final harness = repositoryFor(matchBody(state: 'CONFIRMED', version: 2));
@@ -217,7 +225,8 @@ void main() {
   });
 
   group('a response that contradicts itself is refused', () {
-    test('a SUGGESTED row claiming to be authoritative is a contract violation', () async {
+    test('a SUGGESTED row claiming to be authoritative is a contract violation',
+        () async {
       // This is the single most dangerous response this surface can receive: a
       // question rendered as an answer the person gave. It must not reach a
       // screen at all.
@@ -229,14 +238,19 @@ void main() {
 
       final failure = (result as Failed<TransferMatchPage>).failure;
       expect(failure, isA<ContractViolationFailure>());
-      expect((failure as ContractViolationFailure).location, 'TransferMatchView.authoritative');
+      expect(
+        (failure as ContractViolationFailure).location,
+        'TransferMatchView.authoritative',
+      );
     });
 
     test('a CONFIRMED row that is not authoritative is refused too', () async {
       // The other direction of the same biconditional. Rendering it would tell
       // a person their confirmation does not count.
       final harness = repositoryFor(
-        listBody(<Map<String, Object?>>[matchBody(state: 'CONFIRMED', authoritative: false)]),
+        listBody(<Map<String, Object?>>[
+          matchBody(state: 'CONFIRMED', authoritative: false),
+        ]),
       );
 
       expect(
@@ -250,17 +264,26 @@ void main() {
       // the instant left alone. The database refuses to hold it; so does this.
       final harness = repositoryFor(
         listBody(<Map<String, Object?>>[
-          <String, Object?>{...matchBody(state: 'CONFIRMED'), 'subjectDecidedAt': null},
+          <String, Object?>{
+            ...matchBody(state: 'CONFIRMED'),
+            'subjectDecidedAt': null,
+          },
         ]),
       );
 
-      final failure = (await harness.repository.listOwn() as Failed<TransferMatchPage>).failure;
-      expect((failure as ContractViolationFailure).location, 'TransferMatchView.subjectDecidedAt');
+      final failure =
+          (await harness.repository.listOwn() as Failed<TransferMatchPage>).failure;
+      expect(
+        (failure as ContractViolationFailure).location,
+        'TransferMatchView.subjectDecidedAt',
+      );
     });
 
     test('a SUGGESTED row carrying a decision instant is refused', () async {
       final harness = repositoryFor(
-        listBody(<Map<String, Object?>>[matchBody(subjectDecidedAt: '2026-04-05T09:00:00Z')]),
+        listBody(<Map<String, Object?>>[
+          matchBody(subjectDecidedAt: '2026-04-05T09:00:00Z'),
+        ]),
       );
 
       expect(
@@ -278,7 +301,8 @@ void main() {
         ]),
       );
 
-      final page = (await harness.repository.listOwn() as Success<TransferMatchPage>).value;
+      final page =
+          (await harness.repository.listOwn() as Success<TransferMatchPage>).value;
       expect(page.items, hasLength(3));
       expect(page.items[0].state, MatchState.suggested);
       expect(page.items[1].state, MatchState.confirmed);
@@ -300,7 +324,10 @@ void main() {
       );
 
       final match =
-          (await harness.repository.listOwn() as Success<TransferMatchPage>).value.items.single;
+          (await harness.repository.listOwn() as Success<TransferMatchPage>)
+              .value
+              .items
+              .single;
 
       expect(match.state, MatchState.unrecognised);
       expect(match.isConfirmable, isFalse);
@@ -309,11 +336,16 @@ void main() {
 
     test('an unknown suggestion basis is unrecognised, never the known one', () async {
       final harness = repositoryFor(
-        listBody(<Map<String, Object?>>[matchBody(suggestionBasis: 'SOME_BASIS_FROM_THE_FUTURE')]),
+        listBody(<Map<String, Object?>>[
+          matchBody(suggestionBasis: 'SOME_BASIS_FROM_THE_FUTURE'),
+        ]),
       );
 
       final match =
-          (await harness.repository.listOwn() as Success<TransferMatchPage>).value.items.single;
+          (await harness.repository.listOwn() as Success<TransferMatchPage>)
+              .value
+              .items
+              .single;
 
       expect(match.suggestionBasis, SuggestionBasis.unrecognised);
     });
@@ -323,7 +355,10 @@ void main() {
       // know. Echoing it back would assert a meaning the client does not have.
       final harness = repositoryFor(listBody(<Map<String, Object?>>[]));
 
-      expect(() => matchStateToDto(MatchState.unrecognised), throwsA(isA<ApiException>()));
+      expect(
+        () => matchStateToDto(MatchState.unrecognised),
+        throwsA(isA<ApiException>()),
+      );
       expect(harness.transport.requests, isEmpty);
     });
   });
@@ -333,39 +368,49 @@ void main() {
       final harness = repositoryFor(listBody(<Map<String, Object?>>[matchBody()]));
 
       final match =
-          (await harness.repository.listOwn() as Success<TransferMatchPage>).value.items.single;
+          (await harness.repository.listOwn() as Success<TransferMatchPage>)
+              .value
+              .items
+              .single;
 
       // The whole surface of the type, enumerated. `version` is the only
       // number, exactly as the contract's own description says. If a field
       // called `amount`, `total`, `net` or `rate` is ever added, this list stops
       // matching and somebody has to justify it.
-      expect(<Object?>[
-        match.matchId,
-        match.outflow,
-        match.inflow,
-        match.state,
-        match.authoritative,
-        match.suggestionBasis,
-        match.suggestionWindow,
-        match.subjectDecidedAt,
-        match.firstSuggestedAt,
-        match.createdAt,
-        match.updatedAt,
-        match.version,
-      ], hasLength(12));
+      expect(
+        <Object?>[
+          match.matchId,
+          match.outflow,
+          match.inflow,
+          match.state,
+          match.authoritative,
+          match.suggestionBasis,
+          match.suggestionWindow,
+          match.subjectDecidedAt,
+          match.firstSuggestedAt,
+          match.createdAt,
+          match.updatedAt,
+          match.version,
+        ],
+        hasLength(12),
+      );
       expect(match.version, isA<int>());
       expect(match.toString(), 'TransferMatch()');
       expect(match.outflow.toString(), 'MatchSide()');
     });
 
-    test('the window label is kept verbatim rather than parsed into days', () async {
+    test('the window label is kept verbatim rather than parsed into days',
+        () async {
       // Widening the window later must not silently reinterpret a question a
       // person has already answered, so the client shows WHICH rule looked at
       // their data and never a number it derived.
       final harness = repositoryFor(listBody(<Map<String, Object?>>[matchBody()]));
 
       final match =
-          (await harness.repository.listOwn() as Success<TransferMatchPage>).value.items.single;
+          (await harness.repository.listOwn() as Success<TransferMatchPage>)
+              .value
+              .items
+              .single;
 
       expect(match.suggestionWindow, 'equal-and-opposite/same-currency/P3D/v1');
     });
@@ -374,11 +419,16 @@ void main() {
       // Stored as two columns precisely so that two facts must AGREE rather
       // than one asserting the agreement. The client keeps them apart.
       final harness = repositoryFor(
-        listBody(<Map<String, Object?>>[matchBody(outflowCurrency: 'QAR', inflowCurrency: 'USD')]),
+        listBody(<Map<String, Object?>>[
+          matchBody(outflowCurrency: 'QAR', inflowCurrency: 'USD'),
+        ]),
       );
 
       final match =
-          (await harness.repository.listOwn() as Success<TransferMatchPage>).value.items.single;
+          (await harness.repository.listOwn() as Success<TransferMatchPage>)
+              .value
+              .items
+              .single;
 
       expect(match.outflow.currencyCode, 'QAR');
       expect(match.inflow.currencyCode, 'USD');
@@ -386,8 +436,7 @@ void main() {
       expect(
         match.isConfirmable,
         isFalse,
-        reason:
-            'the platform cannot hold a cross-currency match and holds no '
+        reason: 'the platform cannot hold a cross-currency match and holds no '
             'rate; a client that offered to confirm one would be asking it to '
             'relate two amounts it cannot relate',
       );

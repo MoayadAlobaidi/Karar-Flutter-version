@@ -52,15 +52,18 @@ final class ScriptedIdentityTransport implements ApiTransport {
   List<Object?> get sentBodies =>
       requests.map((ApiRequest request) => request.body).toList(growable: false);
 
-  int callsTo(String path) => requests.where((ApiRequest request) => request.path == path).length;
+  int callsTo(String path) =>
+      requests.where((ApiRequest request) => request.path == path).length;
 
   /// Scripts a 2xx JSON object response.
   void onPost(String path, JsonMap body, {int statusCode = 200}) {
-    _routes['POST $path'] = (ApiRequest _) async => ApiResponse(statusCode: statusCode, body: body);
+    _routes['POST $path'] = (ApiRequest _) async =>
+        ApiResponse(statusCode: statusCode, body: body);
   }
 
   void onGet(String path, JsonMap body, {int statusCode = 200}) {
-    _routes['GET $path'] = (ApiRequest _) async => ApiResponse(statusCode: statusCode, body: body);
+    _routes['GET $path'] = (ApiRequest _) async =>
+        ApiResponse(statusCode: statusCode, body: body);
   }
 
   void onDelete(String path, JsonMap body, {int statusCode = 200}) {
@@ -70,8 +73,8 @@ final class ScriptedIdentityTransport implements ApiTransport {
 
   /// Scripts a typed failure, as the transport would raise it.
   void failWith(HttpMethod method, String path, Failure failure, {int? statusCode}) {
-    _routes['${method.wireName} $path'] = (ApiRequest _) async =>
-        throw ApiException(failure, statusCode: statusCode);
+    _routes['${method.wireName} $path'] =
+        (ApiRequest _) async => throw ApiException(failure, statusCode: statusCode);
   }
 
   /// Scripts an arbitrary responder, for delays and call-order assertions.
@@ -82,10 +85,13 @@ final class ScriptedIdentityTransport implements ApiTransport {
   @override
   Future<ApiResponse> send(ApiRequest request) {
     requests.add(request);
-    final IdentityResponder? responder = _routes['${request.method.wireName} ${request.path}'];
+    final IdentityResponder? responder =
+        _routes['${request.method.wireName} ${request.path}'];
     if (responder == null) {
       return Future<ApiResponse>.error(
-        ApiException(ContractViolationFailure(location: 'unscripted:${request.path}')),
+        ApiException(
+          ContractViolationFailure(location: 'unscripted:${request.path}'),
+        ),
       );
     }
     return responder(request);
@@ -134,14 +140,15 @@ JsonMap mfaChallengePayload({
   String challengeToken = 'challenge-token-fixture',
   DateTime? expiresAt,
   DateTime? now,
-}) => <String, Object?>{
-  'status': 'mfa_required',
-  'challengeToken': challengeToken,
-  'challengeExpiresAt':
-      (expiresAt ?? (now ?? DateTime.utc(2026, 1, 1)).add(const Duration(minutes: 5)))
+}) =>
+    <String, Object?>{
+      'status': 'mfa_required',
+      'challengeToken': challengeToken,
+      'challengeExpiresAt': (expiresAt ??
+              (now ?? DateTime.utc(2026, 1, 1)).add(const Duration(minutes: 5)))
           .toUtc()
           .toIso8601String(),
-};
+    };
 
 /// A session-list payload. Carries device metadata only.
 ///
@@ -150,26 +157,26 @@ JsonMap mfaChallengePayload({
 /// schema declares nullable, so it is the only one a fixture may omit — see
 /// the repository suite, which covers exactly that case.
 JsonMap sessionListPayload({int others = 1}) => <String, Object?>{
-  'sessions': <Object?>[
-    <String, Object?>{
-      'sessionId': '9f1d0f6a-0000-4000-8000-000000000001',
-      'createdAt': DateTime.utc(2026, 1, 1, 9).toIso8601String(),
-      'lastSeenAt': DateTime.utc(2026, 1, 2, 9).toIso8601String(),
-      'absoluteExpiresAt': DateTime.utc(2026, 2, 1, 9).toIso8601String(),
-      'current': true,
-      'userAgentSummary': 'iPhone, Karar app',
-    },
-    for (int index = 0; index < others; index++)
-      <String, Object?>{
-        'sessionId': '9f1d0f6a-0000-4000-8000-00000000000${index + 2}',
-        'createdAt': DateTime.utc(2025, 12, 20, 9).toIso8601String(),
-        'lastSeenAt': DateTime.utc(2025, 12, 28, 9).toIso8601String(),
-        'absoluteExpiresAt': DateTime.utc(2026, 1, 20, 9).toIso8601String(),
-        'current': false,
-        'userAgentSummary': 'Android phone, Karar app',
-      },
-  ],
-};
+      'sessions': <Object?>[
+        <String, Object?>{
+          'sessionId': '9f1d0f6a-0000-4000-8000-000000000001',
+          'createdAt': DateTime.utc(2026, 1, 1, 9).toIso8601String(),
+          'lastSeenAt': DateTime.utc(2026, 1, 2, 9).toIso8601String(),
+          'absoluteExpiresAt': DateTime.utc(2026, 2, 1, 9).toIso8601String(),
+          'current': true,
+          'userAgentSummary': 'iPhone, Karar app',
+        },
+        for (int index = 0; index < others; index++)
+          <String, Object?>{
+            'sessionId': '9f1d0f6a-0000-4000-8000-00000000000${index + 2}',
+            'createdAt': DateTime.utc(2025, 12, 20, 9).toIso8601String(),
+            'lastSeenAt': DateTime.utc(2025, 12, 28, 9).toIso8601String(),
+            'absoluteExpiresAt': DateTime.utc(2026, 1, 20, 9).toIso8601String(),
+            'current': false,
+            'userAgentSummary': 'Android phone, Karar app',
+          },
+      ],
+    };
 
 /// A preference store that records every write.
 ///
@@ -223,14 +230,16 @@ typedef HarnessSecurityState = InMemoryLocalSecurityStateStore;
 
 /// The composition root, wired for a test.
 final class IdentityHarness {
-  IdentityHarness({List<Override> overrides = const <Override>[], DateTime? now})
-    : clock = FixedClock(now ?? DateTime.utc(2026, 1, 1)),
-      transport = ScriptedIdentityTransport(),
-      refreshTransport = ScriptedIdentityTransport(),
-      secureStore = InMemorySecureStore(),
-      preferences = RecordingKeyValueStore(),
-      securityState = HarnessSecurityState(),
-      logSink = RecordingLogSink() {
+  IdentityHarness({
+    List<Override> overrides = const <Override>[],
+    DateTime? now,
+  })  : clock = FixedClock(now ?? DateTime.utc(2026, 1, 1)),
+        transport = ScriptedIdentityTransport(),
+        refreshTransport = ScriptedIdentityTransport(),
+        secureStore = InMemorySecureStore(),
+        preferences = RecordingKeyValueStore(),
+        securityState = HarnessSecurityState(),
+        logSink = RecordingLogSink() {
     container = ProviderContainer(
       overrides: <Override>[
         configurationResultProvider.overrideWithValue(
@@ -248,11 +257,15 @@ final class IdentityHarness {
         ),
         keyValueStoreProvider.overrideWithValue(preferences),
         localSecurityStateStoreProvider.overrideWithValue(securityState),
-        loggerProvider.overrideWithValue(AppLogger(sink: logSink, minimumLevel: LogLevel.trace)),
+        loggerProvider.overrideWithValue(
+          AppLogger(sink: logSink, minimumLevel: LogLevel.trace),
+        ),
         secureStoreProvider.overrideWithValue(secureStore),
         clockProvider.overrideWithValue(clock),
         correlationIdGeneratorProvider.overrideWithValue(
-          ScriptedCorrelationIdGenerator(<String>['00000000-0000-4000-8000-000000000001']),
+          ScriptedCorrelationIdGenerator(<String>[
+            '00000000-0000-4000-8000-000000000001',
+          ]),
         ),
         apiTransportProvider.overrideWithValue(transport),
         rawApiTransportProvider.overrideWithValue(refreshTransport),
@@ -291,7 +304,8 @@ final class IdentityHarness {
   Map<String, String> get secureEntries => secureStore.entries;
 
   /// Every log line emitted, flattened, for exposure assertions.
-  String get loggedText => logSink.records.map((LogRecord record) => record.toString()).join('\n');
+  String get loggedText =>
+      logSink.records.map((LogRecord record) => record.toString()).join('\n');
 
   /// Puts a live session in place, as a signed-in launch would.
   Future<SessionTokens> signInFixture({
@@ -334,7 +348,9 @@ Future<void> pumpIdentity(
         localeResolutionCallback: KararLocalization.resolve,
         theme: KararTheme.light(locale: locale),
         builder: (BuildContext context, Widget? inner) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScale),
+          ),
           child: KararThemeScope(child: inner ?? const SizedBox.shrink()),
         ),
         home: child,
@@ -377,12 +393,19 @@ Future<void> tapIdentityButton(WidgetTester tester, String label) async {
 }
 
 /// Fills the nth text field on screen.
-Future<void> enterIdentityField(WidgetTester tester, int index, String value) async {
+Future<void> enterIdentityField(
+  WidgetTester tester,
+  int index,
+  String value,
+) async {
   await tester.enterText(find.byType(TextField).at(index), value);
 }
 
 /// The locales every identity screen is proven in.
-const List<Locale> identityLocales = <Locale>[KararLocalization.english, KararLocalization.arabic];
+const List<Locale> identityLocales = <Locale>[
+  KararLocalization.english,
+  KararLocalization.arabic,
+];
 
 /// Normal, and the largest scale the platform accessibility settings offer.
 const List<double> identityTextScales = <double>[1.0, 2.0];
@@ -395,7 +418,8 @@ void testEveryDirectionAndScale(
 }) {
   for (final Locale locale in identityLocales) {
     for (final double scale in textScales) {
-      testWidgets('$description [${locale.languageCode} @${scale}x]', (WidgetTester tester) async {
+      testWidgets('$description [${locale.languageCode} @${scale}x]',
+          (WidgetTester tester) async {
         await body(tester, locale, scale);
       });
     }

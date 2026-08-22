@@ -12,21 +12,13 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'support/identity_harness.dart';
 
 void main() {
-  testEveryDirectionAndScale('renders and reads in the locale direction', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('renders and reads in the locale direction',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    await pumpIdentity(
-      tester,
-      const SignInScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const SignInScreen(),
+        harness: harness, locale: locale, textScale: textScale);
 
     expect(find.text(l10n.signInTitle), findsWidgets);
     expect(find.text(l10n.signInSubtitle), findsOneWidget);
@@ -43,11 +35,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testEveryDirectionAndScale('shows the generic message for rejected credentials', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('shows the generic message for rejected credentials',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.failWith(
@@ -57,13 +46,8 @@ void main() {
       statusCode: 401,
     );
 
-    await pumpIdentity(
-      tester,
-      const SignInScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const SignInScreen(),
+        harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await tapIdentityButton(tester, l10n.signInAction);
@@ -77,21 +61,13 @@ void main() {
     expect(find.textContaining('authentication_required'), findsNothing);
   });
 
-  testEveryDirectionAndScale('announces field errors rather than colouring them', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('announces field errors rather than colouring them',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    await pumpIdentity(
-      tester,
-      const SignInScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const SignInScreen(),
+        harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'not-an-address');
     await enterIdentityField(tester, 1, 'short');
     await tapIdentityButton(tester, l10n.signInAction);
@@ -104,25 +80,20 @@ void main() {
     expect(harness.transport.requests, isEmpty);
   });
 
-  testEveryDirectionAndScale('blocks a second submission while one is in flight', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('blocks a second submission while one is in flight',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.on(HttpMethod.post, '/auth/login', (_) async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      return ApiResponse(statusCode: 200, body: sessionPayload(now: harness.clock.nowUtc()));
+      return ApiResponse(
+        statusCode: 200,
+        body: sessionPayload(now: harness.clock.nowUtc()),
+      );
     });
 
-    await pumpIdentity(
-      tester,
-      const SignInScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const SignInScreen(),
+        harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await tapIdentityButton(tester, l10n.signInAction);
@@ -136,17 +107,16 @@ void main() {
     expect(harness.transport.callsTo('/auth/login'), 1);
   });
 
-  testEveryDirectionAndScale('explains a secure-storage failure at the gate', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('explains a secure-storage failure at the gate',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(
       tester,
-      const SignInScreen(startupState: Unauthenticated(secureStorageUnavailable: true)),
+      const SignInScreen(
+        startupState: Unauthenticated(secureStorageUnavailable: true),
+      ),
       harness: harness,
       locale: locale,
       textScale: textScale,
@@ -155,22 +125,15 @@ void main() {
     expect(find.text(l10n.signInSecureStorageNotice), findsOneWidget);
   });
 
-  testEveryDirectionAndScale('never renders the password it was given', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('never renders the password it was given',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
-    harness.transport.onPost('/auth/login', sessionPayload(now: harness.clock.nowUtc()));
+    harness.transport
+        .onPost('/auth/login', sessionPayload(now: harness.clock.nowUtc()));
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    await pumpIdentity(
-      tester,
-      const SignInScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const SignInScreen(),
+        harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await tapIdentityButton(tester, l10n.signInAction);

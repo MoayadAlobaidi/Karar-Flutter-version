@@ -47,8 +47,7 @@ void main() {
       expect(
         supplied,
         suppliedRails,
-        reason:
-            'MANUAL and USER_FILE_UPLOAD are the only rails this platform '
+        reason: 'MANUAL and USER_FILE_UPLOAD are the only rails this platform '
             'has built (ADR-0028). A third would have to be a deliberate edit '
             'here, not a side effect somewhere else.',
       );
@@ -62,8 +61,7 @@ void main() {
         expect(
           standingOfRail(rail),
           RailStanding.notBuilt,
-          reason:
-              '$rail must read as never built. "Pending", "unavailable" '
+          reason: '$rail must read as never built. "Pending", "unavailable" '
               'and "coming soon" are all promises, and the vocabulary has no '
               'member for any of them.',
         );
@@ -71,12 +69,14 @@ void main() {
     });
 
     test('a rail this build does not know is named as unknown, never guessed', () {
-      expect(standingOfRail(ConnectionRail.unrecognised), RailStanding.unknownToThisVersion);
+      expect(
+        standingOfRail(ConnectionRail.unrecognised),
+        RailStanding.unknownToThisVersion,
+      );
       expect(
         standingIsSuppliedBySubject(RailStanding.unknownToThisVersion),
         isFalse,
-        reason:
-            'a rail nobody in this build can describe is not evidence that '
+        reason: 'a rail nobody in this build can describe is not evidence that '
             'the person supplied anything through it',
       );
     });
@@ -89,8 +89,7 @@ void main() {
         expect(
           standingInvitesConnection(standing),
           isFalse,
-          reason:
-              '$standing must not assert that this platform can reach an '
+          reason: '$standing must not assert that this platform can reach an '
               'institution. No issuer exposes an interface to it and no '
               'credential of any kind is stored.',
         );
@@ -122,8 +121,7 @@ void main() {
         expect(
           railContradictsAvailability(rail, RailAvailability.executable),
           isTrue,
-          reason:
-              '$rail reported as EXECUTABLE is drift about the one field '
+          reason: '$rail reported as EXECUTABLE is drift about the one field '
               'that separates "you typed this in" from "an institution sent it"',
         );
       }

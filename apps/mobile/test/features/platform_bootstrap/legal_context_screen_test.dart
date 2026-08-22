@@ -18,155 +18,153 @@ Future<void> pumpLegal(
   required Locale locale,
   double textScale = 1.0,
   PlatformContext? platform,
-}) => pumpFeatureScreen(
-  tester,
-  const LegalContextScreen(),
-  locale: locale,
-  textScale: textScale,
-  overrides: <Override>[platformContextProvider.overrideWithValue(platform ?? platformContext())],
-);
+}) =>
+    pumpFeatureScreen(
+      tester,
+      const LegalContextScreen(),
+      locale: locale,
+      textScale: textScale,
+      overrides: <Override>[
+        platformContextProvider.overrideWithValue(platform ?? platformContext()),
+      ],
+    );
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(LegalContextScreen)));
 
 void main() {
-  testInBothDirections('renders the reviewed safe summary of an assigned entity', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(tester, locale: locale, textScale: scale);
-    final l10n = mountedL10n(tester);
+  testInBothDirections(
+    'renders the reviewed safe summary of an assigned entity',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(tester, locale: locale, textScale: scale);
+      final l10n = mountedL10n(tester);
 
-    expect(find.text(l10n.platformOperatingEntityNameLabel), findsOneWidget);
-    expect(find.text('Example Operating Entity'), findsOneWidget);
-    expect(find.text('jurisdiction-a'), findsWidgets);
-    expect(find.text('privacy@example.invalid'), findsOneWidget);
-  }, textScales: featureTextScales);
+      expect(find.text(l10n.platformOperatingEntityNameLabel), findsOneWidget);
+      expect(find.text('Example Operating Entity'), findsOneWidget);
+      expect(find.text('jurisdiction-a'), findsWidgets);
+      expect(find.text('privacy@example.invalid'), findsOneWidget);
+    },
+    textScales: featureTextScales,
+  );
 
-  testInBothDirections('derives its direction from the locale', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(tester, locale: locale, textScale: scale);
+  testInBothDirections(
+    'derives its direction from the locale',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(tester, locale: locale, textScale: scale);
 
-    expect(
-      directionUnder(tester, find.byType(LegalContextScreen)),
-      locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-    );
-  }, textScales: featureTextScales);
+      expect(
+        directionUnder(tester, find.byType(LegalContextScreen)),
+        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+      );
+    },
+    textScales: featureTextScales,
+  );
 
-  testInBothDirections('infers no role, obligation, licence, approval or processing basis', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(tester, locale: locale, textScale: scale);
+  testInBothDirections(
+    'infers no role, obligation, licence, approval or processing basis',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(tester, locale: locale, textScale: scale);
 
-    for (final claim in <String>[
-      'controller',
-      'processor',
-      'licen',
-      'regulat',
-      'authoris',
-      'authoriz',
-      'supervis',
-      'lawful basis',
-      'legal basis',
-      'compliant',
-      'مرخّص',
-      'منظَّم',
-      'المتحكم',
-      'المعالِج',
-    ]) {
+      for (final claim in <String>[
+        'controller',
+        'processor',
+        'licen',
+        'regulat',
+        'authoris',
+        'authoriz',
+        'supervis',
+        'lawful basis',
+        'legal basis',
+        'compliant',
+        'مرخّص',
+        'منظَّم',
+        'المتحكم',
+        'المعالِج',
+      ]) {
+        expectNothingMatching(
+          tester,
+          RegExp(claim, caseSensitive: false),
+          because: 'the client renders the safe summary and infers nothing from it',
+        );
+      }
+    },
+    textScales: featureTextScales,
+  );
+
+  testInBothDirections(
+    'renders each absent entity state as itself',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(
+        tester,
+        locale: locale,
+        textScale: scale,
+        platform: platformContext(operatingEntity: const OperatingEntityUnassigned()),
+      );
+      var l10n = mountedL10n(tester);
+      expect(find.text(l10n.platformOperatingEntityUnassignedTitle), findsOneWidget);
+
+      await pumpLegal(
+        tester,
+        locale: locale,
+        textScale: scale,
+        platform: platformContext(operatingEntity: const OperatingEntityUnavailable()),
+      );
+      l10n = mountedL10n(tester);
+      expect(find.text(l10n.platformOperatingEntityUnavailableTitle), findsOneWidget);
+
+      await pumpLegal(
+        tester,
+        locale: locale,
+        textScale: scale,
+        platform: platformContext(operatingEntity: const OperatingEntityUnrecognised()),
+      );
+      l10n = mountedL10n(tester);
+      expect(find.text(l10n.platformOperatingEntityUnrecognisedTitle), findsOneWidget);
+    },
+  );
+
+  testInBothDirections(
+    'renders the governing policy version and status as data',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(tester, locale: locale, textScale: scale);
+      final l10n = mountedL10n(tester);
+
+      expect(find.text(l10n.platformPolicyPackHeading), findsOneWidget);
+      expect(find.text('1.0.0'), findsOneWidget);
+      expect(find.text('ACTIVE'), findsOneWidget);
+    },
+  );
+
+  testInBothDirections(
+    'says nothing rather than something when no policy is in effect',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(
+        tester,
+        locale: locale,
+        textScale: scale,
+        platform: platformContext(policyPack: const PolicyPackStatus()),
+      );
+      final l10n = mountedL10n(tester);
+
+      expect(find.text(l10n.platformPolicyPackAbsent), findsOneWidget);
+    },
+  );
+
+  testInBothDirections(
+    'renders no monetary value',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpLegal(tester, locale: locale, textScale: scale);
+
       expectNothingMatching(
         tester,
-        RegExp(claim, caseSensitive: false),
-        because: 'the client renders the safe summary and infers nothing from it',
+        RegExp(r'[\$€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
+        because: 'no financial value belongs on the legal surface',
       );
-    }
-  }, textScales: featureTextScales);
+    },
+  );
 
-  testInBothDirections('renders each absent entity state as itself', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(
-      tester,
-      locale: locale,
-      textScale: scale,
-      platform: platformContext(operatingEntity: const OperatingEntityUnassigned()),
-    );
-    var l10n = mountedL10n(tester);
-    expect(find.text(l10n.platformOperatingEntityUnassignedTitle), findsOneWidget);
-
-    await pumpLegal(
-      tester,
-      locale: locale,
-      textScale: scale,
-      platform: platformContext(operatingEntity: const OperatingEntityUnavailable()),
-    );
-    l10n = mountedL10n(tester);
-    expect(find.text(l10n.platformOperatingEntityUnavailableTitle), findsOneWidget);
-
-    await pumpLegal(
-      tester,
-      locale: locale,
-      textScale: scale,
-      platform: platformContext(operatingEntity: const OperatingEntityUnrecognised()),
-    );
-    l10n = mountedL10n(tester);
-    expect(find.text(l10n.platformOperatingEntityUnrecognisedTitle), findsOneWidget);
-  });
-
-  testInBothDirections('renders the governing policy version and status as data', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(tester, locale: locale, textScale: scale);
-    final l10n = mountedL10n(tester);
-
-    expect(find.text(l10n.platformPolicyPackHeading), findsOneWidget);
-    expect(find.text('1.0.0'), findsOneWidget);
-    expect(find.text('ACTIVE'), findsOneWidget);
-  });
-
-  testInBothDirections('says nothing rather than something when no policy is in effect', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(
-      tester,
-      locale: locale,
-      textScale: scale,
-      platform: platformContext(policyPack: const PolicyPackStatus()),
-    );
-    final l10n = mountedL10n(tester);
-
-    expect(find.text(l10n.platformPolicyPackAbsent), findsOneWidget);
-  });
-
-  testInBothDirections('renders no monetary value', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpLegal(tester, locale: locale, textScale: scale);
-
-    expectNothingMatching(
-      tester,
-      RegExp(r'[\$€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
-      because: 'no financial value belongs on the legal surface',
-    );
-  });
-
-  testWidgets('shows progress rather than an error before the context arrives', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('shows progress rather than an error before the context arrives',
+      (WidgetTester tester) async {
     await pumpFeatureScreen(
       tester,
       const LegalContextScreen(),

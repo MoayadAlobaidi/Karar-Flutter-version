@@ -15,7 +15,8 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 
 import '../authentication/support/identity_harness.dart';
 
-EmailAddress _email() => (EmailAddress.parse('person@example.test') as EmailAccepted).email;
+EmailAddress _email() =>
+    (EmailAddress.parse('person@example.test') as EmailAccepted).email;
 
 List<String> _renderedText(WidgetTester tester) => tester
     .widgetList<Text>(find.byType(Text))
@@ -27,7 +28,8 @@ void main() {
   group('repository', () {
     test('verifying a code maps to a plain success', () async {
       final IdentityHarness harness = IdentityHarness();
-      harness.transport.onPost('/auth/verify-email', <String, Object?>{'status': 'verified'});
+      harness.transport
+          .onPost('/auth/verify-email', <String, Object?>{'status': 'verified'});
 
       final Result<void> outcome = await harness.container
           .read(emailVerificationRepositoryProvider)
@@ -38,7 +40,8 @@ void main() {
 
     test('a trailing space on a pasted code is trimmed before sending', () async {
       final IdentityHarness harness = IdentityHarness();
-      harness.transport.onPost('/auth/verify-email', <String, Object?>{'status': 'verified'});
+      harness.transport
+          .onPost('/auth/verify-email', <String, Object?>{'status': 'verified'});
 
       await harness.container
           .read(emailVerificationRepositoryProvider)
@@ -93,7 +96,9 @@ void main() {
         final IdentityHarness harness = IdentityHarness();
         harness.transport.onPost('/auth/resend-verification', body, statusCode: 202);
         outcomes.add(
-          await harness.container.read(emailVerificationRepositoryProvider).resend(email: _email()),
+          await harness.container
+              .read(emailVerificationRepositoryProvider)
+              .resend(email: _email()),
         );
       }
 
@@ -103,7 +108,8 @@ void main() {
 
     test('the verification code never reaches a log', () async {
       final IdentityHarness harness = IdentityHarness();
-      harness.transport.onPost('/auth/verify-email', <String, Object?>{'status': 'verified'});
+      harness.transport
+          .onPost('/auth/verify-email', <String, Object?>{'status': 'verified'});
 
       await harness.container
           .read(emailVerificationRepositoryProvider)
@@ -115,21 +121,13 @@ void main() {
   });
 
   group('screen', () {
-    testEveryDirectionAndScale('renders in the locale direction', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
+    testEveryDirectionAndScale('renders in the locale direction',
+        (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(
-        tester,
-        const VerifyEmailScreen(),
-        harness: harness,
-        locale: locale,
-        textScale: textScale,
-      );
+      await pumpIdentity(tester, const VerifyEmailScreen(),
+          harness: harness, locale: locale, textScale: textScale);
 
       expect(find.text(l10n.verifyEmailSubtitle), findsOneWidget);
       expect(find.text(l10n.verifyEmailCodeLabel), findsOneWidget);
@@ -140,11 +138,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testEveryDirectionAndScale('a rejected code shows one generic message', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
+    testEveryDirectionAndScale('a rejected code shows one generic message',
+        (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
       harness.transport.failWith(
@@ -154,13 +149,8 @@ void main() {
         statusCode: 401,
       );
 
-      await pumpIdentity(
-        tester,
-        const VerifyEmailScreen(),
-        harness: harness,
-        locale: locale,
-        textScale: textScale,
-      );
+      await pumpIdentity(tester, const VerifyEmailScreen(),
+          harness: harness, locale: locale, textScale: textScale);
       await enterIdentityField(tester, 0, 'person@example.test');
       await enterIdentityField(tester, 1, 'WRONGONE');
       await tapIdentityButton(tester, l10n.verifyEmailAction);
@@ -171,47 +161,45 @@ void main() {
       expect(find.textContaining('401'), findsNothing);
     });
 
-    testEveryDirectionAndScale('every resend outcome renders the same acknowledgement', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
-      final AppLocalizations l10n = lookupAppLocalizations(locale);
-      final List<List<String>> renderings = <List<String>>[];
+    testEveryDirectionAndScale(
+      'every resend outcome renders the same acknowledgement',
+      (WidgetTester tester, Locale locale, double textScale) async {
+        final AppLocalizations l10n = lookupAppLocalizations(locale);
+        final List<List<String>> renderings = <List<String>>[];
 
-      for (final Map<String, Object?> body in <Map<String, Object?>>[
-        <String, Object?>{'status': 'accepted', 'detail': 'A code is on its way.'},
-        <String, Object?>{
-          'status': 'accepted',
-          'detail': 'That address is already verified.',
-          'alreadyVerified': true,
-        },
-      ]) {
-        final IdentityHarness harness = IdentityHarness();
-        harness.transport.onPost('/auth/resend-verification', body, statusCode: 202);
+        for (final Map<String, Object?> body in <Map<String, Object?>>[
+          <String, Object?>{'status': 'accepted', 'detail': 'A code is on its way.'},
+          <String, Object?>{
+            'status': 'accepted',
+            'detail': 'That address is already verified.',
+            'alreadyVerified': true,
+          },
+        ]) {
+          final IdentityHarness harness = IdentityHarness();
+          harness.transport.onPost('/auth/resend-verification', body, statusCode: 202);
 
-        await pumpIdentity(
-          tester,
-          const VerifyEmailScreen(),
-          harness: harness,
-          locale: locale,
-          textScale: textScale,
+          await pumpIdentity(tester, const VerifyEmailScreen(),
+              harness: harness, locale: locale, textScale: textScale);
+          await enterIdentityField(tester, 0, 'person@example.test');
+          await tapIdentityButton(tester, l10n.verifyEmailResendAction);
+          await tester.pumpAndSettle();
+
+          renderings.add(_renderedText(tester));
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+
+        expect(renderings[1], equals(renderings[0]));
+        expect(renderings[0], contains(l10n.verifyEmailResendAcknowledgement));
+        expect(
+          renderings[0].where((String value) => value.contains('already verified')),
+          isEmpty,
         );
-        await enterIdentityField(tester, 0, 'person@example.test');
-        await tapIdentityButton(tester, l10n.verifyEmailResendAction);
-        await tester.pumpAndSettle();
+      },
+    );
 
-        renderings.add(_renderedText(tester));
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
-      }
-
-      expect(renderings[1], equals(renderings[0]));
-      expect(renderings[0], contains(l10n.verifyEmailResendAcknowledgement));
-      expect(renderings[0].where((String value) => value.contains('already verified')), isEmpty);
-    });
-
-    testWidgets('every interactive control carries a name', (WidgetTester tester) async {
+    testWidgets('every interactive control carries a name',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       final SemanticsHandle handle = tester.ensureSemantics();
 

@@ -38,46 +38,47 @@ Map<String, Object?> accountBody({
   Map<String, Object?>? institution,
   String? userSuppliedInstitutionLabel,
   String? mask = '**1234',
-}) => <String, Object?>{
-  'accountId': 'account-0001',
-  'accountType': accountType,
-  'walletKind': walletKind,
-  'nature': nature,
-  'currency': <String, Object?>{'code': 'QAR', 'exponent': 2},
-  'displayName': 'Everyday account',
-  'mask': mask,
-  'institution': institution,
-  'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel,
-  'status': status,
-  'origin': origin,
-  'link': <String, Object?>{
-    'state': 'NOT_LINKED',
-    'impliesLiveInstitutionLink': false,
-    'providerAccessStatus': 'NOT_IMPLEMENTED',
-  },
-  'createdAt': '2026-01-01T00:00:00.000Z',
-  'updatedAt': '2026-02-01T00:00:00.000Z',
-  'version': 1,
-};
+}) =>
+    <String, Object?>{
+      'accountId': 'account-0001',
+      'accountType': accountType,
+      'walletKind': walletKind,
+      'nature': nature,
+      'currency': <String, Object?>{'code': 'QAR', 'exponent': 2},
+      'displayName': 'Everyday account',
+      'mask': mask,
+      'institution': institution,
+      'userSuppliedInstitutionLabel': userSuppliedInstitutionLabel,
+      'status': status,
+      'origin': origin,
+      'link': <String, Object?>{
+        'state': 'NOT_LINKED',
+        'impliesLiveInstitutionLink': false,
+        'providerAccessStatus': 'NOT_IMPLEMENTED',
+      },
+      'createdAt': '2026-01-01T00:00:00.000Z',
+      'updatedAt': '2026-02-01T00:00:00.000Z',
+      'version': 1,
+    };
 
 Map<String, Object?> institutionBody({String kind = 'BANK'}) => <String, Object?>{
-  'institutionId': 'issuer-0001',
-  'code': 'ISSUER_ONE',
-  'kind': kind,
-  'displayNameEn': 'First Reviewed Issuer',
-  'displayNameAr': 'الجهة المُراجَعة الأولى',
-  'status': 'ACTIVE',
-};
+      'institutionId': 'issuer-0001',
+      'code': 'ISSUER_ONE',
+      'kind': kind,
+      'displayNameEn': 'First Reviewed Issuer',
+      'displayNameAr': 'الجهة المُراجَعة الأولى',
+      'status': 'ACTIVE',
+    };
 
 Map<String, Object?> pageBody(List<Object?> items) => <String, Object?>{
-  'items': items,
-  'page': <String, Object?>{
-    'limit': 50,
-    'returned': items.length,
-    'hasMore': false,
-    'nextCursor': null,
-  },
-};
+      'items': items,
+      'page': <String, Object?>{
+        'limit': 50,
+        'returned': items.length,
+        'hasMore': false,
+        'nextCursor': null,
+      },
+    };
 
 /// A repository whose transport answers with [body].
 ({ApiFinancialAccountsRepository repository, FakeApiTransport transport}) repositoryFor(
@@ -117,7 +118,8 @@ void main() {
     test('an unrecognised wire value falls back rather than throwing', () {
       // A client that threw on a value the server added would break on a
       // deployment it did not ship with.
-      expect(AccountTypeDto.fromWire('A_TYPE_THIS_BUILD_HAS_NEVER_SEEN'), AccountTypeDto.unknown);
+      expect(AccountTypeDto.fromWire('A_TYPE_THIS_BUILD_HAS_NEVER_SEEN'),
+          AccountTypeDto.unknown);
       expect(AccountTypeDto.unknown.toWire(), isNull);
     });
 
@@ -154,19 +156,25 @@ void main() {
 
     test('every wallet kind maps, and an absent one stays absent', () async {
       expect(
-        (await accountFrom(accountBody(accountType: 'WALLET', walletKind: 'E_MONEY'))).walletKind,
+        (await accountFrom(accountBody(accountType: 'WALLET', walletKind: 'E_MONEY')))
+            .walletKind,
         WalletKind.eMoney,
       );
       expect((await accountFrom(accountBody())).walletKind, isNull);
       expect(
-        (await accountFrom(accountBody(accountType: 'WALLET', walletKind: 'SOMETHING_NEWER')))
+        (await accountFrom(
+          accountBody(accountType: 'WALLET', walletKind: 'SOMETHING_NEWER'),
+        ))
             .walletKind,
         WalletKind.unrecognised,
       );
     });
 
     test('the platform\'s own UNKNOWN nature is not a parse failure', () async {
-      expect((await accountFrom(accountBody(nature: 'UNKNOWN'))).nature, AccountNature.notStated);
+      expect(
+        (await accountFrom(accountBody(nature: 'UNKNOWN'))).nature,
+        AccountNature.notStated,
+      );
       expect(
         (await accountFrom(accountBody(nature: 'SOMETHING_NEWER'))).nature,
         AccountNature.unrecognised,
@@ -178,16 +186,24 @@ void main() {
         (await accountFrom(accountBody(status: 'ARCHIVED'))).lifecycle,
         AccountLifecycle.archived,
       );
-      expect((await accountFrom(accountBody(status: 'CLOSED'))).lifecycle, AccountLifecycle.closed);
-      expect((await accountFrom(accountBody(origin: 'CSV'))).origin, AccountOrigin.csv);
+      expect(
+        (await accountFrom(accountBody(status: 'CLOSED'))).lifecycle,
+        AccountLifecycle.closed,
+      );
+      expect(
+        (await accountFrom(accountBody(origin: 'CSV'))).origin,
+        AccountOrigin.csv,
+      );
       expect(
         (await accountFrom(accountBody(origin: 'EXTERNAL_PROVIDER'))).origin,
         AccountOrigin.externalProvider,
       );
     });
 
-    test('an issuer is either a catalogue entry or a typed label, never both', () async {
-      final catalogue = await accountFrom(accountBody(institution: institutionBody()));
+    test('an issuer is either a catalogue entry or a typed label, never both',
+        () async {
+      final catalogue =
+          await accountFrom(accountBody(institution: institutionBody()));
       expect(catalogue.issuer, isA<IssuerFromCatalogue>());
 
       final unlisted = await accountFrom(
@@ -221,7 +237,8 @@ void main() {
       }
     });
 
-    test('a mask that could be a full number is withheld at the boundary', () async {
+    test('a mask that could be a full number is withheld at the boundary',
+        () async {
       final held = await accountFrom(accountBody(mask: '4111111111111111'));
       expect(held.mask.isWithheld, isTrue);
       expect(held.mask.value, isNull);
@@ -254,7 +271,8 @@ void main() {
       expect(snapshot.amount.exponent, 3);
     });
 
-    test('a minor-unit value the contract forbids is a stated contract violation', () async {
+    test('a minor-unit value the contract forbids is a stated contract violation',
+        () async {
       final result = await repositoryFor(
         pageBody(<Object?>[
           <String, Object?>{
@@ -278,7 +296,8 @@ void main() {
       expect(result.failureOrNull, isA<ContractViolationFailure>());
     });
 
-    test('a source link reads its coverage as days and its freshness as instants', () async {
+    test('a source link reads its coverage as days and its freshness as instants',
+        () async {
       final result = await repositoryFor(
         pageBody(<Object?>[
           <String, Object?>{
@@ -301,7 +320,10 @@ void main() {
               'lastObservedAt': '2026-03-01T00:00:00.000Z',
               'lastSuccessfulImportAt': null,
             },
-            'historyCoverage': <String, Object?>{'start': '2026-01-01', 'end': '2026-03-31'},
+            'historyCoverage': <String, Object?>{
+              'start': '2026-01-01',
+              'end': '2026-03-31',
+            },
             'capabilities': <String, Object?>{
               'balance': 'OBSERVED',
               'pendingTransactions': 'NOT_PROVIDED',
@@ -323,7 +345,8 @@ void main() {
 
     test('a malformed shape is a stated failure, never an empty row', () async {
       final missingField = Map<String, Object?>.of(accountBody())..remove('currency');
-      final result = await repositoryFor(missingField).repository.readOwnAccount('account-0001');
+      final result =
+          await repositoryFor(missingField).repository.readOwnAccount('account-0001');
       expect(result.failureOrNull, isA<ContractViolationFailure>());
       expect(
         (result.failureOrNull! as ContractViolationFailure).location,
@@ -374,12 +397,14 @@ void main() {
         ),
       );
       expect(
-        (savings.transport.requests.single.body! as Map<String, Object?>).containsKey('walletKind'),
+        (savings.transport.requests.single.body! as Map<String, Object?>)
+            .containsKey('walletKind'),
         isFalse,
       );
     });
 
-    test('clearing a field sends an explicit null, and absence leaves it alone', () async {
+    test('clearing a field sends an explicit null, and absence leaves it alone',
+        () async {
       final held = repositoryFor(accountBody());
       await held.repository.updateAccount(
         'account-0001',
@@ -425,7 +450,8 @@ void main() {
         'account-0001',
         const AccountEdit(expectedVersion: 1, clearWalletKind: true),
       );
-      final clearedBody = cleared.transport.requests.single.body! as Map<String, Object?>;
+      final clearedBody =
+          cleared.transport.requests.single.body! as Map<String, Object?>;
       expect(clearedBody.containsKey('walletKind'), isTrue);
       expect(clearedBody['walletKind'], isNull);
 
@@ -447,7 +473,8 @@ void main() {
         const AccountEdit(expectedVersion: 1, displayName: 'Renamed'),
       );
       expect(
-        (held.transport.requests.single.body! as Map<String, Object?>).containsKey('currency'),
+        (held.transport.requests.single.body! as Map<String, Object?>)
+            .containsKey('currency'),
         isFalse,
         reason: 'the platform refuses a currency change and this client offers none',
       );
@@ -490,10 +517,10 @@ void main() {
 
     test('an edit that changes nothing is declined without a round trip', () async {
       final held = repositoryFor(accountBody());
-      final result = await UpdateAccount(held.repository)(
-        'account-0001',
-        const AccountEdit(expectedVersion: 1),
-      );
+      final result =
+          await UpdateAccount(held.repository)('account-0001', const AccountEdit(
+        expectedVersion: 1,
+      ));
       expect(result.failureOrNull?.code, noChangeCode);
       expect(held.transport.requests, isEmpty);
     });
@@ -505,12 +532,15 @@ void main() {
       await held.repository.listSourceLinks('account-0001');
       await held.repository.listSelectableIssuers();
 
-      expect(held.transport.requests.map((ApiRequest request) => request.path).toList(), <String>[
-        '/financial/accounts',
-        '/financial/accounts/account-0001/balances',
-        '/financial/accounts/account-0001/source-links',
-        '/financial/institutions',
-      ]);
+      expect(
+        held.transport.requests.map((ApiRequest request) => request.path).toList(),
+        <String>[
+          '/financial/accounts',
+          '/financial/accounts/account-0001/balances',
+          '/financial/accounts/account-0001/source-links',
+          '/financial/institutions',
+        ],
+      );
       for (final request in held.transport.requests) {
         expect(request.requiresAuthentication, isTrue);
         // No operation on this surface accepts a subject or a tenant, and this
@@ -549,7 +579,8 @@ void main() {
       expect(transport.requests[1].query['cursor'], 'cursor-1');
     });
 
-    test('the walk is bounded, so a server that always says "more" cannot spin', () async {
+    test('the walk is bounded, so a server that always says "more" cannot spin',
+        () async {
       final transport = FakeApiTransport(
         (ApiRequest request) async => ApiResponse(
           statusCode: 200,

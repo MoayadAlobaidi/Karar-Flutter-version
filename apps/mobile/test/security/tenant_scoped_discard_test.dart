@@ -22,7 +22,8 @@
 //     credential. A re-read here would be a request that must fail, and the
 //     failure would be written into the state the next principal reads.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override, ProviderListenable, ProviderOrFamily;
+import 'package:flutter_riverpod/misc.dart'
+    show Override, ProviderListenable, ProviderOrFamily;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karar_mobile/app/composition/feature_surface.dart';
 import 'package:karar_mobile/app/lifecycle/tenant_data_scope.dart';
@@ -63,7 +64,8 @@ void main() {
 
   /// Everything the registry names, held open by a listener so that closing a
   /// screen cannot be what empties it.
-  final List<ProviderSubscription<Object?>> subscriptions = <ProviderSubscription<Object?>>[];
+  final List<ProviderSubscription<Object?>> subscriptions =
+      <ProviderSubscription<Object?>>[];
 
   void listenTo(ProviderListenable<Object?> provider) =>
       subscriptions.add(container.listen(provider, (_, _) {}, fireImmediately: true));
@@ -140,29 +142,34 @@ void main() {
   /// What each provider currently exposes, by name, so a failure says WHICH one
   /// kept the previous organisation's answer.
   Map<String, Object?> exposedValues() => <String, Object?>{
-    'ownAccounts': switch (container.read(ownAccountsProvider).value) {
-      AccountsLoaded(:final accounts) => accounts,
-      _ => const <FinancialAccount>[],
-    },
-    'selectableIssuers': container.read(selectableIssuersProvider).value,
-    'transactionListing': switch (container.read(transactionListingProvider).value) {
-      TransactionsLoaded(:final transactions) => transactions,
-      _ => const <Transaction>[],
-    },
-    'categoryCatalogue': switch (container.read(categoryCatalogueProvider).value) {
-      CategoryCatalogueLoaded(:final catalogue) => catalogue.entries,
-      _ => const <Object?>[],
-    },
-    'accountDetail': container.read(accountDetailProvider(accountOfA)).value,
-    'accountBalances': container.read(accountBalancesProvider(accountOfA)).value?.entries,
-    'accountSourceLinks': container.read(accountSourceLinksProvider(accountOfA)).value,
-    'accountInstruments': container.read(accountInstrumentsProvider(accountOfA)).value,
-    'accountRecentTransactions': container
-        .read(accountRecentTransactionsProvider(accountOfA))
-        .value,
-    'transactionDetail': container.read(transactionDetailProvider(transactionOfA)).value,
-    'transactionProvenance': container.read(transactionProvenanceProvider(transactionOfA)).value,
-  };
+        'ownAccounts': switch (container.read(ownAccountsProvider).value) {
+          AccountsLoaded(:final accounts) => accounts,
+          _ => const <FinancialAccount>[],
+        },
+        'selectableIssuers': container.read(selectableIssuersProvider).value,
+        'transactionListing':
+            switch (container.read(transactionListingProvider).value) {
+          TransactionsLoaded(:final transactions) => transactions,
+          _ => const <Transaction>[],
+        },
+        'categoryCatalogue': switch (container.read(categoryCatalogueProvider).value) {
+          CategoryCatalogueLoaded(:final catalogue) => catalogue.entries,
+          _ => const <Object?>[],
+        },
+        'accountDetail': container.read(accountDetailProvider(accountOfA)).value,
+        'accountBalances':
+            container.read(accountBalancesProvider(accountOfA)).value?.entries,
+        'accountSourceLinks':
+            container.read(accountSourceLinksProvider(accountOfA)).value,
+        'accountInstruments':
+            container.read(accountInstrumentsProvider(accountOfA)).value,
+        'accountRecentTransactions':
+            container.read(accountRecentTransactionsProvider(accountOfA)).value,
+        'transactionDetail':
+            container.read(transactionDetailProvider(transactionOfA)).value,
+        'transactionProvenance':
+            container.read(transactionProvenanceProvider(transactionOfA)).value,
+      };
 
   /// Whether a provider is holding nothing: a null, or an empty collection.
   bool isEmptied(Object? value) => value == null || (value is Iterable && value.isEmpty);
@@ -192,8 +199,7 @@ void main() {
       expect(
         everyTenantScopedProvider().length,
         registeredProviders,
-        reason:
-            'a tenant-scoped provider was added or removed. Either exercise '
+        reason: 'a tenant-scoped provider was added or removed. Either exercise '
             'it in exposedValues() — which is what actually proves its discard '
             'works — or raise this number deliberately, knowing that its '
             'discard is then unproven by this suite',
@@ -201,15 +207,13 @@ void main() {
       expect(
         exposedValues().length,
         exercisedHere,
-        reason:
-            'the set this suite builds changed; keep the two numbers above '
+        reason: 'the set this suite builds changed; keep the two numbers above '
             'honest about each other',
       );
       expect(
         exercisedHere,
         lessThan(registeredProviders),
-        reason:
-            'if these are equal the suite covers everything and this test '
+        reason: 'if these are equal the suite covers everything and this test '
             'should be replaced by that stronger claim',
       );
     });
@@ -224,16 +228,14 @@ void main() {
         expect(
           isEmptied(entry.value),
           isFalse,
-          reason:
-              '${entry.key} never loaded, so the assertion that it is '
+          reason: '${entry.key} never loaded, so the assertion that it is '
               'emptied below would prove nothing',
         );
       }
       expect(
         container.read(tenantDataScopeProvider).liveAnswerCount,
         held.length,
-        reason:
-            'every loaded element must have registered itself, or the '
+        reason: 'every loaded element must have registered itself, or the '
             'discard cannot reach it',
       );
     });
@@ -247,14 +249,14 @@ void main() {
         expect(
           isEmptied(entry.value),
           isTrue,
-          reason:
-              '${entry.key} is still exposing the previous organisation\'s '
+          reason: '${entry.key} is still exposing the previous organisation\'s '
               'answer after the switch',
         );
       }
     });
 
-    test('re-reads on a binding change, because there is a session to read under', () async {
+    test('re-reads on a binding change, because there is a session to read under',
+        () async {
       await loadEverything();
       final int before = accounts.reads.length + transactions.reads.length;
 
@@ -266,8 +268,7 @@ void main() {
       expect(
         accounts.reads.length + transactions.reads.length,
         greaterThan(before),
-        reason:
-            'the new organisation\'s answer has to be fetched, or every '
+        reason: 'the new organisation\'s answer has to be fetched, or every '
             'screen renders an empty surface until something else asks',
       );
     });
@@ -281,8 +282,7 @@ void main() {
         expect(
           isEmptied(entry.value),
           isTrue,
-          reason:
-              '${entry.key} is still exposing the ended session\'s answer, '
+          reason: '${entry.key} is still exposing the ended session\'s answer, '
               'which is what the next principal to sign in would read',
         );
       }
@@ -300,8 +300,7 @@ void main() {
       expect(
         accounts.reads.length + transactions.reads.length,
         before,
-        reason:
-            'there is no credential to read under; a request issued here '
+        reason: 'there is no credential to read under; a request issued here '
             'can only fail, and its failure would be written into the state '
             'the next principal reads',
       );
@@ -316,8 +315,7 @@ void main() {
       expect(
         scope.generation,
         isNot(before),
-        reason:
-            'a controller that captured the generation before its `await` '
+        reason: 'a controller that captured the generation before its `await` '
             'has no way to know its answer is stale unless this moves',
       );
     });
@@ -333,8 +331,7 @@ void main() {
       expect(
         named.toSet(),
         hasLength(named.length),
-        reason:
-            'a provider registered twice is a merge that went wrong, and '
+        reason: 'a provider registered twice is a merge that went wrong, and '
             'the next merge is as likely to drop one as to duplicate one',
       );
     });

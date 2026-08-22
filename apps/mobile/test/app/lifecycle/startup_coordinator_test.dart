@@ -26,40 +26,39 @@ import '../../core/support/fakes.dart';
 final DateTime _now = DateTime.utc(2026, 8, 16, 12);
 
 AppConfiguration _configuration() => AppConfiguration(
-  environment: AppEnvironment.local,
-  apiBaseUrl: Uri.parse('http://localhost:3000'),
-  appVersion: '0.0.0',
-  buildNumber: '0',
-  brandId: 'karar',
-);
+      environment: AppEnvironment.local,
+      apiBaseUrl: Uri.parse('http://localhost:3000'),
+      appVersion: '0.0.0',
+      buildNumber: '0',
+      brandId: 'karar',
+    );
 
 SessionTokens _liveTokens() => SessionTokens(
-  accessToken: 'access',
-  accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
-  refreshToken: 'refresh',
-  refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
-  sessionId: 'session-1',
-);
+      accessToken: 'access',
+      accessTokenExpiresAt: _now.add(const Duration(minutes: 10)),
+      refreshToken: 'refresh',
+      refreshTokenExpiresAt: _now.add(const Duration(days: 30)),
+      sessionId: 'session-1',
+    );
 
 SessionTokens _deadChainTokens() => SessionTokens(
-  accessToken: 'access',
-  accessTokenExpiresAt: _now.subtract(const Duration(hours: 2)),
-  refreshToken: 'refresh',
-  refreshTokenExpiresAt: _now.subtract(const Duration(hours: 1)),
-  sessionId: 'session-1',
-);
+      accessToken: 'access',
+      accessTokenExpiresAt: _now.subtract(const Duration(hours: 2)),
+      refreshToken: 'refresh',
+      refreshTokenExpiresAt: _now.subtract(const Duration(hours: 1)),
+      sessionId: 'session-1',
+    );
 
 final class _Harness {
   _Harness({
     Result<AppConfiguration>? configuration,
     List<Result<BootstrapSnapshot>>? bootstrapAnswers,
-  }) : clock = FixedClock(_now),
-       secureStore = InMemorySecureStore(),
-       securityState = InMemoryLocalSecurityStateStore(),
-       gateway = FakeBootstrapGateway(
-         bootstrapAnswers ??
-             <Result<BootstrapSnapshot>>[Success<BootstrapSnapshot>(readySnapshot())],
-       ) {
+  })  : clock = FixedClock(_now),
+        secureStore = InMemorySecureStore(),
+        securityState = InMemoryLocalSecurityStateStore(),
+        gateway = FakeBootstrapGateway(
+          bootstrapAnswers ?? <Result<BootstrapSnapshot>>[Success<BootstrapSnapshot>(readySnapshot())],
+        ) {
     sessions = SessionManager(
       store: SecureTokenStore(
         secureStore,
@@ -69,7 +68,8 @@ final class _Harness {
     );
     appLock = AppLockGate(securityState: securityState);
     coordinator = StartupCoordinator(
-      loadConfiguration: () => configuration ?? Success<AppConfiguration>(_configuration()),
+      loadConfiguration: () =>
+          configuration ?? Success<AppConfiguration>(_configuration()),
       appLock: appLock,
       sessionManager: sessions,
       bootstrapGateway: gateway,
@@ -118,16 +118,17 @@ void main() {
       await harness.coordinator.start();
 
       expect(harness.coordinator.state, isA<ConfigInvalid>());
-      expect((harness.coordinator.state as ConfigInvalid).violations, <String>[
-        'API_BASE_URL_MISSING',
-      ]);
+      expect(
+        (harness.coordinator.state as ConfigInvalid).violations,
+        <String>['API_BASE_URL_MISSING'],
+      );
       expect(harness.gateway.callCount, 0, reason: 'no request may be made');
       expect(harness.coordinator.configuration, isNull);
       await harness.settle();
-      expect(harness.observed.map((StartupState state) => state.stage), <StartupStage>[
-        StartupStage.configLoading,
-        StartupStage.configInvalid,
-      ]);
+      expect(
+        harness.observed.map((StartupState state) => state.stage),
+        <StartupStage>[StartupStage.configLoading, StartupStage.configInvalid],
+      );
     });
 
     test('valid configuration is exposed and startup continues', () async {
@@ -264,8 +265,7 @@ void main() {
       expect(
         (state as Unauthenticated).secureStorageUnavailable,
         isTrue,
-        reason:
-            'the credential is still on disk; a plain Unauthenticated would '
+        reason: 'the credential is still on disk; a plain Unauthenticated would '
             'claim a removal that did not happen',
       );
       expect(harness.secureStore.entries, isNotEmpty);
@@ -280,7 +280,10 @@ void main() {
       await harness.coordinator.start();
 
       expect(harness.coordinator.state, isA<Unauthenticated>());
-      expect((harness.coordinator.state as Unauthenticated).secureStorageUnavailable, isFalse);
+      expect(
+        (harness.coordinator.state as Unauthenticated).secureStorageUnavailable,
+        isFalse,
+      );
       expect(harness.gateway.callCount, 0);
       await harness.settle();
       expect(
@@ -528,25 +531,30 @@ void main() {
       expect(harness.coordinator.state.recovery, StartupRecovery.restart);
     });
 
-    test('a resolved bootstrap with an EMPTY capability list is READY, not unavailable', () async {
-      final harness = _Harness(
-        bootstrapAnswers: <Result<BootstrapSnapshot>>[Success<BootstrapSnapshot>(readySnapshot())],
-      );
-      addTearDown(harness.dispose);
-      await harness.storeSession(_liveTokens());
+    test(
+      'a resolved bootstrap with an EMPTY capability list is READY, not unavailable',
+      () async {
+        final harness = _Harness(
+          bootstrapAnswers: <Result<BootstrapSnapshot>>[
+            Success<BootstrapSnapshot>(readySnapshot()),
+          ],
+        );
+        addTearDown(harness.dispose);
+        await harness.storeSession(_liveTokens());
 
-      await harness.coordinator.start();
+        await harness.coordinator.start();
 
-      final state = harness.coordinator.state;
-      expect(state, isA<Ready>());
-      expect((state as Ready).bootstrap.capabilities, isEmpty);
-      expect(
-        state.bootstrap.capabilityState,
-        CapabilityResolutionState.resolved,
-        reason: 'an empty list is a stated answer, not an outage',
-      );
-      expect(state.bootstrap.hasCapability('anything'), isFalse);
-    });
+        final state = harness.coordinator.state;
+        expect(state, isA<Ready>());
+        expect((state as Ready).bootstrap.capabilities, isEmpty);
+        expect(
+          state.bootstrap.capabilityState,
+          CapabilityResolutionState.resolved,
+          reason: 'an empty list is a stated answer, not an outage',
+        );
+        expect(state.bootstrap.hasCapability('anything'), isFalse);
+      },
+    );
 
     test('an unclassifiable capability state fails closed', () async {
       final harness = _Harness(
@@ -616,7 +624,9 @@ void main() {
         const ContractViolationFailure(),
       ]) {
         final harness = _Harness(
-          bootstrapAnswers: <Result<BootstrapSnapshot>>[Failed<BootstrapSnapshot>(failure)],
+          bootstrapAnswers: <Result<BootstrapSnapshot>>[
+            Failed<BootstrapSnapshot>(failure),
+          ],
         );
         addTearDown(harness.dispose);
         await harness.storeSession(_liveTokens());
@@ -638,7 +648,9 @@ void main() {
         const ConfigLoading(),
         const ConfigInvalid(<String>['X']),
         const LocalSecurityStateUnavailable(
-          LocalSecurityStateUnavailableFailure(operation: LocalSecurityStateOperation.read),
+          LocalSecurityStateUnavailableFailure(
+            operation: LocalSecurityStateOperation.read,
+          ),
         ),
         const SecurityRecoveryBlocked(AbandonmentNotDurable()),
         const AppLocked(),
@@ -663,7 +675,9 @@ void main() {
         const ConfigLoading(),
         const ConfigInvalid(<String>['X']),
         const LocalSecurityStateUnavailable(
-          LocalSecurityStateUnavailableFailure(operation: LocalSecurityStateOperation.read),
+          LocalSecurityStateUnavailableFailure(
+            operation: LocalSecurityStateOperation.read,
+          ),
         ),
         const SecurityRecoveryBlocked(AbandonmentNotDurable()),
         const AppLocked(),

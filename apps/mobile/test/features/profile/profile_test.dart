@@ -20,21 +20,23 @@ import '../platform_bootstrap/support/feature_harness.dart';
 import '../platform_bootstrap/support/fixtures.dart';
 
 Map<String, Object?> profileBody({String status = 'ACTIVE'}) => <String, Object?>{
-  'createdAt': '2026-01-01T00:00:00.000Z',
-  'displayName': 'Example Person',
-  'locale': 'en',
-  'residencyJurisdictionRef': 'jurisdiction-a',
-  'status': status,
-  'tenantId': testTenantId,
-  'updatedAt': '2026-02-01T00:00:00.000Z',
-  'userId': testUserId,
-};
+      'createdAt': '2026-01-01T00:00:00.000Z',
+      'displayName': 'Example Person',
+      'locale': 'en',
+      'residencyJurisdictionRef': 'jurisdiction-a',
+      'status': status,
+      'tenantId': testTenantId,
+      'updatedAt': '2026-02-01T00:00:00.000Z',
+      'userId': testUserId,
+    };
 
 ApiProfileRepository repositoryReturning(Object? body) => ApiProfileRepository(
-  KararApiClient(
-    FakeApiTransport((ApiRequest request) async => ApiResponse(statusCode: 200, body: body)),
-  ),
-);
+      KararApiClient(
+        FakeApiTransport(
+          (ApiRequest request) async => ApiResponse(statusCode: 200, body: body),
+        ),
+      ),
+    );
 
 /// A profile repository whose answers the test scripts.
 final class ScriptedProfileRepository implements ProfileRepository {
@@ -48,7 +50,8 @@ final class ScriptedProfileRepository implements ProfileRepository {
   int disableRequests = 0;
 
   @override
-  Future<Result<UserProfile>> readOwn() async => readResult ?? Success<UserProfile>(userProfile());
+  Future<Result<UserProfile>> readOwn() async =>
+      readResult ?? Success<UserProfile>(userProfile());
 
   @override
   Future<Result<UserProfile>> updateOwn(ProfileChangeSet changes) async {
@@ -74,19 +77,22 @@ Future<void> pumpProfile(
   required ProfileRepository repository,
   Locale locale = const Locale('en'),
   double textScale = 1.0,
-}) => pumpFeatureScreen(
-  tester,
-  const ProfileScreen(),
-  locale: locale,
-  textScale: textScale,
-  overrides: <Override>[profileRepositoryProvider.overrideWithValue(repository)],
-);
+}) =>
+    pumpFeatureScreen(
+      tester,
+      const ProfileScreen(),
+      locale: locale,
+      textScale: textScale,
+      overrides: <Override>[profileRepositoryProvider.overrideWithValue(repository)],
+    );
 
 void main() {
   group('the repository', () {
     test('maps every account status the contract defines', () async {
       Future<AccountStatus> statusFor(String wire) async =>
-          (await repositoryReturning(profileBody(status: wire)).readOwn()).valueOrNull!.status;
+          (await repositoryReturning(profileBody(status: wire)).readOwn())
+              .valueOrNull!
+              .status;
 
       expect(await statusFor('ACTIVE'), AccountStatus.active);
       expect(await statusFor('DISABLE_REQUESTED'), AccountStatus.disableRequested);
@@ -123,7 +129,10 @@ void main() {
       // ones the caller never set; a change set naming one field asked the
       // platform to consider both. An optional field left out of a PATCH means
       // "leave this alone", so it is now left out.
-      expect((request.body! as Map<String, Object?>).keys.toSet(), <String>{'displayName'});
+      expect(
+        (request.body! as Map<String, Object?>).keys.toSet(),
+        <String>{'displayName'},
+      );
     });
 
     test('a disable request is recorded only when the platform says so', () async {
@@ -173,72 +182,75 @@ void main() {
   });
 
   group('the screen', () {
-    testInBothDirections('renders the profile and its direction', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpProfile(
-        tester,
-        repository: ScriptedProfileRepository(),
-        locale: locale,
-        textScale: scale,
-      );
-      final l10n = mountedL10n(tester);
+    testInBothDirections(
+      'renders the profile and its direction',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpProfile(
+          tester,
+          repository: ScriptedProfileRepository(),
+          locale: locale,
+          textScale: scale,
+        );
+        final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.profileStatusActive), findsOneWidget);
-      expect(find.text(testTenantId), findsOneWidget);
-      expect(find.text(testUserId), findsOneWidget);
-      expect(
-        directionUnder(tester, find.byType(ProfileScreen)),
-        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      );
-    }, textScales: featureTextScales);
+        expect(find.text(l10n.profileStatusActive), findsOneWidget);
+        expect(find.text(testTenantId), findsOneWidget);
+        expect(find.text(testUserId), findsOneWidget);
+        expect(
+          directionUnder(tester, find.byType(ProfileScreen)),
+          locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        );
+      },
+      textScales: featureTextScales,
+    );
 
-    testInBothDirections('shows a saved state only after the platform returns the stored profile', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      final repository = ScriptedProfileRepository();
+    testInBothDirections(
+      'shows a saved state only after the platform returns the stored profile',
+      (WidgetTester tester, Locale locale, double scale) async {
+        final repository = ScriptedProfileRepository();
 
-      await pumpProfile(tester, repository: repository, locale: locale, textScale: scale);
-      final l10n = mountedL10n(tester);
+        await pumpProfile(
+          tester,
+          repository: repository,
+          locale: locale,
+          textScale: scale,
+        );
+        final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.profileSaveConfirmation), findsNothing);
+        expect(find.text(l10n.profileSaveConfirmation), findsNothing);
 
-      await tester.enterText(find.byType(TextField), 'Changed Name');
-      await tester.tap(find.byType(KararButton).first);
-      await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Changed Name');
+        await tester.tap(find.byType(KararButton).first);
+        await tester.pumpAndSettle();
 
-      expect(repository.updates.single.displayName, 'Changed Name');
-      expect(find.text(l10n.profileSaveConfirmation), findsOneWidget);
-    });
+        expect(repository.updates.single.displayName, 'Changed Name');
+        expect(find.text(l10n.profileSaveConfirmation), findsOneWidget);
+      },
+    );
 
-    testInBothDirections('a refused edit says nothing changed', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpProfile(
-        tester,
-        repository: ScriptedProfileRepository(
-          updateResult: const Failed<UserProfile>(
-            InvalidRequestFailure(code: 'INVALID_PROFILE_FIELD'),
+    testInBothDirections(
+      'a refused edit says nothing changed',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpProfile(
+          tester,
+          repository: ScriptedProfileRepository(
+            updateResult: const Failed<UserProfile>(
+              InvalidRequestFailure(code: 'INVALID_PROFILE_FIELD'),
+            ),
           ),
-        ),
-        locale: locale,
-        textScale: scale,
-      );
-      final l10n = mountedL10n(tester);
+          locale: locale,
+          textScale: scale,
+        );
+        final l10n = mountedL10n(tester);
 
-      await tester.enterText(find.byType(TextField), 'Changed Name');
-      await tester.tap(find.byType(KararButton).first);
-      await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Changed Name');
+        await tester.tap(find.byType(KararButton).first);
+        await tester.pumpAndSettle();
 
-      expect(find.text(l10n.profileSaveFailedTitle), findsOneWidget);
-      expect(find.text(l10n.profileSaveConfirmation), findsNothing);
-    });
+        expect(find.text(l10n.profileSaveFailedTitle), findsOneWidget);
+        expect(find.text(l10n.profileSaveConfirmation), findsNothing);
+      },
+    );
 
     testInBothDirections(
       'a disable-requested account says the request was recorded and nothing more',
@@ -246,7 +258,9 @@ void main() {
         await pumpProfile(
           tester,
           repository: ScriptedProfileRepository(
-            readResult: Success<UserProfile>(userProfile(status: AccountStatus.disableRequested)),
+            readResult: Success<UserProfile>(
+              userProfile(status: AccountStatus.disableRequested),
+            ),
           ),
           locale: locale,
           textScale: scale,
@@ -258,45 +272,45 @@ void main() {
       },
     );
 
-    testInBothDirections('an unreadable profile offers a retry rather than a blank form', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpProfile(
-        tester,
-        repository: ScriptedProfileRepository(
-          readResult: const Failed<UserProfile>(
-            DependencyUnavailableFailure(code: 'DEPENDENCY_UNAVAILABLE'),
+    testInBothDirections(
+      'an unreadable profile offers a retry rather than a blank form',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpProfile(
+          tester,
+          repository: ScriptedProfileRepository(
+            readResult: const Failed<UserProfile>(
+              DependencyUnavailableFailure(code: 'DEPENDENCY_UNAVAILABLE'),
+            ),
           ),
-        ),
-        locale: locale,
-        textScale: scale,
-      );
-      final l10n = mountedL10n(tester);
+          locale: locale,
+          textScale: scale,
+        );
+        final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.profileUnavailableTitle), findsOneWidget);
-      expect(find.byType(TextField), findsNothing);
-    }, textScales: featureTextScales);
+        expect(find.text(l10n.profileUnavailableTitle), findsOneWidget);
+        expect(find.byType(TextField), findsNothing);
+      },
+      textScales: featureTextScales,
+    );
 
-    testInBothDirections('renders no monetary value', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpProfile(
-        tester,
-        repository: ScriptedProfileRepository(),
-        locale: locale,
-        textScale: scale,
-      );
+    testInBothDirections(
+      'renders no monetary value',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpProfile(
+          tester,
+          repository: ScriptedProfileRepository(),
+          locale: locale,
+          textScale: scale,
+        );
 
-      expectNothingMatching(
-        tester,
-        RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
-        because: 'no financial value belongs on the profile surface',
-      );
-    }, textScales: featureTextScales);
+        expectNothingMatching(
+          tester,
+          RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
+          because: 'no financial value belongs on the profile surface',
+        );
+      },
+      textScales: featureTextScales,
+    );
 
     testWidgets('announces progress while the profile loads', (WidgetTester tester) async {
       await pumpFeatureScreen(

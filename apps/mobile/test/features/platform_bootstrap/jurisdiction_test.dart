@@ -27,13 +27,14 @@ Map<String, Object?> declarationBody({
   bool recorded = true,
   String source = 'USER_DECLARED',
   String state = 'UNVERIFIED',
-}) => <String, Object?>{
-  'effectiveFrom': '2026-01-01T00:00:00.000Z',
-  'jurisdictionId': 'jurisdiction-a',
-  'recorded': recorded,
-  'source': source,
-  'state': state,
-};
+}) =>
+    <String, Object?>{
+      'effectiveFrom': '2026-01-01T00:00:00.000Z',
+      'jurisdictionId': 'jurisdiction-a',
+      'recorded': recorded,
+      'source': source,
+      'state': state,
+    };
 
 ApiJurisdictionRepository repositoryReturning(Object? body, {int statusCode = 200}) =>
     ApiJurisdictionRepository(
@@ -62,12 +63,12 @@ final class ScriptedJurisdictionRepository implements JurisdictionRepository {
 }
 
 JurisdictionDeclaration declaration({bool recorded = true}) => JurisdictionDeclaration(
-  jurisdictionId: 'jurisdiction-a',
-  recorded: recorded,
-  source: JurisdictionDeclarationSource.userDeclared,
-  verification: JurisdictionDeclarationVerification.unverified,
-  effectiveFrom: DateTime.utc(2026),
-);
+      jurisdictionId: 'jurisdiction-a',
+      recorded: recorded,
+      source: JurisdictionDeclarationSource.userDeclared,
+      verification: JurisdictionDeclarationVerification.unverified,
+      effectiveFrom: DateTime.utc(2026),
+    );
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(JurisdictionScreen)));
@@ -75,8 +76,9 @@ AppLocalizations mountedL10n(WidgetTester tester) =>
 void main() {
   group('the repository', () {
     test('maps a recorded declaration and keeps it unverified', () async {
-      final result = await repositoryReturning(declarationBody())
-          .declareOwn(const JurisdictionReference(id: 'jurisdiction-a'));
+      final result = await repositoryReturning(declarationBody()).declareOwn(
+        const JurisdictionReference(id: 'jurisdiction-a'),
+      );
 
       final value = result.valueOrNull;
       expect(value, isNotNull);
@@ -106,15 +108,17 @@ void main() {
 
     test('a malformed payload becomes a typed contract violation', () async {
       final body = declarationBody()..remove('jurisdictionId');
-      final result = await repositoryReturning(body)
-          .declareOwn(const JurisdictionReference(id: 'jurisdiction-a'));
+      final result = await repositoryReturning(body).declareOwn(
+        const JurisdictionReference(id: 'jurisdiction-a'),
+      );
 
       expect(result.failureOrNull, isA<ContractViolationFailure>());
     });
 
     test('sends the documented request', () async {
       final transport = FakeApiTransport(
-        (ApiRequest request) async => ApiResponse(statusCode: 200, body: declarationBody()),
+        (ApiRequest request) async =>
+            ApiResponse(statusCode: 200, body: declarationBody()),
       );
       await ApiJurisdictionRepository(KararApiClient(transport))
           .declareOwn(const JurisdictionReference(id: 'jurisdiction-a'));
@@ -127,207 +131,210 @@ void main() {
   });
 
   group('the screen', () {
-    testInBothDirections('renders the status and its direction', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[platformContextProvider.overrideWithValue(platformContext())],
-      );
-      final l10n = mountedL10n(tester);
+    testInBothDirections(
+      'renders the status and its direction',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(platformContext()),
+          ],
+        );
+        final l10n = mountedL10n(tester);
 
-      expect(find.text(l10n.platformJurisdictionVerified), findsOneWidget);
-      expect(find.text('jurisdiction-a'), findsOneWidget);
-      expect(
-        directionUnder(tester, find.byType(JurisdictionScreen)),
-        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-      );
-    }, textScales: featureTextScales);
+        expect(find.text(l10n.platformJurisdictionVerified), findsOneWidget);
+        expect(find.text('jurisdiction-a'), findsOneWidget);
+        expect(
+          directionUnder(tester, find.byType(JurisdictionScreen)),
+          locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        );
+      },
+      textScales: featureTextScales,
+    );
 
-    testInBothDirections('names an unassigned jurisdiction rather than leaving it blank', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[
-          platformContextProvider.overrideWithValue(
-            platformContext(
-              jurisdiction: const JurisdictionStatus(state: PlatformJurisdictionState.none),
+    testInBothDirections(
+      'names an unassigned jurisdiction rather than leaving it blank',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(
+              platformContext(
+                jurisdiction: const JurisdictionStatus(
+                  state: PlatformJurisdictionState.none,
+                ),
+              ),
+            ),
+          ],
+        );
+        final l10n = mountedL10n(tester);
+
+        expect(find.text(l10n.platformJurisdictionNone), findsOneWidget);
+      },
+    );
+
+    testInBothDirections(
+      'offers no control when the platform supplied no selectable references',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(platformContext()),
+          ],
+        );
+        final l10n = mountedL10n(tester);
+
+        expect(find.text(l10n.platformJurisdictionSelectionUnavailable), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionDeclareAction), findsNothing);
+        expect(
+          find.byType(TextField),
+          findsNothing,
+          reason: 'a free-text field would invite an identifier the register may not hold',
+        );
+      },
+      textScales: featureTextScales,
+    );
+
+    testInBothDirections(
+      'records a declaration only after the platform confirms it',
+      (WidgetTester tester, Locale locale, double scale) async {
+        final repository = ScriptedJurisdictionRepository(
+          Success<JurisdictionDeclaration>(declaration()),
+        );
+
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(platformContext()),
+            jurisdictionRepositoryProvider.overrideWithValue(repository),
+            jurisdictionReferenceOptionsProvider.overrideWithValue(
+              const <JurisdictionReference>[JurisdictionReference(id: 'jurisdiction-a')],
+            ),
+          ],
+        );
+        final l10n = mountedL10n(tester);
+
+        expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
+
+        await tester.tap(find.byType(KararCheckboxTile));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
+        await tester.pumpAndSettle();
+
+        expect(repository.calls, 1);
+        expect(repository.lastReference?.id, 'jurisdiction-a');
+        expect(find.text(l10n.platformJurisdictionRecorded), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionRemainsUnverified), findsOneWidget);
+      },
+    );
+
+    testInBothDirections(
+      'says nothing changed when the jurisdiction was already in effect',
+      (WidgetTester tester, Locale locale, double scale) async {
+        final repository = ScriptedJurisdictionRepository(
+          Success<JurisdictionDeclaration>(declaration(recorded: false)),
+        );
+
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(platformContext()),
+            jurisdictionRepositoryProvider.overrideWithValue(repository),
+            jurisdictionReferenceOptionsProvider.overrideWithValue(
+              const <JurisdictionReference>[JurisdictionReference(id: 'jurisdiction-a')],
+            ),
+          ],
+        );
+        final l10n = mountedL10n(tester);
+
+        await tester.tap(find.byType(KararCheckboxTile));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
+        await tester.pumpAndSettle();
+
+        expect(find.text(l10n.platformJurisdictionAlreadyInEffect), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
+      },
+    );
+
+    testInBothDirections(
+      'shows only the platform reference when a declaration fails',
+      (WidgetTester tester, Locale locale, double scale) async {
+        final repository = ScriptedJurisdictionRepository(
+          const Failed<JurisdictionDeclaration>(
+            DependencyUnavailableFailure(
+              code: 'JURISDICTION_DECLARATION_UNAVAILABLE',
+              correlationId: 'req-77',
             ),
           ),
-        ],
-      );
-      final l10n = mountedL10n(tester);
+        );
 
-      expect(find.text(l10n.platformJurisdictionNone), findsOneWidget);
-    });
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(platformContext()),
+            jurisdictionRepositoryProvider.overrideWithValue(repository),
+            jurisdictionReferenceOptionsProvider.overrideWithValue(
+              const <JurisdictionReference>[JurisdictionReference(id: 'jurisdiction-a')],
+            ),
+          ],
+        );
+        final l10n = mountedL10n(tester);
 
-    testInBothDirections('offers no control when the platform supplied no selectable references', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[platformContextProvider.overrideWithValue(platformContext())],
-      );
-      final l10n = mountedL10n(tester);
+        await tester.tap(find.byType(KararCheckboxTile));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
+        await tester.pumpAndSettle();
 
-      expect(find.text(l10n.platformJurisdictionSelectionUnavailable), findsOneWidget);
-      expect(find.text(l10n.platformJurisdictionDeclareAction), findsNothing);
-      expect(
-        find.byType(TextField),
-        findsNothing,
-        reason: 'a free-text field would invite an identifier the register may not hold',
-      );
-    }, textScales: featureTextScales);
+        expect(find.textContaining('req-77'), findsOneWidget);
+        expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
+      },
+    );
 
-    testInBothDirections('records a declaration only after the platform confirms it', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      final repository = ScriptedJurisdictionRepository(
-        Success<JurisdictionDeclaration>(declaration()),
-      );
+    testInBothDirections(
+      'encodes no jurisdiction rules and no monetary value',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpFeatureScreen(
+          tester,
+          const JurisdictionScreen(),
+          locale: locale,
+          textScale: scale,
+          overrides: <Override>[
+            platformContextProvider.overrideWithValue(platformContext()),
+          ],
+        );
 
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[
-          platformContextProvider.overrideWithValue(platformContext()),
-          jurisdictionRepositoryProvider.overrideWithValue(repository),
-          jurisdictionReferenceOptionsProvider.overrideWithValue(const <JurisdictionReference>[
-            JurisdictionReference(id: 'jurisdiction-a'),
-          ]),
-        ],
-      );
-      final l10n = mountedL10n(tester);
-
-      expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
-
-      await tester.tap(find.byType(KararCheckboxTile));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
-      await tester.pumpAndSettle();
-
-      expect(repository.calls, 1);
-      expect(repository.lastReference?.id, 'jurisdiction-a');
-      expect(find.text(l10n.platformJurisdictionRecorded), findsOneWidget);
-      expect(find.text(l10n.platformJurisdictionRemainsUnverified), findsOneWidget);
-    });
-
-    testInBothDirections('says nothing changed when the jurisdiction was already in effect', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      final repository = ScriptedJurisdictionRepository(
-        Success<JurisdictionDeclaration>(declaration(recorded: false)),
-      );
-
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[
-          platformContextProvider.overrideWithValue(platformContext()),
-          jurisdictionRepositoryProvider.overrideWithValue(repository),
-          jurisdictionReferenceOptionsProvider.overrideWithValue(const <JurisdictionReference>[
-            JurisdictionReference(id: 'jurisdiction-a'),
-          ]),
-        ],
-      );
-      final l10n = mountedL10n(tester);
-
-      await tester.tap(find.byType(KararCheckboxTile));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
-      await tester.pumpAndSettle();
-
-      expect(find.text(l10n.platformJurisdictionAlreadyInEffect), findsOneWidget);
-      expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
-    });
-
-    testInBothDirections('shows only the platform reference when a declaration fails', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      final repository = ScriptedJurisdictionRepository(
-        const Failed<JurisdictionDeclaration>(
-          DependencyUnavailableFailure(
-            code: 'JURISDICTION_DECLARATION_UNAVAILABLE',
-            correlationId: 'req-77',
-          ),
-        ),
-      );
-
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[
-          platformContextProvider.overrideWithValue(platformContext()),
-          jurisdictionRepositoryProvider.overrideWithValue(repository),
-          jurisdictionReferenceOptionsProvider.overrideWithValue(const <JurisdictionReference>[
-            JurisdictionReference(id: 'jurisdiction-a'),
-          ]),
-        ],
-      );
-      final l10n = mountedL10n(tester);
-
-      await tester.tap(find.byType(KararCheckboxTile));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(l10n.platformJurisdictionDeclareAction));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('req-77'), findsOneWidget);
-      expect(find.text(l10n.platformJurisdictionRecorded), findsNothing);
-    });
-
-    testInBothDirections('encodes no jurisdiction rules and no monetary value', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpFeatureScreen(
-        tester,
-        const JurisdictionScreen(),
-        locale: locale,
-        textScale: scale,
-        overrides: <Override>[platformContextProvider.overrideWithValue(platformContext())],
-      );
-
-      for (final claim in <String>['Qatar', 'قطر', 'QFC', 'QFCRA', 'PDPL']) {
+        for (final claim in <String>['Qatar', 'قطر', 'QFC', 'QFCRA', 'PDPL']) {
+          expectNothingMatching(
+            tester,
+            RegExp(claim, caseSensitive: false),
+            because: 'no jurisdiction is named or its rules encoded in the client',
+          );
+        }
         expectNothingMatching(
           tester,
-          RegExp(claim, caseSensitive: false),
-          because: 'no jurisdiction is named or its rules encoded in the client',
+          RegExp(r'[\$€£¥]'),
+          because: 'no financial value belongs on the jurisdiction surface',
         );
-      }
-      expectNothingMatching(
-        tester,
-        RegExp(r'[\$€£¥]'),
-        because: 'no financial value belongs on the jurisdiction surface',
-      );
-    });
+      },
+    );
   });
 }

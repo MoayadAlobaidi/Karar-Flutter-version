@@ -26,7 +26,10 @@ void main() {
             'variants such as ar_EG default to Arabic-Indic. This is also the '
             'Gulf banking convention.',
       );
-      expect(ArabicNumerals.containsArabicIndicDigits(arabic.integer(1)), isFalse);
+      expect(
+        ArabicNumerals.containsArabicIndicDigits(arabic.integer(1)),
+        isFalse,
+      );
     });
 
     test('Arabic-Indic digits are available as an explicit product choice', () {
@@ -153,7 +156,10 @@ void main() {
         locale: Locale('ar'),
         numerals: KararNumeralSystem.arabicIndic,
       );
-      expect(ArabicNumerals.containsArabicIndicDigits(arabicIndic.date(moment)), isTrue);
+      expect(
+        ArabicNumerals.containsArabicIndicDigits(arabicIndic.date(moment)),
+        isTrue,
+      );
     });
   });
 

@@ -24,7 +24,10 @@ void inBothLanguages(
   String description,
   void Function(AppLocalizations l10n, String language) body,
 ) {
-  for (final locale in <Locale>[KararLocalization.english, KararLocalization.arabic]) {
+  for (final locale in <Locale>[
+    KararLocalization.english,
+    KararLocalization.arabic,
+  ]) {
     test('$description [${locale.languageCode}]', () async {
       final l10n = await AppLocalizations.delegate.load(locale);
       body(l10n, locale.languageCode);
@@ -39,8 +42,7 @@ void expectAllDistinct(List<String> sentences, String language, String subject) 
   expect(
     sentences.toSet(),
     hasLength(sentences.length),
-    reason:
-        'two members of $subject share one sentence in $language, so a '
+    reason: 'two members of $subject share one sentence in $language, so a '
         'person is told the same thing about two different situations:\n'
         '${sentences.join('\n')}',
   );
@@ -55,7 +57,8 @@ void main() {
     );
   });
 
-  inBothLanguages('every match state has its own consequence sentence', (l10n, language) {
+  inBothLanguages('every match state has its own consequence sentence',
+      (l10n, language) {
     expectAllDistinct(
       <String>[for (final state in MatchState.values) matchStateNote(state, l10n)],
       language,
@@ -65,31 +68,44 @@ void main() {
 
   inBothLanguages('every suggestion basis has its own sentence', (l10n, language) {
     expectAllDistinct(
-      <String>[for (final basis in SuggestionBasis.values) suggestionBasisSentence(basis, l10n)],
+      <String>[
+        for (final basis in SuggestionBasis.values)
+          suggestionBasisSentence(basis, l10n),
+      ],
       language,
       'SuggestionBasis',
     );
   });
 
-  inBothLanguages('every filter names itself, and its own empty state', (l10n, language) {
+  inBothLanguages('every filter names itself, and its own empty state',
+      (l10n, language) {
     expectAllDistinct(
-      <String>[for (final filter in MatchStateFilter.values) matchFilterLabel(filter, l10n)],
+      <String>[
+        for (final filter in MatchStateFilter.values) matchFilterLabel(filter, l10n),
+      ],
       language,
       'MatchStateFilter',
     );
     expectAllDistinct(
-      <String>[for (final filter in MatchStateFilter.values) emptyListingTitle(filter, l10n)],
+      <String>[
+        for (final filter in MatchStateFilter.values)
+          emptyListingTitle(filter, l10n),
+      ],
       language,
       'empty titles',
     );
     expectAllDistinct(
-      <String>[for (final filter in MatchStateFilter.values) emptyListingDescription(filter, l10n)],
+      <String>[
+        for (final filter in MatchStateFilter.values)
+          emptyListingDescription(filter, l10n),
+      ],
       language,
       'empty descriptions',
     );
   });
 
-  inBothLanguages('an in-flight decision names WHICH decision it is', (l10n, language) {
+  inBothLanguages('an in-flight decision names WHICH decision it is',
+      (l10n, language) {
     expect(decisionProgressStatus(MatchDecisionProgress.idle, l10n), isNull);
     expectAllDistinct(
       <String>[
@@ -101,18 +117,25 @@ void main() {
     );
   });
 
-  inBothLanguages('each refusal a person can act on differently reads differently', (
-    l10n,
-    language,
-  ) {
+  inBothLanguages('each refusal a person can act on differently reads differently',
+      (l10n, language) {
     // A version conflict is retried; an illegal transition is not; a
     // cross-currency pair is neither. Rounding any of them into the others
     // throws away the only part that helps.
     expectAllDistinct(
       <String>[
-        decisionRefusalMessage(const ConflictFailure(code: transferMatchVersionConflictCode), l10n),
-        decisionRefusalMessage(const ConflictFailure(code: transferMatchRuleViolatedCode), l10n),
-        decisionRefusalMessage(const NotFoundFailure(code: transferMatchNotFoundCode), l10n),
+        decisionRefusalMessage(
+          const ConflictFailure(code: transferMatchVersionConflictCode),
+          l10n,
+        ),
+        decisionRefusalMessage(
+          const ConflictFailure(code: transferMatchRuleViolatedCode),
+          l10n,
+        ),
+        decisionRefusalMessage(
+          const NotFoundFailure(code: transferMatchNotFoundCode),
+          l10n,
+        ),
         decisionRefusalMessage(
           const InvalidRequestFailure(code: transferMatchCrossCurrencyCode),
           l10n,
@@ -133,7 +156,10 @@ void main() {
         const InvalidRequestFailure(code: transferMatchTransitionUnavailableCode),
         l10n,
       ),
-      decisionRefusalMessage(const ConflictFailure(code: transferMatchRuleViolatedCode), l10n),
+      decisionRefusalMessage(
+        const ConflictFailure(code: transferMatchRuleViolatedCode),
+        l10n,
+      ),
     );
   });
 

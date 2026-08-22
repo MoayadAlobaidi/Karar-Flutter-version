@@ -38,7 +38,9 @@ const String _swiftHalf = 'ios/Runner/StatementDocumentPicker.swift';
 final class _ScriptedChannel implements DocumentPickerChannel {
   _ScriptedChannel.answering(this._answer) : _fault = null;
 
-  _ScriptedChannel.raising(Exception fault) : _answer = null, _fault = fault;
+  _ScriptedChannel.raising(Exception fault)
+      : _answer = null,
+        _fault = fault;
 
   final Object? _answer;
   final Exception? _fault;
@@ -60,7 +62,10 @@ final class _ScriptedChannel implements DocumentPickerChannel {
 
 /// The bytes of a chosen document, as the standard codec delivers them.
 Map<Object?, Object?> _chosenPayload(List<int> bytes, {String mediaType = 'text/csv'}) =>
-    <Object?, Object?>{bytesResultKey: Uint8List.fromList(bytes), mediaTypeResultKey: mediaType};
+    <Object?, Object?>{
+      bytesResultKey: Uint8List.fromList(bytes),
+      mediaTypeResultKey: mediaType,
+    };
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -110,13 +115,15 @@ void main() {
       // drifted from the platform's would be worse than no bound at all.
       answerWith((MethodCall call) async => null);
 
-      await PlatformStatementSourcePicker(channel: const MethodChannelDocumentPicker())
-          .pickStatementSource();
+      await PlatformStatementSourcePicker(
+        channel: const MethodChannelDocumentPicker(),
+      ).pickStatementSource();
 
       expect(calls.single.arguments, <String, Object?>{maxBytesArgument: 10485760});
     });
 
-    test('a chosen document arrives as bytes and a declared type, and nothing else', () async {
+    test('a chosen document arrives as bytes and a declared type, and nothing else',
+        () async {
       final Uint8List sent = Uint8List.fromList(<int>[0x44, 0x61, 0x74, 0x65]);
       answerWith(
         (MethodCall call) async => <Object?, Object?>{
@@ -189,8 +196,8 @@ void main() {
         mediaTypeResultKey: 'text/csv',
       });
 
-      final PickerOutcome outcome = await PlatformStatementSourcePicker(channel: channel)
-          .pickStatementSource();
+      final PickerOutcome outcome =
+          await PlatformStatementSourcePicker(channel: channel).pickStatementSource();
 
       // BY IDENTITY: not a copy, not a re-encoding. What the person's bank
       // wrote is what the platform parses.
@@ -207,7 +214,9 @@ void main() {
     });
 
     test('an unavailable picker is distinct from a failure', () async {
-      final channel = _ScriptedChannel.raising(PlatformException(code: pickerUnavailableCode));
+      final channel = _ScriptedChannel.raising(
+        PlatformException(code: pickerUnavailableCode),
+      );
 
       expect(
         await PlatformStatementSourcePicker(channel: channel).pickStatementSource(),
@@ -228,7 +237,9 @@ void main() {
     });
 
     test('a malformed request is refused without blaming the person', () async {
-      final channel = _ScriptedChannel.raising(PlatformException(code: invalidRequestCode));
+      final channel = _ScriptedChannel.raising(
+        PlatformException(code: invalidRequestCode),
+      );
 
       expect(
         await PlatformStatementSourcePicker(channel: channel).pickStatementSource(),
@@ -237,7 +248,9 @@ void main() {
     });
 
     test('a code this build does not know fails closed and offers a retry', () async {
-      final channel = _ScriptedChannel.raising(PlatformException(code: 'SOMETHING_ADDED_LATER'));
+      final channel = _ScriptedChannel.raising(
+        PlatformException(code: 'SOMETHING_ADDED_LATER'),
+      );
 
       expect(
         await PlatformStatementSourcePicker(channel: channel).pickStatementSource(),
@@ -281,15 +294,21 @@ void main() {
       }
     });
 
-    test('a media type this build cannot use is replaced, never carried around', () async {
+    test('a media type this build cannot use is replaced, never carried around',
+        () async {
       final Uint8List bytes = Uint8List.fromList(<int>[1]);
-      for (final Object? declared in <Object?>[null, '', '   ', 42]) {
+      for (final Object? declared in <Object?>[
+        null,
+        '',
+        '   ',
+        42,
+      ]) {
         final channel = _ScriptedChannel.answering(<Object?, Object?>{
           bytesResultKey: bytes,
           mediaTypeResultKey: declared,
         });
-        final PickerOutcome outcome = await PlatformStatementSourcePicker(channel: channel)
-            .pickStatementSource();
+        final PickerOutcome outcome =
+            await PlatformStatementSourcePicker(channel: channel).pickStatementSource();
         expect(
           (outcome as PickerOutcomeChosen).source.declaredMediaType,
           'application/octet-stream',
@@ -303,13 +322,17 @@ void main() {
         mediaTypeResultKey: 'text/${'x' * 4000}',
       });
 
-      final PickerOutcome outcome = await PlatformStatementSourcePicker(channel: channel)
-          .pickStatementSource();
+      final PickerOutcome outcome =
+          await PlatformStatementSourcePicker(channel: channel).pickStatementSource();
 
-      expect((outcome as PickerOutcomeChosen).source.declaredMediaType, 'application/octet-stream');
+      expect(
+        (outcome as PickerOutcomeChosen).source.declaredMediaType,
+        'application/octet-stream',
+      );
     });
 
-    test('a document past the bound still reaches the client, and is refused there', () async {
+    test('a document past the bound still reaches the client, and is refused there',
+        () async {
       // The native halves read ONE BYTE past the bound and stop. That extra
       // byte is what makes an oversized file arrive longer than the bound, so
       // the existing refusal states the reason instead of a truncated statement
@@ -318,8 +341,8 @@ void main() {
         _chosenPayload(List<int>.filled(maxSourceBytes + 1, 0x61)),
       );
 
-      final PickerOutcome outcome = await PlatformStatementSourcePicker(channel: channel)
-          .pickStatementSource();
+      final PickerOutcome outcome =
+          await PlatformStatementSourcePicker(channel: channel).pickStatementSource();
 
       final SelectedStatementSource selected = SelectedStatementSource(
         bytes: (outcome as PickerOutcomeChosen).source.bytes,
@@ -407,7 +430,8 @@ void main() {
       }
     });
 
-    test('Android reads the stream under the bound and closes it deterministically', () {
+    test('Android reads the stream under the bound and closes it deterministically',
+        () {
       expect(kotlin, contains('maxBytes + 1'));
       // `use` closes on every exit path, including a throw.
       expect(kotlin, contains('openInputStream(uri)?.use'));
@@ -429,8 +453,14 @@ void main() {
     });
 
     test('iOS balances the security scope exactly once each way', () {
-      expect(RegExp('startAccessingSecurityScopedResource').allMatches(swift).length, 1);
-      expect(RegExp('stopAccessingSecurityScopedResource').allMatches(swift).length, 1);
+      expect(
+        RegExp('startAccessingSecurityScopedResource').allMatches(swift).length,
+        1,
+      );
+      expect(
+        RegExp('stopAccessingSecurityScopedResource').allMatches(swift).length,
+        1,
+      );
       // Released by `defer`, so a throw or an early return cannot leak it.
       expect(swift, contains('defer {'));
     });

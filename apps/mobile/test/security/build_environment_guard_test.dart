@@ -81,8 +81,7 @@ void main() {
       expect(
         script,
         contains("authority.contains('@')"),
-        reason:
-            'userinfo in a URL ships inside the artifact and is readable '
+        reason: 'userinfo in a URL ships inside the artifact and is readable '
             'by anyone who unpacks it',
       );
     });
@@ -102,7 +101,11 @@ void main() {
         '".local"',
         '".internal"',
       ]) {
-        expect(script, contains(host), reason: '$host must be rejected as a deployed endpoint');
+        expect(
+          script,
+          contains(host),
+          reason: '$host must be rejected as a deployed endpoint',
+        );
       }
     });
 
@@ -119,22 +122,19 @@ void main() {
       expect(
         script,
         contains("substringAfter('[').substringBefore(']')"),
-        reason:
-            'a bracketed IPv6 authority must be unwrapped before the host '
+        reason: 'a bracketed IPv6 authority must be unwrapped before the host '
             'is compared, or every IPv6 rule below is dead code',
       );
       expect(
         script,
         contains("trimEnd('.')"),
-        reason:
-            'localhost. is the fully-qualified form of localhost and '
+        reason: 'localhost. is the fully-qualified form of localhost and '
             'resolves identically, so the trailing dot must not defeat the rule',
       );
       expect(
         script,
         isNot(contains("rejectLocalOnlyHost(authority.substringBefore(':')")),
-        reason:
-            'this is the exact call that yielded [ for [::1]:8443 and let '
+        reason: 'this is the exact call that yielded [ for [::1]:8443 and let '
             'a PRODUCTION build through',
       );
     });

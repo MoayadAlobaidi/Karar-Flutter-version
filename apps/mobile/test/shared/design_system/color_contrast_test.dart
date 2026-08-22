@@ -44,8 +44,16 @@ void main() {
       test('content on a filled brand surface is readable', () {
         _expectContrast(colors.onBrand, colors.brand, textMinimum);
         _expectContrast(colors.onBrand, colors.brandPressed, textMinimum);
-        _expectContrast(colors.onBrandSurface, colors.brandSurface, textMinimum);
-        _expectContrast(colors.contentInverse, colors.surfaceInverse, textMinimum);
+        _expectContrast(
+          colors.onBrandSurface,
+          colors.brandSurface,
+          textMinimum,
+        );
+        _expectContrast(
+          colors.contentInverse,
+          colors.surfaceInverse,
+          textMinimum,
+        );
       });
 
       test('a destructive control is readable', () {

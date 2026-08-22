@@ -32,60 +32,67 @@ Map<String, Object?> bootstrapBody({
   Map<String, Object?>? capabilities,
   Map<String, Object?>? jurisdiction,
   Map<String, Object?>? policyPack,
-}) => <String, Object?>{
-  'user': <String, Object?>{
-    'userId': '11111111-1111-4111-8111-111111111111',
-    'emailVerified': true,
-  },
-  'session': <String, Object?>{'sessionId': '22222222-2222-4222-8222-222222222222'},
-  'binding':
-      binding ??
-      <String, Object?>{
-        'kind': 'BOUND',
-        'tenant': <String, Object?>{
-          'tenantId': '33333333-3333-4333-8333-333333333333',
-          'name': 'Example Organisation',
-          'roleHint': 'MEMBER',
-        },
+}) =>
+    <String, Object?>{
+      'user': <String, Object?>{
+        'userId': '11111111-1111-4111-8111-111111111111',
+        'emailVerified': true,
       },
-  'jurisdiction':
-      jurisdiction ?? <String, Object?>{'state': 'VERIFIED', 'jurisdictionId': 'jurisdiction-a'},
-  'operatingEntity':
-      operatingEntity ??
-      <String, Object?>{
-        'state': 'ASSIGNED',
-        'entity': <String, Object?>{
-          'id': '44444444-4444-4444-8444-444444444444',
-          'name': 'Example Operating Entity',
-          'jurisdictionRef': 'jurisdiction-a',
-          'contactReference': 'privacy@example.invalid',
-        },
-      },
-  'policyPack': policyPack ?? <String, Object?>{'version': '1.0.0', 'status': 'ACTIVE'},
-  'capabilities': capabilities ?? <String, Object?>{'state': 'RESOLVED', 'items': <Object?>[]},
-};
+      'session': <String, Object?>{'sessionId': '22222222-2222-4222-8222-222222222222'},
+      'binding': binding ??
+          <String, Object?>{
+            'kind': 'BOUND',
+            'tenant': <String, Object?>{
+              'tenantId': '33333333-3333-4333-8333-333333333333',
+              'name': 'Example Organisation',
+              'roleHint': 'MEMBER',
+            },
+          },
+      'jurisdiction': jurisdiction ??
+          <String, Object?>{'state': 'VERIFIED', 'jurisdictionId': 'jurisdiction-a'},
+      'operatingEntity': operatingEntity ??
+          <String, Object?>{
+            'state': 'ASSIGNED',
+            'entity': <String, Object?>{
+              'id': '44444444-4444-4444-8444-444444444444',
+              'name': 'Example Operating Entity',
+              'jurisdictionRef': 'jurisdiction-a',
+              'contactReference': 'privacy@example.invalid',
+            },
+          },
+      'policyPack': policyPack ?? <String, Object?>{'version': '1.0.0', 'status': 'ACTIVE'},
+      'capabilities':
+          capabilities ?? <String, Object?>{'state': 'RESOLVED', 'items': <Object?>[]},
+    };
 
 ApiBootstrapGateway gatewayReturning(Object? body) => ApiBootstrapGateway(
-  KararApiClient(
-    FakeApiTransport((ApiRequest request) async => ApiResponse(statusCode: 200, body: body)),
-  ),
-);
+      KararApiClient(
+        FakeApiTransport(
+          (ApiRequest request) async => ApiResponse(statusCode: 200, body: body),
+        ),
+      ),
+    );
 
 /// A gateway whose transport fails the way the platform fails: a 503 problem
 /// document carrying `BOOTSTRAP_UNAVAILABLE`, mapped by the real mapper.
 ApiBootstrapGateway gatewayFailing({bool? retryable, String? requestId}) {
-  final problem = ProblemDetails.tryParse(<String, Object?>{
-    'type': 'https://karar.example/problems/bootstrap-unavailable',
-    'title': 'Service unavailable',
-    'code': ApiErrorCode.bootstrapUnavailable,
-    'status': 503,
-    'retryable': retryable,
-    'requestId': requestId,
-  }, statusCode: 503);
+  final problem = ProblemDetails.tryParse(
+    <String, Object?>{
+      'type': 'https://karar.example/problems/bootstrap-unavailable',
+      'title': 'Service unavailable',
+      'code': ApiErrorCode.bootstrapUnavailable,
+      'status': 503,
+      'retryable': retryable,
+      'requestId': requestId,
+    },
+    statusCode: 503,
+  );
   final failure = const ProblemFailureMapper().map(statusCode: 503, problem: problem);
   return ApiBootstrapGateway(
     KararApiClient(
-      FakeApiTransport((ApiRequest request) async => throw ApiException(failure, statusCode: 503)),
+      FakeApiTransport(
+        (ApiRequest request) async => throw ApiException(failure, statusCode: 503),
+      ),
     ),
   );
 }
@@ -103,7 +110,10 @@ void main() {
       final platform = await contextFrom(bootstrapBody());
 
       expect(platform.navigation, isA<CapabilityNavigationResolved>());
-      expect((platform.navigation as CapabilityNavigationResolved).destinations, isEmpty);
+      expect(
+        (platform.navigation as CapabilityNavigationResolved).destinations,
+        isEmpty,
+      );
       expect(platform.hasNoAvailableServices, isTrue);
       expect(platform.capabilityResolutionUnavailable, isFalse);
     });
@@ -116,7 +126,8 @@ void main() {
       expect(coordinator.snapshot.capabilities, isEmpty);
     });
 
-    test('an available capability this build ships no screen for is not a destination', () async {
+    test('an available capability this build ships no screen for is not a destination',
+        () async {
       // The platform may report a capability before the client ships a
       // surface for it. Navigation is built from what the binary can actually
       // open, so the answer is still "no services" rather than a row that
@@ -179,7 +190,10 @@ void main() {
         ),
       );
       const terminal = BootstrapUnavailable(
-        BootstrapUnavailableFailure(code: ApiErrorCode.bootstrapUnavailable, retryable: false),
+        BootstrapUnavailableFailure(
+          code: ApiErrorCode.bootstrapUnavailable,
+          retryable: false,
+        ),
       );
 
       expect(retryable.isReady, isFalse);
@@ -201,7 +215,10 @@ void main() {
     test('fails closed rather than reading as an empty answer', () async {
       final platform = await contextFrom(
         bootstrapBody(
-          capabilities: <String, Object?>{'state': 'SOMETHING_NEWER', 'items': <Object?>[]},
+          capabilities: <String, Object?>{
+            'state': 'SOMETHING_NEWER',
+            'items': <Object?>[],
+          },
         ),
       );
 
@@ -229,7 +246,9 @@ void main() {
 
     test('UNASSIGNED is not an error', () async {
       final platform = await contextFrom(
-        bootstrapBody(operatingEntity: <String, Object?>{'state': 'UNASSIGNED', 'entity': null}),
+        bootstrapBody(
+          operatingEntity: <String, Object?>{'state': 'UNASSIGNED', 'entity': null},
+        ),
       );
 
       expect(platform.operatingEntity, isA<OperatingEntityUnassigned>());
@@ -237,7 +256,9 @@ void main() {
 
     test('UNAVAILABLE is a read that failed', () async {
       final platform = await contextFrom(
-        bootstrapBody(operatingEntity: <String, Object?>{'state': 'UNAVAILABLE', 'entity': null}),
+        bootstrapBody(
+          operatingEntity: <String, Object?>{'state': 'UNAVAILABLE', 'entity': null},
+        ),
       );
 
       expect(platform.operatingEntity, isA<OperatingEntityUnavailable>());
@@ -253,9 +274,12 @@ void main() {
       expect(platform.operatingEntity, isA<OperatingEntityUnrecognised>());
     });
 
-    test('ASSIGNED without an entity is treated as unavailable, not as a blank name', () async {
+    test('ASSIGNED without an entity is treated as unavailable, not as a blank name',
+        () async {
       final platform = await contextFrom(
-        bootstrapBody(operatingEntity: <String, Object?>{'state': 'ASSIGNED', 'entity': null}),
+        bootstrapBody(
+          operatingEntity: <String, Object?>{'state': 'ASSIGNED', 'entity': null},
+        ),
       );
 
       expect(platform.operatingEntity, isA<OperatingEntityUnavailable>());
@@ -292,8 +316,11 @@ void main() {
 
     test('jurisdiction states map, and an unknown one is not read as assigned', () async {
       Future<JurisdictionStatus> statusFor(String state) async => (await contextFrom(
-        bootstrapBody(jurisdiction: <String, Object?>{'state': state, 'jurisdictionId': 'j-1'}),
-      )).jurisdiction;
+            bootstrapBody(
+              jurisdiction: <String, Object?>{'state': state, 'jurisdictionId': 'j-1'},
+            ),
+          ))
+              .jurisdiction;
 
       expect((await statusFor('NONE')).state, PlatformJurisdictionState.none);
       expect((await statusFor('UNVERIFIED')).state, PlatformJurisdictionState.unverified);
@@ -304,7 +331,8 @@ void main() {
       expect(unknown.isAssigned, isFalse);
     });
 
-    test('an unverified jurisdiction still governs, and is not reported as verified', () async {
+    test('an unverified jurisdiction still governs, and is not reported as verified',
+        () async {
       final platform = await contextFrom(
         bootstrapBody(
           jurisdiction: <String, Object?>{'state': 'UNVERIFIED', 'jurisdictionId': 'j-1'},
@@ -320,7 +348,9 @@ void main() {
       expect(approved.policyPack.isApproved, isTrue);
 
       final draft = await contextFrom(
-        bootstrapBody(policyPack: <String, Object?>{'version': '2.0.0', 'status': 'DRAFT'}),
+        bootstrapBody(
+          policyPack: <String, Object?>{'version': '2.0.0', 'status': 'DRAFT'},
+        ),
       );
       expect(draft.policyPack.isApproved, isFalse);
     });

@@ -28,14 +28,18 @@ import 'package:karar_mobile/features/transfer_matching/presentation/transfer_ma
 
 import 'support/transfer_matching_harness.dart';
 
-({ProviderContainer container, ScriptedTransferMatchesRepository repository}) listingFor({
+({ProviderContainer container, ScriptedTransferMatchesRepository repository})
+    listingFor({
   List<TransferMatch>? matches,
   ScriptedTransferMatchesRepository? repository,
 }) {
-  final scripted =
-      repository ??
-      ScriptedTransferMatchesRepository(matches: matches ?? <TransferMatch>[matchFixture()]);
-  final container = ProviderContainer(overrides: transferMatchingOverrides(matches: scripted));
+  final scripted = repository ??
+      ScriptedTransferMatchesRepository(
+        matches: matches ?? <TransferMatch>[matchFixture()],
+      );
+  final container = ProviderContainer(
+    overrides: transferMatchingOverrides(matches: scripted),
+  );
   addTearDown(container.dispose);
   return (container: container, repository: scripted);
 }
@@ -44,7 +48,9 @@ TransferMatchesLoaded loadedOf(ProviderContainer container) =>
     container.read(transferMatchListingProvider).value! as TransferMatchesLoaded;
 
 TransferMatchRow rowOf(ProviderContainer container, [String matchId = matchFixtureId]) =>
-    loadedOf(container).rows.firstWhere((TransferMatchRow row) => row.match.matchId == matchId);
+    loadedOf(container)
+        .rows
+        .firstWhere((TransferMatchRow row) => row.match.matchId == matchId);
 
 void main() {
   group('reading proposals writes nothing', () {
@@ -65,13 +71,18 @@ void main() {
       final harness = listingFor();
       await harness.container.read(transferMatchListingProvider.future);
 
-      harness.container.read(transferMatchFilterProvider.notifier).show(MatchStateFilter.confirmed);
+      harness.container
+          .read(transferMatchFilterProvider.notifier)
+          .show(MatchStateFilter.confirmed);
       await harness.container.read(transferMatchListingProvider.future);
 
-      expect(harness.repository.requestedStates, <MatchStateFilter>[
-        MatchStateFilter.awaitingDecision,
-        MatchStateFilter.confirmed,
-      ]);
+      expect(
+        harness.repository.requestedStates,
+        <MatchStateFilter>[
+          MatchStateFilter.awaitingDecision,
+          MatchStateFilter.confirmed,
+        ],
+      );
       expect(harness.repository.calls, <String>['list', 'list']);
     });
 
@@ -87,8 +98,9 @@ void main() {
     test('an in-flight confirmation still reads as a proposal', () async {
       final gate = Completer<void>();
       final harness = listingFor(
-        repository: ScriptedTransferMatchesRepository(matches: <TransferMatch>[matchFixture()])
-          ..gate = gate,
+        repository: ScriptedTransferMatchesRepository(
+          matches: <TransferMatch>[matchFixture()],
+        )..gate = gate,
       );
       await harness.container.read(transferMatchListingProvider.future);
 
@@ -125,7 +137,9 @@ void main() {
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).confirm(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .confirm(matchFixtureId);
 
       final row = rowOf(harness.container);
       expect(row.progress, MatchDecisionProgress.idle);
@@ -147,7 +161,9 @@ void main() {
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).reject(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .reject(matchFixtureId);
 
       final row = rowOf(harness.container);
       expect(row.match.state, MatchState.confirmed);
@@ -155,7 +171,8 @@ void main() {
       expect(row.refusal, isA<DependencyUnavailableFailure>());
     });
 
-    test('a successful confirmation takes the row the PLATFORM answered with', () async {
+    test('a successful confirmation takes the row the PLATFORM answered with',
+        () async {
       final harness = listingFor(
         repository: ScriptedTransferMatchesRepository(
           matches: <TransferMatch>[matchFixture()],
@@ -166,7 +183,9 @@ void main() {
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).confirm(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .confirm(matchFixtureId);
 
       final row = rowOf(harness.container);
       expect(row.match.state, MatchState.confirmed);
@@ -178,11 +197,14 @@ void main() {
   });
 
   group('a decision names the version it was made about', () {
-    test('the version sent is the version of the row the person was shown', () async {
+    test('the version sent is the version of the row the person was shown',
+        () async {
       final harness = listingFor(matches: <TransferMatch>[matchFixture(version: 6)]);
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).confirm(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .confirm(matchFixtureId);
 
       expect(harness.repository.confirmations.single.expectedVersion, 6);
     });
@@ -212,8 +234,9 @@ void main() {
     test('two presses while one is in flight send ONE request', () async {
       final gate = Completer<void>();
       final harness = listingFor(
-        repository: ScriptedTransferMatchesRepository(matches: <TransferMatch>[matchFixture()])
-          ..gate = gate,
+        repository: ScriptedTransferMatchesRepository(
+          matches: <TransferMatch>[matchFixture()],
+        )..gate = gate,
       );
       await harness.container.read(transferMatchListingProvider.future);
       final notifier = harness.container.read(transferMatchListingProvider.notifier);
@@ -230,11 +253,14 @@ void main() {
   });
 
   group('a rejected pair never comes back as confirmed', () {
-    test('rejecting settles the pair and removes the confirmation entirely', () async {
+    test('rejecting settles the pair and removes the confirmation entirely',
+        () async {
       final harness = listingFor();
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).reject(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .reject(matchFixtureId);
 
       final row = rowOf(harness.container);
       expect(row.match.state, MatchState.rejected);
@@ -242,8 +268,7 @@ void main() {
       expect(
         row.match.isConfirmable,
         isFalse,
-        reason:
-            'a rejection is terminal — the contract says so and the '
+        reason: 'a rejection is terminal — the contract says so and the '
             'database enforces it',
       );
       expect(row.match.isRejectable, isFalse);
@@ -255,7 +280,9 @@ void main() {
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).confirm(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .confirm(matchFixtureId);
 
       expect(harness.repository.confirmations, isEmpty);
       expect(rowOf(harness.container).match.state, MatchState.rejected);
@@ -284,21 +311,28 @@ void main() {
       // Sending the request anyway would make the platform's refusal read as
       // the person's mistake.
       final harness = listingFor(
-        matches: <TransferMatch>[matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD')],
+        matches: <TransferMatch>[
+          matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD'),
+        ],
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).confirm(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .confirm(matchFixtureId);
 
       expect(harness.repository.confirmations, isEmpty);
       expect(harness.repository.calls, <String>['list']);
       expect(rowOf(harness.container).refusal?.code, transferMatchCrossCurrencyCode);
     });
 
-    test('the refusal is SPECIFIC rather than a generic transition refusal', () async {
+    test('the refusal is SPECIFIC rather than a generic transition refusal',
+        () async {
       // "Karar cannot pair two currencies" and "that answer is not available"
       // send a person to completely different conclusions about their own data.
-      final refusal = refusalFor(matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD'));
+      final refusal = refusalFor(
+        matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD'),
+      );
       expect(refusal.code, transferMatchCrossCurrencyCode);
       expect(
         refusalFor(matchFixture(state: MatchState.rejected)).code,
@@ -311,11 +345,15 @@ void main() {
       // so there is no reason to withhold it — and a pair nobody can answer
       // would sit in the list for ever.
       final harness = listingFor(
-        matches: <TransferMatch>[matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD')],
+        matches: <TransferMatch>[
+          matchFixture(outflowCurrency: 'QAR', inflowCurrency: 'USD'),
+        ],
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).reject(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .reject(matchFixtureId);
 
       expect(harness.repository.rejections, hasLength(1));
     });
@@ -338,7 +376,8 @@ void main() {
       expect(loadedOf(harness.container).rows, hasLength(2));
     });
 
-    test('nothing is followed when the platform says there is nothing more', () async {
+    test('nothing is followed when the platform says there is nothing more',
+        () async {
       final harness = listingFor();
       await harness.container.read(transferMatchListingProvider.future);
 
@@ -359,8 +398,7 @@ void main() {
       expect(
         harness.container.read(transferMatchListingProvider).value,
         isA<TransferMatchesUnavailable>(),
-        reason:
-            'an empty list would be a claim about the organisation the '
+        reason: 'an empty list would be a claim about the organisation the '
             'session has just left',
       );
     });
@@ -407,8 +445,7 @@ void main() {
       expect(
         loadedOf(harness.container).rows.single.match.state,
         MatchState.suggested,
-        reason:
-            'the reload must have produced a live listing, or the '
+        reason: 'the reload must have produced a live listing, or the '
             'assertion below is vacuous',
       );
 
@@ -418,8 +455,7 @@ void main() {
       expect(
         rowOf(harness.container).match.state,
         MatchState.suggested,
-        reason:
-            'the confirmation was made under an organisation the session '
+        reason: 'the confirmation was made under an organisation the session '
             'has left; writing it back would record it as this one\'s',
       );
       expect(rowOf(harness.container).progress, MatchDecisionProgress.idle);
@@ -428,8 +464,9 @@ void main() {
     test('a discard alone leaves nothing for a late answer to land on', () async {
       final gate = Completer<void>();
       final harness = listingFor(
-        repository: ScriptedTransferMatchesRepository(matches: <TransferMatch>[matchFixture()])
-          ..gate = gate,
+        repository: ScriptedTransferMatchesRepository(
+          matches: <TransferMatch>[matchFixture()],
+        )..gate = gate,
       );
       await harness.container.read(transferMatchListingProvider.future);
 
@@ -459,7 +496,10 @@ void main() {
       final listing = await harness.container.read(transferMatchListingProvider.future);
 
       expect(listing, isA<TransferMatchesUnavailable>());
-      expect((listing as TransferMatchesUnavailable).failure, isA<DependencyUnavailableFailure>());
+      expect(
+        (listing as TransferMatchesUnavailable).failure,
+        isA<DependencyUnavailableFailure>(),
+      );
     });
 
     test('deciding on a listing that is not loaded does nothing', () async {
@@ -470,7 +510,9 @@ void main() {
       );
       await harness.container.read(transferMatchListingProvider.future);
 
-      await harness.container.read(transferMatchListingProvider.notifier).confirm(matchFixtureId);
+      await harness.container
+          .read(transferMatchListingProvider.notifier)
+          .confirm(matchFixtureId);
 
       expect(harness.repository.confirmations, isEmpty);
     });

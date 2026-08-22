@@ -18,7 +18,9 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'support/identity_harness.dart';
 
 /// The English catalogue, for assertions that do not depend on the locale.
-final AppLocalizations _english = lookupAppLocalizations(KararLocalization.english);
+final AppLocalizations _english = lookupAppLocalizations(
+  KararLocalization.english,
+);
 
 void main() {
   group('gate screens', () {
@@ -133,13 +135,14 @@ void main() {
     test('merging keeps both workstreams contributions', () {
       final List<Object?> merged = mergeIdentityInto(
         screens: <StartupStage, StartupScreenBuilder>{
-          StartupStage.tenantSelectionRequired: (BuildContext context, StartupState state) =>
-              const SizedBox.shrink(),
+          StartupStage.tenantSelectionRequired:
+              (BuildContext context, StartupState state) => const SizedBox.shrink(),
         },
         routes: <RouteBase>[
           GoRoute(
             path: '/elsewhere',
-            builder: (BuildContext context, GoRouterState state) => const SizedBox.shrink(),
+            builder: (BuildContext context, GoRouterState state) =>
+                const SizedBox.shrink(),
           ),
         ],
       );
@@ -149,9 +152,8 @@ void main() {
   });
 
   group('sensitive content', () {
-    testWidgets('covers its subtree the moment the application leaves the foreground', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('covers its subtree the moment the application leaves the foreground',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
 
       await pumpIdentity(
@@ -224,9 +226,10 @@ void main() {
 /// `ExcludeSemantics` elsewhere in the shell cannot answer for it.
 bool _coverExcludesSemantics(WidgetTester tester) => tester
     .widget<ExcludeSemantics>(
-      find
-          .descendant(of: find.byType(SensitiveScreen), matching: find.byType(ExcludeSemantics))
-          .first,
+      find.descendant(
+        of: find.byType(SensitiveScreen),
+        matching: find.byType(ExcludeSemantics),
+      ).first,
     )
     .excluding;
 

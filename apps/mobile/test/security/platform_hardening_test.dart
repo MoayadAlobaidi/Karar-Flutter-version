@@ -18,9 +18,12 @@ import 'support/bundle_identity.dart';
 import 'support/source_tree.dart';
 
 const String _androidManifest = 'android/app/src/main/AndroidManifest.xml';
-const String _releaseNetworkConfig = 'android/app/src/main/res/xml/network_security_config.xml';
-const String _debugNetworkConfig = 'android/app/src/debug/res/xml/network_security_config.xml';
-const String _staticDataExtractionRules = 'android/app/src/main/res/xml/data_extraction_rules.xml';
+const String _releaseNetworkConfig =
+    'android/app/src/main/res/xml/network_security_config.xml';
+const String _debugNetworkConfig =
+    'android/app/src/debug/res/xml/network_security_config.xml';
+const String _staticDataExtractionRules =
+    'android/app/src/main/res/xml/data_extraction_rules.xml';
 const String _appGradle = 'android/app/build.gradle.kts';
 const String _infoPlist = 'ios/Runner/Info.plist';
 
@@ -66,7 +69,11 @@ const String _crossPlatformTarget = 'ios';
 
 /// The only hosts a debug build may reach over plain HTTP. Every one is the
 /// developer's own machine.
-const List<String> _permittedCleartextHosts = <String>['localhost', '127.0.0.1', '10.0.2.2'];
+const List<String> _permittedCleartextHosts = <String>[
+  'localhost',
+  '127.0.0.1',
+  '10.0.2.2',
+];
 
 /// Every domain Android's backup rules can name. Each declared extraction mode
 /// must exclude all of them, so "excluded" cannot come to mean "excluded except
@@ -108,7 +115,10 @@ void main() {
     });
 
     test('the manifest points at a network security config', () {
-      expect(manifest, contains('android:networkSecurityConfig="@xml/network_security_config"'));
+      expect(
+        manifest,
+        contains('android:networkSecurityConfig="@xml/network_security_config"'),
+      );
     });
 
     test('the manifest disables cleartext traffic and never enables it', () {
@@ -130,8 +140,7 @@ void main() {
       expect(
         releaseConfig,
         isNot(contains('<domain-config')),
-        reason:
-            'a release domain exception would be a per-host cleartext or trust '
+        reason: 'a release domain exception would be a per-host cleartext or trust '
             'relaxation; there is no host that warrants one',
       );
     });
@@ -141,8 +150,7 @@ void main() {
       expect(
         releaseConfig,
         isNot(contains('src="user"')),
-        reason:
-            'trusting user-installed CAs would let a proxy or MDM profile '
+        reason: 'trusting user-installed CAs would let a proxy or MDM profile '
             'intercept this application',
       );
     });
@@ -151,8 +159,7 @@ void main() {
       expect(
         releaseConfig,
         isNot(contains('<debug-overrides')),
-        reason:
-            'debug-overrides is honoured whenever android:debuggable is true, '
+        reason: 'debug-overrides is honoured whenever android:debuggable is true, '
             'which couples a trust decision to a manifest flag tooling can set. '
             'The debug exception is scoped by source set instead.',
       );
@@ -184,8 +191,7 @@ void main() {
       expect(
         manifest,
         contains('android:fullBackupContent="false"'),
-        reason:
-            'without this, devices from API 24 to 30 fall back to default '
+        reason: 'without this, devices from API 24 to 30 fall back to default '
             'backup behaviour: the data-extraction resource does not apply to '
             'them, and allowBackup alone is not the whole control there',
       );
@@ -204,7 +210,10 @@ void main() {
       // (36 with this SDK), so the gap applies to what ships. The rules
       // resource is what closes it, and a missing resource is documented to
       // leave the transfer modes fully enabled rather than off.
-      expect(manifest, contains('android:dataExtractionRules="@xml/data_extraction_rules"'));
+      expect(
+        manifest,
+        contains('android:dataExtractionRules="@xml/data_extraction_rules"'),
+      );
       expect(manifest, contains('android:fullBackupContent="false"'));
     });
 
@@ -212,8 +221,7 @@ void main() {
       expect(
         manifest,
         contains('<uses-permission android:name="android.permission.INTERNET"/>'),
-        reason:
-            'the Flutter template declares INTERNET in the debug and profile '
+        reason: 'the Flutter template declares INTERNET in the debug and profile '
             'source sets only, which leaves a release build with no network access',
       );
       final declared = RegExp(r'<uses-permission android:name="([^"]+)"')
@@ -223,8 +231,7 @@ void main() {
       expect(
         declared,
         <String>{'android.permission.INTERNET'},
-        reason:
-            'every additional permission is a privacy disclosure obligation this '
+        reason: 'every additional permission is a privacy disclosure obligation this '
             'product does not need to take on',
       );
     });
@@ -277,8 +284,7 @@ void main() {
       expect(
         merged.platform,
         expectedPlatformPermissions,
-        reason:
-            'the permission set of a built artifact no longer matches the '
+        reason: 'the permission set of a built artifact no longer matches the '
             'reviewed record. Adding an entry is a deliberate act with a stated '
             'reason, or the dependency that brings it in goes.',
       );
@@ -315,8 +321,7 @@ void main() {
       expect(
         merged.other,
         isNotEmpty,
-        reason:
-            'no custom permission was found at all. androidx.core '
+        reason: 'no custom permission was found at all. androidx.core '
             'contributes one to every variant, so this means the merged '
             'manifest was not parsed, not that the artifact is clean.',
       );
@@ -324,8 +329,7 @@ void main() {
         expect(
           expected.hasMatch(permission),
           isTrue,
-          reason:
-              '$permission is a custom permission no review covers. It reached a '
+          reason: '$permission is a custom permission no review covers. It reached a '
               'built artifact from a dependency, so the decision is which '
               'dependency goes, not which line here changes.',
         );
@@ -360,12 +364,12 @@ void main() {
       // packaged — and the committed one is the one a reviewer reads. AGP
       // would also reject the duplicate outright, but "the build breaks" is
       // not the property worth asserting; "there is one source of truth" is.
-      final File staticCopy = File('${mobilePackageRoot().path}/$_staticDataExtractionRules');
+      final File staticCopy =
+          File('${mobilePackageRoot().path}/$_staticDataExtractionRules');
       expect(
         staticCopy.existsSync(),
         isFalse,
-        reason:
-            '$_staticDataExtractionRules exists. The rules resource is '
+        reason: '$_staticDataExtractionRules exists. The rules resource is '
             'produced by GenerateDataExtractionRules in $_appGradle, because '
             'one of its required attributes is an Apple Team ID this project '
             'does not have. A committed copy either duplicates the resource or '
@@ -374,16 +378,14 @@ void main() {
       expect(
         gradle,
         contains('abstract class GenerateDataExtractionRules'),
-        reason:
-            'without the generator, @xml/data_extraction_rules resolves to '
+        reason: 'without the generator, @xml/data_extraction_rules resolves to '
             'nothing and the backup framework falls back to its default, which '
             'is to copy everything',
       );
       expect(
         gradle,
         contains('addGeneratedSourceDirectory'),
-        reason:
-            'the generated directory must be registered through the AGP '
+        reason: 'the generated directory must be registered through the AGP '
             'variant API, which wires the task dependency itself. Adding it to '
             'sourceSets by hand is what produces a resource that is merged on '
             'one invocation and missing on the next.',
@@ -391,8 +393,7 @@ void main() {
       expect(
         gradle,
         contains('checkGeneratedSources = true'),
-        reason:
-            'lint skips generated sources by default, and lintVitalRelease '
+        reason: 'lint skips generated sources by default, and lintVitalRelease '
             'is what once caught <cross-platform-transfer> with no platform '
             'attribute. Generating the resource put it out of lint\'s reach: '
             'with this off, a release assembly of a rules resource missing that '
@@ -406,22 +407,19 @@ void main() {
       expect(
         _kotlinStringList(gradle, 'SECTIONS'),
         _dataExtractionModes.toSet(),
-        reason:
-            'a mode with no section is not off: Android documents a missing '
+        reason: 'a mode with no section is not off: Android documents a missing '
             'section as fully enabled for all content',
       );
       expect(
         _kotlinStringList(gradle, 'DOMAINS'),
         _backupDomains.toSet(),
-        reason:
-            'session tokens live in sharedpref, and a domain left unnamed is '
+        reason: 'session tokens live in sharedpref, and a domain left unnamed is '
             'a domain left in',
       );
       expect(
         gradle,
         contains('const val WHOLE_DOMAIN_PATH = "$_wholeDomainPath"'),
-        reason:
-            'every exclusion carries this path. "./" means the same thing at '
+        reason: 'every exclusion carries this path. "./" means the same thing at '
             'runtime and fails lintVitalRelease at FATAL severity in the '
             'sharedpref and database domains, so no release artifact can be '
             'produced with it.',
@@ -429,8 +427,7 @@ void main() {
       expect(
         gradle,
         contains('const val CROSS_PLATFORM_TARGET = "$_crossPlatformTarget"'),
-        reason:
-            'nothing rejects a wrong platform value — FullBackup reads the '
+        reason: 'nothing rejects a wrong platform value — FullBackup reads the '
             'attribute as an opaque string and uses it as a map key — so a '
             'misspelling builds, lints, ships, and addresses a platform nobody '
             'transfers to',
@@ -444,7 +441,8 @@ void main() {
       for (final resource in rules) {
         for (final mode in _dataExtractionModes) {
           final String section = _sectionOf(resource, mode);
-          final Iterable<RegExpMatch> exclusions = RegExp(r'<exclude([^>]*)/>').allMatches(section);
+          final Iterable<RegExpMatch> exclusions =
+              RegExp(r'<exclude([^>]*)/>').allMatches(section);
           expect(
             exclusions,
             isNotEmpty,
@@ -452,20 +450,20 @@ void main() {
           );
           for (final RegExpMatch exclusion in exclusions) {
             final String attributes = exclusion.group(1)!;
-            final String? domain = RegExp(r'domain="([^"]*)"').firstMatch(attributes)?.group(1);
-            final String? path = RegExp(r'path="([^"]*)"').firstMatch(attributes)?.group(1);
+            final String? domain =
+                RegExp(r'domain="([^"]*)"').firstMatch(attributes)?.group(1);
+            final String? path =
+                RegExp(r'path="([^"]*)"').firstMatch(attributes)?.group(1);
             expect(
               domain,
               isNotNull,
-              reason:
-                  '${resource.path}: <$mode> has an exclusion with no domain '
+              reason: '${resource.path}: <$mode> has an exclusion with no domain '
                   'attribute, which the framework skips entirely',
             );
             expect(
               path,
               _wholeDomainPath,
-              reason:
-                  '${resource.path}: <$mode> excludes domain "$domain" with '
+              reason: '${resource.path}: <$mode> excludes domain "$domain" with '
                   'path="$path". The scope of an exclusion is stated, not left '
                   'to the parser\'s null handling, and the whole-domain form is '
                   '"$_wholeDomainPath".',
@@ -486,8 +484,7 @@ void main() {
             expect(
               section,
               contains('<exclude domain="$domain" path="$_wholeDomainPath" />'),
-              reason:
-                  '${resource.path}: <$mode> does not exclude the $domain '
+              reason: '${resource.path}: <$mode> does not exclude the $domain '
                   'domain. Session tokens live in sharedpref, and a domain left '
                   'unnamed is a domain left in.',
             );
@@ -496,8 +493,7 @@ void main() {
         expect(
           resource.declarations,
           isNot(contains('<include')),
-          reason:
-              '${resource.path}: an include element re-admits content to a '
+          reason: '${resource.path}: an include element re-admits content to a '
               'mode this resource exists to empty',
         );
       }
@@ -515,26 +511,23 @@ void main() {
       if (rules == null) return;
 
       for (final resource in rules) {
-        final Iterable<RegExpMatch> openings = RegExp(r'<cross-platform-transfer([^>]*)>')
-            .allMatches(resource.declarations);
+        final Iterable<RegExpMatch> openings =
+            RegExp(r'<cross-platform-transfer([^>]*)>').allMatches(resource.declarations);
         expect(
           openings.length,
           1,
-          reason:
-              '${resource.path}: found ${openings.length} '
+          reason: '${resource.path}: found ${openings.length} '
               'cross-platform-transfer sections. The framework iterates every '
               'matching element, so a duplicate is a second policy nobody '
               'reviewed and a reviewer may read the wrong one.',
         );
         for (final RegExpMatch opening in openings) {
-          final String? platform = RegExp(r'platform="([^"]*)"')
-              .firstMatch(opening.group(1)!)
-              ?.group(1);
+          final String? platform =
+              RegExp(r'platform="([^"]*)"').firstMatch(opening.group(1)!)?.group(1);
           expect(
             platform,
             _crossPlatformTarget,
-            reason:
-                '${resource.path}: cross-platform-transfer declares '
+            reason: '${resource.path}: cross-platform-transfer declares '
                 'platform="$platform". Only "$_crossPlatformTarget" is a target '
                 'the framework names, and a value it does not recognise is '
                 'accepted silently rather than refused — the section then looks '
@@ -544,8 +537,7 @@ void main() {
         expect(
           resource.declarations,
           isNot(contains('apple_icloud')),
-          reason:
-              '${resource.path}: apple_icloud was invented here and names no '
+          reason: '${resource.path}: apple_icloud was invented here and names no '
               'real platform',
         );
       }
@@ -560,31 +552,30 @@ void main() {
       if (rules == null) return;
 
       for (final resource in rules) {
-        final Iterable<RegExpMatch> declared = RegExp(r'<platform-specific-params([^>]*)/>')
-            .allMatches(resource.declarations);
+        final Iterable<RegExpMatch> declared =
+            RegExp(r'<platform-specific-params([^>]*)/>')
+                .allMatches(resource.declarations);
         expect(
           declared.length,
           1,
-          reason:
-              '${resource.path}: found ${declared.length} '
+          reason: '${resource.path}: found ${declared.length} '
               'platform-specific-params elements, expected exactly one',
         );
 
         final String attributes = declared.first.group(1)!;
         for (final attribute in <String>['bundleId', 'teamId', 'contentVersion']) {
-          final String? value = RegExp('$attribute="([^"]*)"').firstMatch(attributes)?.group(1);
+          final String? value =
+              RegExp('$attribute="([^"]*)"').firstMatch(attributes)?.group(1);
           expect(
             value,
             isNotNull,
-            reason:
-                '${resource.path}: platform-specific-params declares no '
+            reason: '${resource.path}: platform-specific-params declares no '
                 '$attribute',
           );
           expect(
             value,
             isNotEmpty,
-            reason:
-                '${resource.path}: platform-specific-params declares an empty '
+            reason: '${resource.path}: platform-specific-params declares an empty '
                 '$attribute, which identifies nothing',
           );
         }
@@ -594,8 +585,7 @@ void main() {
         expect(
           _sectionOf(resource, 'cross-platform-transfer'),
           contains('<platform-specific-params'),
-          reason:
-              '${resource.path}: platform-specific-params is declared outside '
+          reason: '${resource.path}: platform-specific-params is declared outside '
               'the cross-platform-transfer section, where nothing reads it',
         );
       }
@@ -605,9 +595,8 @@ void main() {
       final rules = _generatedRulesOrSkip();
       if (rules == null) return;
 
-      final List<_GeneratedRules> local = rules
-          .where((_GeneratedRules resource) => resource.isLocal)
-          .toList();
+      final List<_GeneratedRules> local =
+          rules.where((_GeneratedRules resource) => resource.isLocal).toList();
       if (local.isEmpty) {
         _requireLocalArtifactIfExpected();
         markTestSkipped(
@@ -621,8 +610,7 @@ void main() {
         expect(
           _teamIdOf(resource),
           _testOnlyTeamId,
-          reason:
-              '${resource.path}: a LOCAL artifact must declare the test-only '
+          reason: '${resource.path}: a LOCAL artifact must declare the test-only '
               'Team ID. Anything else is an identity that came from somewhere, '
               'and nowhere in this repository is a place a real one may come '
               'from.',
@@ -656,15 +644,13 @@ void main() {
       expect(
         gradle,
         contains('const val TEST_ONLY_TEAM_ID = "$_testOnlyTeamId"'),
-        reason:
-            'the generator and this file must name the same test-only value, '
+        reason: 'the generator and this file must name the same test-only value, '
             'or every assertion below is about a string nothing emits',
       );
       expect(
         _appleTeamIdShape.hasMatch(_testOnlyTeamId),
         isFalse,
-        reason:
-            '$_testOnlyTeamId is shaped like a real Apple Team ID. That is '
+        reason: '$_testOnlyTeamId is shaped like a real Apple Team ID. That is '
             'the whole defence: a deployed build validates whatever it is given '
             'against this shape, so a test-only value that satisfies it could be '
             'passed straight through.',
@@ -672,31 +658,27 @@ void main() {
       expect(
         gradle,
         contains(r'val APPLE_TEAM_ID = Regex("^[A-Z0-9]{10}$")'),
-        reason:
-            'the shape a deployed build enforces must be the shape asserted '
+        reason: 'the shape a deployed build enforces must be the shape asserted '
             'here',
       );
       expect(
         gradle,
         contains('if (!APPLE_TEAM_ID.matches(supplied))'),
-        reason:
-            'a deployed build must reject a Team ID that is not shaped like '
+        reason: 'a deployed build must reject a Team ID that is not shaped like '
             'one, which is also what refuses the test-only value when it is '
             'supplied deliberately',
       );
       expect(
         gradle,
         contains('if (supplied.isEmpty())'),
-        reason:
-            'a deployed build must refuse when no Team ID was configured. '
+        reason: 'a deployed build must refuse when no Team ID was configured. '
             'There is no default: a default would be a fabricated identity with '
             'a friendlier name.',
       );
       expect(
         gradle,
         contains('document.contains(TEST_ONLY_TEAM_ID)'),
-        reason:
-            'the generator must also check its own OUTPUT before writing it, '
+        reason: 'the generator must also check its own OUTPUT before writing it, '
             'so a future edit to the environment branch fails the build instead '
             'of shipping',
       );
@@ -709,16 +691,14 @@ void main() {
         expect(
           resource.raw,
           isNot(contains(_testOnlyTeamId)),
-          reason:
-              '${resource.path} was generated for ${resource.environment} and '
+          reason: '${resource.path} was generated for ${resource.environment} and '
               'contains the test-only Team ID. Only LOCAL may declare it.',
         );
         final String? teamId = _teamIdOf(resource);
         expect(
           teamId != null && _appleTeamIdShape.hasMatch(teamId),
           isTrue,
-          reason:
-              '${resource.path} was generated for ${resource.environment} and '
+          reason: '${resource.path} was generated for ${resource.environment} and '
               'declares teamId="$teamId", which is not an Apple Team ID. A value '
               'nothing can match looks configured and is inert.',
         );
@@ -737,8 +717,7 @@ void main() {
       expect(
         _debugNetworkConfig,
         contains('/src/debug/'),
-        reason:
-            'source-set scoping is what makes the exception structurally absent '
+        reason: 'source-set scoping is what makes the exception structurally absent '
             'from a release artifact rather than merely switched off in it',
       );
     });
@@ -747,8 +726,7 @@ void main() {
       expect(
         debugConfig,
         contains('<base-config cleartextTrafficPermitted="false">'),
-        reason:
-            'the loopback permission must be an explicit exception, not a '
+        reason: 'the loopback permission must be an explicit exception, not a '
             'relaxed default',
       );
     });
@@ -764,8 +742,7 @@ void main() {
         expect(
           _permittedCleartextHosts,
           contains(domain),
-          reason:
-              '$domain is not a loopback host. Only the developer machine may '
+          reason: '$domain is not a loopback host. Only the developer machine may '
               'be reached over plain HTTP, in debug builds only.',
         );
       }
@@ -775,8 +752,7 @@ void main() {
       expect(
         debugConfig,
         isNot(contains('src="user"')),
-        reason:
-            'an intercepting proxy must not be able to read this application by '
+        reason: 'an intercepting proxy must not be able to read this application by '
             'installing a certificate, in any build type. Inspect traffic at the '
             'local API instead.',
       );
@@ -795,24 +771,21 @@ void main() {
       expect(
         gradle,
         isNot(contains('qa.karar')),
-        reason:
-            'the template identifier embedded a country code in the package name; '
+        reason: 'the template identifier embedded a country code in the package name; '
             'jurisdiction is decided by backend policy, never by which binary was '
             'installed',
       );
     });
 
     test('the release build type never falls back to the debug signing key', () {
-      final releaseBlock = RegExp(
-        r'release \{(.*?)\n        \}',
-        dotAll: true,
-      ).firstMatch(gradle)?.group(1);
+      final releaseBlock = RegExp(r'release \{(.*?)\n        \}', dotAll: true)
+          .firstMatch(gradle)
+          ?.group(1);
       expect(releaseBlock, isNotNull, reason: 'a release build type must be declared');
       expect(
         releaseBlock,
         isNot(contains('getByName("debug")')),
-        reason:
-            'signing a release with the world-readable debug key would be worse '
+        reason: 'signing a release with the world-readable debug key would be worse '
             'than shipping an unsigned artifact',
       );
       expect(releaseBlock, contains('isDebuggable = false'));
@@ -825,8 +798,7 @@ void main() {
         expect(
           gradle,
           contains('"$environment" to ".'),
-          reason:
-              '$environment builds must be installable beside production and '
+          reason: '$environment builds must be installable beside production and '
               'never mistakable for it',
         );
       }
@@ -840,8 +812,7 @@ void main() {
         expect(
           gradle.toLowerCase(),
           isNot(contains(country)),
-          reason:
-              'a per-country variant would move a jurisdiction decision into the '
+          reason: 'a per-country variant would move a jurisdiction decision into the '
               'build system',
         );
       }
@@ -881,8 +852,7 @@ void main() {
         expect(
           plist,
           isNot(contains(key)),
-          reason:
-              'anything declared in this file is in EVERY iOS artifact, '
+          reason: 'anything declared in this file is in EVERY iOS artifact, '
               'including DEV, STAGING and PRODUCTION. $key must not be one of '
               'them; a deployed build relies on the platform transport policy.',
         );
@@ -894,15 +864,13 @@ void main() {
       expect(
         fragment,
         contains('<key>localhost</key>'),
-        reason:
-            'ATS applies to loopback, so the LOCAL profile needs this one '
+        reason: 'ATS applies to loopback, so the LOCAL profile needs this one '
             'exception. No routable host may be added.',
       );
       expect(
         fragment,
         contains('<key>NSAllowsArbitraryLoads</key> <false/>'),
-        reason:
-            'stated rather than omitted, so turning it on is a visible edit to an '
+        reason: 'stated rather than omitted, so turning it on is a visible edit to an '
             'explicit decision',
       );
       for (final key in <String>[
@@ -946,8 +914,7 @@ void main() {
         expect(
           identifier,
           startsWith('"${baseApplicationId()}'),
-          reason:
-              '$identifier must be the owned identifier, and must be quoted '
+          reason: '$identifier must be the owned identifier, and must be quoted '
               'because it interpolates a build setting',
         );
         expect(identifier, endsWith('"'));
@@ -1009,16 +976,14 @@ void main() {
       expect(
         iosBaseBundleIdentifier(),
         baseApplicationId(),
-        reason:
-            'the iOS build phase derives from a different base identifier '
+        reason: 'the iOS build phase derives from a different base identifier '
             'than the Android build packages. One of the two is naming an '
             'application this project does not own.',
       );
       expect(
         iosEnvironmentSuffixRule(),
         environmentSuffixRule(),
-        reason:
-            'the suffix table in $iosBundleIdentityRules and the one in '
+        reason: 'the suffix table in $iosBundleIdentityRules and the one in '
             '$_appGradle are not the same rule. They must be, because the '
             "Android artifact's data-extraction rules name the iOS artifact by "
             'the identifier this table produces.',
@@ -1026,8 +991,7 @@ void main() {
       expect(
         iosDeclaredEnvironments().toSet(),
         declaredEnvironments().toSet(),
-        reason:
-            'the environment list the iOS build phase validates against is '
+        reason: 'the environment list the iOS build phase validates against is '
             'not the set of environments the product has',
       );
     });
@@ -1048,8 +1012,7 @@ void main() {
         expect(
           entry.value,
           isNotEmpty,
-          reason:
-              '${entry.key} maps to an empty suffix, so a ${entry.key} '
+          reason: '${entry.key} maps to an empty suffix, so a ${entry.key} '
               'artifact carries the production identifier on both platforms. It '
               'would install over production, and an App Store record for that '
               'identifier would accept it.',
@@ -1090,19 +1053,19 @@ void main() {
       expect(
         assembled,
         isNotEmpty,
-        reason:
-            'a build produced a merged manifest but no generated '
+        reason: 'a build produced a merged manifest but no generated '
             'data-extraction rules, so there is nothing that says which '
             'environment it was assembled for',
       );
 
-      final Set<String> expectedIdentifiers = assembled.map(counterpartBundleIdentifier).toSet();
+      final Set<String> expectedIdentifiers = assembled
+          .map(counterpartBundleIdentifier)
+          .toSet();
       for (final MapEntry<String, String> entry in observed.entries) {
         expect(
           expectedIdentifiers,
           contains(entry.value),
-          reason:
-              '${entry.key} declares package="${entry.value}", which is not '
+          reason: '${entry.key} declares package="${entry.value}", which is not '
               'what the rule produces for any environment this tree was '
               'assembled for ($assembled). The packaged identity and the '
               'requested environment have come apart.',
@@ -1141,16 +1104,14 @@ void main() {
         expect(
           declaredEnvironments(),
           contains(bundle.environment),
-          reason:
-              '${bundle.label} records no usable environment '
+          reason: '${bundle.label} records no usable environment '
               "('${bundle.environment}'), so what it should be called cannot be "
               'derived. The packaging phase refuses to produce such an artifact.',
         );
         expect(
           bundle.bundleIdentifier,
           counterpartBundleIdentifier(bundle.environment),
-          reason:
-              '${bundle.label} was compiled for ${bundle.environment} and '
+          reason: '${bundle.label} was compiled for ${bundle.environment} and '
               "calls itself '${bundle.bundleIdentifier}', but the Android build "
               'names '
               "'${counterpartBundleIdentifier(bundle.environment)}' as the iOS "
@@ -1167,8 +1128,7 @@ void main() {
           expect(
             bundle.bundleIdentifier,
             entry.value,
-            reason:
-                'the ${bundle.environment} iOS artifact (${bundle.label}) '
+            reason: 'the ${bundle.environment} iOS artifact (${bundle.label}) '
                 "is '${bundle.bundleIdentifier}' and the ${bundle.environment} "
                 "Android artifact (${entry.key}) is '${entry.value}'",
           );
@@ -1197,14 +1157,14 @@ void main() {
       }
 
       for (final resource in rules) {
-        final String? declared = RegExp(r'<platform-specific-params[^>]*bundleId="([^"]*)"')
-            .firstMatch(resource.declarations)
-            ?.group(1);
+        final String? declared =
+            RegExp(r'<platform-specific-params[^>]*bundleId="([^"]*)"')
+                .firstMatch(resource.declarations)
+                ?.group(1);
         expect(
           declared,
           counterpartBundleIdentifier(resource.environment!),
-          reason:
-              '${resource.path} was generated for ${resource.environment} '
+          reason: '${resource.path} was generated for ${resource.environment} '
               "and names '$declared' as the iOS counterpart, which is not the "
               'identifier an iOS build of that environment produces',
         );
@@ -1313,7 +1273,8 @@ List<_GeneratedRules> _generatedRules() {
     results.add(
       _GeneratedRules(
         path: path.substring(packageRoot.length + 1),
-        environment: RegExp(r'karar\.env\s*=\s*([A-Z]+)').firstMatch(raw)?.group(1),
+        environment:
+            RegExp(r'karar\.env\s*=\s*([A-Z]+)').firstMatch(raw)?.group(1),
         raw: raw,
         declarations: collapseXmlWhitespace(stripXmlComments(raw)),
       ),
@@ -1335,8 +1296,7 @@ List<_GeneratedRules>? _generatedRulesOrSkip() {
   expect(
     _androidBuildIsExpected,
     isFalse,
-    reason:
-        '$_androidGateVariable is set, so an assembly must have generated a '
+    reason: '$_androidGateVariable is set, so an assembly must have generated a '
         'data-extraction rules resource — but none was found under build/. The '
         'resource is produced per assembly; nothing to read means nothing was '
         'assembled, and passing by absence is what this gate prevents.',
@@ -1353,8 +1313,7 @@ void _requireLocalArtifactIfExpected() {
   expect(
     _androidBuildIsExpected,
     isFalse,
-    reason:
-        '$_androidGateVariable is set, so a LOCAL assembly must have run — '
+    reason: '$_androidGateVariable is set, so a LOCAL assembly must have run — '
         'but every generated rules resource was produced for another profile. '
         'The test-only identity is only ever asserted against a LOCAL artifact, '
         'so without one this assertion never runs.',
@@ -1367,15 +1326,13 @@ String _sectionOf(_GeneratedRules resource, String mode) {
   // `platform`, and omitting it does not make the section permissive, it makes
   // the resource invalid. Matching the bare `<mode>` form would fail on a
   // correct file and pass on one missing the attribute, which is backwards.
-  final RegExpMatch? match = RegExp(
-    '<$mode(?:\\s[^>]*)?>(.*?)</$mode>',
-    dotAll: true,
-  ).firstMatch(resource.declarations);
+  final RegExpMatch? match =
+      RegExp('<$mode(?:\\s[^>]*)?>(.*?)</$mode>', dotAll: true)
+          .firstMatch(resource.declarations);
   expect(
     match,
     isNotNull,
-    reason:
-        '${resource.path} declares no <$mode> section. An undeclared mode is '
+    reason: '${resource.path} declares no <$mode> section. An undeclared mode is '
         'documented as fully enabled for all content, not off.',
   );
   return match!.group(1)!;
@@ -1393,15 +1350,13 @@ String? _teamIdOf(_GeneratedRules resource) =>
 /// that each expected entry appears somewhere in the file — which would pass on
 /// a list that also contains something nobody reviewed.
 Set<String> _kotlinStringList(String kotlin, String name) {
-  final RegExpMatch? match = RegExp(
-    'val $name =\\s*\\n?\\s*listOf\\(([^)]*)\\)',
-    dotAll: true,
-  ).firstMatch(kotlin);
+  final RegExpMatch? match =
+      RegExp('val $name =\\s*\\n?\\s*listOf\\(([^)]*)\\)', dotAll: true)
+          .firstMatch(kotlin);
   expect(
     match,
     isNotNull,
-    reason:
-        '$_appGradle declares no `val $name = listOf(...)`, so the generated '
+    reason: '$_appGradle declares no `val $name = listOf(...)`, so the generated '
         'resource is built from something this assertion cannot see',
   );
   return RegExp(r'"([^"]*)"')
@@ -1436,7 +1391,8 @@ final class _MergedPermissions {
 const String _androidGateVariable = 'KARAR_VERIFY_ANDROID_ARTIFACT';
 
 bool get _androidBuildIsExpected {
-  final String value = (Platform.environment[_androidGateVariable] ?? '').trim().toLowerCase();
+  final String value =
+      (Platform.environment[_androidGateVariable] ?? '').trim().toLowerCase();
   return value == '1' || value == 'true' || value == 'yes';
 }
 
@@ -1447,8 +1403,7 @@ void _requireBuildIfExpected() {
   expect(
     _androidBuildIsExpected,
     isFalse,
-    reason:
-        '$_androidGateVariable is set, so a built APK and its merged '
+    reason: '$_androidGateVariable is set, so a built APK and its merged '
         'manifest must be present — but none was found. Build the debug APK '
         'before running this suite, or unset the variable. Passing by absence '
         'is exactly the failure this gate exists to prevent.',
@@ -1463,7 +1418,8 @@ void _requireBuildIfExpected() {
 /// unioned, so a permission present in one variant and not another is still
 /// caught.
 _MergedPermissions? _mergedManifestPermissions() {
-  final Directory intermediates = Directory('android/app/build/intermediates/merged_manifest');
+  final Directory intermediates =
+      Directory('android/app/build/intermediates/merged_manifest');
   final Directory fallback = Directory('build/app/intermediates/merged_manifest');
   final Directory root = intermediates.existsSync() ? intermediates : fallback;
   if (!root.existsSync()) return null;
@@ -1481,9 +1437,9 @@ _MergedPermissions? _mergedManifestPermissions() {
     // this file: the merger copies the source manifest's prose into its output,
     // and that prose names permissions.
     final String declarations = stripXmlComments(manifest.readAsStringSync());
-    for (final RegExpMatch match in RegExp(
-      r'<uses-permission[^>]*android:name="([^"]+)"',
-    ).allMatches(declarations)) {
+    for (final RegExpMatch match
+        in RegExp(r'<uses-permission[^>]*android:name="([^"]+)"')
+            .allMatches(declarations)) {
       final String name = match.group(1)!;
       (name.startsWith('android.permission.') ? platform : other).add(name);
     }

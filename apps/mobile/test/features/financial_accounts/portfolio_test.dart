@@ -18,29 +18,38 @@ void main() {
     test('two accounts of the same type and currency at one issuer stay two', () {
       final portfolio = AccountPortfolio.from(wholePortfolio());
       final atIssuerOne = portfolio.groups
-          .firstWhere((PortfolioGroup group) => group.key.issuer?.issuerId == issuerOneId)
+          .firstWhere(
+            (PortfolioGroup group) => group.key.issuer?.issuerId == issuerOneId,
+          )
           .accounts;
 
       final everyday = atIssuerOne
           .where(
             (FinancialAccount account) =>
-                account.accountType == AccountType.current && account.currency.code == 'QAR',
+                account.accountType == AccountType.current &&
+                account.currency.code == 'QAR',
           )
           .toList();
       expect(everyday.length, 2, reason: 'two accounts must not be merged into one');
-      expect(everyday.map((FinancialAccount account) => account.accountId).toSet().length, 2);
+      expect(
+        everyday.map((FinancialAccount account) => account.accountId).toSet().length,
+        2,
+      );
     });
 
     test('two wallets from one issuer are two rows with their own kinds', () {
-      final portfolio = AccountPortfolio.from(wholePortfolio(), grouping: PortfolioGrouping.issuer);
+      final portfolio = AccountPortfolio.from(
+        wholePortfolio(),
+        grouping: PortfolioGrouping.issuer,
+      );
       final wallets = portfolio.accounts
           .where((FinancialAccount account) => account.isWallet)
           .toList();
       expect(wallets.length, 2);
-      expect(wallets.map((FinancialAccount account) => account.walletKind).toSet(), <WalletKind>{
-        WalletKind.mobileMoney,
-        WalletKind.prepaid,
-      });
+      expect(
+        wallets.map((FinancialAccount account) => account.walletKind).toSet(),
+        <WalletKind>{WalletKind.mobileMoney, WalletKind.prepaid},
+      );
       expect(
         wallets.map((FinancialAccount account) => account.issuer.groupingKey).toSet(),
         hasLength(1),
@@ -60,7 +69,9 @@ void main() {
 
     test('cash and an unlisted issuer each group on their own', () {
       final portfolio = AccountPortfolio.from(wholePortfolio());
-      final keys = portfolio.groups.map((PortfolioGroup group) => group.key.identifier).toList();
+      final keys = portfolio.groups
+          .map((PortfolioGroup group) => group.key.identifier)
+          .toList();
       expect(keys, contains('none'));
       expect(keys, contains('unlisted:$unlistedIssuerLabel'));
     });
@@ -69,7 +80,8 @@ void main() {
   group('grouping', () {
     test('every axis produces groups that partition the portfolio', () {
       for (final grouping in PortfolioGrouping.values) {
-        final portfolio = AccountPortfolio.from(wholePortfolio(), grouping: grouping);
+        final portfolio =
+            AccountPortfolio.from(wholePortfolio(), grouping: grouping);
         final counted = portfolio.groups.fold<int>(
           0,
           (int total, PortfolioGroup group) => total + group.accounts.length,
@@ -89,7 +101,9 @@ void main() {
       );
       for (final group in portfolio.groups) {
         expect(
-          group.accounts.map((FinancialAccount account) => account.currency.code).toSet(),
+          group.accounts
+              .map((FinancialAccount account) => account.currency.code)
+              .toSet(),
           hasLength(1),
           reason: 'a currency group must hold exactly one currency',
         );
@@ -126,7 +140,8 @@ void main() {
       }
     });
 
-    test('an empty result caused by a filter is distinguishable from no accounts', () {
+    test('an empty result caused by a filter is distinguishable from no accounts',
+        () {
       final filtered = AccountPortfolio.from(
         wholePortfolio(),
         filter: const PortfolioFilter(currencyCode: 'ZZZ'),
@@ -151,17 +166,17 @@ void main() {
     test('the filter reports how many axes are narrowed', () {
       expect(const PortfolioFilter().activeCount, 0);
       expect(
-        const PortfolioFilter(currencyCode: 'QAR', accountType: AccountType.wallet).activeCount,
+        const PortfolioFilter(currencyCode: 'QAR', accountType: AccountType.wallet)
+            .activeCount,
         2,
       );
     });
 
     test('options are offered only where there is a choice to make', () {
-      final options = AccountPortfolio.optionsFor(wholePortfolio(), PortfolioGrouping.currency);
-      expect(options.map((PortfolioGroupKey key) => key.currencyCode).toList(), <String>[
-        'QAR',
-        'USD',
-      ]);
+      final options =
+          AccountPortfolio.optionsFor(wholePortfolio(), PortfolioGrouping.currency);
+      expect(options.map((PortfolioGroupKey key) => key.currencyCode).toList(),
+          <String>['QAR', 'USD']);
     });
   });
 
@@ -182,9 +197,8 @@ void main() {
       ]);
 
       expect(grouped.entries, hasLength(2));
-      final booked = grouped.entries.firstWhere(
-        (BalanceKindGroup group) => group.kind == BalanceKind.booked,
-      );
+      final booked = grouped.entries
+          .firstWhere((BalanceKindGroup group) => group.kind == BalanceKind.booked);
       expect(booked.snapshots, hasLength(2));
       expect(booked.mostRecent.snapshotId, 'snapshot-b');
     });

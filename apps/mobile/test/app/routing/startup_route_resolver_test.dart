@@ -15,23 +15,25 @@ import 'package:karar_mobile/core/security/token_store.dart';
 import '../../core/support/fakes.dart';
 
 List<StartupState> allStates() => <StartupState>[
-  const ConfigLoading(),
-  const ConfigInvalid(<String>['API_BASE_URL_MISSING']),
-  const LocalSecurityStateUnavailable(
-    LocalSecurityStateUnavailableFailure(operation: LocalSecurityStateOperation.read),
-  ),
-  const SecurityRecoveryBlocked(AbandonmentNotDurable()),
-  const AppLocked(),
-  const SessionRestoring(),
-  const Unauthenticated(),
-  const SessionExpired(SessionEndReason.expired),
-  const MfaChallengeRequired(),
-  const EmailVerificationRequired(),
-  const BootstrapLoading(),
-  const BootstrapUnavailable(BootstrapUnavailableFailure()),
-  const TenantSelectionPending(<TenantOption>[]),
-  Ready(readySnapshot()),
-];
+      const ConfigLoading(),
+      const ConfigInvalid(<String>['API_BASE_URL_MISSING']),
+      const LocalSecurityStateUnavailable(
+        LocalSecurityStateUnavailableFailure(
+          operation: LocalSecurityStateOperation.read,
+        ),
+      ),
+      const SecurityRecoveryBlocked(AbandonmentNotDurable()),
+      const AppLocked(),
+      const SessionRestoring(),
+      const Unauthenticated(),
+      const SessionExpired(SessionEndReason.expired),
+      const MfaChallengeRequired(),
+      const EmailVerificationRequired(),
+      const BootstrapLoading(),
+      const BootstrapUnavailable(BootstrapUnavailableFailure()),
+      const TenantSelectionPending(<TenantOption>[]),
+      Ready(readySnapshot()),
+    ];
 
 void main() {
   const resolver = StartupRouteResolver();
@@ -41,11 +43,16 @@ void main() {
       expect(resolver.routeFor(const ConfigLoading()), RoutePaths.startup);
       expect(resolver.routeFor(const SessionRestoring()), RoutePaths.startup);
       expect(resolver.routeFor(const BootstrapLoading()), RoutePaths.startup);
-      expect(resolver.routeFor(const ConfigInvalid(<String>['X'])), RoutePaths.configurationError);
+      expect(
+        resolver.routeFor(const ConfigInvalid(<String>['X'])),
+        RoutePaths.configurationError,
+      );
       expect(
         resolver.routeFor(
           const LocalSecurityStateUnavailable(
-            LocalSecurityStateUnavailableFailure(operation: LocalSecurityStateOperation.read),
+            LocalSecurityStateUnavailableFailure(
+              operation: LocalSecurityStateOperation.read,
+            ),
           ),
         ),
         RoutePaths.securityUnavailable,
@@ -74,7 +81,9 @@ void main() {
     });
 
     test('every stage resolves to a route the router declares', () {
-      final destinations = <String>{for (final state in allStates()) resolver.routeFor(state)};
+      final destinations = <String>{
+        for (final state in allStates()) resolver.routeFor(state),
+      };
       final declared = <String>{...RoutePaths.gateRoutes, RoutePaths.home};
 
       expect(destinations.difference(declared), isEmpty);
@@ -138,7 +147,10 @@ void main() {
 
     test('a gate permits its own sub-tree so a flow can have steps', () {
       expect(resolver.redirect(const Unauthenticated(), '/sign-in/register'), isNull);
-      expect(resolver.redirect(const Unauthenticated(), '/sign-in/forgot-password'), isNull);
+      expect(
+        resolver.redirect(const Unauthenticated(), '/sign-in/forgot-password'),
+        isNull,
+      );
     });
 
     test('READY bounces every gate route to the protected root', () {

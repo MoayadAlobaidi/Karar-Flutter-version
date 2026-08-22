@@ -202,7 +202,8 @@ void main() {
   setUpAll(() {
     directory = Directory.systemTemp.createTempSync('karar_synthetic_contract');
     File('${directory.path}/openapi.yaml').writeAsStringSync(syntheticContract);
-    final contract = generator.ContractReader('${directory.path}/openapi.yaml').read();
+    final contract =
+        generator.ContractReader('${directory.path}/openapi.yaml').read();
     final emitter = generator.DartEmitter(contract);
     models = emitter.emitModels();
     client = emitter.emitClient();
@@ -220,11 +221,17 @@ void main() {
     });
 
     test('the field carries the underlying type', () {
-      expect(classBody(models, 'ListThingsResponseDto'), contains('final String grade;'));
+      expect(
+        classBody(models, 'ListThingsResponseDto'),
+        contains('final String grade;'),
+      );
     });
 
     test('and is decoded as that type, not cast to a map', () {
-      expect(classBody(models, 'ListThingsResponseDto'), contains("json['grade']! as String"));
+      expect(
+        classBody(models, 'ListThingsResponseDto'),
+        contains("json['grade']! as String"),
+      );
     });
   });
 
@@ -243,7 +250,10 @@ void main() {
     test('a nullable enumeration field is three-state too', () {
       final body = classBody(models, 'UpdateThingRequestDto');
       expect(body, contains('final Omittable<ColourDto> colour;'));
-      expect(body, contains("if (colour.isSent) 'colour': colour.valueOrNull?.toWire(),"));
+      expect(
+        body,
+        contains("if (colour.isSent) 'colour': colour.valueOrNull?.toWire(),"),
+      );
     });
 
     test('an optional NON-nullable request field is omitted when it is null', () {
@@ -299,7 +309,8 @@ void main() {
     // generator carries them — but only when the contract leaves it no
     // choice about which type to send.
     test('the operation takes the bytes', () {
-      expect(operationSignature(client, 'uploadThingSource'), contains('required Uint8List body'));
+      expect(operationSignature(client, 'uploadThingSource'),
+          contains('required Uint8List body'));
     });
 
     test('and sends them under the media type the contract names', () {
@@ -318,7 +329,10 @@ void main() {
     });
 
     test('and the note about an unsendable body is gone', () {
-      expect(operationDocumentation(client, 'uploadThingSource'), isNot(contains('NOT MODELLED')));
+      expect(
+        operationDocumentation(client, 'uploadThingSource'),
+        isNot(contains('NOT MODELLED')),
+      );
     });
 
     test('two declared media types is a CHOICE, and the generator refuses it', () {
@@ -344,7 +358,10 @@ void main() {
     });
 
     test('an operation with a JSON body carries neither', () {
-      expect(operationDocumentation(client, 'updateThing'), isNot(contains('NOT MODELLED')));
+      expect(
+        operationDocumentation(client, 'updateThing'),
+        isNot(contains('NOT MODELLED')),
+      );
       expect(operationBody(client, 'updateThing'), isNot(contains('rawBody')));
     });
   });
@@ -359,7 +376,8 @@ void main() {
       // The synthetic contract has no UNKNOWN, so this is asserted against the
       // real one, where `AccountNature` declares it. Collapsing the two would
       // let a value the platform never sent render as one it did.
-      final committed = File('lib/core/networking/generated/models.dart').readAsStringSync();
+      final committed =
+          File('lib/core/networking/generated/models.dart').readAsStringSync();
       final nature = committed.substring(
         committed.indexOf('enum AccountNatureDto {'),
         committed.indexOf('\n}', committed.indexOf('enum AccountNatureDto {')),

@@ -43,12 +43,13 @@ const String iosBuildEnvironmentKey = 'KararBuildEnvironment';
 /// applied. This is the PRODUCTION identity on both platforms.
 String baseApplicationId() {
   final String gradle = stripCodeComments(readRequiredFile(androidBuildGradle));
-  final String? id = RegExp(r'applicationId\s*=\s*"([^"]+)"').firstMatch(gradle)?.group(1);
+  final String? id = RegExp(r'applicationId\s*=\s*"([^"]+)"')
+      .firstMatch(gradle)
+      ?.group(1);
   expect(
     id,
     isNotNull,
-    reason:
-        '$androidBuildGradle declares no applicationId, so there is no base '
+    reason: '$androidBuildGradle declares no applicationId, so there is no base '
         'identifier for either platform to derive from',
   );
   return id!;
@@ -62,31 +63,33 @@ String baseApplicationId() {
 /// way: an unsuffixed artifact is a production artifact.
 Map<String, String> environmentSuffixRule() {
   final String gradle = stripCodeComments(readRequiredFile(androidBuildGradle));
-  final RegExpMatch? block = RegExp(
-    r'val environmentSuffixes[^=]*=\s*mapOf\(([^)]*)\)',
-    dotAll: true,
-  ).firstMatch(gradle);
+  final RegExpMatch? block =
+      RegExp(r'val environmentSuffixes[^=]*=\s*mapOf\(([^)]*)\)', dotAll: true)
+          .firstMatch(gradle);
   expect(
     block,
     isNotNull,
-    reason:
-        '$androidBuildGradle declares no `val environmentSuffixes = '
+    reason: '$androidBuildGradle declares no `val environmentSuffixes = '
         'mapOf(...)`, so the suffix rule is somewhere this suite cannot read '
         'and every derived assertion below would be about a guess',
   );
 
   final rule = <String, String>{};
-  for (final RegExpMatch entry in RegExp(
-    r'"([A-Z]+)"\s+to\s+"([^"]*)"',
-  ).allMatches(block!.group(1)!)) {
+  for (final RegExpMatch entry
+      in RegExp(r'"([A-Z]+)"\s+to\s+"([^"]*)"').allMatches(block!.group(1)!)) {
     rule[entry.group(1)!] = entry.group(2)!;
   }
-  expect(rule, isNotEmpty, reason: '$androidBuildGradle declares an empty environment suffix map');
+  expect(
+    rule,
+    isNotEmpty,
+    reason: '$androidBuildGradle declares an empty environment suffix map',
+  );
   return rule;
 }
 
 /// Every environment the product has, in the order the rule declares them.
-List<String> declaredEnvironments() => environmentSuffixRule().keys.toList(growable: false);
+List<String> declaredEnvironments() =>
+    environmentSuffixRule().keys.toList(growable: false);
 
 /// The identifier BOTH platforms must produce for [environment].
 ///
@@ -99,8 +102,7 @@ String counterpartBundleIdentifier(String environment) {
   expect(
     rule.containsKey(environment),
     isTrue,
-    reason:
-        "'$environment' is not one of the declared environments "
+    reason: "'$environment' is not one of the declared environments "
         '${rule.keys.toList()}',
   );
   return '${baseApplicationId()}${rule[environment]!}';
@@ -120,15 +122,13 @@ Map<String, String> environmentByBundleIdentifier() {
 /// The base identifier the iOS build phase derives from.
 String iosBaseBundleIdentifier() {
   final String script = readRequiredFile(iosBundleIdentityRules);
-  final String? id = RegExp(
-    r'^KARAR_BASE_BUNDLE_ID="([^"]*)"',
-    multiLine: true,
-  ).firstMatch(script)?.group(1);
+  final String? id = RegExp(r'^KARAR_BASE_BUNDLE_ID="([^"]*)"', multiLine: true)
+      .firstMatch(script)
+      ?.group(1);
   expect(
     id,
     isNotNull,
-    reason:
-        '$iosBundleIdentityRules declares no KARAR_BASE_BUNDLE_ID, so the '
+    reason: '$iosBundleIdentityRules declares no KARAR_BASE_BUNDLE_ID, so the '
         'iOS build phase has no base identifier to derive from',
   );
   return id!;
@@ -151,8 +151,7 @@ Map<String, String> iosEnvironmentSuffixRule() {
   expect(
     rule,
     isNotEmpty,
-    reason:
-        '$iosBundleIdentityRules declares no environment arms, so the iOS '
+    reason: '$iosBundleIdentityRules declares no environment arms, so the iOS '
         'build phase resolves every environment to the same identifier — which '
         'is the defect this rule exists to close',
   );
@@ -163,16 +162,17 @@ Map<String, String> iosEnvironmentSuffixRule() {
 /// xcconfig seed is one of the identifiers this project issues.
 List<String> iosDeclaredEnvironments() {
   final String script = readRequiredFile(iosBundleIdentityRules);
-  final String? declared = RegExp(
-    r'^KARAR_ENVIRONMENTS="([^"]*)"',
-    multiLine: true,
-  ).firstMatch(script)?.group(1);
+  final String? declared =
+      RegExp(r'^KARAR_ENVIRONMENTS="([^"]*)"', multiLine: true)
+          .firstMatch(script)
+          ?.group(1);
   expect(
     declared,
     isNotNull,
     reason: '$iosBundleIdentityRules declares no KARAR_ENVIRONMENTS list',
   );
-  return declared!.split(RegExp(r'\s+')).where((String e) => e.isNotEmpty).toList(growable: false);
+  return declared!.split(RegExp(r'\s+')).where((String e) => e.isNotEmpty)
+      .toList(growable: false);
 }
 
 /// The `KARAR_BUNDLE_ID_SUFFIX` an xcconfig seeds PRODUCT_BUNDLE_IDENTIFIER
@@ -183,10 +183,9 @@ List<String> iosDeclaredEnvironments() {
 /// read as the value.
 String? xcconfigBundleIdSuffix(String relativePath) {
   final String contents = stripCodeComments(readRequiredFile(relativePath));
-  final RegExpMatch? match = RegExp(
-    r'^\s*KARAR_BUNDLE_ID_SUFFIX\s*=(.*)$',
-    multiLine: true,
-  ).firstMatch(contents);
+  final RegExpMatch? match =
+      RegExp(r'^\s*KARAR_BUNDLE_ID_SUFFIX\s*=(.*)$', multiLine: true)
+          .firstMatch(contents);
   return match?.group(1)?.trim();
 }
 
@@ -209,11 +208,13 @@ final class PackagedIosBundle {
 
   /// The environment the build phase recorded. Empty when the phase did not
   /// run, which is itself a finding.
-  String get environment => (info[iosBuildEnvironmentKey] as String? ?? '').trim();
+  String get environment =>
+      (info[iosBuildEnvironmentKey] as String? ?? '').trim();
 
   /// The EFFECTIVE identifier of the artifact — not the xcconfig seed, not
   /// PRODUCT_BUNDLE_IDENTIFIER, but what the installed application is called.
-  String get bundleIdentifier => (info['CFBundleIdentifier'] as String? ?? '').trim();
+  String get bundleIdentifier =>
+      (info['CFBundleIdentifier'] as String? ?? '').trim();
 }
 
 /// Decodes a plist — binary or XML — through plutil.
@@ -223,14 +224,15 @@ final class PackagedIosBundle {
 /// here would put a component of this project's own between the assertion and
 /// the artifact, and a bug in it would read as a passing test.
 Map<String, Object?> decodePlist(File file) {
-  final ProcessResult result = Process.runSync('/usr/bin/plutil', <String>[
-    '-convert',
-    'json',
-    '-o',
-    '-',
-    file.path,
-  ]);
-  expect(result.exitCode, 0, reason: 'plutil could not read ${file.path}: ${result.stderr}');
+  final ProcessResult result = Process.runSync(
+    '/usr/bin/plutil',
+    <String>['-convert', 'json', '-o', '-', file.path],
+  );
+  expect(
+    result.exitCode,
+    0,
+    reason: 'plutil could not read ${file.path}: ${result.stderr}',
+  );
   return jsonDecode(result.stdout as String) as Map<String, Object?>;
 }
 
@@ -263,9 +265,17 @@ List<PackagedIosBundle> packagedIosBundles() {
     if (!info.existsSync()) {
       continue;
     }
-    bundles.add(PackagedIosBundle(entity.path.split('/').last, bundle, decodePlist(info)));
+    bundles.add(
+      PackagedIosBundle(
+        entity.path.split('/').last,
+        bundle,
+        decodePlist(info),
+      ),
+    );
   }
-  bundles.sort((PackagedIosBundle a, PackagedIosBundle b) => a.label.compareTo(b.label));
+  bundles.sort(
+    (PackagedIosBundle a, PackagedIosBundle b) => a.label.compareTo(b.label),
+  );
   return bundles;
 }
 
@@ -293,9 +303,9 @@ Map<String, String> builtAndroidApplicationIds() {
       final String path = entity.path.replaceAll(r'\', '/');
       if (!path.endsWith('/AndroidManifest.xml')) continue;
       if (!path.contains('/merged_manifest')) continue;
-      final String? id = RegExp(r'\bpackage="([^"]+)"')
-          .firstMatch(entity.readAsStringSync())
-          ?.group(1);
+      final String? id =
+          RegExp(r'\bpackage="([^"]+)"').firstMatch(entity.readAsStringSync())
+              ?.group(1);
       if (id == null) continue;
       observed[path.substring(packageRoot.length + 1)] = id;
     }

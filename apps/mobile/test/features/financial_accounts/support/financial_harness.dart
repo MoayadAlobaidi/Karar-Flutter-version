@@ -34,9 +34,14 @@ import 'financial_fixtures.dart';
 
 /// A page with no successor.
 Page<T> onePage<T>(List<T> items) => Page<T>(
-  items: items,
-  cursor: PageCursor(limit: 50, returned: items.length, hasMore: false, nextCursor: null),
-);
+      items: items,
+      cursor: PageCursor(
+        limit: 50,
+        returned: items.length,
+        hasMore: false,
+        nextCursor: null,
+      ),
+    );
 
 /// Accounts, balances, source links and issuers, all scripted.
 final class ScriptedAccountsRepository
@@ -94,7 +99,10 @@ final class ScriptedAccountsRepository
   }
 
   @override
-  Future<Result<FinancialAccount>> updateAccount(String accountId, AccountEdit edit) async {
+  Future<Result<FinancialAccount>> updateAccount(
+    String accountId,
+    AccountEdit edit,
+  ) async {
     updated.add(edit);
     return updateResult ?? Success<FinancialAccount>(account(accountId: accountId));
   }
@@ -237,7 +245,9 @@ final class ScriptedTransactionsRepository implements TransactionsRepository {
   }
 
   @override
-  Future<Result<List<TransactionProvenance>>> listProvenance(String transactionId) async {
+  Future<Result<List<TransactionProvenance>>> listProvenance(
+    String transactionId,
+  ) async {
     reads.add('listProvenance');
     return Success<List<TransactionProvenance>>(provenanceRows);
   }
@@ -288,13 +298,17 @@ List<Override> financialOverrides({
   ScriptedTransactionsRepository? transactions,
   ScriptedCategoriesRepository? categories,
   BootstrapSnapshot? bootstrap,
-}) => <Override>[
-  financialBootstrapProvider.overrideWithValue(bootstrap ?? syntheticBootstrap()),
-  if (accounts != null) ...<Override>[
-    financialAccountsRepositoryProvider.overrideWithValue(accounts),
-    issuerCatalogueRepositoryProvider.overrideWithValue(accounts),
-  ],
-  if (instruments != null) paymentInstrumentsRepositoryProvider.overrideWithValue(instruments),
-  if (transactions != null) transactionsRepositoryProvider.overrideWithValue(transactions),
-  if (categories != null) transactionCategoriesRepositoryProvider.overrideWithValue(categories),
-];
+}) =>
+    <Override>[
+      financialBootstrapProvider.overrideWithValue(bootstrap ?? syntheticBootstrap()),
+      if (accounts != null) ...<Override>[
+        financialAccountsRepositoryProvider.overrideWithValue(accounts),
+        issuerCatalogueRepositoryProvider.overrideWithValue(accounts),
+      ],
+      if (instruments != null)
+        paymentInstrumentsRepositoryProvider.overrideWithValue(instruments),
+      if (transactions != null)
+        transactionsRepositoryProvider.overrideWithValue(transactions),
+      if (categories != null)
+        transactionCategoriesRepositoryProvider.overrideWithValue(categories),
+    ];

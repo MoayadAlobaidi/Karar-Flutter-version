@@ -15,17 +15,16 @@ import 'package:karar_mobile/l10n/karar_localization.dart';
 import 'support/identity_harness.dart';
 
 void main() {
-  testEveryDirectionAndScale('names theft plainly when a token was reused', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('names theft plainly when a token was reused',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
     await pumpIdentity(
       tester,
-      const SessionExpiredScreen(state: SessionExpired(SessionEndReason.refreshTokenReuseDetected)),
+      const SessionExpiredScreen(
+        state: SessionExpired(SessionEndReason.refreshTokenReuseDetected),
+      ),
       harness: harness,
       locale: locale,
       textScale: textScale,
@@ -40,9 +39,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('each reason has its own guidance and the same one action', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('each reason has its own guidance and the same one action',
+      (WidgetTester tester) async {
     final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
     final Map<SessionEndReason, String> expected = <SessionEndReason, String>{
       SessionEndReason.expired: l10n.sessionEndedExpired,
@@ -69,19 +67,20 @@ void main() {
     }
   });
 
-  testWidgets('the credential has already been cleared before this screen renders', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('the credential has already been cleared before this screen renders',
+      (WidgetTester tester) async {
     final IdentityHarness harness = IdentityHarness();
     await harness.signInFixture();
     // Ending the session is what produces this state, and it wipes as it goes.
-    await harness.container
-        .read(sessionManagerProvider)
-        .end(SessionEndReason.refreshTokenReuseDetected);
+    await harness.container.read(sessionManagerProvider).end(
+          SessionEndReason.refreshTokenReuseDetected,
+        );
 
     await pumpIdentity(
       tester,
-      const SessionExpiredScreen(state: SessionExpired(SessionEndReason.refreshTokenReuseDetected)),
+      const SessionExpiredScreen(
+        state: SessionExpired(SessionEndReason.refreshTokenReuseDetected),
+      ),
       harness: harness,
     );
 

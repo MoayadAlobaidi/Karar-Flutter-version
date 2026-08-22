@@ -23,26 +23,32 @@ SessionTokens _tokens({
   required String access,
   Duration accessLifetime = const Duration(minutes: 10),
   Duration refreshLifetime = const Duration(days: 30),
-}) => SessionTokens(
-  accessToken: access,
-  accessTokenExpiresAt: _now.add(accessLifetime),
-  refreshToken: 'refresh-for-$access',
-  refreshTokenExpiresAt: _now.add(refreshLifetime),
-  sessionId: 'session-1',
-);
+}) =>
+    SessionTokens(
+      accessToken: access,
+      accessTokenExpiresAt: _now.add(accessLifetime),
+      refreshToken: 'refresh-for-$access',
+      refreshTokenExpiresAt: _now.add(refreshLifetime),
+      sessionId: 'session-1',
+    );
 
 final class _Harness {
   _Harness({required Future<Result<SessionTokens>> Function(String) refresh})
-    : clock = FixedClock(_now),
-      secureStore = InMemorySecureStore() {
-    sessions = SessionManager(store: SecureTokenStore(secureStore), logger: AppLogger.silent);
+      : clock = FixedClock(_now),
+        secureStore = InMemorySecureStore() {
+    sessions = SessionManager(
+      store: SecureTokenStore(secureStore),
+      logger: AppLogger.silent,
+    );
     coordinator = TokenRefreshCoordinator(
       sessionManager: sessions,
       refresh: refresh,
       clock: clock,
       logger: AppLogger.silent,
     );
-    sessions.onSessionEnded.listen((SessionEnded ended) => endReasons.add(ended.reason));
+    sessions.onSessionEnded.listen(
+      (SessionEnded ended) => endReasons.add(ended.reason),
+    );
   }
 
   final FixedClock clock;
@@ -136,7 +142,8 @@ void main() {
       );
       addTearDown(harness.dispose);
 
-      final nearlyExpired = _tokens(access: 'nearly', accessLifetime: const Duration(seconds: 5));
+      final nearlyExpired =
+          _tokens(access: 'nearly', accessLifetime: const Duration(seconds: 5));
       await harness.sessions.adopt(nearlyExpired);
 
       await harness.coordinator.ensureUsable(nearlyExpired);
@@ -341,10 +348,9 @@ void main() {
       final reactive = harness.coordinator.refreshAfterRejection(expired);
       await Future<void>.delayed(Duration.zero);
       gate.complete();
-      await Future.wait<Result<SessionTokens>>(<Future<Result<SessionTokens>>>[
-        proactive,
-        reactive,
-      ]);
+      await Future.wait<Result<SessionTokens>>(
+        <Future<Result<SessionTokens>>>[proactive, reactive],
+      );
 
       expect(calls, 1);
     });
@@ -361,7 +367,8 @@ void main() {
 
       await harness.sessions.adopt(_tokens(access: 'already-renewed'));
 
-      final outcome = await harness.coordinator.refreshAfterRejection(_tokens(access: 'rejected'));
+      final outcome =
+          await harness.coordinator.refreshAfterRejection(_tokens(access: 'rejected'));
 
       expect(calls, 0);
       expect(outcome.valueOrNull?.accessToken, 'already-renewed');

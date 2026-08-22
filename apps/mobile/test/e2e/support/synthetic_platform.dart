@@ -96,7 +96,8 @@ final class ScriptedReply {
 
   /// An RFC 7807 problem document, under the media type the platform's single
   /// problem writer emits.
-  const ScriptedReply.problem(this.status, this.body) : mediaType = 'application/problem+json';
+  const ScriptedReply.problem(this.status, this.body)
+      : mediaType = 'application/problem+json';
 
   final int status;
   final Object? body;
@@ -152,9 +153,10 @@ final class SyntheticPlatform {
 
   /// Every request issued against one template.
   List<RecordedRequest> requestsFor(String method, String template) => <RecordedRequest>[
-    for (final request in requests)
-      if (request.method == method.toUpperCase() && request.template == template) request,
-  ];
+        for (final request in requests)
+          if (request.method == method.toUpperCase() && request.template == template)
+            request,
+      ];
 
   /// The single request issued against one template.
   RecordedRequest requestFor(String method, String template) {
@@ -167,7 +169,8 @@ final class SyntheticPlatform {
     return matching.single;
   }
 
-  String _key(String method, String template) => '${method.toUpperCase()} $template';
+  String _key(String method, String template) =>
+      '${method.toUpperCase()} $template';
 
   FutureOr<ResponseBody> _handle(RequestOptions options, int attempt) {
     final method = options.method.toUpperCase();
@@ -250,11 +253,8 @@ final class SyntheticPlatform {
     contractViolations.addAll(
       contract
           .violations(schema, body, at: 'request $method $template')
-          .map(
-            (String failure) =>
-                'the client sent a body the contract '
-                'refuses — $failure',
-          ),
+          .map((String failure) => 'the client sent a body the contract '
+              'refuses — $failure'),
     );
   }
 
@@ -276,12 +276,13 @@ final class SyntheticPlatform {
     }
     contractViolations.addAll(
       contract
-          .violations(schema, reply.body, at: '${reply.status} $method $template')
-          .map(
-            (String failure) =>
-                'the journey served a body the server could '
-                'not — $failure',
-          ),
+          .violations(
+            schema,
+            reply.body,
+            at: '${reply.status} $method $template',
+          )
+          .map((String failure) => 'the journey served a body the server could '
+              'not — $failure'),
     );
   }
 }

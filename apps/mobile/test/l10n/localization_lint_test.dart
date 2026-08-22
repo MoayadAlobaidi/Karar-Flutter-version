@@ -42,15 +42,18 @@ void main() {
 
   test('layout is directional, never left or right', () {
     final Map<RegExp, String> banned = <RegExp, String>{
-      RegExp(r'EdgeInsets\.only\((?:\s*\w+\s*:\s*[^,)]+,?)*\s*(left|right)\s*:'):
-          'use EdgeInsetsDirectional.only(start:/end:)',
+      RegExp(
+        r'EdgeInsets\.only\((?:\s*\w+\s*:\s*[^,)]+,?)*\s*(left|right)\s*:',
+      ): 'use EdgeInsetsDirectional.only(start:/end:)',
       RegExp(r'EdgeInsets\.fromLTRB\('): 'use EdgeInsetsDirectional.fromSTEB',
-      RegExp(r'\bAlignment\.(centerLeft|centerRight|topLeft|topRight|bottomLeft|bottomRight)\b'):
-          'use AlignmentDirectional',
+      RegExp(
+        r'\bAlignment\.(centerLeft|centerRight|topLeft|topRight|bottomLeft|bottomRight)\b',
+      ): 'use AlignmentDirectional',
       RegExp(r'\bTextAlign\.(left|right)\b'): 'use TextAlign.start or end',
       RegExp(r'\bPositioned\(\s*(?:\s*\w+\s*:\s*[^,)]+,?)*\s*(left|right)\s*:'):
           'use PositionedDirectional',
-      RegExp(r'BorderRadius\.horizontal\('): 'use BorderRadiusDirectional.horizontal',
+      RegExp(r'BorderRadius\.horizontal\('):
+          'use BorderRadiusDirectional.horizontal',
       RegExp(r'\bBorderRadius\.only\(\s*(top|bottom)(Left|Right)'):
           'use BorderRadiusDirectional.only',
     };
@@ -58,7 +61,9 @@ void main() {
     final List<String> offenders = <String>[];
     for (final _Source source in sources) {
       for (final MapEntry<RegExp, String> rule in banned.entries) {
-        offenders.addAll(source.findAll(rule.key).map((String hit) => '$hit -> ${rule.value}'));
+        offenders.addAll(
+          source.findAll(rule.key).map((String hit) => '$hit -> ${rule.value}'),
+        );
       }
     }
     expect(
@@ -83,11 +88,15 @@ class _Source {
   List<String> findAll(RegExp pattern) {
     return pattern
         .allMatches(_content)
-        .map((RegExpMatch match) => '$path:${_lineOf(match.start)}  ${_snippet(match.start)}')
+        .map(
+          (RegExpMatch match) =>
+              '$path:${_lineOf(match.start)}  ${_snippet(match.start)}',
+        )
         .toList();
   }
 
-  int _lineOf(int offset) => '\n'.allMatches(_content.substring(0, offset)).length + 1;
+  int _lineOf(int offset) =>
+      '\n'.allMatches(_content.substring(0, offset)).length + 1;
 
   String _snippet(int offset) {
     final String rest = _content.substring(offset);

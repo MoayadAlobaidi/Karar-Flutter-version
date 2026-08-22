@@ -19,30 +19,29 @@ import 'support/statement_import_harness.dart';
 
 void main() {
   group('a cell from an uploaded file renders inertly', () {
-    testInBothDirections('every adversarial cell renders byte-identical as plain text', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      for (final hostile in adversarialCells) {
-        await pumpFeatureScreen(
-          tester,
-          UntrustedCellText(UntrustedCell(hostile)),
-          locale: locale,
-          textScale: scale,
-        );
+    testInBothDirections(
+      'every adversarial cell renders byte-identical as plain text',
+      (WidgetTester tester, Locale locale, double scale) async {
+        for (final hostile in adversarialCells) {
+          await pumpFeatureScreen(
+            tester,
+            UntrustedCellText(UntrustedCell(hostile)),
+            locale: locale,
+            textScale: scale,
+          );
 
-        final texts = tester.widgetList<Text>(find.byType(Text)).toList();
-        expect(
-          texts.map((Text text) => text.data),
-          contains(hostile),
-          reason:
-              'the cell must reach the screen exactly as the file wrote it. '
-              'Escaping, trimming, normalising or truncating it would show a '
-              'person something their bank did not write.',
-        );
-      }
-    });
+          final texts = tester.widgetList<Text>(find.byType(Text)).toList();
+          expect(
+            texts.map((Text text) => text.data),
+            contains(hostile),
+            reason:
+                'the cell must reach the screen exactly as the file wrote it. '
+                'Escaping, trimming, normalising or truncating it would show a '
+                'person something their bank did not write.',
+          );
+        }
+      },
+    );
 
     testWidgets('a cell is never turned into rich text or a gesture target', (
       WidgetTester tester,
@@ -71,13 +70,18 @@ void main() {
           reason: 'file content must not be wrapped in anything that acts on a tap',
         );
         expect(
-          find.descendant(of: find.byType(UntrustedCellText), matching: find.byType(InkWell)),
+          find.descendant(
+            of: find.byType(UntrustedCellText),
+            matching: find.byType(InkWell),
+          ),
           findsNothing,
         );
       }
     });
 
-    testWidgets('a formula-shaped cell gets no escape prefix', (WidgetTester tester) async {
+    testWidgets('a formula-shaped cell gets no escape prefix', (
+      WidgetTester tester,
+    ) async {
       // Prefixing `=cmd|/c calc` with an apostrophe is right at an EXPORT
       // boundary, where a spreadsheet will interpret the file. Here it would
       // corrupt what is shown while protecting nothing.
@@ -97,7 +101,9 @@ void main() {
       );
     });
 
-    testWidgets('whitespace and control characters survive untouched', (WidgetTester tester) async {
+    testWidgets('whitespace and control characters survive untouched', (
+      WidgetTester tester,
+    ) async {
       // A merchant name really can be padded, and the padding is part of what
       // the bank wrote. Trimming it here would make the screen disagree with
       // the file and with what the platform parses.

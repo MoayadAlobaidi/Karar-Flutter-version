@@ -54,23 +54,25 @@ import 'support/tenant_isolation_harness.dart';
 const String nameOfA = 'Organisation A payroll';
 const String nameOfB = 'Organisation B payroll';
 
-FinancialAccount accountOfA() => account(accountId: 'account-of-tenant-a', displayName: nameOfA);
+FinancialAccount accountOfA() =>
+    account(accountId: 'account-of-tenant-a', displayName: nameOfA);
 
-FinancialAccount accountOfB() => account(accountId: 'account-of-tenant-b', displayName: nameOfB);
+FinancialAccount accountOfB() =>
+    account(accountId: 'account-of-tenant-b', displayName: nameOfB);
 
 /// The transaction identifiers a listing is currently exposing.
 List<String> idsOf(AsyncValue<TransactionListing> value) => switch (value.value) {
-  TransactionsLoaded(:final transactions) =>
-    transactions.map((Transaction held) => held.transactionId).toList(),
-  _ => const <String>[],
-};
+      TransactionsLoaded(:final transactions) =>
+        transactions.map((Transaction held) => held.transactionId).toList(),
+      _ => const <String>[],
+    };
 
 /// The account identifiers a portfolio view is currently exposing.
 List<String> idsIn(AsyncValue<AccountsView> value) => switch (value.value) {
-  AccountsLoaded(:final accounts) =>
-    accounts.map((FinancialAccount held) => held.accountId).toList(),
-  _ => const <String>[],
-};
+      AccountsLoaded(:final accounts) =>
+        accounts.map((FinancialAccount held) => held.accountId).toList(),
+      _ => const <String>[],
+    };
 
 /// A provider with nothing but a future the test controls, used to characterise
 /// what the framework's own discard primitive does.
@@ -85,9 +87,8 @@ final class _Probe extends AsyncNotifier<String> {
   }
 }
 
-final AsyncNotifierProvider<_Probe, String> _probeProvider = AsyncNotifierProvider<_Probe, String>(
-  _Probe.new,
-);
+final AsyncNotifierProvider<_Probe, String> _probeProvider =
+    AsyncNotifierProvider<_Probe, String>(_Probe.new);
 
 void main() {
   group('what `ref.invalidate` actually does to an async provider', () {
@@ -107,7 +108,8 @@ void main() {
       _Probe.pending.clear();
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      final subscription = container.listen(_probeProvider, (_, _) {}, fireImmediately: true);
+      final subscription =
+          container.listen(_probeProvider, (_, _) {}, fireImmediately: true);
       addTearDown(subscription.close);
 
       _Probe.pending.first.complete('ORGANISATION_A');
@@ -126,8 +128,7 @@ void main() {
       expect(
         container.read(_probeProvider).value,
         'ORGANISATION_A',
-        reason:
-            'if this ever stops holding, `ref.invalidate` has become an '
+        reason: 'if this ever stops holding, `ref.invalidate` has become an '
             'erase and the tenant switch may already be safe',
       );
     });
@@ -155,19 +156,15 @@ void main() {
     }) async {
       final tick = settle ?? drain;
       await harness.signIn();
-      final subscription = harness.container.listen(
-        ownAccountsProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
+      final subscription =
+          harness.container.listen(ownAccountsProvider, (_, _) {}, fireImmediately: true);
       await tick();
       harness.accounts.pending.first.complete(<FinancialAccount>[accountOfA()]);
       await tick();
       expect(
         idsIn(harness.container.read(ownAccountsProvider)),
         <String>['account-of-tenant-a'],
-        reason:
-            'the first load must actually produce organisation A data, or '
+        reason: 'the first load must actually produce organisation A data, or '
             'nothing below is testing a leak',
       );
       return subscription;
@@ -187,8 +184,7 @@ void main() {
       expect(
         harness.sessions.tokens?.accessToken,
         'tenant-b-access',
-        reason:
-            'a switch adopts the replacement credential; without that the '
+        reason: 'a switch adopts the replacement credential; without that the '
             'session is still organisation A and no boundary is crossed',
       );
       expect(
@@ -198,212 +194,221 @@ void main() {
       );
     });
 
-    test('organisation A\'s portfolio is not readable once the switch has returned', () async {
-      final subscription = await loadPortfolioOfA();
-      addTearDown(subscription.close);
+    test(
+      'organisation A\'s portfolio is not readable once the switch has returned',
+      () async {
+        final subscription = await loadPortfolioOfA();
+        addTearDown(subscription.close);
 
-      await switchToB();
+        await switchToB();
 
-      // Organisation B's read is in flight. This is the whole window a slow
-      // network opens, and the question is what the provider yields during it.
-      expect(
-        idsIn(harness.container.read(ownAccountsProvider)),
-        isNot(contains('account-of-tenant-a')),
-        reason:
-            'the switch has completed and organisation A\'s portfolio is '
-            'still the value every screen reads',
-      );
-    });
+        // Organisation B's read is in flight. This is the whole window a slow
+        // network opens, and the question is what the provider yields during it.
+        expect(
+          idsIn(harness.container.read(ownAccountsProvider)),
+          isNot(contains('account-of-tenant-a')),
+          reason: 'the switch has completed and organisation A\'s portfolio is '
+              'still the value every screen reads',
+        );
+      },
+    );
 
-    testWidgets('organisation A\'s accounts are not on screen once the switch has returned', (
-      WidgetTester tester,
-    ) async {
-      Future<void> pumpDrain() async {
-        for (var i = 0; i < 8; i++) {
-          await tester.pump(Duration.zero);
+    testWidgets(
+      'organisation A\'s accounts are not on screen once the switch has returned',
+      (WidgetTester tester) async {
+        Future<void> pumpDrain() async {
+          for (var i = 0; i < 8; i++) {
+            await tester.pump(Duration.zero);
+          }
         }
-      }
 
-      final subscription = await loadPortfolioOfA(settle: pumpDrain);
-      addTearDown(subscription.close);
+        final subscription = await loadPortfolioOfA(settle: pumpDrain);
+        addTearDown(subscription.close);
 
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: harness.container,
-          child: MaterialApp(
-            locale: KararLocalization.english,
-            localizationsDelegates: KararLocalization.localizationsDelegates,
-            supportedLocales: KararLocalization.supportedLocales,
-            theme: KararTheme.light(),
-            builder: (BuildContext context, Widget? child) =>
-                KararThemeScope(child: child ?? const SizedBox.shrink()),
-            home: const AccountsAndWalletsScreen(),
-          ),
-        ),
-      );
-      await tester.pump();
-      expect(
-        find.text(nameOfA),
-        findsOneWidget,
-        reason:
-            'the screen must be showing organisation A first, or the '
-            'assertion below proves nothing',
-      );
-
-      await switchToB(settle: pumpDrain);
-      await tester.pump();
-
-      expect(
-        find.text(nameOfA),
-        findsNothing,
-        reason:
-            'organisation A\'s account is rendered under organisation B '
-            'for the whole of the post-switch reload',
-      );
-    });
-
-    test('the framework drops a build() answer issued before the switch', () async {
-      // The property that HOLDS. `ownAccountsProvider.build()` is started
-      // here and never allowed to settle before the switch; Riverpod cancels
-      // the pending future on invalidation, so the answer is discarded rather
-      // than becoming organisation B's state.
-      await harness.signIn();
-      final subscription = harness.container.listen(
-        ownAccountsProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      await drain();
-      final stale = harness.accounts.pending.first;
-
-      await switchToB();
-
-      stale.complete(<FinancialAccount>[accountOfA()]);
-      await drain();
-      harness.accounts.pending.last.complete(<FinancialAccount>[accountOfB()]);
-      await drain();
-
-      expect(idsIn(harness.container.read(ownAccountsProvider)), <String>[
-        'account-of-tenant-b',
-      ], reason: 'a build() answer from before the switch was adopted');
-    });
-
-    test('a listing refresh issued under A does not overwrite B once it resolves', () async {
-      final subscription = await loadPortfolioOfA();
-      addTearDown(subscription.close);
-
-      // A refresh under organisation A. Its answer is still in flight.
-      final refreshing = harness.container.read(ownAccountsProvider.notifier).refresh();
-      await drain();
-      final int inFlight = harness.accounts.pending.length - 1;
-
-      await switchToB();
-
-      // Settle organisation B first, so the assertion below distinguishes a
-      // leak from a load that has simply not finished.
-      harness.accounts.pending.last.complete(<FinancialAccount>[accountOfB()]);
-      await drain();
-      expect(idsIn(harness.container.read(ownAccountsProvider)), <String>['account-of-tenant-b']);
-
-      harness.accounts.pending[inFlight].complete(<FinancialAccount>[accountOfA()]);
-      await refreshing;
-      await drain();
-
-      expect(
-        idsIn(harness.container.read(ownAccountsProvider)),
-        isNot(contains('account-of-tenant-a')),
-        reason:
-            'organisation A\'s portfolio replaced organisation B\'s in '
-            'the state B\'s screens read',
-      );
-    });
-
-    test('a transaction listing refresh issued under A does not overwrite B', () async {
-      await harness.signIn();
-      final subscription = harness.container.listen(
-        transactionListingProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-      await drain();
-      harness.transactions.pending.first.complete(<Transaction>[
-        transaction(transactionId: 'transaction-of-tenant-a'),
-      ]);
-      await drain();
-
-      final refreshing = harness.container.read(transactionListingProvider.notifier).refresh();
-      await drain();
-      final int inFlight = harness.transactions.pending.length - 1;
-
-      await switchToB();
-
-      harness.transactions.pending.last.complete(<Transaction>[
-        transaction(transactionId: 'transaction-of-tenant-b'),
-      ]);
-      await drain();
-
-      harness.transactions.pending[inFlight].complete(<Transaction>[
-        transaction(transactionId: 'transaction-of-tenant-a'),
-      ]);
-      await refreshing;
-      await drain();
-
-      expect(
-        idsOf(harness.container.read(transactionListingProvider)),
-        isNot(contains('transaction-of-tenant-a')),
-        reason: 'organisation A\'s transactions replaced organisation B\'s',
-      );
-    });
-
-    test('an account create confirmed under A does not settle into B\'s form', () async {
-      await harness.signIn();
-      final subscription = harness.container.listen(
-        accountFormControllerProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
-      addTearDown(subscription.close);
-
-      final creating = harness.container
-          .read(accountFormControllerProvider.notifier)
-          .create(
-            const ManualAccountDraft(
-              displayName: 'A new account',
-              accountType: AccountType.current,
-              currencyCode: 'QAR',
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: harness.container,
+            child: MaterialApp(
+              locale: KararLocalization.english,
+              localizationsDelegates: KararLocalization.localizationsDelegates,
+              supportedLocales: KararLocalization.supportedLocales,
+              theme: KararTheme.light(),
+              builder: (BuildContext context, Widget? child) =>
+                  KararThemeScope(child: child ?? const SizedBox.shrink()),
+              home: const AccountsAndWalletsScreen(),
             ),
-          );
-      await drain();
-      expect(
-        harness.accounts.pendingCreates,
-        hasLength(1),
-        reason: 'the create must be in flight, or there is no race to run',
-      );
+          ),
+        );
+        await tester.pump();
+        expect(
+          find.text(nameOfA),
+          findsOneWidget,
+          reason: 'the screen must be showing organisation A first, or the '
+              'assertion below proves nothing',
+        );
 
-      await switchToB();
+        await switchToB(settle: pumpDrain);
+        await tester.pump();
 
-      harness.accounts.pendingCreates.first.complete(Success<FinancialAccount>(accountOfA()));
-      await drain();
-      // The controller refreshes the portfolio after a successful write and
-      // parks further reads; answer them so the create can finish.
-      for (final held in harness.accounts.pending) {
-        if (!held.isCompleted) {
-          held.complete(<FinancialAccount>[accountOfB()]);
+        expect(
+          find.text(nameOfA),
+          findsNothing,
+          reason: 'organisation A\'s account is rendered under organisation B '
+              'for the whole of the post-switch reload',
+        );
+      },
+    );
+
+    test(
+      'the framework drops a build() answer issued before the switch',
+      () async {
+        // The property that HOLDS. `ownAccountsProvider.build()` is started
+        // here and never allowed to settle before the switch; Riverpod cancels
+        // the pending future on invalidation, so the answer is discarded rather
+        // than becoming organisation B's state.
+        await harness.signIn();
+        final subscription = harness.container
+            .listen(ownAccountsProvider, (_, _) {}, fireImmediately: true);
+        addTearDown(subscription.close);
+        await drain();
+        final stale = harness.accounts.pending.first;
+
+        await switchToB();
+
+        stale.complete(<FinancialAccount>[accountOfA()]);
+        await drain();
+        harness.accounts.pending.last.complete(<FinancialAccount>[accountOfB()]);
+        await drain();
+
+        expect(
+          idsIn(harness.container.read(ownAccountsProvider)),
+          <String>['account-of-tenant-b'],
+          reason: 'a build() answer from before the switch was adopted',
+        );
+      },
+    );
+
+    test(
+      'a listing refresh issued under A does not overwrite B once it resolves',
+      () async {
+        final subscription = await loadPortfolioOfA();
+        addTearDown(subscription.close);
+
+        // A refresh under organisation A. Its answer is still in flight.
+        final refreshing =
+            harness.container.read(ownAccountsProvider.notifier).refresh();
+        await drain();
+        final int inFlight = harness.accounts.pending.length - 1;
+
+        await switchToB();
+
+        // Settle organisation B first, so the assertion below distinguishes a
+        // leak from a load that has simply not finished.
+        harness.accounts.pending.last.complete(<FinancialAccount>[accountOfB()]);
+        await drain();
+        expect(
+          idsIn(harness.container.read(ownAccountsProvider)),
+          <String>['account-of-tenant-b'],
+        );
+
+        harness.accounts.pending[inFlight].complete(<FinancialAccount>[accountOfA()]);
+        await refreshing;
+        await drain();
+
+        expect(
+          idsIn(harness.container.read(ownAccountsProvider)),
+          isNot(contains('account-of-tenant-a')),
+          reason: 'organisation A\'s portfolio replaced organisation B\'s in '
+              'the state B\'s screens read',
+        );
+      },
+    );
+
+    test(
+      'a transaction listing refresh issued under A does not overwrite B',
+      () async {
+        await harness.signIn();
+        final subscription = harness.container
+            .listen(transactionListingProvider, (_, _) {}, fireImmediately: true);
+        addTearDown(subscription.close);
+        await drain();
+        harness.transactions.pending.first.complete(<Transaction>[
+          transaction(transactionId: 'transaction-of-tenant-a'),
+        ]);
+        await drain();
+
+        final refreshing =
+            harness.container.read(transactionListingProvider.notifier).refresh();
+        await drain();
+        final int inFlight = harness.transactions.pending.length - 1;
+
+        await switchToB();
+
+        harness.transactions.pending.last.complete(<Transaction>[
+          transaction(transactionId: 'transaction-of-tenant-b'),
+        ]);
+        await drain();
+
+        harness.transactions.pending[inFlight].complete(<Transaction>[
+          transaction(transactionId: 'transaction-of-tenant-a'),
+        ]);
+        await refreshing;
+        await drain();
+
+        expect(
+          idsOf(harness.container.read(transactionListingProvider)),
+          isNot(contains('transaction-of-tenant-a')),
+          reason: 'organisation A\'s transactions replaced organisation B\'s',
+        );
+      },
+    );
+
+    test(
+      'an account create confirmed under A does not settle into B\'s form',
+      () async {
+        await harness.signIn();
+        final subscription = harness.container
+            .listen(accountFormControllerProvider, (_, _) {}, fireImmediately: true);
+        addTearDown(subscription.close);
+
+        final creating =
+            harness.container.read(accountFormControllerProvider.notifier).create(
+                  const ManualAccountDraft(
+                    displayName: 'A new account',
+                    accountType: AccountType.current,
+                    currencyCode: 'QAR',
+                  ),
+                );
+        await drain();
+        expect(
+          harness.accounts.pendingCreates,
+          hasLength(1),
+          reason: 'the create must be in flight, or there is no race to run',
+        );
+
+        await switchToB();
+
+        harness.accounts.pendingCreates.first
+            .complete(Success<FinancialAccount>(accountOfA()));
+        await drain();
+        // The controller refreshes the portfolio after a successful write and
+        // parks further reads; answer them so the create can finish.
+        for (final held in harness.accounts.pending) {
+          if (!held.isCompleted) {
+            held.complete(<FinancialAccount>[accountOfB()]);
+          }
         }
-      }
-      await creating;
-      await drain();
+        await creating;
+        await drain();
 
-      expect(
-        harness.container.read(accountFormControllerProvider),
-        isNot(isA<AccountFormSaved>()),
-        reason:
-            'a write confirmed under organisation A surfaced as a saved '
-            'account on organisation B\'s form',
-      );
-    });
+        expect(
+          harness.container.read(accountFormControllerProvider),
+          isNot(isA<AccountFormSaved>()),
+          reason: 'a write confirmed under organisation A surfaced as a saved '
+              'account on organisation B\'s form',
+        );
+      },
+    );
   });
 
   group('a sign-out', () {
@@ -414,17 +419,16 @@ void main() {
 
     test('leaves no financial listing behind for the next session', () async {
       await harness.signIn();
-      final subscription = harness.container.listen(
-        ownAccountsProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
+      final subscription =
+          harness.container.listen(ownAccountsProvider, (_, _) {}, fireImmediately: true);
       await drain();
       harness.accounts.pending.first.complete(<FinancialAccount>[accountOfA()]);
       await drain();
-      expect(idsIn(harness.container.read(ownAccountsProvider)), <String>[
-        'account-of-tenant-a',
-      ], reason: 'the fixture must load real data, or nothing is being cleared');
+      expect(
+        idsIn(harness.container.read(ownAccountsProvider)),
+        <String>['account-of-tenant-a'],
+        reason: 'the fixture must load real data, or nothing is being cleared',
+      );
 
       await harness.coordinator.signOut();
       await drain();
@@ -441,19 +445,15 @@ void main() {
       expect(
         idsIn(harness.container.read(ownAccountsProvider)),
         isNot(contains('account-of-tenant-a')),
-        reason:
-            'the previous session\'s portfolio is still cached in the '
+        reason: 'the previous session\'s portfolio is still cached in the '
             'process-wide container and is served to whoever signs in next',
       );
     });
 
     test('leaves no transaction listing behind for the next session', () async {
       await harness.signIn();
-      final subscription = harness.container.listen(
-        transactionListingProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
+      final subscription = harness.container
+          .listen(transactionListingProvider, (_, _) {}, fireImmediately: true);
       await drain();
       harness.transactions.pending.first.complete(<Transaction>[
         transaction(transactionId: 'transaction-of-tenant-a'),
@@ -473,11 +473,8 @@ void main() {
 
     test('a read issued before the sign-out does not land after it', () async {
       await harness.signIn();
-      final subscription = harness.container.listen(
-        ownAccountsProvider,
-        (_, _) {},
-        fireImmediately: true,
-      );
+      final subscription =
+          harness.container.listen(ownAccountsProvider, (_, _) {}, fireImmediately: true);
       addTearDown(subscription.close);
       await drain();
       harness.accounts.pending.first.complete(<FinancialAccount>[accountOfA()]);
@@ -496,8 +493,7 @@ void main() {
       expect(
         idsIn(harness.container.read(ownAccountsProvider)),
         isNot(contains('account-of-tenant-a')),
-        reason:
-            'an answer to a request issued under the ended session was '
+        reason: 'an answer to a request issued under the ended session was '
             'written into state after the session ended',
       );
     });
@@ -528,8 +524,7 @@ void main() {
         expect(
           registered,
           contains(provider),
-          reason:
-              'a tenant-scoped provider missing from the registry survives '
+          reason: 'a tenant-scoped provider missing from the registry survives '
               'a switch untouched',
         );
       }

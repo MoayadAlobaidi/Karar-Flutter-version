@@ -100,8 +100,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'a screen reaches a repository through a provider, never by name:\n'
+        reason: 'a screen reaches a repository through a provider, never by name:\n'
             '${offenders.join('\n')}',
       );
     });
@@ -214,8 +213,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'a binary float is not a ledger value (ADR-0006):\n'
+        reason: 'a binary float is not a ledger value (ADR-0006):\n'
             '${offenders.join('\n')}',
       );
     });
@@ -243,16 +241,8 @@ void main() {
           // Arithmetic where one side is money-named. The operator must be
           // SPACED: `import '../domain/balance_snapshot.dart'` contains a
           // slash next to a money word and is a path, not a division.
-          RegExp(
-            '$money'
-            r'[A-Za-z0-9_]*\s+[+\-*/]\s+[A-Za-z0-9_(]',
-            caseSensitive: false,
-          ),
-          RegExp(
-            r'[A-Za-z0-9_)]\s+[+\-*/]\s+[A-Za-z0-9_.]*'
-            '$money',
-            caseSensitive: false,
-          ),
+          RegExp('$money' r'[A-Za-z0-9_]*\s+[+\-*/]\s+[A-Za-z0-9_(]', caseSensitive: false),
+          RegExp(r'[A-Za-z0-9_)]\s+[+\-*/]\s+[A-Za-z0-9_.]*' '$money', caseSensitive: false),
           // Two parses added together, whatever the operands are called: the
           // money name may sit one variable away.
           // `(?:tryParse|parse)`, not `(?:try)?parse`: these are
@@ -263,11 +253,7 @@ void main() {
           RegExp(r'(?:int|num)\.(?:tryParse|parse)\([^)]*\)[!\s]*[+\-*/]'),
           RegExp(r'[+\-*/][!\s]*(?:int|num)\.(?:tryParse|parse)\('),
           // Aggregation over a collection of them.
-          RegExp(
-            r'\.(?:fold|reduce)\s*[(<][^;]{0,120}'
-            '$money',
-            caseSensitive: false,
-          ),
+          RegExp(r'\.(?:fold|reduce)\s*[(<][^;]{0,120}' '$money', caseSensitive: false),
         ]) {
           for (final match in pattern.allMatches(source.body)) {
             offenders.add('${source.path}:${source.lineOf(match.start)}');
@@ -277,8 +263,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'the client does not compute money — a total, a net worth or a '
+        reason: 'the client does not compute money — a total, a net worth or a '
             'cross-currency sum is Phase 6 (ADR-0007):\n${offenders.join('\n')}',
       );
     });
@@ -289,7 +274,8 @@ void main() {
       // this rule exists for, and there is no number in the path to call it on.
       final offenders = <String>[];
       for (final source in _sources()) {
-        for (final match in RegExp(r'minorUnits\s*\.\s*toString\(\)').allMatches(source.body)) {
+        for (final match
+            in RegExp(r'minorUnits\s*\.\s*toString\(\)').allMatches(source.body)) {
           offenders.add('${source.path}:${source.lineOf(match.start)}');
         }
       }
@@ -326,7 +312,8 @@ void main() {
           }
           // `fingerprintVersion` is the ALGORITHM version the contract does
           // send; the fingerprint itself is absent from the projection.
-          if (name == 'fingerprint' && !RegExp(r'fingerprint(?!Version)').hasMatch(source.body)) {
+          if (name == 'fingerprint' &&
+              !RegExp(r'fingerprint(?!Version)').hasMatch(source.body)) {
             continue;
           }
           offenders.add('${source.path} references "$name"');
@@ -335,8 +322,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'the platform sends none of these and the client reconstructs '
+        reason: 'the platform sends none of these and the client reconstructs '
             'none of them:\n${offenders.join('\n')}',
       );
     });
@@ -358,8 +344,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'financial data is read from the platform on demand and is '
+        reason: 'financial data is read from the platform on demand and is '
             'never persisted on the device:\n${offenders.join('\n')}',
       );
     });
@@ -381,8 +366,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'a diagnostic sink is the easiest way for an amount, a mask or '
+        reason: 'a diagnostic sink is the easiest way for an amount, a mask or '
             'an account name to leave the device:\n${offenders.join('\n')}',
       );
     });
@@ -407,10 +391,13 @@ void main() {
       ];
       final offenders = <String>[];
       for (final source in _sources()) {
-        for (final match in RegExp(r"String toString\(\) =>\s*'([^']*)'").allMatches(source.body)) {
+        for (final match in RegExp(
+          r"String toString\(\) =>\s*'([^']*)'",
+        ).allMatches(source.body)) {
           final rendering = match.group(1)!;
           for (final value in holderValues) {
-            if (rendering.contains(r'$' + value) || rendering.contains(r'${' + value)) {
+            if (rendering.contains(r'$' + value) ||
+                rendering.contains(r'${' + value)) {
               offenders.add('${source.path}: $rendering');
             }
           }
@@ -419,23 +406,29 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'a toString is the easiest route from a value to a crash '
+        reason: 'a toString is the easiest route from a value to a crash '
             'dump:\n${offenders.join('\n')}',
       );
     });
 
     test('no display name, amount or mask travels in a route', () {
-      final routes = File('lib/features/financial_accounts/presentation/financial_routes.dart')
+      final routes = File(
+        'lib/features/financial_accounts/presentation/financial_routes.dart',
+      )
           .readAsLinesSync()
           .map((String line) => line.trimLeft().startsWith('//') ? '' : line)
           .join('\n');
-      for (final name in <String>['displayName', 'amount', 'mask', 'currency', 'issuer']) {
+      for (final name in <String>[
+        'displayName',
+        'amount',
+        'mask',
+        'currency',
+        'issuer',
+      ]) {
         expect(
           routes.contains(name),
           isFalse,
-          reason:
-              'a route is a deep link and a restoration bundle; "$name" '
+          reason: 'a route is a deep link and a restoration bundle; "$name" '
               'has no business in one',
         );
       }
@@ -460,8 +453,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'behaviour differences resolve through policy packs, never '
+        reason: 'behaviour differences resolve through policy packs, never '
             'through a country test in a feature:\n${offenders.join('\n')}',
       );
     });
@@ -484,15 +476,15 @@ void main() {
 
 final class _Source {
   _Source(this.path, File file)
-    : body = file
-          .readAsLinesSync()
-          .map((String line) => line.trimLeft().startsWith('//') ? '' : line)
-          .join('\n'),
-      imports = <String>[
-        for (final line in file.readAsLinesSync())
-          if (line.trim().startsWith('import ') || line.trim().startsWith('export '))
-            RegExp("['\"]([^'\"]+)['\"]").firstMatch(line)?.group(1) ?? '',
-      ];
+      : body = file
+            .readAsLinesSync()
+            .map((String line) => line.trimLeft().startsWith('//') ? '' : line)
+            .join('\n'),
+        imports = <String>[
+          for (final line in file.readAsLinesSync())
+            if (line.trim().startsWith('import ') || line.trim().startsWith('export '))
+              RegExp("['\"]([^'\"]+)['\"]").firstMatch(line)?.group(1) ?? '',
+        ];
 
   final String path;
 

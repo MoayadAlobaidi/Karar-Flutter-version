@@ -152,7 +152,9 @@ final class ContractDocument {
     }
     final operation = item[method.toLowerCase()];
     if (operation == null) {
-      throw StateError('The contract declares no ${method.toUpperCase()} on $template.');
+      throw StateError(
+        'The contract declares no ${method.toUpperCase()} on $template.',
+      );
     }
     return ContractNode(pathItem.document, operation);
   }
@@ -310,7 +312,11 @@ final class ContractDocument {
   /// form), `enum`, `required`, `additionalProperties: false`, `properties`,
   /// `items`, `oneOf`, `pattern`, `minLength`/`maxLength`, `minimum`/`maximum`
   /// and the `date`, `date-time` and `uuid` formats.
-  List<String> violations(ContractNode schemaNode, Object? value, {String at = 'body'}) {
+  List<String> violations(
+    ContractNode schemaNode,
+    Object? value, {
+    String at = 'body',
+  }) {
     final schema = resolve(schemaNode);
     final node = schema.value;
     if (node is! YamlMap) {
@@ -321,7 +327,11 @@ final class ContractDocument {
     if (oneOf is YamlList) {
       final branchFailures = <String>[];
       for (final branch in oneOf) {
-        final failures = violations(ContractNode(schema.document, branch), value, at: at);
+        final failures = violations(
+          ContractNode(schema.document, branch),
+          value,
+          at: at,
+        );
         if (failures.isEmpty) {
           return const <String>[];
         }
@@ -337,9 +347,9 @@ final class ContractDocument {
     final failures = <String>[];
 
     final declaredTypes = _typesOf(node['type']);
-    if (declaredTypes.isNotEmpty && !declaredTypes.any((String type) => _isOfType(type, value))) {
-      final complaint =
-          '$at: the contract declares '
+    if (declaredTypes.isNotEmpty &&
+        !declaredTypes.any((String type) => _isOfType(type, value))) {
+      final complaint = '$at: the contract declares '
           '${declaredTypes.join(' or ')} but the value is ${_describe(value)}';
       return <String>[complaint];
     }
@@ -398,7 +408,11 @@ final class ContractDocument {
       if (items != null) {
         for (var index = 0; index < value.length; index++) {
           failures.addAll(
-            violations(ContractNode(schema.document, items), value[index], at: '$at[$index]'),
+            violations(
+              ContractNode(schema.document, items),
+              value[index],
+              at: '$at[$index]',
+            ),
           );
         }
       }
@@ -451,18 +465,16 @@ final class ContractDocument {
   }
 
   bool _isOfType(String type, Object? value) => switch (type) {
-    'null' => value == null,
-    'string' => value is String,
-    'integer' => value is int,
-    'number' => value is num,
-    'boolean' => value is bool,
-    'object' => value is Map,
-    'array' => value is List,
-    _ => throw StateError(
-      'The contract declares a type this reader does '
-      'not implement: $type',
-    ),
-  };
+        'null' => value == null,
+        'string' => value is String,
+        'integer' => value is int,
+        'number' => value is num,
+        'boolean' => value is bool,
+        'object' => value is Map,
+        'array' => value is List,
+        _ => throw StateError('The contract declares a type this reader does '
+            'not implement: $type'),
+      };
 
   static final RegExp _calendarDay = RegExp(r'^\d{4}-\d{2}-\d{2}$');
 
@@ -479,35 +491,35 @@ final class ContractDocument {
   );
 
   String? _formatComplaint(String format, String value) => switch (format) {
-    'date' =>
-      _calendarDay.hasMatch(value) && DateTime.tryParse(value) != null
-          ? null
-          : 'is not a calendar day (format: date), it reads "$value"',
-    'date-time' =>
-      _instant.hasMatch(value) && DateTime.tryParse(value) != null
-          ? null
-          : 'is not an instant with an explicit offset (format: date-time), '
+        'date' => _calendarDay.hasMatch(value) && DateTime.tryParse(value) != null
+            ? null
+            : 'is not a calendar day (format: date), it reads "$value"',
+        'date-time' => _instant.hasMatch(value) && DateTime.tryParse(value) != null
+            ? null
+            : 'is not an instant with an explicit offset (format: date-time), '
                 'it reads "$value"',
-    'uuid' => _uuid.hasMatch(value) ? null : 'is not a uuid (format: uuid), it reads "$value"',
-    // Every other format the contract uses is decorative for this reader's
-    // purpose. Named rather than silently ignored.
-    'email' || 'uri' || 'password' || 'byte' || 'binary' => null,
-    _ => throw StateError(
-      'The contract declares a format this reader does not implement: '
-      '$format',
-    ),
-  };
+        'uuid' => _uuid.hasMatch(value)
+            ? null
+            : 'is not a uuid (format: uuid), it reads "$value"',
+        // Every other format the contract uses is decorative for this reader's
+        // purpose. Named rather than silently ignored.
+        'email' || 'uri' || 'password' || 'byte' || 'binary' => null,
+        _ => throw StateError(
+            'The contract declares a format this reader does not implement: '
+            '$format',
+          ),
+      };
 
   String _describe(Object? value) => switch (value) {
-    null => 'null',
-    String() => 'a string',
-    int() => 'an integer',
-    double() => 'a number',
-    bool() => 'a boolean',
-    Map() => 'an object',
-    List() => 'an array',
-    _ => value.runtimeType.toString(),
-  };
+        null => 'null',
+        String() => 'a string',
+        int() => 'an integer',
+        double() => 'a number',
+        bool() => 'a boolean',
+        Map() => 'an object',
+        List() => 'an array',
+        _ => value.runtimeType.toString(),
+      };
 
   String _render(Object? value) => value is String ? '"$value"' : '$value';
 }

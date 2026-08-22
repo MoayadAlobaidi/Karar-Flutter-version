@@ -26,20 +26,14 @@ import 'package:karar_mobile/shared/shared.dart';
 import '../authentication/support/identity_harness.dart';
 
 const List<String> _recoveryCodes = <String>[
-  'AAAA-1111',
-  'BBBB-2222',
-  'CCCC-3333',
-  'DDDD-4444',
-  'EEEE-5555',
-  'FFFF-6666',
-  'GGGG-7777',
-  'HHHH-8888',
-  'IIII-9999',
-  'JJJJ-0000',
+  'AAAA-1111', 'BBBB-2222', 'CCCC-3333', 'DDDD-4444', 'EEEE-5555',
+  'FFFF-6666', 'GGGG-7777', 'HHHH-8888', 'IIII-9999', 'JJJJ-0000',
 ];
 
 /// The English catalogue, for assertions that do not depend on the locale.
-final AppLocalizations _english = lookupAppLocalizations(KararLocalization.english);
+final AppLocalizations _english = lookupAppLocalizations(
+  KararLocalization.english,
+);
 
 void main() {
   group('challenge status', () {
@@ -69,9 +63,8 @@ void main() {
         'otpauthUrl': 'otpauth://totp/Karar:person?secret=JBSWY3DPEHPK3PXP',
       });
 
-      final Result<MfaEnrolment> outcome = await harness.container
-          .read(mfaRepositoryProvider)
-          .startEnrolment();
+      final Result<MfaEnrolment> outcome =
+          await harness.container.read(mfaRepositoryProvider).startEnrolment();
 
       final MfaEnrolment enrolment = outcome.valueOrNull!;
       expect(enrolment.sharedSecret, 'JBSWY3DPEHPK3PXP');
@@ -127,9 +120,8 @@ void main() {
         statusCode: 409,
       );
 
-      final Result<MfaEnrolment> outcome = await harness.container
-          .read(mfaRepositoryProvider)
-          .startEnrolment();
+      final Result<MfaEnrolment> outcome =
+          await harness.container.read(mfaRepositoryProvider).startEnrolment();
 
       expect(outcome.failureOrNull, isA<ConflictFailure>());
     });
@@ -138,16 +130,20 @@ void main() {
   group('challenge', () {
     Future<IdentityHarness> withOutstandingChallenge() async {
       final IdentityHarness harness = IdentityHarness();
-      harness.transport.onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
-      await harness.container
-          .read(authenticationRepositoryProvider)
-          .signIn(email: emailFixture(), password: passwordFixture());
+      harness.transport
+          .onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
+      await harness.container.read(authenticationRepositoryProvider).signIn(
+            email: emailFixture(),
+            password: passwordFixture(),
+          );
       return harness;
     }
 
-    test('exchanges the challenge for a session without exposing the token', () async {
+    test('exchanges the challenge for a session without exposing the token',
+        () async {
       final IdentityHarness harness = await withOutstandingChallenge();
-      harness.transport.onPost('/auth/mfa/challenge', sessionPayload(now: harness.clock.nowUtc()));
+      harness.transport
+          .onPost('/auth/mfa/challenge', sessionPayload(now: harness.clock.nowUtc()));
 
       final Result<SessionEstablished> outcome = await harness.container
           .read(mfaRepositoryProvider)
@@ -162,11 +158,14 @@ void main() {
 
     test('a recovery code completes the same challenge', () async {
       final IdentityHarness harness = await withOutstandingChallenge();
-      harness.transport.onPost('/auth/mfa/recovery', sessionPayload(now: harness.clock.nowUtc()));
+      harness.transport
+          .onPost('/auth/mfa/recovery', sessionPayload(now: harness.clock.nowUtc()));
 
       final Result<SessionEstablished> outcome = await harness.container
           .read(mfaRepositoryProvider)
-          .completeChallengeWithRecoveryCode(recoveryCode: const OpaqueSecret('AAAA-1111'));
+          .completeChallengeWithRecoveryCode(
+            recoveryCode: const OpaqueSecret('AAAA-1111'),
+          );
 
       expect(outcome, isA<Success<SessionEstablished>>());
       expect(harness.loggedText, isNot(contains('AAAA-1111')));
@@ -186,7 +185,10 @@ void main() {
 
     test('abandoning the flow discards the challenge token', () async {
       final IdentityHarness harness = await withOutstandingChallenge();
-      expect(harness.container.read(pendingMfaChallengeStoreProvider).token, isNotNull);
+      expect(
+        harness.container.read(pendingMfaChallengeStoreProvider).token,
+        isNotNull,
+      );
 
       harness.container.read(mfaRepositoryProvider).discardChallenge();
 
@@ -202,7 +204,8 @@ void main() {
     test('a valid code disables it', () async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
-      harness.transport.onPost('/auth/mfa/disable', <String, Object?>{'status': 'disabled'});
+      harness.transport
+          .onPost('/auth/mfa/disable', <String, Object?>{'status': 'disabled'});
 
       final Result<void> outcome = await harness.container
           .read(mfaRepositoryProvider)
@@ -230,11 +233,8 @@ void main() {
   });
 
   group('enrolment screen', () {
-    testEveryDirectionAndScale('walks key, code and recovery codes', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
+    testEveryDirectionAndScale('walks key, code and recovery codes',
+        (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
@@ -248,13 +248,8 @@ void main() {
         'recoveryCodes': _recoveryCodes,
       });
 
-      await pumpIdentity(
-        tester,
-        const MfaEnrolmentScreen(),
-        harness: harness,
-        locale: locale,
-        textScale: textScale,
-      );
+      await pumpIdentity(tester, const MfaEnrolmentScreen(),
+          harness: harness, locale: locale, textScale: textScale);
       expect(find.text(l10n.mfaEnrolIntro), findsOneWidget);
       expect(
         Directionality.of(tester.element(find.byType(MfaEnrolmentScreen))),
@@ -274,9 +269,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('the done action stays disabled until the codes are acknowledged', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the done action stays disabled until the codes are acknowledged',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
@@ -299,17 +293,28 @@ void main() {
 
       // These codes cannot be shown again; leaving without saving them loses
       // the way back into the account.
-      expect(tester.widget<KararButton>(identityButton(l10n.actionDone)).onPressed, isNull);
+      expect(
+        tester
+            .widget<KararButton>(identityButton(l10n.actionDone))
+            .onPressed,
+        isNull,
+      );
 
       await tester.ensureVisible(find.byType(KararCheckboxTile));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(KararCheckboxTile));
       await tester.pumpAndSettle();
 
-      expect(tester.widget<KararButton>(identityButton(l10n.actionDone)).onPressed, isNotNull);
+      expect(
+        tester
+            .widget<KararButton>(identityButton(l10n.actionDone))
+            .onPressed,
+        isNotNull,
+      );
     });
 
-    testWidgets('offers no clipboard action for the key or the codes', (WidgetTester tester) async {
+    testWidgets('offers no clipboard action for the key or the codes',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
@@ -330,7 +335,8 @@ void main() {
       expect(find.byType(SensitiveScreen), findsOneWidget);
     });
 
-    testWidgets('never shows the otpauth URL, which embeds the key', (WidgetTester tester) async {
+    testWidgets('never shows the otpauth URL, which embeds the key',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
@@ -350,25 +356,19 @@ void main() {
   });
 
   group('challenge screen', () {
-    testEveryDirectionAndScale('renders and switches to the recovery-code mode', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
+    testEveryDirectionAndScale('renders and switches to the recovery-code mode',
+        (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
-      harness.transport.onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
-      await harness.container
-          .read(authenticationRepositoryProvider)
-          .signIn(email: emailFixture(), password: passwordFixture());
+      harness.transport
+          .onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
+      await harness.container.read(authenticationRepositoryProvider).signIn(
+            email: emailFixture(),
+            password: passwordFixture(),
+          );
 
-      await pumpIdentity(
-        tester,
-        const MfaChallengeScreen(),
-        harness: harness,
-        locale: locale,
-        textScale: textScale,
-      );
+      await pumpIdentity(tester, const MfaChallengeScreen(),
+          harness: harness, locale: locale, textScale: textScale);
 
       expect(find.text(l10n.mfaChallengeSubtitle), findsOneWidget);
       expect(
@@ -383,35 +383,30 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testEveryDirectionAndScale('an expired challenge offers only a fresh sign-in', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
+    testEveryDirectionAndScale('an expired challenge offers only a fresh sign-in',
+        (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
       // No challenge was ever issued, which is what a relaunch mid-challenge
       // looks like: the token lived in memory and did not survive.
 
-      await pumpIdentity(
-        tester,
-        const MfaChallengeScreen(),
-        harness: harness,
-        locale: locale,
-        textScale: textScale,
-      );
+      await pumpIdentity(tester, const MfaChallengeScreen(),
+          harness: harness, locale: locale, textScale: textScale);
 
       expect(find.text(l10n.mfaChallengeExpired), findsOneWidget);
       expect(identityButton(l10n.mfaChallengeAbandon), findsOneWidget);
     });
 
-    testWidgets('a rejected code shows one generic message', (WidgetTester tester) async {
+    testWidgets('a rejected code shows one generic message',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       final AppLocalizations l10n = lookupAppLocalizations(KararLocalization.english);
-      harness.transport.onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
-      await harness.container
-          .read(authenticationRepositoryProvider)
-          .signIn(email: emailFixture(), password: passwordFixture());
+      harness.transport
+          .onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
+      await harness.container.read(authenticationRepositoryProvider).signIn(
+            email: emailFixture(),
+            password: passwordFixture(),
+          );
       harness.transport.failWith(
         HttpMethod.post,
         '/auth/mfa/challenge',
@@ -429,13 +424,16 @@ void main() {
       expect(find.text(l10n.mfaInvalidCode), findsOneWidget);
     });
 
-    testWidgets('every interactive control carries a name', (WidgetTester tester) async {
+    testWidgets('every interactive control carries a name',
+        (WidgetTester tester) async {
       final IdentityHarness harness = IdentityHarness();
       final SemanticsHandle handle = tester.ensureSemantics();
-      harness.transport.onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
-      await harness.container
-          .read(authenticationRepositoryProvider)
-          .signIn(email: emailFixture(), password: passwordFixture());
+      harness.transport
+          .onPost('/auth/login', mfaChallengePayload(now: harness.clock.nowUtc()));
+      await harness.container.read(authenticationRepositoryProvider).signIn(
+            email: emailFixture(),
+            password: passwordFixture(),
+          );
 
       await pumpIdentity(tester, const MfaChallengeScreen(), harness: harness);
 
@@ -446,22 +444,14 @@ void main() {
   });
 
   group('disable screen', () {
-    testEveryDirectionAndScale('warns before asking for the code', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
+    testEveryDirectionAndScale('warns before asking for the code',
+        (WidgetTester tester, Locale locale, double textScale) async {
       final IdentityHarness harness = IdentityHarness();
       await harness.signInFixture();
       final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-      await pumpIdentity(
-        tester,
-        const MfaDisableScreen(),
-        harness: harness,
-        locale: locale,
-        textScale: textScale,
-      );
+      await pumpIdentity(tester, const MfaDisableScreen(),
+          harness: harness, locale: locale, textScale: textScale);
 
       expect(find.text(l10n.mfaDisableWarning), findsOneWidget);
       expect(

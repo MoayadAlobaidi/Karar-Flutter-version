@@ -33,7 +33,12 @@ Map<String, Object?> amountBody({
   String minorUnits = '-81000',
   String currency = 'QAR',
   int exponent = 2,
-}) => <String, Object?>{'minorUnits': minorUnits, 'currency': currency, 'exponent': exponent};
+}) =>
+    <String, Object?>{
+      'minorUnits': minorUnits,
+      'currency': currency,
+      'exponent': exponent,
+    };
 
 /// One transaction, exactly as the contract declares it: every field present,
 /// the nullable ones carrying null rather than being left out.
@@ -45,88 +50,96 @@ Map<String, Object?> transactionBody({
   String? valueDate,
   Object? originalAmount,
   Map<String, Object?>? amount,
-}) => <String, Object?>{
-  'transactionId': 'transaction-0001',
-  'accountId': 'account-0001',
-  'amount': amount ?? amountBody(),
-  'direction': direction,
-  'bookingDate': '2026-03-01',
-  'valueDate': valueDate,
-  'eventOccurredAt': null,
-  'sourceTimezone': null,
-  'merchant': null,
-  'description': 'A synthetic movement',
-  'note': null,
-  'originalAmount': originalAmount,
-  'sourceKind': sourceKind,
-  'availability': availability,
-  'status': status,
-  'createdAt': '2026-03-01T09:00:00.000Z',
-  'version': 1,
-};
+}) =>
+    <String, Object?>{
+      'transactionId': 'transaction-0001',
+      'accountId': 'account-0001',
+      'amount': amount ?? amountBody(),
+      'direction': direction,
+      'bookingDate': '2026-03-01',
+      'valueDate': valueDate,
+      'eventOccurredAt': null,
+      'sourceTimezone': null,
+      'merchant': null,
+      'description': 'A synthetic movement',
+      'note': null,
+      'originalAmount': originalAmount,
+      'sourceKind': sourceKind,
+      'availability': availability,
+      'status': status,
+      'createdAt': '2026-03-01T09:00:00.000Z',
+      'version': 1,
+    };
 
 Map<String, Object?> revisionValuesBody() => <String, Object?>{
-  'amount': amountBody(),
-  'direction': 'MONEY_OUT',
-  'bookingDate': '2026-03-01',
-  'valueDate': '2026-03-02',
-  'eventOccurredAt': null,
-  'sourceTimezone': null,
-  'merchant': null,
-  'description': 'A synthetic movement',
-  'note': null,
-  'status': 'POSTED',
-};
+      'amount': amountBody(),
+      'direction': 'MONEY_OUT',
+      'bookingDate': '2026-03-01',
+      'valueDate': '2026-03-02',
+      'eventOccurredAt': null,
+      'sourceTimezone': null,
+      'merchant': null,
+      'description': 'A synthetic movement',
+      'note': null,
+      'status': 'POSTED',
+    };
 
 Map<String, Object?> categoryAssignmentBody({
   String assignmentSource = 'USER',
   String? ruleVersion,
-}) => <String, Object?>{
-  'assignmentId': 'assignment-0001',
-  'categoryCode': 'HOUSEHOLD.UTILITIES',
-  'assignmentSource': assignmentSource,
-  'ruleVersion': ruleVersion,
-  'status': 'ACTIVE',
-  'assignedAt': '2026-03-02T09:00:00.000Z',
-};
+}) =>
+    <String, Object?>{
+      'assignmentId': 'assignment-0001',
+      'categoryCode': 'HOUSEHOLD.UTILITIES',
+      'assignmentSource': assignmentSource,
+      'ruleVersion': ruleVersion,
+      'status': 'ACTIVE',
+      'assignedAt': '2026-03-02T09:00:00.000Z',
+    };
 
 Map<String, Object?> provenanceBody({
   String sourceDirection = 'DEBIT',
   String directionMapping = 'MANUAL_ENTRY',
   String categoryAssignmentSource = 'NONE',
-}) => <String, Object?>{
-  'revisionNumber': 1,
-  'sourceKind': 'MANUAL',
-  'availability': 'EXECUTABLE',
-  'accountId': 'account-0001',
-  'importedFromStatement': false,
-  'versions': <String, Object?>{
-    'parserVersion': 'p-1',
-    'mappingVersion': 'm-1',
-    'normalizationVersion': 'n-1',
-    'fingerprintVersion': 'f-1',
-  },
-  'sourceDirection': sourceDirection,
-  'directionMapping': directionMapping,
-  'categoryAssignmentSource': categoryAssignmentSource,
-  'createdAt': '2026-03-01T09:00:00.000Z',
-};
+}) =>
+    <String, Object?>{
+      'revisionNumber': 1,
+      'sourceKind': 'MANUAL',
+      'availability': 'EXECUTABLE',
+      'accountId': 'account-0001',
+      'importedFromStatement': false,
+      'versions': <String, Object?>{
+        'parserVersion': 'p-1',
+        'mappingVersion': 'm-1',
+        'normalizationVersion': 'n-1',
+        'fingerprintVersion': 'f-1',
+      },
+      'sourceDirection': sourceDirection,
+      'directionMapping': directionMapping,
+      'categoryAssignmentSource': categoryAssignmentSource,
+      'createdAt': '2026-03-01T09:00:00.000Z',
+    };
 
 Map<String, Object?> pageBody(List<Object?> items) => <String, Object?>{
-  'items': items,
-  'page': <String, Object?>{
-    'limit': 50,
-    'returned': items.length,
-    'hasMore': false,
-    'nextCursor': null,
-  },
-};
+      'items': items,
+      'page': <String, Object?>{
+        'limit': 50,
+        'returned': items.length,
+        'hasMore': false,
+        'nextCursor': null,
+      },
+    };
 
-({ApiTransactionsRepository repository, FakeApiTransport transport}) repositoryFor(Object? body) {
+({ApiTransactionsRepository repository, FakeApiTransport transport}) repositoryFor(
+  Object? body,
+) {
   final transport = FakeApiTransport(
     (ApiRequest request) async => ApiResponse(statusCode: 200, body: body),
   );
-  return (repository: ApiTransactionsRepository(KararApiClient(transport)), transport: transport);
+  return (
+    repository: ApiTransactionsRepository(KararApiClient(transport)),
+    transport: transport,
+  );
 }
 
 Future<Transaction> transactionFrom(Map<String, Object?> body) async {
@@ -136,7 +149,8 @@ Future<Transaction> transactionFrom(Map<String, Object?> body) async {
 
 void main() {
   group('a transaction is mapped out of the generated DTO', () {
-    test('every direction and status maps, and an unknown one is unrecognised', () async {
+    test('every direction and status maps, and an unknown one is unrecognised',
+        () async {
       expect(
         (await transactionFrom(transactionBody(direction: 'MONEY_IN'))).direction,
         MoneyDirection.moneyIn,
@@ -146,7 +160,8 @@ void main() {
         MoneyDirection.moneyOut,
       );
       expect(
-        (await transactionFrom(transactionBody(direction: 'SOMETHING_NEWER'))).direction,
+        (await transactionFrom(transactionBody(direction: 'SOMETHING_NEWER')))
+            .direction,
         MoneyDirection.unrecognised,
       );
       expect(
@@ -162,7 +177,8 @@ void main() {
         SourceKind.csv,
       );
       expect(
-        (await transactionFrom(transactionBody(availability: 'NOT_IMPLEMENTED'))).availability,
+        (await transactionFrom(transactionBody(availability: 'NOT_IMPLEMENTED')))
+            .availability,
         RailAvailability.notImplemented,
       );
     });
@@ -199,7 +215,8 @@ void main() {
       expect(held.amount.isNegative, isTrue);
     });
 
-    test('an original amount is carried only when the platform sent one', () async {
+    test('an original amount is carried only when the platform sent one',
+        () async {
       expect((await transactionFrom(transactionBody())).originalAmount, isNull);
       final held = await transactionFrom(
         transactionBody(
@@ -210,7 +227,8 @@ void main() {
       expect(held.originalAmount!.currency, 'USD');
     });
 
-    test('a minor-unit value the contract forbids is a stated violation', () async {
+    test('a minor-unit value the contract forbids is a stated violation',
+        () async {
       final result = await repositoryFor(
         pageBody(<Object?>[
           // A float, which the contract never sends and a ledger cannot use.
@@ -223,7 +241,8 @@ void main() {
     test('a malformed day is a stated violation naming the field', () async {
       final malformed = Map<String, Object?>.of(transactionBody())
         ..['bookingDate'] = '2026-03-01T00:00:00Z';
-      final result = await repositoryFor(pageBody(<Object?>[malformed])).repository.listOwn();
+      final result =
+          await repositoryFor(pageBody(<Object?>[malformed])).repository.listOwn();
       expect(result.failureOrNull, isA<ContractViolationFailure>());
       expect(
         (result.failureOrNull! as ContractViolationFailure).location,
@@ -231,9 +250,11 @@ void main() {
       );
     });
 
-    test('a missing required field is a stated violation naming the field', () async {
+    test('a missing required field is a stated violation naming the field',
+        () async {
       final missing = Map<String, Object?>.of(transactionBody())..remove('amount');
-      final result = await repositoryFor(pageBody(<Object?>[missing])).repository.listOwn();
+      final result =
+          await repositoryFor(pageBody(<Object?>[missing])).repository.listOwn();
       expect(
         (result.failureOrNull! as ContractViolationFailure).location,
         'TransactionView.amount',
@@ -292,8 +313,10 @@ void main() {
       expect((result as Success<TransactionDetail>).value.activeCategory, isNull);
     });
 
-    test('provenance carries the algorithm versions and never a fingerprint', () async {
-      final result = await repositoryFor(pageBody(<Object?>[provenanceBody()])).repository
+    test('provenance carries the algorithm versions and never a fingerprint',
+        () async {
+      final result = await repositoryFor(pageBody(<Object?>[provenanceBody()]))
+          .repository
           .listProvenance('transaction-0001');
 
       final row = (result as Success<List<TransactionProvenance>>).value.single;
@@ -345,7 +368,10 @@ void main() {
     });
 
     test('a partial delete is NOT applied, and says why', () async {
-      final held = await outcomeFor('PARTIALLY_APPLIED', code: 'DELETION_PARTIALLY_APPLIED');
+      final held = await outcomeFor(
+        'PARTIALLY_APPLIED',
+        code: 'DELETION_PARTIALLY_APPLIED',
+      );
       expect(held.applied, isFalse);
       expect(held.code, 'DELETION_PARTIALLY_APPLIED');
     });
@@ -357,12 +383,14 @@ void main() {
       expect(held.applied, isFalse);
       // A refusal code this build has no name for renders as none rather than
       // as an invented one.
-      expect((await outcomeFor('PARTIALLY_APPLIED', code: 'SOMETHING_NEWER')).code, isNull);
+      expect((await outcomeFor('PARTIALLY_APPLIED', code: 'SOMETHING_NEWER')).code,
+          isNull);
     });
   });
 
   group('what the client sends', () {
-    test('a manual entry sends a magnitude and a direction, never a sign', () async {
+    test('a manual entry sends a magnitude and a direction, never a sign',
+        () async {
       final held = repositoryFor(transactionBody());
       await held.repository.createManual(
         ManualTransactionDraft(
@@ -440,7 +468,8 @@ void main() {
       expect(body['direction'], 'MONEY_IN');
     });
 
-    test('a filter travels as contract vocabulary, not as Dart enum names', () async {
+    test('a filter travels as contract vocabulary, not as Dart enum names',
+        () async {
       final held = repositoryFor(pageBody(<Object?>[]));
       await held.repository.listOwn(
         filter: TransactionFilter(
@@ -466,17 +495,21 @@ void main() {
 
     test('a category assignment names the code and nothing else', () async {
       final held = repositoryFor(categoryAssignmentBody());
-      await held.repository.assignCategory('transaction-0001', 'HOUSEHOLD.UTILITIES');
+      await held.repository
+          .assignCategory('transaction-0001', 'HOUSEHOLD.UTILITIES');
 
       final request = held.transport.requests.single;
       expect(request.path, '/financial/transactions/transaction-0001/category');
       expect(request.method.wireName, 'PUT');
-      expect((request.body! as Map<String, Object?>).keys.toSet(), <String>{
-        'categoryCode',
-      }, reason: 'there is no confidence and no suggestion on this route');
+      expect(
+        (request.body! as Map<String, Object?>).keys.toSet(),
+        <String>{'categoryCode'},
+        reason: 'there is no confidence and no suggestion on this route',
+      );
     });
 
-    test('a vocabulary member this build cannot write never leaves the device', () async {
+    test('a vocabulary member this build cannot write never leaves the device',
+        () async {
       // `unrecognised` names a value the PLATFORM sent that this build does not
       // know. Echoing it back would assert a meaning the client does not have,
       // so the request is refused before it is issued.
@@ -485,7 +518,10 @@ void main() {
         filter: const TransactionFilter(direction: MoneyDirection.unrecognised),
       );
       expect(result.failureOrNull, isA<InvalidRequestFailure>());
-      expect((result.failureOrNull! as InvalidRequestFailure).fields, contains('direction'));
+      expect(
+        (result.failureOrNull! as InvalidRequestFailure).fields,
+        contains('direction'),
+      );
       expect(held.transport.requests, isEmpty);
     });
   });

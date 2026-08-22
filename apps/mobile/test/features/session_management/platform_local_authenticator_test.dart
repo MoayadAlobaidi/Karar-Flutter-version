@@ -26,7 +26,11 @@ import 'package:local_auth/local_auth.dart';
 /// A plugin that answers as instructed, so the mapping can be exercised on a
 /// machine with no authenticator attached.
 final class _FakePlugin implements PlatformAuthenticatorPlugin {
-  _FakePlugin({this.deviceSupported = true, this.authenticated = true, this.failure});
+  _FakePlugin({
+    this.deviceSupported = true,
+    this.authenticated = true,
+    this.failure,
+  });
 
   bool deviceSupported;
   bool authenticated;
@@ -84,40 +88,63 @@ void main() {
     test('a device that can authenticate its owner is available', () async {
       final _FakePlugin plugin = _FakePlugin();
 
-      expect(await _adapter(plugin).availability(), LocalAuthAvailability.available);
+      expect(
+        await _adapter(plugin).availability(),
+        LocalAuthAvailability.available,
+      );
     });
 
-    test('a device with nothing enrolled and no screen lock is notEnrolled', () async {
+    test('a device with nothing enrolled and no screen lock is notEnrolled',
+        () async {
       // The platform answered, and the answer was no. That is actionable in
       // the platform settings, which is the distinction `notEnrolled` exists
       // to carry: the screen says what to do rather than only that it cannot.
       final _FakePlugin plugin = _FakePlugin(deviceSupported: false);
 
-      expect(await _adapter(plugin).availability(), LocalAuthAvailability.notEnrolled);
+      expect(
+        await _adapter(plugin).availability(),
+        LocalAuthAvailability.notEnrolled,
+      );
     });
 
-    test('a platform with no implementation registered is unsupported', () async {
-      final _FakePlugin plugin = _FakePlugin(failure: MissingPluginException('no implementation'));
+    test('a platform with no implementation registered is unsupported',
+        () async {
+      final _FakePlugin plugin = _FakePlugin(
+        failure: MissingPluginException('no implementation'),
+      );
 
-      expect(await _adapter(plugin).availability(), LocalAuthAvailability.unsupported);
+      expect(
+        await _adapter(plugin).availability(),
+        LocalAuthAvailability.unsupported,
+      );
     });
 
-    test('a platform that refuses to answer is unavailable, not available', () async {
+    test('a platform that refuses to answer is unavailable, not available',
+        () async {
       // FAIL CLOSED: a check that did not complete is reported distinctly and
       // behaves as unsupported, so the switch is never offered on a guess.
       final _FakePlugin plugin = _FakePlugin(
-        failure: const LocalAuthException(code: LocalAuthExceptionCode.uiUnavailable),
+        failure: const LocalAuthException(
+          code: LocalAuthExceptionCode.uiUnavailable,
+        ),
       );
 
-      expect(await _adapter(plugin).availability(), LocalAuthAvailability.unavailable);
+      expect(
+        await _adapter(plugin).availability(),
+        LocalAuthAvailability.unavailable,
+      );
     });
 
-    test('an Error raised by the platform does not escape the adapter', () async {
+    test('an Error raised by the platform does not escape the adapter',
+        () async {
       final _FakePlugin plugin = _FakePlugin(
         failure: StateError('the platform channel is in a bad state'),
       );
 
-      expect(await _adapter(plugin).availability(), LocalAuthAvailability.unavailable);
+      expect(
+        await _adapter(plugin).availability(),
+        LocalAuthAvailability.unavailable,
+      );
     });
   });
 
@@ -132,7 +159,8 @@ void main() {
       expect(plugin.promptCount, 1);
     });
 
-    test('a credential the device judged and rejected is not recognised', () async {
+    test('a credential the device judged and rejected is not recognised',
+        () async {
       final _FakePlugin plugin = _FakePlugin(authenticated: false);
 
       expect(
@@ -145,7 +173,8 @@ void main() {
       );
     });
 
-    test('a dismissed or abandoned prompt is cancelled, never a failure', () async {
+    test('a dismissed or abandoned prompt is cancelled, never a failure',
+        () async {
       // Cancellation is not counted against the user, and a prompt taken down
       // before any credential was judged must not be reported as one that was
       // judged and rejected.
@@ -163,7 +192,8 @@ void main() {
       }
     });
 
-    test('both lockouts tell the user to sign in with their password', () async {
+    test('both lockouts tell the user to sign in with their password',
+        () async {
       // A temporary lockout and one that holds until some other authentication
       // succeeds carry the same instruction, and the screen states it.
       for (final LocalAuthExceptionCode code in <LocalAuthExceptionCode>[
@@ -182,7 +212,8 @@ void main() {
       }
     });
 
-    test('a device with nothing that can satisfy the prompt is unavailable', () async {
+    test('a device with nothing that can satisfy the prompt is unavailable',
+        () async {
       for (final LocalAuthExceptionCode code in <LocalAuthExceptionCode>[
         LocalAuthExceptionCode.noBiometricHardware,
         LocalAuthExceptionCode.noBiometricsEnrolled,
@@ -225,7 +256,8 @@ void main() {
     test('NO plugin failure code is ever reported as an unlock', () async {
       // The property that matters, asserted over every code the installed
       // plugin declares rather than over the ones this file happens to name.
-      for (final LocalAuthExceptionCode code in LocalAuthExceptionCode.values) {
+      for (final LocalAuthExceptionCode code
+          in LocalAuthExceptionCode.values) {
         expect(
           await _outcomeForCode(code),
           isNot(isA<LocalAuthSucceeded>()),
@@ -234,8 +266,11 @@ void main() {
       }
     });
 
-    test('a missing plugin implementation is an outcome, not a crash', () async {
-      final _FakePlugin plugin = _FakePlugin(failure: MissingPluginException('no implementation'));
+    test('a missing plugin implementation is an outcome, not a crash',
+        () async {
+      final _FakePlugin plugin = _FakePlugin(
+        failure: MissingPluginException('no implementation'),
+      );
 
       expect(
         await _adapter(plugin).authenticate(reason: 'Unlock Karar'),
@@ -247,7 +282,8 @@ void main() {
       );
     });
 
-    test('an Error raised by the platform does not escape the adapter', () async {
+    test('an Error raised by the platform does not escape the adapter',
+        () async {
       // The caller is a lock screen. An exception thrown out of here would
       // leave the user looking at a locked application with no outcome to
       // render and no way forward.
@@ -255,10 +291,14 @@ void main() {
         failure: StateError('the platform channel is in a bad state'),
       );
 
-      expect(await _adapter(plugin).authenticate(reason: 'Unlock Karar'), isA<LocalAuthFailed>());
+      expect(
+        await _adapter(plugin).authenticate(reason: 'Unlock Karar'),
+        isA<LocalAuthFailed>(),
+      );
     });
 
-    test('the outcome carries the verdict and nothing the plugin said', () async {
+    test('the outcome carries the verdict and nothing the plugin said',
+        () async {
       // Anything the platform volunteers about the sensor or the device is
       // dropped at this boundary: the port's outcomes are non-sensitive by
       // construction and the lock screen renders its own localized copy.
@@ -270,14 +310,16 @@ void main() {
         ),
       );
 
-      final LocalAuthOutcome outcome = await _adapter(plugin).authenticate(reason: 'Unlock Karar');
+      final LocalAuthOutcome outcome =
+          await _adapter(plugin).authenticate(reason: 'Unlock Karar');
 
       expect(outcome.toString(), isNot(contains('DEADBEEF')));
       expect(outcome.toString(), isNot(contains('template')));
       expect(outcome.toString(), isNot(contains('enrolment-id-99')));
     });
 
-    test('the prompt carries the localized reason it was given, unchanged', () async {
+    test('the prompt carries the localized reason it was given, unchanged',
+        () async {
       // The reason is the ONLY string the port accepts, and it carries no
       // account information. The adapter must not decorate it.
       final _FakePlugin plugin = _FakePlugin();
@@ -304,7 +346,8 @@ void main() {
   });
 
   group('the authenticator chosen for this platform', () {
-    test('is the plugin-backed one only where a prompt can actually appear', () {
+    test('is the plugin-backed one only where a prompt can actually appear',
+        () {
       // On the machine the suite runs on there is no authenticator, so the
       // factory must yield the honest fallback rather than an adapter whose
       // every call would fail.
@@ -317,10 +360,14 @@ void main() {
     });
 
     test('the fallback still reports unsupported and never succeeds', () async {
-      const UnsupportedLocalAuthenticator fallback = UnsupportedLocalAuthenticator();
+      const UnsupportedLocalAuthenticator fallback =
+          UnsupportedLocalAuthenticator();
 
       expect(await fallback.availability(), LocalAuthAvailability.unsupported);
-      expect(await fallback.authenticate(reason: 'Unlock Karar'), isNot(isA<LocalAuthSucceeded>()));
+      expect(
+        await fallback.authenticate(reason: 'Unlock Karar'),
+        isNot(isA<LocalAuthSucceeded>()),
+      );
     });
   });
 }

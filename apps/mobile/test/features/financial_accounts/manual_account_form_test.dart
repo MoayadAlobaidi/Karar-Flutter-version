@@ -31,8 +31,7 @@ Future<ScriptedAccountsRepository> pumpForm(
   Locale locale = const Locale('en'),
   double textScale = 1.0,
 }) async {
-  final held =
-      repository ??
+  final held = repository ??
       ScriptedAccountsRepository(
         accounts: <FinancialAccount>[
           account(accountId: 'account-0001', displayName: 'Everyday account'),
@@ -52,28 +51,29 @@ Future<ScriptedAccountsRepository> pumpForm(
 
 void main() {
   group('the create form', () {
-    testInBothDirections('offers exactly the six account types the contract names', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpForm(tester, locale: locale, textScale: scale);
-      final l10n = mountedL10n(tester);
-      for (final label in <String>[
-        l10n.accountTypeCurrent,
-        l10n.accountTypeSavings,
-        l10n.accountTypeCreditCard,
-        l10n.accountTypeCash,
-        l10n.accountTypeWallet,
-        l10n.accountTypeOther,
-      ]) {
-        expect(find.text(label), findsOneWidget, reason: '$label is not offered');
-      }
-      // The unrecognised member is a rendering state, never an option.
-      expect(find.text(l10n.accountTypeUnrecognised), findsNothing);
-    }, textScales: featureTextScales);
+    testInBothDirections(
+      'offers exactly the six account types the contract names',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpForm(tester, locale: locale, textScale: scale);
+        final l10n = mountedL10n(tester);
+        for (final label in <String>[
+          l10n.accountTypeCurrent,
+          l10n.accountTypeSavings,
+          l10n.accountTypeCreditCard,
+          l10n.accountTypeCash,
+          l10n.accountTypeWallet,
+          l10n.accountTypeOther,
+        ]) {
+          expect(find.text(label), findsOneWidget, reason: '$label is not offered');
+        }
+        // The unrecognised member is a rendering state, never an option.
+        expect(find.text(l10n.accountTypeUnrecognised), findsNothing);
+      },
+      textScales: featureTextScales,
+    );
 
-    testWidgets('the wallet kind appears only once WALLET is chosen', (WidgetTester tester) async {
+    testWidgets('the wallet kind appears only once WALLET is chosen',
+        (WidgetTester tester) async {
       await pumpForm(tester);
       final l10n = mountedL10n(tester);
 
@@ -91,7 +91,10 @@ void main() {
       final repository = await pumpForm(tester);
       final l10n = mountedL10n(tester);
 
-      await tester.enterText(find.byType(TextField).first, 'Wallet a person typed');
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Wallet a person typed',
+      );
       await tester.tap(find.text(l10n.accountTypeWallet));
       await tester.pumpAndSettle();
       await tester.tap(find.text(l10n.walletKindPayroll));
@@ -107,7 +110,8 @@ void main() {
       expect(draft.violations, isEmpty);
     });
 
-    testWidgets('a non-wallet is created with no wallet kind at all', (WidgetTester tester) async {
+    testWidgets('a non-wallet is created with no wallet kind at all',
+        (WidgetTester tester) async {
       final repository = await pumpForm(tester);
       final l10n = mountedL10n(tester);
 
@@ -123,9 +127,8 @@ void main() {
       expect(draft.currencyCode, 'USD');
     });
 
-    testWidgets('an issuer is a catalogue entry or a typed label, never both', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('an issuer is a catalogue entry or a typed label, never both',
+        (WidgetTester tester) async {
       final repository = await pumpForm(tester);
       final l10n = mountedL10n(tester);
 
@@ -149,9 +152,8 @@ void main() {
       expect(draft.unlistedIssuerLabel, isNull);
     });
 
-    testWidgets('an unlisted issuer is sent as the label and no catalogue id', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('an unlisted issuer is sent as the label and no catalogue id',
+        (WidgetTester tester) async {
       final repository = await pumpForm(tester);
       final l10n = mountedL10n(tester);
 
@@ -168,30 +170,32 @@ void main() {
       expect(draft.issuerId, isNull);
     });
 
-    testInBothDirections('a refused draft is summarised field by field', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpForm(tester, locale: locale, textScale: scale);
-      final l10n = mountedL10n(tester);
+    testInBothDirections(
+      'a refused draft is summarised field by field',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpForm(tester, locale: locale, textScale: scale);
+        final l10n = mountedL10n(tester);
 
-      // Nothing typed: the name and the currency are both missing.
-      await tester.tap(find.text(l10n.actionSave));
-      await tester.pumpAndSettle();
+        // Nothing typed: the name and the currency are both missing.
+        await tester.tap(find.text(l10n.actionSave));
+        await tester.pumpAndSettle();
 
-      expect(find.text(l10n.accountFormValidationSummaryTitle), findsOneWidget);
-      expect(find.textContaining(l10n.accountFormErrorDisplayName), findsOneWidget);
-    }, textScales: featureTextScales);
+        expect(find.text(l10n.accountFormValidationSummaryTitle), findsOneWidget);
+        expect(
+          find.textContaining(l10n.accountFormErrorDisplayName),
+          findsOneWidget,
+        );
+      },
+      textScales: featureTextScales,
+    );
 
     testWidgets('the mask helper forbids a full number', (WidgetTester tester) async {
       await pumpForm(tester);
       expect(find.text(mountedL10n(tester).accountFormMaskHelper), findsOneWidget);
     });
 
-    testWidgets('there is no origin, status or connect control on a create', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('there is no origin, status or connect control on a create',
+        (WidgetTester tester) async {
       await pumpForm(tester);
       final l10n = mountedL10n(tester);
       expect(find.text(l10n.dataOriginManuallyAdded), findsNothing);
@@ -206,7 +210,8 @@ void main() {
   });
 
   group('the edit form', () {
-    testWidgets('seeds from the stored account and sends its version', (WidgetTester tester) async {
+    testWidgets('seeds from the stored account and sends its version',
+        (WidgetTester tester) async {
       final repository = await pumpForm(tester, accountId: 'account-0001');
       final l10n = mountedL10n(tester);
 
@@ -221,48 +226,53 @@ void main() {
       expect(edit.displayName, 'Renamed account');
     });
 
-    testWidgets('the currency field is disabled and says why', (WidgetTester tester) async {
+    testWidgets('the currency field is disabled and says why',
+        (WidgetTester tester) async {
       await pumpForm(tester, accountId: 'account-0001');
-      expect(find.text(mountedL10n(tester).accountFormCurrencyImmutable), findsOneWidget);
+      expect(
+        find.text(mountedL10n(tester).accountFormCurrencyImmutable),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('a lifecycle change is offered on an edit and not on a create', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('a lifecycle change is offered on an edit and not on a create',
+        (WidgetTester tester) async {
       await pumpForm(tester, accountId: 'account-0001');
-      expect(find.text(mountedL10n(tester).accountLifecycleArchived), findsOneWidget);
+      expect(
+        find.text(mountedL10n(tester).accountLifecycleArchived),
+        findsOneWidget,
+      );
     });
 
-    testInBothDirections('a version conflict is explained rather than retried silently', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      final repository = ScriptedAccountsRepository(
-        accounts: <FinancialAccount>[account(accountId: 'account-0001')],
-        updateResult: const Failed<FinancialAccount>(
-          ConflictFailure(code: 'ACCOUNT_VERSION_CONFLICT'),
-        ),
-      );
-      await pumpForm(
-        tester,
-        accountId: 'account-0001',
-        repository: repository,
-        locale: locale,
-        textScale: scale,
-      );
-      final l10n = mountedL10n(tester);
+    testInBothDirections(
+      'a version conflict is explained rather than retried silently',
+      (WidgetTester tester, Locale locale, double scale) async {
+        final repository = ScriptedAccountsRepository(
+          accounts: <FinancialAccount>[account(accountId: 'account-0001')],
+          updateResult: const Failed<FinancialAccount>(
+            ConflictFailure(code: 'ACCOUNT_VERSION_CONFLICT'),
+          ),
+        );
+        await pumpForm(
+          tester,
+          accountId: 'account-0001',
+          repository: repository,
+          locale: locale,
+          textScale: scale,
+        );
+        final l10n = mountedL10n(tester);
 
-      await tester.enterText(find.byType(TextField).first, 'Renamed');
-      await tester.tap(find.text(l10n.actionSave));
-      await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField).first, 'Renamed');
+        await tester.tap(find.text(l10n.actionSave));
+        await tester.pumpAndSettle();
 
-      expect(find.text(l10n.accountFormVersionConflict), findsOneWidget);
-    }, textScales: featureTextScales);
+        expect(find.text(l10n.accountFormVersionConflict), findsOneWidget);
+      },
+      textScales: featureTextScales,
+    );
 
-    testWidgets('a saved edit is confirmed only after the platform stored it', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('a saved edit is confirmed only after the platform stored it',
+        (WidgetTester tester) async {
       await pumpForm(tester, accountId: 'account-0001');
       final l10n = mountedL10n(tester);
 
@@ -275,21 +285,21 @@ void main() {
   });
 
   group('when the issuer catalogue cannot be read', () {
-    testInBothDirections('the form still works and says the person may name one themselves', (
-      WidgetTester tester,
-      Locale locale,
-      double scale,
-    ) async {
-      await pumpForm(
-        tester,
-        repository: ScriptedAccountsRepository(),
-        locale: locale,
-        textScale: scale,
-      );
-      final l10n = mountedL10n(tester);
-      expect(find.text(l10n.accountFormIssuersUnavailable), findsOneWidget);
-      expect(find.text(l10n.accountFormIssuerUnlistedOption), findsOneWidget);
-      expect(find.text(l10n.accountFormIssuerCatalogueOption), findsNothing);
-    }, textScales: featureTextScales);
+    testInBothDirections(
+      'the form still works and says the person may name one themselves',
+      (WidgetTester tester, Locale locale, double scale) async {
+        await pumpForm(
+          tester,
+          repository: ScriptedAccountsRepository(),
+          locale: locale,
+          textScale: scale,
+        );
+        final l10n = mountedL10n(tester);
+        expect(find.text(l10n.accountFormIssuersUnavailable), findsOneWidget);
+        expect(find.text(l10n.accountFormIssuerUnlistedOption), findsOneWidget);
+        expect(find.text(l10n.accountFormIssuerCatalogueOption), findsNothing);
+      },
+      textScales: featureTextScales,
+    );
   });
 }

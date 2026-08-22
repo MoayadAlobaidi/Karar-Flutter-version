@@ -29,11 +29,15 @@ final class FakeStatementSourcePicker implements StatementSourcePicker {
   FakeStatementSourcePicker(this.outcome);
 
   /// Returns a picker that hands over [bytes] as a chosen CSV.
-  factory FakeStatementSourcePicker.returning(List<int> bytes) => FakeStatementSourcePicker(
-    PickerOutcomeChosen(
-      PickedStatementSource(bytes: Uint8List.fromList(bytes), declaredMediaType: 'text/csv'),
-    ),
-  );
+  factory FakeStatementSourcePicker.returning(List<int> bytes) =>
+      FakeStatementSourcePicker(
+        PickerOutcomeChosen(
+          PickedStatementSource(
+            bytes: Uint8List.fromList(bytes),
+            declaredMediaType: 'text/csv',
+          ),
+        ),
+      );
 
   PickerOutcome outcome;
 
@@ -95,7 +99,9 @@ final class ScriptedStatementImportsRepository implements StatementImportsReposi
     calls.add('upload');
     uploadedBytes = bytes;
     return uploadResult ??
-        Success<StatementImportSnapshot>(snapshotFixture(state: ImportLifecycleState.sourceStored));
+        Success<StatementImportSnapshot>(
+          snapshotFixture(state: ImportLifecycleState.sourceStored),
+        );
   }
 
   @override
@@ -165,17 +171,18 @@ StatementImportSnapshot snapshotFixture({
   ImportRefusal? refusal,
   bool awaitsDecision = true,
   int? version = 1,
-}) => StatementImportSnapshot(
-  importId: importFixtureId,
-  state: state,
-  accountId: accountFixtureId,
-  counts: counts,
-  reconciliation: reconciliation,
-  awaitsDecision: awaitsDecision,
-  hasStoredSource: true,
-  refusal: refusal,
-  version: version,
-);
+}) =>
+    StatementImportSnapshot(
+      importId: importFixtureId,
+      state: state,
+      accountId: accountFixtureId,
+      counts: counts,
+      reconciliation: reconciliation,
+      awaitsDecision: awaitsDecision,
+      hasStoredSource: true,
+      refusal: refusal,
+      version: version,
+    );
 
 const ImportCounts countsFixture = ImportCounts(
   rowCount: 12,
@@ -192,28 +199,29 @@ StatementImportPreview previewFixture({
   ImportRefusal? refusal,
   ReconciliationOutcome reconciliation = ReconciliationOutcome.notAvailable,
   ImportLifecycleState state = ImportLifecycleState.reviewRequired,
-}) => StatementImportPreview(
-  snapshot: snapshotFixture(
-    state: state,
-    counts: countsFixture,
-    reconciliation: reconciliation,
-    refusal: refusal,
-  ),
-  rowIssues: issues,
-  reportedErrorCount: issues.length,
-  totalErrorCount: totalErrorCount ?? issues.length,
-);
+}) =>
+    StatementImportPreview(
+      snapshot: snapshotFixture(
+        state: state,
+        counts: countsFixture,
+        reconciliation: reconciliation,
+        refusal: refusal,
+      ),
+      rowIssues: issues,
+      reportedErrorCount: issues.length,
+      totalErrorCount: totalErrorCount ?? issues.length,
+    );
 
 /// The overrides a statement-import screen test needs.
 List<Override> statementImportOverrides({
   ScriptedStatementImportsRepository? repository,
   FakeStatementSourcePicker? picker,
-}) => <Override>[
-  statementImportsRepositoryProvider.overrideWithValue(
-    repository ?? ScriptedStatementImportsRepository(),
-  ),
-  if (picker != null) statementSourcePickerProvider.overrideWithValue(picker),
-];
+}) =>
+    <Override>[
+      statementImportsRepositoryProvider
+          .overrideWithValue(repository ?? ScriptedStatementImportsRepository()),
+      if (picker != null) statementSourcePickerProvider.overrideWithValue(picker),
+    ];
 
 /// A failure any test can use where the kind does not matter.
 const Failure syntheticFailure = DependencyUnavailableFailure();

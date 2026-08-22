@@ -18,43 +18,49 @@ Map<String, Object?> bootstrapBody({
   Map<String, Object?>? operatingEntity,
   Map<String, Object?>? capabilities,
   bool emailVerified = true,
-}) => <String, Object?>{
-  'user': <String, Object?>{
-    'userId': '11111111-1111-4111-8111-111111111111',
-    'emailVerified': emailVerified,
-  },
-  'session': <String, Object?>{'sessionId': '22222222-2222-4222-8222-222222222222'},
-  'binding':
-      binding ??
-      <String, Object?>{
-        'kind': 'BOUND',
-        'tenant': <String, Object?>{
-          'tenantId': '33333333-3333-4333-8333-333333333333',
-          'name': 'Test Tenant',
-          'roleHint': 'MEMBER',
-        },
+}) =>
+    <String, Object?>{
+      'user': <String, Object?>{
+        'userId': '11111111-1111-4111-8111-111111111111',
+        'emailVerified': emailVerified,
       },
-  'jurisdiction': <String, Object?>{'state': 'VERIFIED', 'jurisdictionId': 'jurisdiction-a'},
-  'operatingEntity':
-      operatingEntity ??
-      <String, Object?>{
-        'state': 'ASSIGNED',
-        'entity': <String, Object?>{
-          'id': '44444444-4444-4444-8444-444444444444',
-          'name': 'Test Operating Entity',
-          'jurisdictionRef': 'jurisdiction-a',
-          'contactReference': 'privacy@example.invalid',
-        },
+      'session': <String, Object?>{'sessionId': '22222222-2222-4222-8222-222222222222'},
+      'binding': binding ??
+          <String, Object?>{
+            'kind': 'BOUND',
+            'tenant': <String, Object?>{
+              'tenantId': '33333333-3333-4333-8333-333333333333',
+              'name': 'Test Tenant',
+              'roleHint': 'MEMBER',
+            },
+          },
+      'jurisdiction': <String, Object?>{
+        'state': 'VERIFIED',
+        'jurisdictionId': 'jurisdiction-a',
       },
-  'policyPack': <String, Object?>{'version': '1.0.0', 'status': 'ACTIVE'},
-  'capabilities': capabilities ?? <String, Object?>{'state': 'RESOLVED', 'items': <Object?>[]},
-};
+      'operatingEntity': operatingEntity ??
+          <String, Object?>{
+            'state': 'ASSIGNED',
+            'entity': <String, Object?>{
+              'id': '44444444-4444-4444-8444-444444444444',
+              'name': 'Test Operating Entity',
+              'jurisdictionRef': 'jurisdiction-a',
+              'contactReference': 'privacy@example.invalid',
+            },
+          },
+      'policyPack': <String, Object?>{'version': '1.0.0', 'status': 'ACTIVE'},
+      'capabilities': capabilities ??
+          <String, Object?>{'state': 'RESOLVED', 'items': <Object?>[]},
+    };
 
-ApiBootstrapGateway gatewayReturning(Object? body, {int statusCode = 200}) => ApiBootstrapGateway(
-  KararApiClient(
-    FakeApiTransport((ApiRequest request) async => ApiResponse(statusCode: statusCode, body: body)),
-  ),
-);
+ApiBootstrapGateway gatewayReturning(Object? body, {int statusCode = 200}) =>
+    ApiBootstrapGateway(
+      KararApiClient(
+        FakeApiTransport(
+          (ApiRequest request) async => ApiResponse(statusCode: statusCode, body: body),
+        ),
+      ),
+    );
 
 void main() {
   group('mapping', () {
@@ -105,7 +111,9 @@ void main() {
 
     test('an operating entity that did not resolve carries no entity', () async {
       final result = await gatewayReturning(
-        bootstrapBody(operatingEntity: <String, Object?>{'state': 'UNAVAILABLE', 'entity': null}),
+        bootstrapBody(
+          operatingEntity: <String, Object?>{'state': 'UNAVAILABLE', 'entity': null},
+        ),
       ).load();
 
       expect(result.valueOrNull?.operatingEntityState, OperatingEntityState.unavailable);
@@ -114,7 +122,9 @@ void main() {
 
     test('an empty capability list is RESOLVED, not absent', () async {
       final result = await gatewayReturning(
-        bootstrapBody(capabilities: <String, Object?>{'state': 'RESOLVED', 'items': <Object?>[]}),
+        bootstrapBody(
+          capabilities: <String, Object?>{'state': 'RESOLVED', 'items': <Object?>[]},
+        ),
       ).load();
 
       final snapshot = result.valueOrNull!;
@@ -151,15 +161,17 @@ void main() {
 
   group('forward compatibility', () {
     test('an unrecognised enumeration value maps to unknown, never to a default', () async {
-      final result = await gatewayReturning(<String, Object?>{
-        ...bootstrapBody(),
-        'jurisdiction': <String, Object?>{
-          'state': 'SOMETHING_NEWER',
-          'jurisdictionId': 'jurisdiction-a',
+      final result = await gatewayReturning(
+        <String, Object?>{
+          ...bootstrapBody(),
+          'jurisdiction': <String, Object?>{
+            'state': 'SOMETHING_NEWER',
+            'jurisdictionId': 'jurisdiction-a',
+          },
+          'operatingEntity': <String, Object?>{'state': 'SOMETHING_NEWER', 'entity': null},
+          'capabilities': <String, Object?>{'state': 'SOMETHING_NEWER', 'items': <Object?>[]},
         },
-        'operatingEntity': <String, Object?>{'state': 'SOMETHING_NEWER', 'entity': null},
-        'capabilities': <String, Object?>{'state': 'SOMETHING_NEWER', 'items': <Object?>[]},
-      }).load();
+      ).load();
 
       final snapshot = result.valueOrNull!;
       expect(snapshot.jurisdictionState, JurisdictionState.unknown);

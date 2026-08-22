@@ -48,7 +48,8 @@ List<_Declared> _directDependencies() {
 
     // Only two-space-indented entries are direct dependencies; deeper
     // indentation belongs to a nested key such as `sdk:` or `path:`.
-    final RegExpMatch? match = RegExp(r'^  ([a-z0-9_]+):\s*(.*)$').firstMatch(line);
+    final RegExpMatch? match =
+        RegExp(r'^  ([a-z0-9_]+):\s*(.*)$').firstMatch(line);
     if (match == null) continue;
     declared.add(MapEntry<String, String>(match.group(1)!, match.group(2)!.trim()));
   }
@@ -69,8 +70,7 @@ void main() {
       expect(
         declared.length,
         greaterThan(5),
-        reason:
-            'the parser found almost no direct dependencies, which means it '
+        reason: 'the parser found almost no direct dependencies, which means it '
             'is broken rather than that the pubspec is clean',
       );
     });
@@ -87,13 +87,16 @@ void main() {
         for (final _Declared entry in declared)
           if (entry.value.isEmpty) entry.key,
       ];
-      const Set<String> sdkSourced = <String>{'flutter', 'flutter_test', 'flutter_localizations'};
+      const Set<String> sdkSourced = <String>{
+        'flutter',
+        'flutter_test',
+        'flutter_localizations',
+      };
       final Set<String> offending = nested.toSet().difference(sdkSourced);
       expect(
         offending,
         isEmpty,
-        reason:
-            'these direct dependencies use a nested block rather than an '
+        reason: 'these direct dependencies use a nested block rather than an '
             'inline version, which hides the constraint from the check below: '
             '${offending.join(', ')}. A git: or path: source is not a reviewed '
             'release at all; a hosted: block may be pinned but is not visible '
@@ -109,14 +112,14 @@ void main() {
         // An empty value introduces a nested block, which the test above
         // constrains to SDK-sourced packages only.
         if (constraint.isEmpty) continue;
-        final bool isExact = RegExp(r'^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$').hasMatch(constraint);
+        final bool isExact = RegExp(r'^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$')
+            .hasMatch(constraint);
         if (!isExact) ranged.add('${entry.key}: $constraint');
       }
       expect(
         ranged,
         isEmpty,
-        reason:
-            'these direct dependencies are not exactly pinned, so a fresh '
+        reason: 'these direct dependencies are not exactly pinned, so a fresh '
             'resolution could pick a version nobody reviewed:\n'
             '${ranged.join('\n')}\n'
             'Pin them, or record a technical reason beside the entry and amend '
@@ -146,8 +149,7 @@ void main() {
         expect(
           byName[name],
           matches(RegExp(r'^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$')),
-          reason:
-              '$name holds credentials, terminates TLS, or hosts the '
+          reason: '$name holds credentials, terminates TLS, or hosts the '
               'biometric prompt; it must never float',
         );
       }
@@ -162,8 +164,7 @@ void main() {
       expect(
         lines.where((String line) => line.trimRight() == 'dependency_overrides:'),
         isEmpty,
-        reason:
-            'dependency_overrides bypasses the pins above. If one is ever '
+        reason: 'dependency_overrides bypasses the pins above. If one is ever '
             'genuinely needed, record why beside it and amend this test '
             'deliberately.',
       );
@@ -207,15 +208,13 @@ void main() {
       expect(
         hostedUrls,
         greaterThan(50),
-        reason:
-            'almost no hosted source was found in the lockfile, which means '
+        reason: 'almost no hosted source was found in the lockfile, which means '
             'this test is parsing nothing rather than that the lockfile is clean',
       );
       expect(
         foreign.toSet(),
         isEmpty,
-        reason:
-            'these hosted sources are not pub.dev:\n${foreign.toSet().join('\n')}\n'
+        reason: 'these hosted sources are not pub.dev:\n${foreign.toSet().join('\n')}\n'
             'A package resolved from another host is reviewed by nobody here, '
             'and the lockfile makes it reproducible rather than making it safe.',
       );
@@ -225,14 +224,17 @@ void main() {
       // A `sha256:` somewhere is not the same as one on every package. An entry
       // without a digest is an entry whose bytes nothing pins.
       final List<String> lines = File('pubspec.lock').readAsLinesSync();
-      final int hosted = lines.where((String line) => line.trim() == 'source: hosted').length;
-      final int digests = lines.where((String line) => line.trim().startsWith('sha256:')).length;
+      final int hosted = lines
+          .where((String line) => line.trim() == 'source: hosted')
+          .length;
+      final int digests = lines
+          .where((String line) => line.trim().startsWith('sha256:'))
+          .length;
       expect(hosted, greaterThan(50), reason: 'the lockfile was not parsed');
       expect(
         digests,
         hosted,
-        reason:
-            'there are $hosted hosted packages but $digests checksums. '
+        reason: 'there are $hosted hosted packages but $digests checksums. '
             'Every hosted package must pin its bytes, not most of them.',
       );
     });

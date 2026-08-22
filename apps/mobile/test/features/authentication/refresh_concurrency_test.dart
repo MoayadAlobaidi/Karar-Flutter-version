@@ -22,10 +22,12 @@ import 'package:karar_mobile/features/authentication/presentation/providers/auth
 
 import 'support/identity_harness.dart';
 
-EmailAddress _email() => (EmailAddress.parse('person@example.test') as EmailAccepted).email;
+EmailAddress _email() =>
+    (EmailAddress.parse('person@example.test') as EmailAccepted).email;
 
 Password _password() =>
-    (const PasswordPolicy().parse('correct-horse-battery') as PasswordAccepted).password;
+    (const PasswordPolicy().parse('correct-horse-battery') as PasswordAccepted)
+        .password;
 
 void main() {
   late IdentityHarness harness;
@@ -43,12 +45,17 @@ void main() {
     final Completer<void> releaseRefresh = Completer<void>();
     harness.refreshTransport.on(HttpMethod.post, '/auth/refresh', (_) async {
       await releaseRefresh.future;
-      return ApiResponse(statusCode: 200, body: refreshPayload(now: harness.clock.nowUtc()));
+      return ApiResponse(
+        statusCode: 200,
+        body: refreshPayload(now: harness.clock.nowUtc()),
+      );
     });
-    harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+    harness.transport
+        .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
 
     // A refresh is already running when the change completes.
-    final Future<Result<SessionTokens>> firstRefresh = coordinator.refreshAfterRejection(tokens);
+    final Future<Result<SessionTokens>> firstRefresh =
+        coordinator.refreshAfterRejection(tokens);
     final Future<Result<void>> change = repository.changePassword(
       currentPassword: const OpaqueSecret('old-password'),
       newPassword: _password(),
@@ -71,10 +78,14 @@ void main() {
     final Completer<void> releaseRefresh = Completer<void>();
     harness.refreshTransport.on(HttpMethod.post, '/auth/refresh', (_) async {
       await releaseRefresh.future;
-      return ApiResponse(statusCode: 200, body: refreshPayload(now: harness.clock.nowUtc()));
+      return ApiResponse(
+        statusCode: 200,
+        body: refreshPayload(now: harness.clock.nowUtc()),
+      );
     });
 
-    final List<Future<Result<SessionTokens>>> attempts = <Future<Result<SessionTokens>>>[
+    final List<Future<Result<SessionTokens>>> attempts =
+        <Future<Result<SessionTokens>>>[
       coordinator.refreshAfterRejection(tokens),
       coordinator.refreshAfterRejection(tokens),
       coordinator.refreshAfterRejection(tokens),
@@ -99,7 +110,8 @@ void main() {
       statusCode: 401,
     );
 
-    final Result<SessionTokens> outcome = await coordinator.refreshAfterRejection(tokens);
+    final Result<SessionTokens> outcome =
+        await coordinator.refreshAfterRejection(tokens);
 
     expect(outcome.failureOrNull, isA<SessionExpiredFailure>());
     expect(
@@ -110,11 +122,14 @@ void main() {
     expect(coordinator.isTerminated, isTrue);
   });
 
-  test('a transient refresh failure leaves the session intact for a retry', () async {
+  test('a transient refresh failure leaves the session intact for a retry',
+      () async {
     final SessionTokens tokens = await harness.signInFixture();
-    harness.refreshTransport.failWith(HttpMethod.post, '/auth/refresh', const OfflineFailure());
+    harness.refreshTransport
+        .failWith(HttpMethod.post, '/auth/refresh', const OfflineFailure());
 
-    final Result<SessionTokens> outcome = await coordinator.refreshAfterRejection(tokens);
+    final Result<SessionTokens> outcome =
+        await coordinator.refreshAfterRejection(tokens);
 
     expect(outcome.failureOrNull, isA<OfflineFailure>());
     expect(
@@ -125,7 +140,8 @@ void main() {
     expect(coordinator.isTerminated, isFalse);
   });
 
-  test('a fresh sign-in clears the terminal latch a dead refresh chain set', () async {
+  test('a fresh sign-in clears the terminal latch a dead refresh chain set',
+      () async {
     final SessionTokens tokens = await harness.signInFixture();
     harness.refreshTransport.failWith(
       HttpMethod.post,
@@ -144,18 +160,14 @@ void main() {
         now: harness.clock.nowUtc(),
       ),
     );
-    final Result<Object?> signedIn = await repository.signIn(
-      email: _email(),
-      password: _password(),
-    );
+    final Result<Object?> signedIn =
+        await repository.signIn(email: _email(), password: _password());
 
     expect(signedIn, isA<Success<Object?>>());
     expect(
       coordinator.isTerminated,
       isFalse,
-      reason:
-          'a new session must not inherit the previous chain'
-          's verdict',
+      reason: 'a new session must not inherit the previous chain''s verdict',
     );
     expect(
       harness.container.read(sessionManagerProvider).tokens!.accessToken,
@@ -163,7 +175,8 @@ void main() {
     );
   });
 
-  test('an unsafe request refused a replay is reported without ending the session', () async {
+  test('an unsafe request refused a replay is reported without ending the session',
+      () async {
     await harness.signInFixture();
     // The transport raises this when a refresh completes mid-flight and the
     // request carried no idempotency key. It is recoverable: the session is
@@ -184,11 +197,14 @@ void main() {
     expect(harness.container.read(sessionManagerProvider).hasSession, isTrue);
   });
 
-  test('every authenticated unsafe identity request carries an idempotency key', () async {
+  test('every authenticated unsafe identity request carries an idempotency key',
+      () async {
     await harness.signInFixture();
     harness.transport.onPost('/auth/logout', <String, Object?>{'status': 'logged_out'});
-    harness.transport.onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
-    harness.refreshTransport.onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
+    harness.transport
+        .onPost('/auth/change-password', <String, Object?>{'status': 'changed'});
+    harness.refreshTransport
+        .onPost('/auth/refresh', refreshPayload(now: harness.clock.nowUtc()));
 
     await repository.changePassword(
       currentPassword: const OpaqueSecret('old-password'),

@@ -31,13 +31,8 @@ Future<List<String>> _registerAndCapture(
   final IdentityHarness harness = IdentityHarness();
   harness.transport.onPost('/auth/register', body, statusCode: 202);
 
-  await pumpIdentity(
-    tester,
-    const RegisterScreen(),
-    harness: harness,
-    locale: locale,
-    textScale: textScale,
-  );
+  await pumpIdentity(tester, const RegisterScreen(),
+      harness: harness, locale: locale, textScale: textScale);
   await enterIdentityField(tester, 0, 'person@example.test');
   await enterIdentityField(tester, 1, 'correct-horse-battery');
   await enterIdentityField(tester, 2, 'correct-horse-battery');
@@ -55,21 +50,13 @@ Future<List<String>> _registerAndCapture(
 typedef JsonMapFixture = Map<String, Object?>;
 
 void main() {
-  testEveryDirectionAndScale('renders the form in the locale direction', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('renders the form in the locale direction',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    await pumpIdentity(
-      tester,
-      const RegisterScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const RegisterScreen(),
+        harness: harness, locale: locale, textScale: textScale);
 
     expect(find.text(l10n.registerSubtitle), findsOneWidget);
     expect(find.text(l10n.registerConfirmPasswordLabel), findsOneWidget);
@@ -80,61 +67,55 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testEveryDirectionAndScale('a new address and an already-registered address render identically', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
-    final AppLocalizations l10n = lookupAppLocalizations(locale);
+  testEveryDirectionAndScale(
+    'a new address and an already-registered address render identically',
+    (WidgetTester tester, Locale locale, double textScale) async {
+      final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    final List<String> fresh = await _registerAndCapture(
-      tester,
-      body: <String, Object?>{
-        'status': 'accepted',
-        'detail': 'Account created. Verification code sent.',
-      },
-      locale: locale,
-      textScale: textScale,
-      l10n: l10n,
-    );
+      final List<String> fresh = await _registerAndCapture(
+        tester,
+        body: <String, Object?>{
+          'status': 'accepted',
+          'detail': 'Account created. Verification code sent.',
+        },
+        locale: locale,
+        textScale: textScale,
+        l10n: l10n,
+      );
 
-    final List<String> existing = await _registerAndCapture(
-      tester,
-      body: <String, Object?>{
-        'status': 'accepted',
-        'detail': 'That address is already registered; we sent a sign-in reminder.',
-        'alreadyRegistered': true,
-        'existingAccountCreatedAt': '2024-03-01T00:00:00Z',
-      },
-      locale: locale,
-      textScale: textScale,
-      l10n: l10n,
-    );
+      final List<String> existing = await _registerAndCapture(
+        tester,
+        body: <String, Object?>{
+          'status': 'accepted',
+          'detail': 'That address is already registered; we sent a sign-in reminder.',
+          'alreadyRegistered': true,
+          'existingAccountCreatedAt': '2024-03-01T00:00:00Z',
+        },
+        locale: locale,
+        textScale: textScale,
+        l10n: l10n,
+      );
 
-    // Identical, not merely similar. Any difference at all — a word, a
-    // count, a timestamp — tells an attacker whether the address exists.
-    expect(existing, equals(fresh));
-    expect(fresh, contains(l10n.registerAcknowledgementMessage));
-    // Nothing the server wrote is on screen.
-    expect(fresh.where((String value) => value.contains('already registered')), isEmpty);
-    expect(fresh.where((String value) => value.contains('2024-03-01')), isEmpty);
-  });
+      // Identical, not merely similar. Any difference at all — a word, a
+      // count, a timestamp — tells an attacker whether the address exists.
+      expect(existing, equals(fresh));
+      expect(fresh, contains(l10n.registerAcknowledgementMessage));
+      // Nothing the server wrote is on screen.
+      expect(
+        fresh.where((String value) => value.contains('already registered')),
+        isEmpty,
+      );
+      expect(fresh.where((String value) => value.contains('2024-03-01')), isEmpty);
+    },
+  );
 
-  testEveryDirectionAndScale('rejects a mismatched confirmation before sending', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('rejects a mismatched confirmation before sending',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
 
-    await pumpIdentity(
-      tester,
-      const RegisterScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const RegisterScreen(),
+        harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await enterIdentityField(tester, 2, 'correct-horse-batteryX');
@@ -145,11 +126,8 @@ void main() {
     expect(harness.transport.requests, isEmpty);
   });
 
-  testEveryDirectionAndScale('surfaces a rate limit without a diagnostic', (
-    WidgetTester tester,
-    Locale locale,
-    double textScale,
-  ) async {
+  testEveryDirectionAndScale('surfaces a rate limit without a diagnostic',
+      (WidgetTester tester, Locale locale, double textScale) async {
     final IdentityHarness harness = IdentityHarness();
     final AppLocalizations l10n = lookupAppLocalizations(locale);
     harness.transport.failWith(
@@ -159,13 +137,8 @@ void main() {
       statusCode: 429,
     );
 
-    await pumpIdentity(
-      tester,
-      const RegisterScreen(),
-      harness: harness,
-      locale: locale,
-      textScale: textScale,
-    );
+    await pumpIdentity(tester, const RegisterScreen(),
+        harness: harness, locale: locale, textScale: textScale);
     await enterIdentityField(tester, 0, 'person@example.test');
     await enterIdentityField(tester, 1, 'correct-horse-battery');
     await enterIdentityField(tester, 2, 'correct-horse-battery');

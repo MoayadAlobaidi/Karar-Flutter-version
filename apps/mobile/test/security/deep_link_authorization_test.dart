@@ -161,19 +161,17 @@ void main() {
       // there is nowhere to put a route that is not in one. This asserts the
       // override actually uses that table, which is the part a future edit
       // could quietly undo by inlining a route back into the override.
-      final ProviderContainer container = ProviderContainer(overrides: featureSurfaceOverrides());
+      final ProviderContainer container = ProviderContainer(
+        overrides: featureSurfaceOverrides(),
+      );
       addTearDown(container.dispose);
 
       final List<RouteBase> mounted = container.read(featureRoutesProvider);
       final List<RouteBase> named = everyFeatureRoute();
 
-      expect(
-        mounted.length,
-        named.length,
-        reason:
-            'the shell mounts a route that belongs to no named '
-            'contribution; add it to one rather than to the override',
-      );
+      expect(mounted.length, named.length,
+          reason: 'the shell mounts a route that belongs to no named '
+              'contribution; add it to one rather than to the override');
       expect(
         mounted.whereType<GoRoute>().map((GoRoute route) => route.path).toSet(),
         named.whereType<GoRoute>().map((GoRoute route) => route.path).toSet(),
@@ -190,7 +188,12 @@ void main() {
         GoRoute(
           path: '/financial/parent',
           builder: (_, _) => const SizedBox.shrink(),
-          routes: <RouteBase>[GoRoute(path: 'child', builder: (_, _) => const SizedBox.shrink())],
+          routes: <RouteBase>[
+            GoRoute(
+              path: 'child',
+              builder: (_, _) => const SizedBox.shrink(),
+            ),
+          ],
         ),
       ];
 
@@ -214,16 +217,14 @@ void main() {
       expect(
         derived,
         contains(FinancialRoutes.accounts),
-        reason:
-            'the derivation must produce real paths, or the suite below is '
+        reason: 'the derivation must produce real paths, or the suite below is '
             'checking an empty list',
       );
       for (final path in derived) {
         expect(
           path,
           isNot(contains(':')),
-          reason:
-              '$path still carries an unfilled parameter, so the deep link '
+          reason: '$path still carries an unfilled parameter, so the deep link '
               'that follows it is not a real location',
         );
       }
@@ -231,18 +232,21 @@ void main() {
   });
 
   group('without the capability', () {
-    testWidgets('every financial deep link renders the refusal', (WidgetTester tester) async {
+    testWidgets('every financial deep link renders the refusal', (
+      WidgetTester tester,
+    ) async {
       for (final path in everyFinancialPath()) {
         final launch = DeepLinkLaunch(
-          bootstrapAnswers: <Result<BootstrapSnapshot>>[ready(withTransactions: false)],
+          bootstrapAnswers: <Result<BootstrapSnapshot>>[
+            ready(withTransactions: false),
+          ],
         );
         await launch.persistSession();
         await launch.boot(tester);
         expect(
           launch.coordinator.state,
           isA<Ready>(),
-          reason:
-              'the launch must reach READY, or the refusal below is the '
+          reason: 'the launch must reach READY, or the refusal below is the '
               'startup gate rather than the capability gate',
         );
 
@@ -262,7 +266,11 @@ void main() {
           isEmpty,
           reason: '$path constructed a financial screen and read from it',
         );
-        expect(launch.transport.requests, isEmpty, reason: '$path put a request on the wire');
+        expect(
+          launch.transport.requests,
+          isEmpty,
+          reason: '$path put a request on the wire',
+        );
       }
     });
 
@@ -299,16 +307,14 @@ void main() {
       expect(
         identical(launch.router, routerBefore),
         isTrue,
-        reason:
-            'the router must NOT have been rebuilt — a route table whose '
+        reason: 'the router must NOT have been rebuilt — a route table whose '
             'shape depended on the capability would reset navigation, which is '
             'why the decision has to be made per build instead',
       );
       expect(
         find.byType(FinancialUnavailableScreen),
         findsOneWidget,
-        reason:
-            'the same route table opened the surface after the capability '
+        reason: 'the same route table opened the surface after the capability '
             'was withdrawn, so authorization was decided once',
       );
       expect(find.byType(AccountsAndWalletsScreen), findsNothing);
@@ -316,7 +322,9 @@ void main() {
   });
 
   group('with the capability', () {
-    testWidgets('a deep link into the portfolio opens it', (WidgetTester tester) async {
+    testWidgets('a deep link into the portfolio opens it', (
+      WidgetTester tester,
+    ) async {
       final launch = DeepLinkLaunch(
         bootstrapAnswers: <Result<BootstrapSnapshot>>[ready(withTransactions: true)],
       );
@@ -346,7 +354,11 @@ void main() {
 
     /// Follows [path] with the account and transaction reads refused by
     /// [failure], and returns what the screen said.
-    Future<List<String>> renderRefusal(WidgetTester tester, String path, Failure failure) async {
+    Future<List<String>> renderRefusal(
+      WidgetTester tester,
+      String path,
+      Failure failure,
+    ) async {
       final launch = DeepLinkLaunch(
         bootstrapAnswers: <Result<BootstrapSnapshot>>[ready(withTransactions: true)],
         financialRepositories: refusingFinancialRepositories(failure),
@@ -357,7 +369,9 @@ void main() {
       return visibleText(tester);
     }
 
-    testWidgets('reads the same as one that does not exist — account', (WidgetTester tester) async {
+    testWidgets('reads the same as one that does not exist — account', (
+      WidgetTester tester,
+    ) async {
       final notMine = await renderRefusal(
         tester,
         '/financial/accounts/$foreignAccountId',
@@ -377,8 +391,7 @@ void main() {
       expect(
         notMine,
         missing,
-        reason:
-            'the client tells a link-follower whether the identifier exists '
+        reason: 'the client tells a link-follower whether the identifier exists '
             'and is merely not theirs, which confirms the resource',
       );
       for (final line in notMine) {
@@ -406,8 +419,7 @@ void main() {
       expect(
         notMine,
         missing,
-        reason:
-            'the refusal distinguishes a transaction that is not yours from '
+        reason: 'the refusal distinguishes a transaction that is not yours from '
             'one that is not there',
       );
       for (final line in notMine) {
@@ -425,7 +437,9 @@ void main() {
         const ConfigLoading(),
         const ConfigInvalid(<String>['API_BASE_URL_MISSING']),
         const LocalSecurityStateUnavailable(
-          LocalSecurityStateUnavailableFailure(operation: LocalSecurityStateOperation.read),
+          LocalSecurityStateUnavailableFailure(
+            operation: LocalSecurityStateOperation.read,
+          ),
         ),
         const SecurityRecoveryBlocked(AbandonmentNotDurable()),
         const AppLocked(),

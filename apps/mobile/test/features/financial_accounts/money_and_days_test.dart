@@ -28,11 +28,15 @@ void main() {
 
     test('zero is decided on the characters, not on a parsed number', () {
       expect(const Money(minorUnits: '0', currency: 'QAR', exponent: 2).isZero, isTrue);
-      expect(const Money(minorUnits: '000', currency: 'QAR', exponent: 2).isZero, isTrue);
+      expect(
+        const Money(minorUnits: '000', currency: 'QAR', exponent: 2).isZero,
+        isTrue,
+      );
       expect(const Money(minorUnits: '1', currency: 'QAR', exponent: 2).isZero, isFalse);
     });
 
-    test('minor units beyond a 64-bit integer answer null rather than losing digits', () {
+    test('minor units beyond a 64-bit integer answer null rather than losing digits',
+        () {
       const huge = Money(
         minorUnits: '123456789012345678901234567890',
         currency: 'QAR',
@@ -44,7 +48,10 @@ void main() {
     });
 
     test('toString carries no figure', () {
-      expect(const Money(minorUnits: '999999', currency: 'QAR', exponent: 2).toString(), 'Money()');
+      expect(
+        const Money(minorUnits: '999999', currency: 'QAR', exponent: 2).toString(),
+        'Money()',
+      );
     });
 
     test('the type exposes no arithmetic at all', () {
@@ -105,17 +112,29 @@ void main() {
 
       test('Arabic-Indic digits', () {
         expect(minorUnitsFromTypedAmount('١٢', 2), '1200');
-        expect(minorUnitsFromTypedAmount('١٢.٥٠', 2), '1250');
+        expect(
+          minorUnitsFromTypedAmount('١٢.٥٠', 2),
+          '1250',
+        );
       });
 
       test('Persian, that is Extended Arabic-Indic, digits', () {
         expect(minorUnitsFromTypedAmount('۱۲', 2), '1200');
-        expect(minorUnitsFromTypedAmount('۱۲.۵۰', 2), '1250');
+        expect(
+          minorUnitsFromTypedAmount('۱۲.۵۰', 2),
+          '1250',
+        );
       });
 
       test('U+066B, the Arabic decimal separator', () {
-        expect(minorUnitsFromTypedAmount('١٢٫٥٠', 2), '1250');
-        expect(minorUnitsFromTypedAmount('۱۲٫۵۰', 2), '1250');
+        expect(
+          minorUnitsFromTypedAmount('١٢٫٥٠', 2),
+          '1250',
+        );
+        expect(
+          minorUnitsFromTypedAmount('۱۲٫۵۰', 2),
+          '1250',
+        );
         // With ASCII digits too: the separator is a punctuation choice, not a
         // numeral-system one, and a person may mix them.
         expect(minorUnitsFromTypedAmount('12٫50', 2), '1250');
@@ -233,8 +252,14 @@ void main() {
 
       test('a value longer than the contract allows', () {
         // Thirty-one minor-unit characters, one past the contract's bound.
-        expect(minorUnitsFromTypedAmount('12345678901234567890123456789.99', 2), isNull);
-        expect(minorUnitsFromTypedAmount('9999999999999999999999999999999', 0), isNull);
+        expect(
+          minorUnitsFromTypedAmount('12345678901234567890123456789.99', 2),
+          isNull,
+        );
+        expect(
+          minorUnitsFromTypedAmount('9999999999999999999999999999999', 0),
+          isNull,
+        );
         // The bound is on the value, so the same digits within it are fine.
         expect(
           minorUnitsFromTypedAmount('999999999999999999999999999999', 0),
@@ -300,62 +325,64 @@ void main() {
   });
 
   group('rendering', () {
-    testInBothDirections('a booking day renders as the day the contract sent', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
-      late String rendered;
-      await pumpKarar(
-        tester,
-        Builder(
-          builder: (BuildContext context) {
-            rendered = formatCalendarDay(context, const CalendarDay(year: 2026, month: 3, day: 1));
-            return const SizedBox.shrink();
-          },
-        ),
-        locale: locale,
-        textScale: textScale,
-      );
-      // The day part is preserved verbatim; only digit SHAPES may differ.
-      expect(rendered.replaceAll(RegExp('[^0-9٠-٩۰-۹-]'), ''), rendered);
-      expect(rendered.split('-').length, 3);
-    }, textScales: testTextScales);
+    testInBothDirections(
+      'a booking day renders as the day the contract sent',
+      (WidgetTester tester, Locale locale, double textScale) async {
+        late String rendered;
+        await pumpKarar(
+          tester,
+          Builder(
+            builder: (BuildContext context) {
+              rendered = formatCalendarDay(
+                context,
+                const CalendarDay(year: 2026, month: 3, day: 1),
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+          locale: locale,
+          textScale: textScale,
+        );
+        // The day part is preserved verbatim; only digit SHAPES may differ.
+        expect(rendered.replaceAll(RegExp('[^0-9٠-٩۰-۹-]'), ''), rendered);
+        expect(rendered.split('-').length, 3);
+      },
+      textScales: testTextScales,
+    );
 
-    testInBothDirections('an amount renders with its own currency code and never a shared symbol', (
-      WidgetTester tester,
-      Locale locale,
-      double textScale,
-    ) async {
-      late String qar;
-      late String usd;
-      await pumpKarar(
-        tester,
-        Builder(
-          builder: (BuildContext context) {
-            qar = formatMoney(
-              context,
-              const Money(minorUnits: '125000', currency: 'QAR', exponent: 2),
-            );
-            usd = formatMoney(
-              context,
-              const Money(minorUnits: '125000', currency: 'USD', exponent: 2),
-            );
-            return const SizedBox.shrink();
-          },
-        ),
-        locale: locale,
-        textScale: textScale,
-      );
-      expect(qar, contains('QAR'));
-      expect(usd, contains('USD'));
-      // Two different currencies must never render identically.
-      expect(qar, isNot(usd));
-    }, textScales: testTextScales);
+    testInBothDirections(
+      'an amount renders with its own currency code and never a shared symbol',
+      (WidgetTester tester, Locale locale, double textScale) async {
+        late String qar;
+        late String usd;
+        await pumpKarar(
+          tester,
+          Builder(
+            builder: (BuildContext context) {
+              qar = formatMoney(
+                context,
+                const Money(minorUnits: '125000', currency: 'QAR', exponent: 2),
+              );
+              usd = formatMoney(
+                context,
+                const Money(minorUnits: '125000', currency: 'USD', exponent: 2),
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+          locale: locale,
+          textScale: textScale,
+        );
+        expect(qar, contains('QAR'));
+        expect(usd, contains('USD'));
+        // Two different currencies must never render identically.
+        expect(qar, isNot(usd));
+      },
+      textScales: testTextScales,
+    );
 
-    testWidgets('the exponent comes from the response, not from a client table', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('the exponent comes from the response, not from a client table',
+        (WidgetTester tester) async {
       late String twoDecimals;
       late String threeDecimals;
       await pumpKarar(
@@ -378,9 +405,8 @@ void main() {
       expect(threeDecimals, '1.000');
     });
 
-    testWidgets('an amount too large for an int still renders exactly', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('an amount too large for an int still renders exactly',
+        (WidgetTester tester) async {
       late String rendered;
       await pumpKarar(
         tester,

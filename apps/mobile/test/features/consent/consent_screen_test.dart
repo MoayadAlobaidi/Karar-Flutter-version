@@ -101,109 +101,120 @@ Future<void> pumpConsent(
   Locale locale = const Locale('en'),
   double textScale = 1.0,
   ConsentPrerequisites prerequisites = metPrerequisites,
-}) => pumpFeatureScreen(
-  tester,
-  const ConsentScreen(),
-  locale: locale,
-  textScale: textScale,
-  overrides: <Override>[
-    consentRepositoryProvider.overrideWithValue(repository),
-    consentPrerequisitesProvider.overrideWithValue(prerequisites),
-  ],
-);
+}) =>
+    pumpFeatureScreen(
+      tester,
+      const ConsentScreen(),
+      locale: locale,
+      textScale: textScale,
+      overrides: <Override>[
+        consentRepositoryProvider.overrideWithValue(repository),
+        consentPrerequisitesProvider.overrideWithValue(prerequisites),
+      ],
+    );
 
 AppLocalizations mountedL10n(WidgetTester tester) =>
     AppLocalizations.of(tester.element(find.byType(ConsentScreen)));
 
 void main() {
-  testInBothDirections('offers the acceptance control when the platform said one can be recorded', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    final repository = ScriptedConsentRepository(documents: <LegalDocument>[legalDocument()]);
+  testInBothDirections(
+    'offers the acceptance control when the platform said one can be recorded',
+    (WidgetTester tester, Locale locale, double scale) async {
+      final repository = ScriptedConsentRepository(
+        documents: <LegalDocument>[legalDocument()],
+      );
 
-    await pumpConsent(tester, repository: repository, locale: locale, textScale: scale);
-    final l10n = mountedL10n(tester);
+      await pumpConsent(
+        tester,
+        repository: repository,
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
 
-    expect(find.text(l10n.consentStateRequired), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsOneWidget);
-    expect(
-      directionUnder(tester, find.byType(ConsentScreen)),
-      locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-    );
-  }, textScales: featureTextScales);
+      expect(find.text(l10n.consentStateRequired), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsOneWidget);
+      expect(
+        directionUnder(tester, find.byType(ConsentScreen)),
+        locale.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+      );
+    },
+    textScales: featureTextScales,
+  );
 
-  testInBothDirections('renders no acceptance control while a prerequisite is outstanding', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(documents: <LegalDocument>[legalDocument()]),
-      locale: locale,
-      textScale: scale,
-      prerequisites: const ConsentPrerequisites(
-        jurisdictionAssigned: true,
-        policyPackApproved: false,
-        operatingEntityAssigned: true,
-      ),
-    );
-    final l10n = mountedL10n(tester);
+  testInBothDirections(
+    'renders no acceptance control while a prerequisite is outstanding',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(
+          documents: <LegalDocument>[legalDocument()],
+        ),
+        locale: locale,
+        textScale: scale,
+        prerequisites: const ConsentPrerequisites(
+          jurisdictionAssigned: true,
+          policyPackApproved: false,
+          operatingEntityAssigned: true,
+        ),
+      );
+      final l10n = mountedL10n(tester);
 
-    expect(find.text(l10n.consentStatePolicyNotApproved), findsOneWidget);
-    expect(
-      find.text(l10n.consentAcceptAction),
-      findsNothing,
-      reason: 'a control that cannot work is not rendered as one that might',
-    );
-    expect(find.text(l10n.consentBlockerPolicy), findsOneWidget);
-  }, textScales: featureTextScales);
+      expect(find.text(l10n.consentStatePolicyNotApproved), findsOneWidget);
+      expect(
+        find.text(l10n.consentAcceptAction),
+        findsNothing,
+        reason: 'a control that cannot work is not rendered as one that might',
+      );
+      expect(find.text(l10n.consentBlockerPolicy), findsOneWidget);
+    },
+    textScales: featureTextScales,
+  );
 
-  testInBothDirections('says a document is unpublished rather than offering nothing to read', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(
-        documents: <LegalDocument>[legalDocument(published: false)],
-      ),
-      locale: locale,
-      textScale: scale,
-    );
-    final l10n = mountedL10n(tester);
+  testInBothDirections(
+    'says a document is unpublished rather than offering nothing to read',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(
+          documents: <LegalDocument>[legalDocument(published: false)],
+        ),
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
 
-    expect(find.text(l10n.consentStateDocumentUnavailable), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsNothing);
-  });
+      expect(find.text(l10n.consentStateDocumentUnavailable), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
+    },
+  );
 
-  testInBothDirections('says nothing is being asked when no document applies', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(),
-      locale: locale,
-      textScale: scale,
-    );
-    final l10n = mountedL10n(tester);
+  testInBothDirections(
+    'says nothing is being asked when no document applies',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(),
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
 
-    expect(find.text(l10n.consentNothingToAgreeTitle), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsNothing);
-  }, textScales: featureTextScales);
+      expect(find.text(l10n.consentNothingToAgreeTitle), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
+    },
+    textScales: featureTextScales,
+  );
 
-  testWidgets('shows no accepted state before the platform confirms one', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('shows no accepted state before the platform confirms one',
+      (WidgetTester tester) async {
     final repository = ScriptedConsentRepository(
       documents: <LegalDocument>[legalDocument()],
       acceptResult: const Failed<ConsentGrant>(
-        DependencyUnavailableFailure(code: 'DEPENDENCY_UNAVAILABLE', correlationId: 'req-60'),
+        DependencyUnavailableFailure(
+          code: 'DEPENDENCY_UNAVAILABLE',
+          correlationId: 'req-60',
+        ),
       ),
     );
 
@@ -220,9 +231,8 @@ void main() {
     expect(find.textContaining('req-60'), findsOneWidget);
   });
 
-  testWidgets('shows the accepted state only after the platform confirms it', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('shows the accepted state only after the platform confirms it',
+      (WidgetTester tester) async {
     final repository = ScriptedConsentRepository(
       documents: <LegalDocument>[legalDocument()],
       status: consentStatus(),
@@ -238,105 +248,111 @@ void main() {
     expect(find.text(l10n.consentAcceptedConfirmation), findsOneWidget);
   });
 
-  testInBothDirections('offers withdrawal for an in-force grant, and says history is preserved', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    final repository = ScriptedConsentRepository(
-      documents: <LegalDocument>[legalDocument()],
-      status: consentStatus(
-        state: ConsentStatusState.active,
-        grantId: 'grant-1',
-        grantedVersion: '1.0.0',
-      ),
-    );
-
-    await pumpConsent(tester, repository: repository, locale: locale, textScale: scale);
-    final l10n = mountedL10n(tester);
-
-    expect(find.text(l10n.consentStateActive), findsOneWidget);
-    expect(find.text(l10n.consentWithdrawAction), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsNothing);
-
-    await tester.tap(find.text(l10n.consentWithdrawAction));
-    await tester.pumpAndSettle();
-
-    expect(repository.withdrawals, 1);
-    expect(find.text(l10n.consentWithdrawnConfirmation), findsOneWidget);
-    expect(find.text(l10n.consentHistoryPreservedNote), findsOneWidget);
-  });
-
-  testInBothDirections('a re-consent explains that agreeing creates a new record', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(
+  testInBothDirections(
+    'offers withdrawal for an in-force grant, and says history is preserved',
+    (WidgetTester tester, Locale locale, double scale) async {
+      final repository = ScriptedConsentRepository(
         documents: <LegalDocument>[legalDocument()],
-        status: consentStatus(state: ConsentStatusState.reconsentRequired),
-      ),
-      locale: locale,
-      textScale: scale,
-    );
-    final l10n = mountedL10n(tester);
-
-    expect(find.text(l10n.consentStateReconsentRequired), findsOneWidget);
-    expect(find.text(l10n.consentReconsentCreatesNewGrantNote), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsOneWidget);
-  });
-
-  testInBothDirections('an unavailable surface is explicit and carries only a reference', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(
-        documentsFailure: const DependencyUnavailableFailure(
-          code: 'DEPENDENCY_UNAVAILABLE',
-          correlationId: 'req-61',
+        status: consentStatus(
+          state: ConsentStatusState.active,
+          grantId: 'grant-1',
+          grantedVersion: '1.0.0',
         ),
-      ),
-      locale: locale,
-      textScale: scale,
-    );
-    final l10n = mountedL10n(tester);
+      );
 
-    expect(find.text(l10n.consentSurfaceUnavailableTitle), findsOneWidget);
-    expect(find.textContaining('req-61'), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsNothing);
-  }, textScales: featureTextScales);
+      await pumpConsent(
+        tester,
+        repository: repository,
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
 
-  testInBothDirections('a purpose whose status could not be read is unavailable on its own', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(
-        documents: <LegalDocument>[legalDocument()],
-        statusFailure: const DependencyUnavailableFailure(code: 'DEPENDENCY_UNAVAILABLE'),
-      ),
-      locale: locale,
-      textScale: scale,
-    );
-    final l10n = mountedL10n(tester);
+      expect(find.text(l10n.consentStateActive), findsOneWidget);
+      expect(find.text(l10n.consentWithdrawAction), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
 
-    expect(find.text(l10n.consentStateUnavailable), findsOneWidget);
-    expect(find.text(l10n.consentAcceptAction), findsNothing);
-  });
+      await tester.tap(find.text(l10n.consentWithdrawAction));
+      await tester.pumpAndSettle();
+
+      expect(repository.withdrawals, 1);
+      expect(find.text(l10n.consentWithdrawnConfirmation), findsOneWidget);
+      expect(find.text(l10n.consentHistoryPreservedNote), findsOneWidget);
+    },
+  );
+
+  testInBothDirections(
+    'a re-consent explains that agreeing creates a new record',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(
+          documents: <LegalDocument>[legalDocument()],
+          status: consentStatus(state: ConsentStatusState.reconsentRequired),
+        ),
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
+
+      expect(find.text(l10n.consentStateReconsentRequired), findsOneWidget);
+      expect(find.text(l10n.consentReconsentCreatesNewGrantNote), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsOneWidget);
+    },
+  );
+
+  testInBothDirections(
+    'an unavailable surface is explicit and carries only a reference',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(
+          documentsFailure: const DependencyUnavailableFailure(
+            code: 'DEPENDENCY_UNAVAILABLE',
+            correlationId: 'req-61',
+          ),
+        ),
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
+
+      expect(find.text(l10n.consentSurfaceUnavailableTitle), findsOneWidget);
+      expect(find.textContaining('req-61'), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
+    },
+    textScales: featureTextScales,
+  );
+
+  testInBothDirections(
+    'a purpose whose status could not be read is unavailable on its own',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(
+          documents: <LegalDocument>[legalDocument()],
+          statusFailure: const DependencyUnavailableFailure(
+            code: 'DEPENDENCY_UNAVAILABLE',
+          ),
+        ),
+        locale: locale,
+        textScale: scale,
+      );
+      final l10n = mountedL10n(tester);
+
+      expect(find.text(l10n.consentStateUnavailable), findsOneWidget);
+      expect(find.text(l10n.consentAcceptAction), findsNothing);
+    },
+  );
 
   testInBothDirections(
     'renders the safe metadata and states that the document itself is not available',
     (WidgetTester tester, Locale locale, double scale) async {
       await pumpConsent(
         tester,
-        repository: ScriptedConsentRepository(documents: <LegalDocument>[legalDocument()]),
+        repository: ScriptedConsentRepository(
+          documents: <LegalDocument>[legalDocument()],
+        ),
         locale: locale,
         textScale: scale,
       );
@@ -352,31 +368,40 @@ void main() {
     textScales: featureTextScales,
   );
 
-  testInBothDirections('renders no monetary value and constructs no legal prose', (
-    WidgetTester tester,
-    Locale locale,
-    double scale,
-  ) async {
-    await pumpConsent(
-      tester,
-      repository: ScriptedConsentRepository(documents: <LegalDocument>[legalDocument()]),
-      locale: locale,
-      textScale: scale,
-    );
+  testInBothDirections(
+    'renders no monetary value and constructs no legal prose',
+    (WidgetTester tester, Locale locale, double scale) async {
+      await pumpConsent(
+        tester,
+        repository: ScriptedConsentRepository(
+          documents: <LegalDocument>[legalDocument()],
+        ),
+        locale: locale,
+        textScale: scale,
+      );
 
-    expectNothingMatching(
-      tester,
-      RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
-      because: 'no financial value belongs on the consent surface',
-    );
-    for (final claim in <String>['hereby', 'you agree that', 'Qatar', 'قطر', 'PDPL', 'GDPR']) {
       expectNothingMatching(
         tester,
-        RegExp(claim, caseSensitive: false),
-        because: 'legal wording is published by the platform, never composed here',
+        RegExp(r'[€£¥]|\b(QAR|USD|EUR|SAR|AED)\b'),
+        because: 'no financial value belongs on the consent surface',
       );
-    }
-  }, textScales: featureTextScales);
+      for (final claim in <String>[
+        'hereby',
+        'you agree that',
+        'Qatar',
+        'قطر',
+        'PDPL',
+        'GDPR',
+      ]) {
+        expectNothingMatching(
+          tester,
+          RegExp(claim, caseSensitive: false),
+          because: 'legal wording is published by the platform, never composed here',
+        );
+      }
+    },
+    textScales: featureTextScales,
+  );
 
   testWidgets('announces progress while the surface loads', (WidgetTester tester) async {
     // A repository that has not answered yet, so the loading state is the one
@@ -407,13 +432,15 @@ final class _PendingConsentRepository implements ConsentRepository {
   Future<Result<ConsentStatusRecord>> readStatus({
     required String purposeRef,
     String? jurisdictionRef,
-  }) => _never.future;
+  }) =>
+      _never.future;
 
   @override
   Future<Result<ConsentGrant>> accept({
     required String legalDocumentVersionId,
     required String purposeRef,
-  }) => _never.future;
+  }) =>
+      _never.future;
 
   @override
   Future<Result<ConsentWithdrawal>> withdraw({required String grantId}) => _never.future;

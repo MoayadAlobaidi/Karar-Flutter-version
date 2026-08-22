@@ -5,7 +5,10 @@ import 'package:karar_mobile/shared/shared.dart';
 
 /// The locales every component is proven in. Adding a language here makes the
 /// whole component suite run against it.
-const List<Locale> testLocales = <Locale>[KararLocalization.english, KararLocalization.arabic];
+const List<Locale> testLocales = <Locale>[
+  KararLocalization.english,
+  KararLocalization.arabic,
+];
 
 /// Normal, and the largest scale the platform accessibility settings offer.
 const List<double> testTextScales = <double>[1.0, 2.0];
@@ -61,7 +64,8 @@ Future<void> pumpKarar(
 /// is requested.
 void testInBothDirections(
   String description,
-  Future<void> Function(WidgetTester tester, Locale locale, double textScale) body, {
+  Future<void> Function(WidgetTester tester, Locale locale, double textScale)
+  body, {
   List<double> textScales = const <double>[1.0],
 }) {
   for (final Locale locale in testLocales) {
