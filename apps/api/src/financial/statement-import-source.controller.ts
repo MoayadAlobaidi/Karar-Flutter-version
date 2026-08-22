@@ -116,65 +116,54 @@ export class StatementImportSourceController {
     @Body() body: unknown,
     @Res() reply: ReplyLike,
   ): Promise<void> {
-    // Every refusal below hangs up before it answers. See `hangUp`: the
-    // parser deliberately hands over an unread stream, so a refusal that does
-    // not close it leaves Node to drain the whole declared body afterwards.
-    let principal;
+    // ONE try/catch around everything that can refuse, because every refusal
+    // has to hang up first. See `hangUp`: the parser deliberately hands this
+    // route an unread stream so a valid CSV is not consumed before the guards
+    // decide, and the cost is that a refusal which does not close the stream
+    // leaves Node to drain the whole declared body afterwards. `refuse` throws,
+    // so the catch covers the refusals below as well as any other throw.
     try {
-      principal = requirePrincipal(this.principals, request);
+      const principal = requirePrincipal(this.principals, request);
+      const id = this.importId(importId);
+      if (isUnsupportedBody(body) || !isByteStream(body)) {
+        refuse(
+          codedProblem(
+            415,
+            'Unsupported media type',
+            'UNSUPPORTED_MEDIA_TYPE',
+            `this path accepts ${CSV_MEDIA_TYPE} and nothing else`,
+          ),
+        );
+      }
+      // CHECK ONE: the declared length, before a byte is read.
+      const declared = request.headers['content-length'];
+      if (declaredLengthExceedsBound(typeof declared === 'string' ? declared : undefined)) {
+        refuse(this.tooLarge());
+      }
+      let result;
+      try {
+        // CHECK TWO: the accumulated length, on every chunk, inside the stream
+        // the use case consumes. The bound the use case is also given is the
+        // same number, from the same policy.
+        result = await this.useCases.storeImportSource.execute(
+          {
+            importId: id,
+            content: boundedBytes(body),
+            mediaType: CSV_MEDIA_TYPE,
+            maxBytes: LIMITS.maxBytes,
+          },
+          principal,
+        );
+      } catch (error) {
+        if (error instanceof StatementSourceTooLargeError) refuse(this.tooLarge());
+        throw error;
+      }
+      if (!result.ok) refuse(problemForImportsError(result.error));
+      reply.status(200).send(this.serialize(result.value));
     } catch (error) {
       hangUp(request);
       throw error;
     }
-    let id;
-    try {
-      id = this.importId(importId);
-    } catch (error) {
-      hangUp(request);
-      throw error;
-    }
-    if (isUnsupportedBody(body) || !isByteStream(body)) {
-      hangUp(request);
-      refuse(
-        codedProblem(
-          415,
-          'Unsupported media type',
-          'UNSUPPORTED_MEDIA_TYPE',
-          `this path accepts ${CSV_MEDIA_TYPE} and nothing else`,
-        ),
-      );
-    }
-    // CHECK ONE: the declared length, before a byte is read.
-    const declared = request.headers['content-length'];
-    if (declaredLengthExceedsBound(typeof declared === 'string' ? declared : undefined)) {
-      hangUp(request);
-      refuse(this.tooLarge());
-    }
-
-    let result;
-    try {
-      // CHECK TWO: the accumulated length, on every chunk, inside the stream
-      // the use case consumes. The bound the use case is also given is the
-      // same number, from the same policy.
-      result = await this.useCases.storeImportSource.execute(
-        {
-          importId: id,
-          content: boundedBytes(body),
-          mediaType: CSV_MEDIA_TYPE,
-          maxBytes: LIMITS.maxBytes,
-        },
-        principal,
-      );
-    } catch (error) {
-      hangUp(request);
-      if (error instanceof StatementSourceTooLargeError) refuse(this.tooLarge());
-      throw error;
-    }
-    if (!result.ok) {
-      hangUp(request);
-      refuse(problemForImportsError(result.error));
-    }
-    reply.status(200).send(this.serialize(result.value));
   }
 
   @Post(':importId/parse')
