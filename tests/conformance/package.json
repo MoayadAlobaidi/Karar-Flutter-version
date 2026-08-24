@@ -14,15 +14,15 @@
     "@karar/consent": "workspace:*",
     "@karar/platform": "workspace:*",
     "@karar/shared-kernel": "workspace:*",
-    "@nestjs/common": "^11.2.0",
-    "@nestjs/platform-fastify": "^11.2.0",
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/platform-fastify": "^11.2.1",
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
     "@karar/consent-local-fixtures": "workspace:*",
-    "@nestjs/testing": "^11.2.0",
+    "@nestjs/testing": "^11.2.1",
     "@types/node": "^25.9.5",
-    "@types/pg": "^8.15.0",
+    "@types/pg": "^8.23.1",
     "pg": "^8.16.0",
     "yaml": "2.9.0"
   }

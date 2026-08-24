@@ -15,7 +15,7 @@
     "@karar/audit": "workspace:*",
     "@karar/platform": "workspace:*",
     "@karar/shared-kernel": "workspace:*",
-    "@nestjs/common": "^11.2.0",
+    "@nestjs/common": "^11.2.1",
     "argon2": "^0.45.1",
     "jose": "^6.2.9",
     "otplib": "^13.4.1",
@@ -23,11 +23,11 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@nestjs/core": "^11.2.0",
-    "@nestjs/platform-fastify": "^11.2.0",
-    "@nestjs/testing": "^11.2.0",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/platform-fastify": "^11.2.1",
+    "@nestjs/testing": "^11.2.1",
     "@types/node": "^25.9.5",
-    "@types/pg": "^8.15.0",
+    "@types/pg": "^8.23.1",
     "pg": "^8.16.0"
   }
 }

@@ -27,7 +27,7 @@
     "prisma": "^7.9.1"
   },
   "devDependencies": {
-    "@types/pg": "^8.15.0"
+    "@types/pg": "^8.23.1"
   },
   "exports": {
     ".": {
