@@ -24,7 +24,7 @@
     "@karar/operating-entity": "workspace:*",
     "@karar/tenancy": "workspace:*",
     "@types/node": "^25.9.5",
-    "@types/pg": "^8.15.0",
+    "@types/pg": "^8.23.1",
     "pg": "^8.16.0"
   }
 }
