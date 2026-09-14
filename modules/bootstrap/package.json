@@ -25,8 +25,8 @@
     "@nestjs/core": "^11.2.0",
     "@nestjs/platform-fastify": "^11.2.0",
     "@nestjs/testing": "^11.2.0",
-    "@types/node": "^25.9.5",
-    "@types/pg": "^8.15.0",
+    "@types/node": "^25.9.6",
+    "@types/pg": "^8.23.1",
     "pg": "^8.16.0"
   }
 }
