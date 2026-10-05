@@ -23,8 +23,8 @@
     "@karar/consent": "workspace:*",
     "@karar/operating-entity": "workspace:*",
     "@karar/tenancy": "workspace:*",
-    "@types/node": "^25.9.5",
-    "@types/pg": "^8.15.0",
-    "pg": "^8.16.0"
+    "@types/node": "^25.9.9",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1"
   }
 }
