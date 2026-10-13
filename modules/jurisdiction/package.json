@@ -21,9 +21,9 @@
   "devDependencies": {
     "@nestjs/platform-fastify": "^11.2.0",
     "@nestjs/testing": "^11.2.0",
-    "@types/node": "^25.9.5",
-    "@types/pg": "^8.15.0",
-    "pg": "^8.16.0",
+    "@types/node": "^25.9.9",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   }
